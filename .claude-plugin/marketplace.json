@@ -8,7 +8,10 @@
   "plugins": [
     {
       "name": "harness-engineering",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "Junhanliu-dev/harness-engineering"
+      },
       "description": "Discover an existing codebase's patterns and generate a Harness Engineering structure tailored to that project's language and conventions",
       "version": "0.1.0",
       "author": {
