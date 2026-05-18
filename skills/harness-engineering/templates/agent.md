@@ -22,6 +22,7 @@ following the harness structure below.
 | Requirements | harness/skills/harness-requirements/ | Requirement decomposition | Analysis phase |
 | Wiki | harness/wiki/ | Business context | On demand |
 | Pipeline | harness/pipeline.md | Stage definitions | Via /harness-run |
+| Fix      | harness/skills/harness-fix/ | Bug-fix orchestrator (5-stage) | Via /harness-fix |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting

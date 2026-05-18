@@ -64,12 +64,17 @@ project-root/
 │   │   ├── harness-review/SKILL.md
 │   │   ├── harness-testing/SKILL.md
 │   │   ├── harness-requirements/SKILL.md
-│   │   └── harness-run/SKILL.md
+│   │   ├── harness-run/SKILL.md
+│   │   └── harness-fix/SKILL.md              # NEW: bug-fix lane (5-stage)
 │   ├── agents/                     # harness-coder.md, harness-reviewer.md
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
 │   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh
 │   ├── pipeline.md
-│   └── changes/_template/          # requirements.md, task-breakdown.md, coding-report.md, review-record.md, pipeline-state.md, ci-result.md
+│   └── changes/                    # typed: feat/, fix/, refactor/, …
+│       ├── _template/              # requirements.md, task-breakdown.md, coding-report.md, review-record.md, pipeline-state.md, ci-result.md
+│       ├── feat/{slug}/            # full pipeline outputs
+│       ├── fix/{slug}/             # fix-lane outputs (with caused_by frontmatter)
+│       └── refactor/{slug}/        # (future)
 └── src/  (existing code)
 ```
 
@@ -146,6 +151,7 @@ Create one folder per skill under `harness/skills/<name>/`, each containing a `S
 | `harness/skills/harness-testing/SKILL.md`     | `templates/skills/harness-testing.md` |
 | `harness/skills/harness-requirements/SKILL.md`| `templates/skills/harness-requirements.md` |
 | `harness/skills/harness-run/SKILL.md`         | `templates/skills/harness-run.md` |
+| `harness/skills/harness-fix/SKILL.md`         | `templates/skills/harness-fix.md` (bug-fix lane — 5 stages with auto-link) |
 
 ### When to create a per-layer spec
 

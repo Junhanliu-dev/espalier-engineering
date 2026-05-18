@@ -35,6 +35,24 @@ strict project conventions.
 - Notes: {anything the reviewer should pay attention to}
 ```
 
+### Test-mode self-report (fix lane Stage 5 only)
+
+When running in test-writing mode under `/harness-fix` Stage 5 AND a meaningful
+test for the change requires scope inflation beyond the fix's committed files,
+include this addendum in your coding-report.md:
+
+```markdown
+### Test Scope Signal
+- TEST_SCOPE_INFLATION: true
+- Required additional files: {list}
+- Required additional layers: {list}
+- Reason: "{one sentence why a meaningful test needs these}"
+```
+
+The orchestrator detects `TEST_SCOPE_INFLATION: true` and fires the late-escalation prompt.
+
+Do NOT set this signal if you can write a meaningful test within the original fix scope. Setting it spuriously triggers a user prompt and may force unnecessary escalation.
+
 ## You Must NOT
 
 - Review your own code (that's the reviewer's job)
