@@ -1,5 +1,8 @@
 # Harness Engineering
 
+> **v0.2.0 is out.** Adds `/harness-fix` bug-fix lane, typed `harness/changes/{type}/{slug}/` layout, causal back-links, escalation paths, squash-merge resilience, and a self-healing reverse-lookup cache.
+> **Existing v0.1.0 users:** see [`docs/migrating-v0.1-to-v0.2.md`](./docs/migrating-v0.1-to-v0.2.md). One script handles the mechanical bits — no full regen needed.
+
 A Claude Code skill that **discovers** an existing codebase's patterns, conventions, and architecture, then **generates** a structured constraint system (rules, skills, agents, hooks, pipeline) so AI coders produce code matching that project's standards.
 
 > When an agent makes an error, engineer its elimination — not with prompt tweaks, but with files, rules, automated checks, and system structure.
@@ -27,6 +30,10 @@ The result: a per-project constraint system that AI coders pick up automatically
 - "Create harness structure for my codebase"
 - "Make AI code production-ready for this repo"
 - "Build agent constraints for this project"
+
+Once set up, the harness exposes two orchestrators:
+- **`/harness-run <requirement>`** — full 10-stage pipeline for features, refactors, and large fixes.
+- **`/harness-fix <bug>`** (v0.2.0+) — 5-stage bug-fix lane with auto-link to the change that introduced the bug, escalation paths for late-discovered scope inflation, and squash-merge resilience.
 
 ## Install
 
@@ -125,4 +132,12 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Status
 
-`v0.1.0` — early release. Schema and templates may change. Please file issues with the harness output you'd expect to see for your stack.
+`v0.2.0` — bug-fix lane (`/harness-fix`), typed `harness/changes/{type}/{slug}/` layout, causal back-links between fixes and the changes that introduced them, escalation paths (including late-stage), squash-merge resilience with optional post-merge hook, and self-healing reverse-lookup cache.
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full release notes and [docs/plan.md](./docs/plan.md) for the implementation rationale per phase.
+
+Schema and templates may still change. Please file issues with the harness output you'd expect to see for your stack.
+
+### Optional dependency
+
+The `/harness-fix` slug derivation transliterates Unicode bug descriptions via the Python `unidecode` library. If unavailable, falls back to ASCII-strip (loses CJK/RTL meaning but never crashes). Install with `pip install unidecode` or `uv pip install unidecode`.
