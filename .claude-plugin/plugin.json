@@ -1,7 +1,7 @@
 {
   "name": "harness-engineering",
   "description": "Discover an existing codebase's patterns and generate a Harness Engineering structure (rules, skills, agents, hooks, pipeline) so AI coders produce code matching that project's conventions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Zayhan"
   },
