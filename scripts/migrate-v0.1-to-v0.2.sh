@@ -247,10 +247,18 @@ fi
 if [ "$NEEDS_GITIGNORE" = "yes" ]; then
   echo "==> Adding cache to .gitignore"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] echo 'harness/.commit-index.tsv' >> .gitignore"
+    echo "[dry-run] append 'harness/.commit-index.tsv' to .gitignore (with newline guard)"
   else
     [ -f .gitignore ] || touch .gitignore
-    grep -qxF "harness/.commit-index.tsv" .gitignore || echo "harness/.commit-index.tsv" >> .gitignore
+    if ! grep -qxF "harness/.commit-index.tsv" .gitignore; then
+      # Ensure file ends with a newline before appending; otherwise the new
+      # line glues to the previous (e.g., existing "harness" + appended
+      # "harness/.commit-index.tsv" -> "harnessharness/.commit-index.tsv").
+      if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then
+        printf '\n' >> .gitignore
+      fi
+      echo "harness/.commit-index.tsv" >> .gitignore
+    fi
   fi
 fi
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.2 — 2026-05-18
+
+Bug fix: `.gitignore` append could produce a glued line if the existing `.gitignore` was missing a trailing newline.
+
+### Fixed
+- **`.gitignore` newline guard** in `scripts/migrate-v0.1-to-v0.2.sh` AND `skills/harness-engineering/references/wiring.md` §10.8 Step 6.
+  - Symptom: a target repo with `.gitignore` whose last line was `harness` (no trailing newline) and ran the migration / wiring would end up with `harnessharness/.commit-index.tsv` as a single concatenated line.
+  - Fix: check `tail -c1 .gitignore` before append; insert `\n` first if needed.
+  - Verified against 4 scenarios: missing newline, with newline, empty file, idempotent re-run.
+
+### Manual fix for already-affected repos
+If your `.gitignore` already has a `harnessharness/.commit-index.tsv` line, edit it by hand:
+```bash
+# Replace the bad line with a properly-separated one
+sed -i.bak 's|harnessharness/.commit-index.tsv|harness/.commit-index.tsv|' .gitignore
+# Make sure the line before is on its own
+```
+Then re-run `/harness-migrate` to confirm idempotency.
+
 ## 0.2.1 — 2026-05-18
 
 Migration UX improvements for marketplace users.
