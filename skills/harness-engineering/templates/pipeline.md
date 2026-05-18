@@ -55,6 +55,7 @@
   - Branch name matches convention
   - No merge conflicts
 - **Human checkpoint:** Confirm push target
+- **Output:** `harness/changes/{type}/{slug}/pipeline-state.md` gains a `## Commits` table row (Stage 7, SHA, files) — read by `/harness-fix` reverse lookup.
 
 ### 8. CI Verification
 - **Gate (PROGRAMMATIC — all must be true):**
