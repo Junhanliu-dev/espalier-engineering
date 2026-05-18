@@ -2,20 +2,25 @@
 # Pre-push quality gate
 # Blocks git push unless all conditions are met
 
-# Find the current requirement's pipeline state
+# Find the most-recently-modified pipeline-state.md across typed subdirs
+# (harness/changes/{type}/{slug}/pipeline-state.md — depth 3 from CHANGES_DIR).
 CHANGES_DIR="harness/changes"
-LATEST=$(ls -t "$CHANGES_DIR" 2>/dev/null | grep -v _template | head -1)
 
-if [ -z "$LATEST" ]; then
-  echo "WARNING: No harness change record found. Pushing without pipeline tracking."
-  exit 0  # Allow but warn
+# stat format differs between BSD (macOS) and GNU (Linux)
+if [ "$(uname)" = "Darwin" ]; then
+  STAT_ARGS=(-f '%m %N')
+else
+  STAT_ARGS=(-c '%Y %n')
 fi
 
-STATE_FILE="$CHANGES_DIR/$LATEST/pipeline-state.md"
+STATE_FILE=$(find "$CHANGES_DIR" -mindepth 3 -maxdepth 3 -name pipeline-state.md \
+             -not -path "*/_template/*" \
+             -exec stat "${STAT_ARGS[@]}" {} + 2>/dev/null \
+             | sort -rn | head -1 | cut -d' ' -f2-)
 
-if [ ! -f "$STATE_FILE" ]; then
-  echo "WARNING: No pipeline state file. Pushing without pipeline verification."
-  exit 0
+if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
+  echo "WARNING: No harness change record found. Pushing without pipeline tracking."
+  exit 0  # Allow but warn
 fi
 
 # Check pipeline stage (must be ≥ 7)
