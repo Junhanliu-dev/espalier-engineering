@@ -4,7 +4,7 @@
     "name": "Zayhan"
   },
   "description": "Marketplace publishing the harness-engineering skill",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "plugins": [
     {
       "name": "harness-engineering",
@@ -13,7 +13,7 @@
         "repo": "Junhanliu-dev/harness-engineering"
       },
       "description": "Discover an existing codebase's patterns and generate a Harness Engineering structure tailored to that project's language and conventions",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "Zayhan"
       },

@@ -6,19 +6,69 @@ If you ran `/harness-engineering` on a project under v0.1.0 and have a `harness/
 
 ## TL;DR
 
-```bash
-# 1. Update the plugin (pick one path)
-/plugin update harness-engineering        # marketplace install
-# OR
-cd ~/repos/harness-engineering && git pull # manual clone install
+Pick the path that matches your install:
 
-# 2. From the target project root:
-bash $PLUGIN_DIR/scripts/migrate-v0.1-to-v0.2.sh --dry-run    # preview
-bash $PLUGIN_DIR/scripts/migrate-v0.1-to-v0.2.sh              # apply
-# (script auto-finds plugin dir; or pass --plugin-dir=<path>)
+### Marketplace install (most users) — easiest: use `/harness-migrate` skill
+
+```text
+# 1. Update plugin
+/plugin update harness-engineering
+
+# 2. From inside Claude Code, in your target project:
+/harness-migrate
+```
+
+The `/harness-migrate` skill (added in v0.2.1) auto-locates the script in the
+plugin install, runs `--dry-run` first, shows the preview, then asks before
+applying.
+
+### Marketplace install — direct script invocation
+
+```bash
+# 1. Update plugin
+/plugin update harness-engineering
+
+# 2. From target project root:
+cd ~/path/to/your-project
+
+# 3. Run from plugin install (typical path)
+bash ~/.claude/plugins/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
+bash ~/.claude/plugins/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh
+```
+
+### Manual clone install
+
+```bash
+# 1. Update local clone
+cd ~/repos/harness-engineering && git pull
+
+# 2. From target project root:
+cd ~/path/to/your-project
+bash ~/repos/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
+bash ~/repos/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh
+```
+
+### No-install / one-shot (e.g., CI)
+
+```bash
+cd ~/path/to/your-project
+curl -L -o /tmp/migrate.sh https://raw.githubusercontent.com/Junhanliu-dev/harness-engineering/v0.2.1/scripts/migrate-v0.1-to-v0.2.sh
+chmod +x /tmp/migrate.sh
+/tmp/migrate.sh --dry-run --plugin-dir=$HOME/.claude/plugins/harness-engineering/skills/harness-engineering
+/tmp/migrate.sh             --plugin-dir=$HOME/.claude/plugins/harness-engineering/skills/harness-engineering
 ```
 
 Then commit the result. Done.
+
+### Where is the plugin installed?
+
+| Install method | Typical path |
+|----------------|--------------|
+| Marketplace (`/plugin install`) | `~/.claude/plugins/harness-engineering/` |
+| Manual clone + symlink (Option B of README install) | `~/repos/harness-engineering/` (or wherever you cloned) |
+| Project-scoped (Option C of README install) | `<project>/.claude/skills/harness-engineering/` (symlink target) |
+
+If the script can't find templates automatically, pass `--plugin-dir=<path>` pointing at the `skills/harness-engineering/` subdir of your install (the one containing `hook-templates/`).
 
 ## What the migration changes
 
