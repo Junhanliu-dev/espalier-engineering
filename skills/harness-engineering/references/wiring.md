@@ -243,6 +243,14 @@ fi
 ### Step 6: Add reverse-lookup cache to .gitignore (Phase 4.6)
 
 ```bash
-# Cache is regenerable; teammates rebuild on first slow scan
-grep -qxF "harness/.commit-index.tsv" .gitignore 2>/dev/null || echo "harness/.commit-index.tsv" >> .gitignore
+# Cache is regenerable; teammates rebuild on first slow scan.
+# Guard against missing trailing newline in existing .gitignore — otherwise
+# the appended line glues to the previous one (seen v0.2.0/v0.2.1 bug:
+# "harness" + "harness/.commit-index.tsv" -> "harnessharness/.commit-index.tsv").
+if ! grep -qxF "harness/.commit-index.tsv" .gitignore 2>/dev/null; then
+  if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then
+    printf '\n' >> .gitignore
+  fi
+  echo "harness/.commit-index.tsv" >> .gitignore
+fi
 ```
