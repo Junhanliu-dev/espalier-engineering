@@ -1,5 +1,7 @@
 # Phase 10: Wiring (Connect Harness to Claude Code Runtime)
 
+> **v0.3.0+ note:** Phase 10 is bundled inside `scripts/bootstrap-harness.sh` (Stages 5-10 of that script). Normal flow does NOT execute the manual steps below — they're retained for **debugging / manual recovery**. If `/harness-engineering` fails mid-wiring, the steps below let you finish by hand.
+
 Generated files are inert until wired into the execution environment. Run these steps in order.
 
 ## 10.1 Wire Rules → Auto-loaded Context
