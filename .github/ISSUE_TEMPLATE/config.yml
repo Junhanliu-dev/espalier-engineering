@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Junhanliu-dev/espalier-engineering/security/advisories/new
+    about: Report security issues privately via GitHub security advisories — do NOT open a public issue.
+  - name: Question or discussion
+    url: https://github.com/Junhanliu-dev/espalier-engineering/discussions
+    about: Open-ended questions, design discussions, or "how do I" should go in Discussions (not Issues).
