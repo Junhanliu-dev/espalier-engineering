@@ -2,7 +2,7 @@
 
 ## 0.3.0 — 2026-05-19
 
-Init-speedup release. `/harness-engineering` first run is now ~75-80% faster on a fresh repo via parallelism + a bundled bootstrap script. **Zero workflow semantic change** — every artifact in `harness/` is byte-equivalent to v0.2.x output (modulo discovery-driven substitutions).
+Init-speedup release. `/harness-engineering` first run is now ~30-50% faster on a fresh repo via parallelism + a bundled bootstrap script. **Zero workflow semantic change** — every artifact in `harness/` is byte-equivalent to v0.2.x output (modulo discovery-driven substitutions).
 
 ### Added
 - **`scripts/bootstrap-harness.sh`** — single idempotent bash script bundling Phase 8 (Hooks) + Phase 10 (Wiring) + Phase 11 (Validation) + pure-template copies. 11 internal stages, 7 flags, 24 parallel validation checks. Safe-symlink pre-flight, portable `abspath` (no `realpath` dependency on macOS), atomic `.claude/settings.json` merge that preserves user hooks.
@@ -22,10 +22,12 @@ Init-speedup release. `/harness-engineering` first run is now ~75-80% faster on 
 - **`skills/harness-engineering/references/validation.md`** — added v0.3.0 note: runs via `bootstrap-harness.sh --validate-only`; per-check table retained as source of truth.
 
 ### Performance
-- Tool calls: ~110-140 sequential → ~25-35 raw calls across ~5-7 batched turns (~75-80% reduction).
-- Wall clock (medium repo, ~150 source files): 8-12 min → 1.5-2.5 min.
-- Wall clock (small repo, ~50 files): 4-6 min → 0.8-1.5 min.
-- LLM token cost (Opus): ~70% reduction (fewer round-trips, less repeated context loading).
+- Tool calls: ~110-140 sequential → ~25-35 raw calls across ~5-7 batched turns.
+- Wall clock (medium repo, ~150 source files): 20+ min → 10-15 min.
+- Wall clock (small repo, ~50 files): scales down proportionally.
+- LLM token cost (Opus): meaningful reduction (fewer round-trips, less repeated context loading). Exact savings vary with repo size + scout depth.
+
+Note: Earlier release notes overstated the speedup (claimed 75-80% / ~5x). Real-world runs on medium-large repos show a more modest 30-50% improvement — discovery scouts still take time reading source files, and the oracle (ctx7 + WebSearch) is single-flight with network latency. Numbers above reflect observed runs.
 
 ### Fixed (latent v0.2.x bugs surfaced during dry-run)
 - **`pre-push-gate-wrapper.sh` was referenced in `.claude/settings.json` but never shipped as a template.** Result on v0.2.x: PreToolUse hook on Bash failed to find the wrapper at fire time. v0.3.0 ships `hook-templates/pre-push-gate-wrapper.sh` (parses stdin, dispatches to `pre-push-gate.sh` only for `git push` commands), bootstrap cp's it, validation Check 6 verifies it's executable.
