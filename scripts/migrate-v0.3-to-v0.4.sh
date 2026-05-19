@@ -107,7 +107,7 @@ _rewrite_file() {
   done
   # Now rewrite dir prefix. Only `harness/` (word-boundary before, slash after).
   # Don't touch `harness-coder`, `harness-reviewer`, `harness-engineering` etc.
-  "${SED_INPLACE[@]}" -E 's|(^|[^a-zA-Z0-9_-])harness/|\1espalier/|g' "$f"
+  "${SED_INPLACE[@]}" -E -e 's|^harness/|espalier/|' -e 's|([^a-zA-Z0-9_-])harness/|\1espalier/|g' "$f"
 }
 
 # --- Preflight ---------------------------------------------------------------
@@ -170,19 +170,18 @@ else
 fi
 
 # --- Step 2: rename child skill directories ---------------------------------
+#
+# Parallel indexed arrays (bash 3.2 compatible — macOS default).
+# Do NOT use `declare -A` (associative arrays = bash 4+ only); silently
+# becomes a no-op on macOS, then `${!ARRAY[@]}` trips set -u.
 
 log "Step 2: rename child skill directories"
-declare -A SKILL_DIR_RENAMES=(
-  ["harness-coding"]="espalier-coding"
-  ["harness-review"]="espalier-review"
-  ["harness-testing"]="espalier-testing"
-  ["harness-requirements"]="espalier-requirements"
-  ["harness-fix"]="espalier-fix"
-  ["harness-run"]="espalier"
-)
+SKILL_OLD=(harness-coding harness-review harness-testing harness-requirements harness-fix harness-run)
+SKILL_NEW=(espalier-coding espalier-review espalier-testing espalier-requirements espalier-fix espalier)
 
-for old in "${!SKILL_DIR_RENAMES[@]}"; do
-  new="${SKILL_DIR_RENAMES[$old]}"
+for i in "${!SKILL_OLD[@]}"; do
+  old="${SKILL_OLD[$i]}"
+  new="${SKILL_NEW[$i]}"
   src="espalier/skills/$old"
   dst="espalier/skills/$new"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -214,7 +213,7 @@ for skill_dir in espalier/skills/*/; do
   for expr in "${SKILL_RENAMES[@]}"; do
     "${SED_INPLACE[@]}" -E "$expr" "$skill_md"
   done
-  "${SED_INPLACE[@]}" -E 's|(^|[^a-zA-Z0-9_-])harness/|\1espalier/|g' "$skill_md"
+  "${SED_INPLACE[@]}" -E -e 's|^harness/|espalier/|' -e 's|([^a-zA-Z0-9_-])harness/|\1espalier/|g' "$skill_md"
 done
 
 # Also rewrite per-layer specs inside espalier-coding/specs/
@@ -330,7 +329,7 @@ for HOOK in .git/hooks/post-merge .husky/post-merge; do
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] rewrite $HOOK (harness/ paths → espalier/)"
   else
-    "${SED_INPLACE[@]}" -E 's|(^|[^a-zA-Z0-9_-])harness/|\1espalier/|g' "$HOOK"
+    "${SED_INPLACE[@]}" -E -e 's|^harness/|espalier/|' -e 's|([^a-zA-Z0-9_-])harness/|\1espalier/|g' "$HOOK"
   fi
 done
 
