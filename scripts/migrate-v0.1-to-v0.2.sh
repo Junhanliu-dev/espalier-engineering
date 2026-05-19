@@ -60,10 +60,19 @@ if [ ! -d "harness" ] || [ ! -d ".claude" ]; then
 fi
 
 if [ -z "$PLUGIN_DIR" ]; then
-  # Try common locations
+  # Try common locations.
+  # New (v0.4+ rename): plugin name `espalier`, repo `espalier-engineering`, skill dir `espalier-init`.
+  # Legacy: plugin name `harness-engineering`, repo `harness-engineering`, skill dir `harness-engineering`.
   for candidate in \
+    "$HOME/.claude/plugins/espalier-engineering/skills/espalier-init" \
+    "$HOME/.claude/plugins/espalier/skills/espalier-init" \
+    "$HOME/.claude/plugins/harness-engineering/skills/espalier-init" \
     "$HOME/.claude/plugins/harness-engineering/skills/harness-engineering" \
+    "$HOME/repos/espalier-engineering/skills/espalier-init" \
+    "$HOME/repos/espalier-engineering/skills/harness-engineering" \
+    "$HOME/repos/harness-engineering/skills/espalier-init" \
     "$HOME/repos/harness-engineering/skills/harness-engineering" \
+    "$HOME/SBM_Projects/espalier-engineering/skills/espalier-init" \
     "$HOME/SBM_Projects/harness-engineering/skills/harness-engineering"; do
     if [ -d "$candidate/hook-templates" ]; then
       PLUGIN_DIR="$candidate"

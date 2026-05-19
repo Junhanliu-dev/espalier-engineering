@@ -1,5 +1,7 @@
 # Migrating from v0.1.0 to v0.2.0
 
+> **Note for v0.4.0+ users:** This is the legacy migration guide for projects on v0.1.0. If you're on v0.2.x or v0.3.x and want to upgrade to v0.4.0 (the Espalier rebrand), see [`migrating-v0.3-to-v0.4.md`](./migrating-v0.3-to-v0.4.md) instead. If you're on v0.1.0, you need BOTH migrations — run `/espalier-migrate` and it will detect this and apply v0.1→v0.2 first, then v0.3→v0.4 automatically.
+
 If you ran `/harness-engineering` on a project under v0.1.0 and have a `harness/` directory already, this guide walks you through upgrading to v0.2.0 (typed change layout + `/harness-fix` bug-fix lane + squash-merge resilience + reverse-lookup cache).
 
 **You do not need to regenerate the harness.** A migration script handles the mechanical changes; this doc covers the decisions you'll make.
@@ -8,54 +10,57 @@ If you ran `/harness-engineering` on a project under v0.1.0 and have a `harness/
 
 Pick the path that matches your install:
 
-### Marketplace install (most users) — easiest: use `/harness-migrate` skill
+### Marketplace install (most users) — easiest: use `/espalier-migrate` skill
 
 ```text
-# 1. Update plugin
-/plugin update harness-engineering
+# 1. Update plugin (v0.4.0+ ships as 'espalier'; old 'harness-engineering' plugin slug is frozen)
+/plugin install espalier-engineering@espalier-engineering
 
 # 2. From inside Claude Code, in your target project:
-/harness-migrate
+/espalier-migrate
 ```
 
-The `/harness-migrate` skill (added in v0.2.1) auto-locates the script in the
-plugin install, runs `--dry-run` first, shows the preview, then asks before
-applying.
+The `/espalier-migrate` skill (v0.4.0+) auto-detects whether your install needs
+v0.1→v0.2 (typed changes) or v0.3→v0.4 (rename) or both, locates the right
+script(s) in the plugin install, runs `--dry-run` first, shows the preview,
+then asks before applying. Older `/harness-migrate` invocation (v0.2.1–v0.3.x)
+still works on installs that have the old plugin and only need v0.1→v0.2.
 
 ### Marketplace install — direct script invocation
 
 ```bash
 # 1. Update plugin
-/plugin update harness-engineering
+/plugin install espalier-engineering@espalier-engineering
 
 # 2. From target project root:
 cd ~/path/to/your-project
 
-# 3. Run from plugin install (typical path)
-bash ~/.claude/plugins/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
-bash ~/.claude/plugins/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh
+# 3. Run from plugin install (typical path — both new and legacy plugin dirs supported)
+bash ~/.claude/plugins/espalier-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
+bash ~/.claude/plugins/espalier-engineering/scripts/migrate-v0.1-to-v0.2.sh
 ```
 
 ### Manual clone install
 
 ```bash
-# 1. Update local clone
-cd ~/repos/harness-engineering && git pull
+# 1. Update local clone (repo renamed in v0.4.0; github maintains redirects)
+cd ~/repos/espalier-engineering && git pull
+# or for legacy clones: cd ~/repos/harness-engineering && git pull
 
 # 2. From target project root:
 cd ~/path/to/your-project
-bash ~/repos/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
-bash ~/repos/harness-engineering/scripts/migrate-v0.1-to-v0.2.sh
+bash ~/repos/espalier-engineering/scripts/migrate-v0.1-to-v0.2.sh --dry-run
+bash ~/repos/espalier-engineering/scripts/migrate-v0.1-to-v0.2.sh
 ```
 
 ### No-install / one-shot (e.g., CI)
 
 ```bash
 cd ~/path/to/your-project
-curl -L -o /tmp/migrate.sh https://raw.githubusercontent.com/Junhanliu-dev/harness-engineering/v0.2.1/scripts/migrate-v0.1-to-v0.2.sh
+curl -L -o /tmp/migrate.sh https://raw.githubusercontent.com/Junhanliu-dev/espalier-engineering/v0.4.0/scripts/migrate-v0.1-to-v0.2.sh
 chmod +x /tmp/migrate.sh
-/tmp/migrate.sh --dry-run --plugin-dir=$HOME/.claude/plugins/harness-engineering/skills/harness-engineering
-/tmp/migrate.sh             --plugin-dir=$HOME/.claude/plugins/harness-engineering/skills/harness-engineering
+/tmp/migrate.sh --dry-run --plugin-dir=$HOME/.claude/plugins/espalier-engineering/skills/espalier-init
+/tmp/migrate.sh             --plugin-dir=$HOME/.claude/plugins/espalier-engineering/skills/espalier-init
 ```
 
 Then commit the result. Done.
@@ -64,11 +69,13 @@ Then commit the result. Done.
 
 | Install method | Typical path |
 |----------------|--------------|
-| Marketplace (`/plugin install`) | `~/.claude/plugins/harness-engineering/` |
-| Manual clone + symlink (Option B of README install) | `~/repos/harness-engineering/` (or wherever you cloned) |
-| Project-scoped (Option C of README install) | `<project>/.claude/skills/harness-engineering/` (symlink target) |
+| Marketplace v0.4.0+ (`/plugin install espalier-engineering@espalier-engineering`) | `~/.claude/plugins/espalier-engineering/` |
+| Marketplace legacy (`/plugin install harness-engineering`) | `~/.claude/plugins/harness-engineering/` |
+| Manual clone + symlink (current) | `~/repos/espalier-engineering/` |
+| Manual clone + symlink (legacy) | `~/repos/harness-engineering/` (or wherever you cloned) |
+| Project-scoped | `<project>/.claude/skills/espalier-init/` (symlink target) |
 
-If the script can't find templates automatically, pass `--plugin-dir=<path>` pointing at the `skills/harness-engineering/` subdir of your install (the one containing `hook-templates/`).
+If the script can't find templates automatically, pass `--plugin-dir=<path>` pointing at the `skills/espalier-init/` subdir of your install (the one containing `hook-templates/`). The legacy `skills/harness-engineering/` subdir is also recognized for backward compat.
 
 ## What the migration changes
 
@@ -163,11 +170,12 @@ git revert <migration-commit-sha>
 
 ### "Plugin dir not found"
 
-The script auto-searches common install locations. If yours is elsewhere:
+The script auto-searches common install locations (both new `espalier-engineering` and legacy `harness-engineering` paths). If yours is elsewhere:
 
 ```bash
-HARNESS_PLUGIN_DIR=/path/to/harness-engineering/skills/harness-engineering \
+ESPALIER_PLUGIN_DIR=/path/to/espalier-engineering/skills/espalier-init \
   bash scripts/migrate-v0.1-to-v0.2.sh
+# Legacy env var HARNESS_PLUGIN_DIR also still honored.
 ```
 
 Or pass `--plugin-dir=<path>`.
@@ -186,17 +194,23 @@ If `.git/hooks/post-merge` exists from another tool (e.g., your CI bootstrap), t
 
 ## Verifying the upgrade landed
 
-After migration, try a real bug fix:
+After migration, try a real bug fix. **If you ran only v0.1→v0.2** (not the v0.3→v0.4 rename), use the legacy command:
 
 ```bash
 /harness-fix <bug at file:line>
 ```
 
+If you ALSO ran `/espalier-migrate` (which applies v0.3→v0.4 after v0.1→v0.2), use:
+
+```bash
+/espalier-fix <bug at file:line>
+```
+
 Expected:
-- Slug auto-derived to `harness/changes/fix/<slug>/`
+- Slug auto-derived to `harness/changes/fix/<slug>/` (legacy) or `espalier/changes/fix/<slug>/` (v0.4)
 - Stage 0 auto-link runs (may print warning if you didn't backfill)
-- Sub-agents spawned for coder / reviewer
+- Sub-agents `harness-coder` / `harness-reviewer` spawned (agent names kept across rename)
 - Stage 7 pushes + records SHA in `## Commits` table
 - (If `caused_by` populated) row appended to causing feat's `## Follow-up Fixes` table
 
-If anything misbehaves, check `harness/changes/fix/<slug>/pipeline-state.md` for the Stage History trail.
+If anything misbehaves, check `<dir>/changes/fix/<slug>/pipeline-state.md` for the Stage History trail.

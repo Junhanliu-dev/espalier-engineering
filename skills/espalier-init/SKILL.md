@@ -1,19 +1,19 @@
 ---
-name: harness-engineering
-description: Analyze any existing codebase, discover its patterns and best practices, and generate a Harness Engineering structure (rules, skills, wiki, pipeline) tailored to that project's language and conventions
+name: espalier-init
+description: Analyze any existing codebase, discover its patterns and best practices, and generate an Espalier structure (rules, skills, wiki, pipeline) so AI coders produce code matching that project's language and conventions
 ---
 
-# Harness Engineering
+# Espalier Init
 
 Discover the actual patterns, conventions, and architecture of an existing codebase, then generate a structured constraint system that ensures AI agents produce code matching those standards.
 
 ## When to Use
 
-- "Set up harness for this project"
-- "Create harness structure for my codebase"
+- "Set up Espalier for this project"
+- "Create Espalier structure for my codebase"
 - "Make AI code production-ready for this repo"
 - "Build agent constraints for this project"
-- "Initialize harness engineering"
+- "/espalier-init"
 
 ## Philosophy
 
@@ -21,20 +21,20 @@ Discover the actual patterns, conventions, and architecture of an existing codeb
 
 **Core insight:** The problem isn't model intelligence. It's that models don't know the unwritten rules — patterns every experienced developer on the team knows but nobody documented.
 
-This skill **discovers** those rules from the code itself, then encodes them as machine-enforceable constraints.
+This skill **discovers** those rules from the code itself, then encodes them as machine-enforceable constraints. Like an espalier trains a fruit tree to grow along a wall, this skill trains your AI coder to grow along the patterns already in your codebase.
 
 ## File Layout of This Skill
 
 ```
-harness-engineering/
+espalier-init/
 ├── SKILL.md                       # this file — overview + phase index
 ├── templates/                     # markdown templates emitted into target project
-│   ├── rules/                     # → harness/rules/ in target
-│   ├── skills/                    # → harness/skills/<name>/SKILL.md
-│   ├── agents/                    # → harness/agents/ in target
-│   ├── agent.md                   # → harness/agent.md (orchestrator)
-│   └── pipeline.md                # → harness/pipeline.md
-├── hook-templates/                # shell scripts emitted into harness/hooks/
+│   ├── rules/                     # → espalier/rules/ in target
+│   ├── skills/                    # → espalier/skills/<name>/SKILL.md
+│   ├── agents/                    # → espalier/agents/ in target
+│   ├── agent.md                   # → espalier/agent.md (orchestrator)
+│   └── pipeline.md                # → espalier/pipeline.md
+├── hook-templates/                # shell scripts emitted into espalier/hooks/
 └── references/                    # deep-dive content read on demand
     ├── discovery-checklist.md     # Phase 1 detail
     ├── wiring.md                  # Phase 10 detail
@@ -49,24 +49,24 @@ harness-engineering/
 ```
 project-root/
 ├── .claude/
-│   ├── rules/                     # symlinks to harness/rules/*.md
-│   ├── skills/                    # symlinks to harness/skills/*
-│   ├── agents/                    # symlinks to harness/agents/*.md
+│   ├── rules/                     # symlinks to espalier/rules/*.md
+│   ├── skills/                    # symlinks to espalier/skills/*
+│   ├── agents/                    # symlinks to espalier/agents/*.md
 │   └── settings.json              # hooks for quality gates
-├── CLAUDE.md                       # references harness/agent.md
-├── harness/
+├── CLAUDE.md                       # references espalier/agent.md
+├── espalier/
 │   ├── agent.md                    # orchestrator definition
 │   ├── rules/                      # engineering-structure, coding-standards, development-process
 │   ├── skills/                     # folder name MUST equal SKILL.md `name:` frontmatter
-│   │   ├── harness-coding/
+│   │   ├── espalier-coding/
 │   │   │   ├── SKILL.md
 │   │   │   └── specs/{layer}.md
-│   │   ├── harness-review/SKILL.md
-│   │   ├── harness-testing/SKILL.md
-│   │   ├── harness-requirements/SKILL.md
-│   │   ├── harness-run/SKILL.md
-│   │   └── harness-fix/SKILL.md              # NEW: bug-fix lane (5-stage)
-│   ├── agents/                     # harness-coder.md, harness-reviewer.md
+│   │   ├── espalier-review/SKILL.md
+│   │   ├── espalier-testing/SKILL.md
+│   │   ├── espalier-requirements/SKILL.md
+│   │   ├── espalier/SKILL.md                   # main pipeline orchestrator (slash: /espalier)
+│   │   └── espalier-fix/SKILL.md               # bug-fix lane (5-stage; slash: /espalier-fix)
+│   ├── agents/                     # harness-coder.md, harness-reviewer.md (agent names kept for stability)
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
 │   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh
 │   ├── pipeline.md
@@ -88,28 +88,29 @@ Claude Code's skill loader compares the **folder name** against the SKILL.md `na
 
 ```
 ✅ CORRECT
-harness/skills/harness-coding/SKILL.md         (name: harness-coding)
-harness/skills/harness-review/SKILL.md         (name: harness-review)
+espalier/skills/espalier-coding/SKILL.md         (name: espalier-coding)
+espalier/skills/espalier-review/SKILL.md         (name: espalier-review)
+espalier/skills/espalier/SKILL.md                (name: espalier)            ← main pipeline
 
 ❌ WRONG (will warn / break)
-harness/skills/coding/SKILL.md                 (name: harness-coding)
-harness/skills/review/SKILL.md                 (name: harness-review)
+espalier/skills/coding/SKILL.md                  (name: espalier-coding)
+espalier/skills/review/SKILL.md                  (name: espalier-review)
 ```
 
 When you generate a skill:
-1. Choose the `name:` value first (must be globally unique, kebab-case, descriptive — prefix with `harness-` for skills inside this harness).
+1. Choose the `name:` value first (must be globally unique, kebab-case, descriptive — prefix with `espalier-` for child skills inside this install; the main pipeline owns the bare name `espalier`).
 2. Use the SAME string as the folder name.
 3. Symlinks in `.claude/skills/<name>` then resolve to a same-named source folder — no mismatch possible.
 
-This applies to **all** skill folders generated by this skill: harness-coding, harness-review, harness-testing, harness-requirements, harness-run, and any additional ones added later.
+This applies to **all** skill folders generated by this skill: espalier-coding, espalier-review, espalier-testing, espalier-requirements, espalier (main), espalier-fix, and any additional ones added later.
 
 ---
 
-## Phase Dependency Note (v0.3.0 — parallel execution)
+## Phase Dependency Note (parallel execution)
 
-Phases 0-2 are sequential by necessity (Phase 0 prompt blocks; Phase 1 produces DISCOVERY blob consumed by Phase 2). Within Phase 1 and Phase 2, work is parallel. Phases 3+ are bundled into a single `bootstrap-harness.sh` invocation.
+Phases 0-2 are sequential by necessity (Phase 0 prompt blocks; Phase 1 produces DISCOVERY blob consumed by Phase 2). Within Phase 1 and Phase 2, work is parallel. Phases 3+ are bundled into a single `bootstrap-espalier.sh` invocation.
 
-**Rule:** run Phases 0 → 1 → 2 → 3 in order. Each step batches parallel work to minimize sequential tool calls (~5-7 batched turns total vs. ~110-140 sequential calls in v0.2.x).
+**Rule:** run Phases 0 → 1 → 2 → 3 in order. Each step batches parallel work to minimize sequential tool calls (~5-7 batched turns total).
 
 ---
 
@@ -120,7 +121,7 @@ Issue ONE `AskUserQuestion` with TWO questions in the multi-question form:
 ### Q1 — Squash-merge strategy
 
 ```
-How does this repo merge PRs? Choice affects how /harness-fix links bug
+How does this repo merge PRs? Choice affects how /espalier-fix links bug
 fixes to causing commits.
 
   1. Rebase-merge / true merge-commit                   → MERGE_DECISION = not-needed
@@ -158,12 +159,14 @@ scope for this install:
        radius — reviewer could in principle make external calls.
 ```
 
-Cache the answers in `$MERGE_DECISION` and `$AGENT_TOOLS`. Phase 2's Write batch reads `$AGENT_TOOLS` when emitting `harness/agents/harness-coder.md` and `harness/agents/harness-reviewer.md`:
+> Why agent identifiers stay `harness-coder` / `harness-reviewer`: these are internal sub-agent names baked into pipeline orchestration. Renaming them mid-pipeline would break any in-flight changes. The plugin name and slash commands rebranded to Espalier in v0.4.0; agent identifiers remain frozen.
+
+Cache the answers in `$MERGE_DECISION` and `$AGENT_TOOLS`. Phase 2's Write batch reads `$AGENT_TOOLS` when emitting `espalier/agents/harness-coder.md` and `espalier/agents/harness-reviewer.md`:
 
 - `restricted` → keep the `tools:` frontmatter line from the template verbatim
 - `inherit` → omit the `tools:` line entirely (Claude Code interprets missing `tools:` as "inherit from parent")
 
-Pass `$MERGE_DECISION` to `bootstrap-harness.sh` in Phase 3 via `--merge-decision=$MERGE_DECISION`. `$AGENT_TOOLS` only affects Phase 2 LLM writes, no bootstrap flag needed.
+Pass `$MERGE_DECISION` to `bootstrap-espalier.sh` in Phase 3 via `--merge-decision=$MERGE_DECISION`. `$AGENT_TOOLS` only affects Phase 2 LLM writes, no bootstrap flag needed.
 
 ---
 
@@ -200,29 +203,29 @@ After all scouts return:
 Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 
 **Rules** (3 files):
-- `harness/rules/engineering-structure.md`  ← `templates/rules/engineering-structure.md` + DISCOVERY.layers/.naming
-- `harness/rules/coding-standards.md`       ← `templates/rules/coding-standards.md` + DISCOVERY.{naming,error_handling,…}
-- `harness/rules/development-process.md`    ← `templates/rules/development-process.md` + DISCOVERY.{branch_strategy,commit_conventions,ci_checks}
+- `espalier/rules/engineering-structure.md`  ← `templates/rules/engineering-structure.md` + DISCOVERY.layers/.naming
+- `espalier/rules/coding-standards.md`       ← `templates/rules/coding-standards.md` + DISCOVERY.{naming,error_handling,…}
+- `espalier/rules/development-process.md`    ← `templates/rules/development-process.md` + DISCOVERY.{branch_strategy,commit_conventions,ci_checks}
 
 **Orchestrator + per-stack skills** (4 files):
-- `harness/agent.md`                         ← `templates/agent.md` + project_name + DISCOVERY.{lang,framework,layers}
-- `harness/skills/harness-coding/SKILL.md`   ← `templates/skills/harness-coding.md` + DISCOVERY
-- `harness/skills/harness-testing/SKILL.md`  ← `templates/skills/harness-testing.md` + DISCOVERY.testing
-- `harness/skills/harness-review/SKILL.md`   ← `templates/skills/harness-review.md` (swap `{project}` → project_name)
+- `espalier/agent.md`                          ← `templates/agent.md` + project_name + DISCOVERY.{lang,framework,layers}
+- `espalier/skills/espalier-coding/SKILL.md`   ← `templates/skills/espalier-coding.md` + DISCOVERY
+- `espalier/skills/espalier-testing/SKILL.md`  ← `templates/skills/espalier-testing.md` + DISCOVERY.testing
+- `espalier/skills/espalier-review/SKILL.md`   ← `templates/skills/espalier-review.md` (swap `{project}` → project_name)
 
 **Sub-agents** (2 files — `tools:` field branches on `$AGENT_TOOLS` from Phase 0 Q2):
-- `harness/agents/harness-coder.md`          ← `templates/agents/harness-coder.md` + project_name. If `$AGENT_TOOLS == restricted` (default): keep `tools: Read, Write, Edit, Bash, Glob, Grep` line. If `$AGENT_TOOLS == inherit`: omit the `tools:` line entirely so the agent inherits from parent session.
-- `harness/agents/harness-reviewer.md`       ← `templates/agents/harness-reviewer.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash` for restricted; omit for inherit.
+- `espalier/agents/harness-coder.md`          ← `templates/agents/harness-coder.md` + project_name. If `$AGENT_TOOLS == restricted` (default): keep `tools: Read, Write, Edit, Bash, Glob, Grep` line. If `$AGENT_TOOLS == inherit`: omit the `tools:` line entirely so the agent inherits from parent session.
+- `espalier/agents/harness-reviewer.md`       ← `templates/agents/harness-reviewer.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash` for restricted; omit for inherit.
 
 **Wiki** (4 files — all populated from DISCOVERY scouts 1.2/1.8/1.9/1.10, never stubs):
-- `harness/wiki/architecture.md`             ← DISCOVERY.architecture (scout 1.2)
-- `harness/wiki/data-models.md`              ← DISCOVERY.data_models (scout 1.8)
-- `harness/wiki/critical-paths.md`           ← DISCOVERY.critical_paths (scout 1.9)
-- `harness/wiki/external-services.md`        ← DISCOVERY.external_services (scout 1.10)
+- `espalier/wiki/architecture.md`             ← DISCOVERY.architecture (scout 1.2)
+- `espalier/wiki/data-models.md`              ← DISCOVERY.data_models (scout 1.8)
+- `espalier/wiki/critical-paths.md`           ← DISCOVERY.critical_paths (scout 1.9)
+- `espalier/wiki/external-services.md`        ← DISCOVERY.external_services (scout 1.10)
 
 **Hooks with placeholders** (2 files):
-- `harness/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks
-- `harness/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-${LANG}.sh`, rewrite `case` block from DISCOVERY.layers. If LANG ∉ {ts,py,go}, emit a no-op script (`#!/bin/bash\nexit 0`).
+- `espalier/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks
+- `espalier/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-${LANG}.sh`, rewrite `case` block from DISCOVERY.layers. If LANG ∉ {ts,py,go}, emit a no-op script (`#!/bin/bash\nexit 0`).
 
 **Then per-layer specs (parallel scout batch + Write batch):**
 
@@ -235,9 +238,9 @@ scout("Read 2-3 representative files in <layer.dir>. Return JSON:
          allowed_imports: [...], forbidden_imports: [...], example_file_path }")
 ```
 
-After all scouts return, issue ONE parallel Write batch for `harness/skills/harness-coding/specs/{layer}.md` files. Skip layers flagged trivial (e.g., bare `index.ts` re-export barrel).
+After all scouts return, issue ONE parallel Write batch for `espalier/skills/espalier-coding/specs/{layer}.md` files. Skip layers flagged trivial (e.g., bare `index.ts` re-export barrel).
 
-Spec template (`templates/skills/harness-coding-spec.md`) has **no frontmatter** — specs are sub-pages of `harness-coding`, not registered skills.
+Spec template (`templates/skills/espalier-coding-spec.md`) has **no frontmatter** — specs are sub-pages of `espalier-coding`, not registered skills.
 
 ---
 
@@ -245,7 +248,7 @@ Spec template (`templates/skills/harness-coding-spec.md`) has **no frontmatter**
 
 Run:
 ```bash
-bash $PLUGIN_DIR/scripts/bootstrap-harness.sh \
+bash $PLUGIN_DIR/scripts/bootstrap-espalier.sh \
   --project-dir=. \
   --plugin-dir=$PLUGIN_DIR \
   --lang=$LANG \
@@ -255,17 +258,17 @@ bash $PLUGIN_DIR/scripts/bootstrap-harness.sh \
 Bootstrap runs all 11 internal stages in one shell process:
 
 - **Stages 1-2:** preflight + `mkdir -p` (idempotent — Phase 2 Writes already created some dirs).
-- **Stage 3:** `cp` pure-copy templates → `harness/pipeline.md`, `harness/skills/{harness-run,harness-fix,harness-requirements}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
-- **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index) + `chmod +x harness/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
-- **Stage 5:** safe symlinks `.claude/{rules,skills,agents}/*` → `harness/...` (refuses if target is regular file; uses portable `abspath`).
-- **Stage 6:** heredoc `harness/changes/_template/pipeline-state.md`.
-- **Stage 7:** append `## Harness Engineering` to `CLAUDE.md` (grep-guarded).
+- **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
+- **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index) + `chmod +x espalier/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
+- **Stage 5:** safe symlinks `.claude/{rules,skills,agents}/*` → `espalier/...` (refuses if target is regular file; uses portable `abspath`).
+- **Stage 6:** heredoc `espalier/changes/_template/pipeline-state.md`.
+- **Stage 7:** append `## Espalier` to `CLAUDE.md` (grep-guarded).
 - **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup).
-- **Stage 9:** persist `$MERGE_DECISION` to `harness/.merge-hook-decision`. If `installed`, install `.husky/post-merge` (or `.git/hooks/post-merge`).
-- **Stage 10:** append `harness/.commit-index.tsv` to `.gitignore` (newline-guarded).
+- **Stage 9:** persist `$MERGE_DECISION` to `espalier/.merge-hook-decision`. If `installed`, install `.husky/post-merge` (or `.git/hooks/post-merge`).
+- **Stage 10:** append `espalier/.commit-index.tsv` to `.gitignore` (newline-guarded).
 - **Stage 11:** run 24 validation checks in parallel; print sorted output; non-zero exit if any failed.
 
-**Re-run safety:** if `harness/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
+**Re-run safety:** if `espalier/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
 
 **Debug flags** (NOT used by normal flow): `--copy-only`, `--wire-only`, `--validate-only`, `--dry-run`.
 
@@ -292,7 +295,7 @@ The agent that writes code NEVER reviews its own code. Different `.claude/agents
 | Layer | Content | Mechanism | When |
 |-------|---------|-----------|------|
 | Always | rules/ | `.claude/rules/` symlinks | Every session |
-| Stage | skills/ | `/harness-*` invocation | During that phase |
+| Stage | skills/ | `/espalier-*` invocation | During that phase |
 | Delegated | agents/ | Agent tool prompt | Sub-agent scope |
 | On-demand | wiki/ | Read tool | Agent queries as needed |
 
@@ -309,28 +312,28 @@ After each real task:
 
 ---
 
-## Quick Start (Minimum Viable Harness)
+## Quick Start (Minimum Viable Espalier)
 
 If the full structure is too much, start with 3 files + wiring:
 
 ```bash
-# 1. Create minimum harness
-mkdir -p harness
+# 1. Create minimum espalier
+mkdir -p espalier
 # Write coding-standards.md (Phase 2 output)
 # Write review-skill.md (Phase 3 review output)
 # Write ci-gates.md (programmatic conditions)
 
 # 2. Wire it
 mkdir -p .claude/rules
-ln -sf "$(pwd)/harness/coding-standards.md" .claude/rules/harness-standards.md
+ln -sf "$(pwd)/espalier/coding-standards.md" .claude/rules/espalier-standards.md
 
 # 3. Reference in CLAUDE.md
 cat >> CLAUDE.md << 'EOF'
 
-## Harness (Minimum)
-Before writing code: Read harness/coding-standards.md
-Before marking done: Run review checklist in harness/review-skill.md
-Before pushing: Verify conditions in harness/ci-gates.md
+## Espalier (Minimum)
+Before writing code: Read espalier/coding-standards.md
+Before marking done: Run review checklist in espalier/review-skill.md
+Before pushing: Verify conditions in espalier/ci-gates.md
 EOF
 ```
 
