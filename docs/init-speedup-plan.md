@@ -11,7 +11,7 @@
 ## 0. Goals & Non-Goals
 
 ### Goals
-1. Cut first-run wall clock of `/harness-engineering` on a fresh repo from ~5-15 min to ~1-3 min (~10-20x fewer tool calls, ~5x wall-clock).
+1. Cut first-run wall clock of `/harness-engineering` on a fresh repo from 20+ min to ~10-15 min (~30-50% reduction; fewer round-trips, parallel scouts, bundled bootstrap). Note: earlier draft of this doc claimed ~5x speedup; real-world runs are more modest because discovery scouts and oracle network calls dominate.
 2. Preserve every behavior, output file, gate, and decision from v0.2.1. No semantic change — speedup only via parallelism and bash batching.
 3. Move from ~110-140 sequential tool calls to ~5-7 batched turns.
 4. Bundle Phase 8 + 10 + 11 (Hooks + Wiring + Validation) into one idempotent shell script.
@@ -742,7 +742,7 @@ Track F dropped (workflow-preservation audit). R1/R6/R10/R-extra refinements fol
 ## 15. Success Metrics
 
 After landing v0.3.0:
-- ✓ Fresh-repo wall clock: 5-15 min → 1.5-2.5 min (~75-80% reduction)
+- ✓ Fresh-repo wall clock: 20+ min → 10-15 min (~30-50% reduction)
 - ✓ Tool call count: ~110-140 → ~25-35 raw calls across ~5-7 batched turns
 - ✓ All 24 Phase 11 validation checks pass on 3 reference repos (parallel exec via R6)
 - ✓ Generated files byte-identical to v0.2.1 (modulo discovery-driven substitutions)

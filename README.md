@@ -1,6 +1,6 @@
 # Harness Engineering
 
-> **v0.3.0 is out.** Init speedup — `/harness-engineering` first run is now ~75-80% faster on a fresh repo via parallel discovery scouts + a bundled bootstrap script. Wall clock: 8-12 min → 1.5-2.5 min on a medium codebase. Zero workflow semantic change vs v0.2.x; every artifact in `harness/` is byte-equivalent (modulo discovery-driven substitutions).
+> **v0.3.0 is out.** Init speedup — `/harness-engineering` first run is now ~30-50% faster on a fresh repo via parallel discovery scouts + a bundled bootstrap script. Wall clock: 20+ min → 10-15 min on a medium codebase. Zero workflow semantic change vs v0.2.x; every artifact in `harness/` is byte-equivalent (modulo discovery-driven substitutions).
 > **v0.2.0 features (still in v0.3.0):** `/harness-fix` bug-fix lane, typed `harness/changes/{type}/{slug}/` layout, causal back-links, escalation paths, squash-merge resilience, self-healing reverse-lookup cache.
 > **Existing v0.1.0 users:** see [`docs/migrating-v0.1-to-v0.2.md`](./docs/migrating-v0.1-to-v0.2.md). One script handles the mechanical bits — no full regen needed.
 > **Existing v0.2.x users:** no migration. v0.3.0 only changes how `/harness-engineering` runs on FRESH repos; existing installs keep working unchanged.
@@ -26,7 +26,7 @@ Given any existing repo, the skill:
 
 The result: a per-project constraint system that AI coders pick up automatically. Reduces rework cycles from 3-5 rounds to typically 1.
 
-> **Heads-up on first run:** `/harness-engineering` does real work to discover your codebase — 10 parallel scouts read source files, tests, CI configs, schemas, entry points, and external dependencies. Expect ~1.5-2.5 min on a medium repo (~150 source files), longer on big ones. **It's a one-time tax.** Once `harness/` is generated, every future `/harness-run` and `/harness-fix` invocation reuses it — and the per-project rules cut rework rounds enough that you'll earn the time back inside the first few requirements.
+> **Heads-up on first run:** `/harness-engineering` does real work to discover your codebase — 10 parallel scouts read source files, tests, CI configs, schemas, entry points, and external dependencies. Expect **~10-15 min on a medium repo (~150 source files), longer on big ones**. **It's a one-time tax.** Once `harness/` is generated, every future `/harness-run` and `/harness-fix` invocation reuses it — and the per-project rules cut rework rounds enough that you'll earn the time back inside the first few requirements.
 
 ## When to Use
 
@@ -169,7 +169,7 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Status
 
-`v0.3.0` — **init speedup.** `/harness-engineering` first run on a fresh repo is ~75-80% faster (8-12 min → 5-10 min on a medium codebase). Achieved via parallel discovery scouts (10 calls per batch), parallel substitution-file writes, and a bundled `scripts/bootstrap-harness.sh` collapsing Phase 8 (Hooks) + Phase 10 (Wiring) + Phase 11 (Validation) into one idempotent invocation. Zero workflow semantic change; every artifact byte-equivalent to v0.2.x output (modulo discovery-driven substitutions). Also ships fixes for latent v0.2.x bugs: missing `pre-push-gate-wrapper.sh` template, undefined `.claude/settings.json` merge behavior, unsafe `ln -sf` overwrite, `realpath` portability on macOS.
+`v0.3.0` — **init speedup.** `/harness-engineering` first run on a fresh repo is ~30-50% faster (20+ min → 10-15 min on a medium codebase). Achieved via parallel discovery scouts (10 calls per batch), parallel substitution-file writes, and a bundled `scripts/bootstrap-harness.sh` collapsing Phase 8 (Hooks) + Phase 10 (Wiring) + Phase 11 (Validation) into one idempotent invocation. Zero workflow semantic change; every artifact byte-equivalent to v0.2.x output (modulo discovery-driven substitutions). Also ships fixes for latent v0.2.x bugs: missing `pre-push-gate-wrapper.sh` template, undefined `.claude/settings.json` merge behavior, unsafe `ln -sf` overwrite, `realpath` portability on macOS.
 
 `v0.2.0` — bug-fix lane (`/harness-fix`), typed `harness/changes/{type}/{slug}/` layout, causal back-links between fixes and the changes that introduced them, escalation paths (including late-stage), squash-merge resilience with optional post-merge hook, and self-healing reverse-lookup cache.
 
