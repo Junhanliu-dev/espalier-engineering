@@ -1,5 +1,5 @@
 ---
-name: harness-requirements
+name: espalier-requirements
 description: Requirements analysis skill - decompose requirements into actionable specs
 ---
 

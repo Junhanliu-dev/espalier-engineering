@@ -1,5 +1,5 @@
 #!/bin/bash
-# Smoke tests for bootstrap-harness.sh.
+# Smoke tests for bootstrap-espalier.sh.
 #
 # Creates temp repos, simulates the LLM Write batch (writes minimal placeholder
 # substitution files), invokes bootstrap, and asserts:
@@ -26,8 +26,8 @@ for arg in "$@"; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BOOTSTRAP="$SCRIPT_DIR/bootstrap-harness.sh"
-PLUGIN_DIR="$(cd "$SCRIPT_DIR/../skills/harness-engineering" && pwd)"
+BOOTSTRAP="$SCRIPT_DIR/bootstrap-espalier.sh"
+PLUGIN_DIR="$(cd "$SCRIPT_DIR/../skills/espalier-init" && pwd)"
 PASS=0
 FAIL=0
 FAILED_TESTS=()
@@ -62,24 +62,24 @@ simulate_llm_writes() {
   ( cd "$dir" && bash "$BOOTSTRAP" --copy-only --lang="$lang" --plugin-dir="$PLUGIN_DIR" >/dev/null 2>&1 )
 
   # Rules (substitution)
-  cat > "$dir/harness/rules/engineering-structure.md" << 'EOF'
+  cat > "$dir/espalier/rules/engineering-structure.md" << 'EOF'
 # Engineering Structure
 ## Language & Stack
 - Language: test
 EOF
-  cat > "$dir/harness/rules/coding-standards.md"      << 'EOF'
+  cat > "$dir/espalier/rules/coding-standards.md"      << 'EOF'
 # Coding Standards
 EOF
-  cat > "$dir/harness/rules/development-process.md"   << 'EOF'
+  cat > "$dir/espalier/rules/development-process.md"   << 'EOF'
 # Development Process
 EOF
 
   # Orchestrator
-  echo "# Agent" > "$dir/harness/agent.md"
+  echo "# Agent" > "$dir/espalier/agent.md"
 
   # Skill SKILL.md files (substitution)
-  for s in harness-coding harness-review harness-testing; do
-    cat > "$dir/harness/skills/$s/SKILL.md" << EOF
+  for s in espalier-coding espalier-review espalier-testing; do
+    cat > "$dir/espalier/skills/$s/SKILL.md" << EOF
 ---
 name: $s
 description: smoke test
@@ -87,15 +87,15 @@ description: smoke test
 EOF
   done
 
-  # Sub-agents
-  cat > "$dir/harness/agents/harness-coder.md" << 'EOF'
+  # Sub-agents (names kept as harness-coder/harness-reviewer)
+  cat > "$dir/espalier/agents/harness-coder.md" << 'EOF'
 ---
 name: harness-coder
 description: smoke
 tools: Read, Write
 ---
 EOF
-  cat > "$dir/harness/agents/harness-reviewer.md" << 'EOF'
+  cat > "$dir/espalier/agents/harness-reviewer.md" << 'EOF'
 ---
 name: harness-reviewer
 description: smoke
@@ -105,16 +105,16 @@ EOF
 
   # Wiki
   for f in architecture data-models critical-paths external-services; do
-    echo "# $f" > "$dir/harness/wiki/$f.md"
+    echo "# $f" > "$dir/espalier/wiki/$f.md"
   done
 
   # Substitution hooks
-  cat > "$dir/harness/hooks/pre-push-gate.sh" << 'EOF'
+  cat > "$dir/espalier/hooks/pre-push-gate.sh" << 'EOF'
 #!/bin/bash
 # Smoke pre-push gate
 exit 0
 EOF
-  cat > "$dir/harness/hooks/check-layer-boundaries.sh" << 'EOF'
+  cat > "$dir/espalier/hooks/check-layer-boundaries.sh" << 'EOF'
 #!/bin/bash
 # Smoke boundary check
 exit 0
@@ -126,7 +126,7 @@ echo "Test 1: --dry-run"
 TMP=$(mktemp -d -t smoke1.XXXX)
 make_smoke_repo "$TMP"
 ( cd "$TMP" && bash "$BOOTSTRAP" --dry-run --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
-assert "dry-run made no harness/" "[ ! -d '$TMP/harness' ]"
+assert "dry-run made no espalier/" "[ ! -d '$TMP/espalier' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 2: Full happy path (R1 — single invocation) ─────────────────────
@@ -137,19 +137,20 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 EXIT=$?
 assert "bootstrap exit 0"                 "[ $EXIT -eq 0 ]"
-assert "harness/pipeline.md exists"       "[ -f '$TMP/harness/pipeline.md' ]"
-assert "harness/skills/harness-run/SKILL.md exists" "[ -f '$TMP/harness/skills/harness-run/SKILL.md' ]"
-assert "harness/skills/harness-fix/SKILL.md exists" "[ -f '$TMP/harness/skills/harness-fix/SKILL.md' ]"
-assert ".claude/rules symlinks exist"     "[ -L '$TMP/.claude/rules/harness-structure.md' ]"
-assert ".claude/skills/harness-coding link" "[ -L '$TMP/.claude/skills/harness-coding' ]"
+assert "espalier/pipeline.md exists"       "[ -f '$TMP/espalier/pipeline.md' ]"
+assert "espalier/skills/espalier/SKILL.md exists"     "[ -f '$TMP/espalier/skills/espalier/SKILL.md' ]"
+assert "espalier/skills/espalier-fix/SKILL.md exists" "[ -f '$TMP/espalier/skills/espalier-fix/SKILL.md' ]"
+assert ".claude/rules symlinks exist"     "[ -L '$TMP/.claude/rules/espalier-structure.md' ]"
+assert ".claude/skills/espalier-coding link" "[ -L '$TMP/.claude/skills/espalier-coding' ]"
+assert ".claude/skills/espalier (main) link" "[ -L '$TMP/.claude/skills/espalier' ]"
 assert ".claude/agents/harness-coder link"  "[ -L '$TMP/.claude/agents/harness-coder.md' ]"
-assert "pre-push-gate.sh executable (R10)"      "[ -x '$TMP/harness/hooks/pre-push-gate.sh' ]"
-assert "check-layer-boundaries.sh executable"   "[ -x '$TMP/harness/hooks/check-layer-boundaries.sh' ]"
-assert "post-edit-wrapper.sh executable"        "[ -x '$TMP/harness/hooks/post-edit-wrapper.sh' ]"
-assert "merge decision persisted"               "grep -q ask-later '$TMP/harness/.merge-hook-decision'"
-assert "CLAUDE.md has Harness section"          "grep -q '## Harness Engineering' '$TMP/CLAUDE.md'"
+assert "pre-push-gate.sh executable (R10)"      "[ -x '$TMP/espalier/hooks/pre-push-gate.sh' ]"
+assert "check-layer-boundaries.sh executable"   "[ -x '$TMP/espalier/hooks/check-layer-boundaries.sh' ]"
+assert "post-edit-wrapper.sh executable"        "[ -x '$TMP/espalier/hooks/post-edit-wrapper.sh' ]"
+assert "merge decision persisted"               "grep -q ask-later '$TMP/espalier/.merge-hook-decision'"
+assert "CLAUDE.md has Espalier section"         "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 assert ".claude/settings.json valid JSON"       "python3 -c 'import json,sys; json.load(open(\"$TMP/.claude/settings.json\"))'"
-assert "gitignore has cache entry"              "grep -qxF 'harness/.commit-index.tsv' '$TMP/.gitignore'"
+assert "gitignore has cache entry"              "grep -qxF 'espalier/.commit-index.tsv' '$TMP/.gitignore'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 3: Idempotent re-run (detects complete install → validate only) ─
@@ -180,8 +181,8 @@ echo "Test 5: --copy-only debug flag"
 TMP=$(mktemp -d -t smoke5.XXXX)
 make_smoke_repo "$TMP"
 ( cd "$TMP" && bash "$BOOTSTRAP" --copy-only --lang=py --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
-assert "copy-only created harness/pipeline.md"  "[ -f '$TMP/harness/pipeline.md' ]"
-assert "copy-only did NOT create symlinks"      "[ ! -L '$TMP/.claude/rules/harness-structure.md' ] || [ ! -e '$TMP/.claude/rules/harness-structure.md' ]"
+assert "copy-only created espalier/pipeline.md"  "[ -f '$TMP/espalier/pipeline.md' ]"
+assert "copy-only did NOT create symlinks"      "[ ! -L '$TMP/.claude/rules/espalier-structure.md' ] || [ ! -e '$TMP/.claude/rules/espalier-structure.md' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 6: --wire-only debug flag still works ──────────────────────────
@@ -193,7 +194,7 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
 WIRE_EXIT=$?
 assert "wire-only exit 0"                       "[ $WIRE_EXIT -eq 0 ]"
-assert "wire-only created symlinks"             "[ -L '$TMP/.claude/rules/harness-structure.md' ]"
+assert "wire-only created symlinks"             "[ -L '$TMP/.claude/rules/espalier-structure.md' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 7: safe_ln refuses to clobber regular file ─────────────────────
@@ -202,10 +203,10 @@ TMP=$(mktemp -d -t smoke7.XXXX)
 make_smoke_repo "$TMP"
 simulate_llm_writes "$TMP" ts
 mkdir -p "$TMP/.claude/rules"
-echo "user content" > "$TMP/.claude/rules/harness-structure.md"  # regular file, not symlink
+echo "user content" > "$TMP/.claude/rules/espalier-structure.md"  # regular file, not symlink
 SAFE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "safe_ln blocked regular file"           "echo \"\$SAFE_OUT\" | grep -q 'exists as regular file'"
-assert "user file preserved"                    "[ \"\$(cat '$TMP/.claude/rules/harness-structure.md')\" = 'user content' ]"
+assert "user file preserved"                    "[ \"\$(cat '$TMP/.claude/rules/espalier-structure.md')\" = 'user content' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 8: settings.json merge preserves user hooks ─────────────────────
@@ -223,7 +224,7 @@ cat > "$TMP/.claude/settings.json" << 'EOF'
 EOF
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 assert "user hook survived merge"               "grep -q 'echo user-hook' '$TMP/.claude/settings.json'"
-assert "harness hook added"                     "grep -q 'post-edit-wrapper' '$TMP/.claude/settings.json'"
+assert "Espalier hook added"                    "grep -q 'post-edit-wrapper' '$TMP/.claude/settings.json'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 9: portable abspath (no realpath binary needed) ────────────────
@@ -235,7 +236,7 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && env PATH="/usr/bin:/bin" bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 ABS_EXIT=$?
 assert "bootstrap works without realpath"       "[ $ABS_EXIT -eq 0 ]"
-assert "symlink uses absolute path"             "[ \"\$(readlink '$TMP/.claude/rules/harness-structure.md' | head -c 1)\" = '/' ]"
+assert "symlink uses absolute path"             "[ \"\$(readlink '$TMP/.claude/rules/espalier-structure.md' | head -c 1)\" = '/' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 10: parallel validation output is sorted ────────────────────────

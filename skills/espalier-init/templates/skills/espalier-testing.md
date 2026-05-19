@@ -1,5 +1,5 @@
 ---
-name: harness-testing
+name: espalier-testing
 description: Test writing skill matching project's testing patterns
 ---
 

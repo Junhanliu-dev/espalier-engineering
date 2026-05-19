@@ -1,24 +1,24 @@
 ---
-name: harness-run
-description: Execute the harness development pipeline for a requirement
+name: espalier
+description: Execute the Espalier development pipeline for a requirement
 ---
 
-# Harness Pipeline Runner
+# Espalier Pipeline Runner
 
 ## When to Use
-- "Implement this requirement using the harness"
+- "Implement this requirement using Espalier"
 - "Run the full pipeline for this feature"
-- "/harness-run <requirement description>"
+- "/espalier <requirement description>"
 
 ## Instructions
 
 You are the pipeline orchestrator. For the given requirement, drive it through
-all 10 stages defined in `harness/pipeline.md`.
+all 10 stages defined in `espalier/pipeline.md`.
 
 ### Before Starting
 
-1. Read `harness/pipeline.md` for stage definitions
-2. Check for existing state: look in `harness/changes/` for a matching requirement
+1. Read `espalier/pipeline.md` for stage definitions
+2. Check for existing state: look in `espalier/changes/` for a matching requirement
    - If found, read `pipeline-state.md` and RESUME from the current stage
    - If not found, create a new directory and start from Stage 1
 
@@ -26,7 +26,7 @@ all 10 stages defined in `harness/pipeline.md`.
 
 On every invocation, check:
 ```
-find harness/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md
+find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md
 ```
 
 If any state file is found with an in-progress stage marker (Current Stage < 10):
@@ -57,13 +57,13 @@ Stages 3-6 use sub-agents for separation of concerns:
 Agent tool:
   prompt: |
     You are the harness-coder.
-    Read harness/agents/harness-coder.md for your full instructions.
+    Read espalier/agents/harness-coder.md for your full instructions.
 
     REQUIREMENT: {paste requirement from Stage 1 output}
     TASK: {specific sub-task from decomposition}
 
     When done, write your coding report to:
-    harness/changes/{type}/{slug}/coding-report.md
+    espalier/changes/{type}/{slug}/coding-report.md
 ```
 
 **Stage 4 (Review):**
@@ -71,12 +71,12 @@ Agent tool:
 Agent tool:
   prompt: |
     You are the harness-reviewer.
-    Read harness/agents/harness-reviewer.md for your full instructions.
+    Read espalier/agents/harness-reviewer.md for your full instructions.
 
-    WHAT TO REVIEW: Read harness/changes/{type}/{slug}/coding-report.md to see
+    WHAT TO REVIEW: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what the coder did. Then read the actual files listed there.
 
-    Write your review to: harness/changes/{type}/{slug}/review-record.md
+    Write your review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
 **Stage 5 (Testing):**
@@ -84,12 +84,12 @@ Agent tool:
 Agent tool:
   prompt: |
     You are the harness-coder in testing mode.
-    Read harness/agents/harness-coder.md AND harness/skills/harness-testing/SKILL.md.
+    Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
-    WHAT TO TEST: Read harness/changes/{type}/{slug}/coding-report.md to see
+    WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what was implemented. Write tests for those changes.
 
-    Append test report to: harness/changes/{type}/{slug}/coding-report.md
+    Append test report to: espalier/changes/{type}/{slug}/coding-report.md
 ```
 
 **Stage 6 (Test Review):**
@@ -97,15 +97,15 @@ Agent tool:
 Agent tool:
   prompt: |
     You are the harness-reviewer reviewing tests.
-    Read harness/agents/harness-reviewer.md for your instructions.
+    Read espalier/agents/harness-reviewer.md for your instructions.
 
     WHAT TO REVIEW: The test files created in Stage 5.
-    Read harness/changes/{type}/{slug}/coding-report.md for the list.
+    Read espalier/changes/{type}/{slug}/coding-report.md for the list.
 
     Check: Are tests meaningful? Do they cover edge cases?
-    Do they match project testing patterns in harness/skills/harness-testing/SKILL.md?
+    Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
 
-    Append review to: harness/changes/{type}/{slug}/review-record.md
+    Append review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
 ### State File Format
@@ -119,7 +119,7 @@ Parse `{type}` from the requirement prefix:
 
 Then derive `{slug}` from the remainder of the requirement (kebab-case, max 60 chars, strip slashes).
 
-Create `harness/changes/{type}/{slug}/pipeline-state.md`:
+Create `espalier/changes/{type}/{slug}/pipeline-state.md`:
 
 ```markdown
 # Pipeline State: {requirement title}
@@ -150,7 +150,7 @@ append to the state file's Commits table.
 ```bash
 SHA=$(git rev-parse HEAD)
 FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ',' | sed 's/,$//')
-STATE="harness/changes/${TYPE}/${SLUG}/pipeline-state.md"
+STATE="espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
 
 # Ensure section exists
 if ! grep -q "^## Commits" "$STATE"; then
@@ -167,14 +167,14 @@ if ! grep -qE "^\| 7 \| ${SHA} " "$STATE"; then
   echo "| 7 | $SHA | $FILES |" >> "$STATE"
 fi
 
-# Self-heal reverse-lookup cache (Phase 4.6 — silently no-op if helpers absent)
-[ -f harness/hooks/lookup-helpers.sh ] && {
-  . harness/hooks/lookup-helpers.sh
+# Self-heal reverse-lookup cache (silently no-op if helpers absent)
+[ -f espalier/hooks/lookup-helpers.sh ] && {
+  . espalier/hooks/lookup-helpers.sh
   _cache_append "$SHA" "${TYPE}/${SLUG}" "original"
 }
 ```
 
-This commit-record is read at fix-time by `/harness-fix` Stage 0 reverse lookup,
+This commit-record is read at fix-time by `/espalier-fix` Stage 0 reverse lookup,
 and used by the post-merge hook for squash-merge mapping.
 
 ### Stage 7 Reverse-link to PARTIAL_FIX (when applicable)
@@ -186,11 +186,11 @@ fix's pipeline-state.md so the audit chain closes:
 > Variables in scope: `TYPE` and `SLUG` are the active change's identifiers.
 
 ```bash
-REQS="harness/changes/${TYPE}/${SLUG}/requirements.md"
+REQS="espalier/changes/${TYPE}/${SLUG}/requirements.md"
 FILED_FROM=$(grep '^filed_from_partial_fix:' "$REQS" 2>/dev/null | awk '{print $2}')
 
 if [ -n "$FILED_FROM" ]; then
-  PARTIAL_STATE="harness/changes/${FILED_FROM}/pipeline-state.md"
+  PARTIAL_STATE="espalier/changes/${FILED_FROM}/pipeline-state.md"
   if [ -f "$PARTIAL_STATE" ]; then
     # Update Root Cause Status line
     if [ "$(uname)" = "Darwin" ]; then

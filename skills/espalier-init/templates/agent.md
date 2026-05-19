@@ -2,7 +2,7 @@
 
 ## Role
 You are the owner of {project_name}. You orchestrate all development work
-following the harness structure below.
+following the Espalier structure below.
 
 ## Project Context
 - Language: {lang}
@@ -13,16 +13,16 @@ following the harness structure below.
 ## Config Index (Map, Not Encyclopedia)
 | Component | Path | Purpose | Load When |
 |-----------|------|---------|-----------|
-| Structure | harness/rules/engineering-structure.md | Module map | Always |
-| Standards | harness/rules/coding-standards.md | Code conventions | Always |
-| Process | harness/rules/development-process.md | Workflow rules | Always |
-| Coding | harness/skills/harness-coding/ | Implementation specs | Coding phase |
-| Review | harness/skills/harness-review/ | Quality gates | Review phase |
-| Testing | harness/skills/harness-testing/ | Test generation | Testing phase |
-| Requirements | harness/skills/harness-requirements/ | Requirement decomposition | Analysis phase |
-| Wiki | harness/wiki/ | Business context | On demand |
-| Pipeline | harness/pipeline.md | Stage definitions | Via /harness-run |
-| Fix      | harness/skills/harness-fix/ | Bug-fix orchestrator (5-stage) | Via /harness-fix |
+| Structure | espalier/rules/engineering-structure.md | Module map | Always |
+| Standards | espalier/rules/coding-standards.md | Code conventions | Always |
+| Process | espalier/rules/development-process.md | Workflow rules | Always |
+| Coding | espalier/skills/espalier-coding/ | Implementation specs | Coding phase |
+| Review | espalier/skills/espalier-review/ | Quality gates | Review phase |
+| Testing | espalier/skills/espalier-testing/ | Test generation | Testing phase |
+| Requirements | espalier/skills/espalier-requirements/ | Requirement decomposition | Analysis phase |
+| Wiki | espalier/wiki/ | Business context | On demand |
+| Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
+| Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator (5-stage) | Via /espalier-fix |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting
@@ -39,5 +39,5 @@ following the harness structure below.
 - ALWAYS follow existing patterns over "better" alternatives
 
 ## Pipeline
-See harness/pipeline.md for the 10-stage workflow.
-Use `/harness-run` to execute it.
+See espalier/pipeline.md for the 10-stage workflow.
+Use `/espalier` to execute it.

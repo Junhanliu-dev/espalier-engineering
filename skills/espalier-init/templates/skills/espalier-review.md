@@ -1,5 +1,5 @@
 ---
-name: harness-review
+name: espalier-review
 description: Expert review skill with project-specific checklist
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: harness-coding
+name: espalier-coding
 description: Implementation skill with per-layer specs for this project
 ---
 
@@ -11,8 +11,8 @@ description: Implementation skill with per-layer specs for this project
 
 ## Layer Specs
 {for each discovered layer, reference its spec file}
-- Read `harness/skills/harness-coding/specs/{layer-a}.md` when working in {layer A}
-- Read `harness/skills/harness-coding/specs/{layer-b}.md` when working in {layer B}
+- Read `espalier/skills/espalier-coding/specs/{layer-a}.md` when working in {layer A}
+- Read `espalier/skills/espalier-coding/specs/{layer-b}.md` when working in {layer B}
 
 ## Implementation Checklist
 - [ ] {project-specific step 1}
