@@ -1,5 +1,7 @@
 # Phase 11: Validation (Dry Run)
 
+> **v0.3.0+ note:** Phase 11 runs via `scripts/bootstrap-harness.sh` (Stage 11 of that script — 24 checks executed in parallel). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-harness.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits). The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
+
 After all generation and wiring is complete, validate end-to-end.
 
 ## Final Wiring Verification
