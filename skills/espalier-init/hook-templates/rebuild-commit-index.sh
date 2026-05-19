@@ -1,32 +1,32 @@
 #!/bin/bash
-# Reconstruct harness/.commit-index.tsv from pipeline-state.md files.
+# Reconstruct espalier/.commit-index.tsv from pipeline-state.md files.
 #
 # Safe to run anytime — overwrites in place. Idempotent.
 # Source of truth lives in pipeline-state.md Commits + Squash Merges tables;
 # this script just denormalizes those into a fast-lookup TSV.
 #
 # Triggered by:
-#   /harness-fix --build-index      (continue normally after)
-#   /harness-fix --rebuild-index    (delete cache first, then rebuild)
-#   Auto-build on first cold scan > HARNESS_CACHE_THRESHOLD_MS (default 1000ms)
+#   /espalier-fix --build-index      (continue normally after)
+#   /espalier-fix --rebuild-index    (delete cache first, then rebuild)
+#   Auto-build on first cold scan > ESPALIER_CACHE_THRESHOLD_MS (default 1000ms)
 
 # NOTE: no `set -e` — awk failures on a single malformed pipeline-state.md
 # should not crash the whole rebuild. Errors are best-effort logged.
-INDEX="harness/.commit-index.tsv"
+INDEX="espalier/.commit-index.tsv"
 TMP="${INDEX}.tmp.$$"
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-if [ ! -d "harness/changes" ]; then
-  echo "ERROR: harness/changes/ not found. Run from project root." >&2
+if [ ! -d "espalier/changes" ]; then
+  echo "ERROR: espalier/changes/ not found. Run from project root." >&2
   exit 1
 fi
 
 # Clean tmp on exit
 trap 'rm -f "$TMP"' EXIT
 
-# Walk every pipeline-state.md at depth 3 (harness/changes/{type}/{slug}/)
-find harness/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/null | while read -r f; do
-  SLUG=$(echo "$f" | sed 's|harness/changes/||; s|/pipeline-state.md||')
+# Walk every pipeline-state.md at depth 3 (espalier/changes/{type}/{slug}/)
+find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/null | while read -r f; do
+  SLUG=$(echo "$f" | sed 's|espalier/changes/||; s|/pipeline-state.md||')
 
   # Extract from Commits table (Stage 7 push records).
   # Markdown row format: | stage | sha | files |

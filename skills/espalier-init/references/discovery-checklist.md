@@ -2,7 +2,7 @@
 
 **Goal:** Understand what this project IS before prescribing anything.
 
-In v0.3.0 this phase runs as ONE parallel batch (10 calls in a single message). See "Parallel Execution Recipe" below for copy-paste scout prompts. Sections 1.1-1.10 describe what each call covers.
+This phase runs as ONE parallel batch (10 calls in a single message). See "Parallel Execution Recipe" below for copy-paste scout prompts. Sections 1.1-1.10 describe what each call covers.
 
 ## 1.1 Detect Language & Framework
 
@@ -92,29 +92,29 @@ After detecting the stack, research current best practices for that specific lan
 
 Why both: ctx7 catches official/authoritative recommendations; WebSearch catches community drift, recent vulnerabilities, and idioms not yet in docs. Running them concurrently costs the same wall time as either alone but doubles coverage.
 
-Compare what the project does vs. what the ecosystem recommends. The harness should encode **the project's actual conventions** (even if they differ from ecosystem defaults), but flag divergences for the wiki.
+Compare what the project does vs. what the ecosystem recommends. Espalier should encode **the project's actual conventions** (even if they differ from ecosystem defaults), but flag divergences for the wiki.
 
 ## 1.8 Detect Data Models (wiki scout)
 
 Find schema files and entity definitions. Look for: `prisma/schema.prisma`, `**/models/`, `**/entities/`, `**/schemas/`, SQLAlchemy models, Mongoose schemas, Gorm structs, ActiveRecord migrations, JPA `@Entity`, etc.
 
-Output: entity list with `{name, file, fields_sample, relationships}`. Feeds `harness/wiki/data-models.md`.
+Output: entity list with `{name, file, fields_sample, relationships}`. Feeds `espalier/wiki/data-models.md`.
 
 ## 1.9 Detect Critical Paths (wiki scout)
 
 Trace entry points to primary business flows. Look at request handlers (controllers, routes), CLI entry points (`main` / `cmd/`), cron jobs, message consumers. For each entry, identify which 3-5 files are touched downstream.
 
-Output: `{entry_points, primary_flows: [{name, files_touched, layers}], modification_hotspots}`. Feeds `harness/wiki/critical-paths.md`.
+Output: `{entry_points, primary_flows: [{name, files_touched, layers}], modification_hotspots}`. Feeds `espalier/wiki/critical-paths.md`.
 
 ## 1.10 Detect External Services (wiki scout)
 
 Grep for SDK imports (`stripe`, `aws-sdk`, `redis`, `kafka`, `postgres`, `elasticsearch`, `openai`, etc.). Read env-var config (`.env.example`, `config/`). Look for timeout / retry / circuit-breaker patterns.
 
-Output: `{services: [{name, purpose, config_location}], env_vars, timeout_retry_patterns}`. Feeds `harness/wiki/external-services.md`.
+Output: `{services: [{name, purpose, config_location}], env_vars, timeout_retry_patterns}`. Feeds `espalier/wiki/external-services.md`.
 
 ---
 
-## Parallel Execution Recipe (v0.3.0)
+## Parallel Execution Recipe
 
 In one message, issue these 10 tool calls concurrently:
 

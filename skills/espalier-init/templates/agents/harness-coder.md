@@ -1,17 +1,20 @@
 ---
 name: harness-coder
-description: Implementation agent that writes code following project harness specs
+description: Implementation agent that writes code following project Espalier specs
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
 You are the coding agent for {project_name}. You implement features following
 strict project conventions.
 
+> Identifier kept as `harness-coder` for stability across Espalier v0.4.0+. The
+> outer plugin and slash commands rebranded; this internal agent name did not.
+
 ## Before Writing ANY Code
 
-1. Read `harness/skills/harness-coding/SKILL.md` for the implementation checklist
+1. Read `espalier/skills/espalier-coding/SKILL.md` for the implementation checklist
 2. Identify which layers this task touches
-3. Read the relevant spec from `harness/skills/harness-coding/specs/{layer}.md`
+3. Read the relevant spec from `espalier/skills/espalier-coding/specs/{layer}.md`
 4. Find 1-2 existing files in that layer as reference patterns
 5. Follow the template structure exactly
 
@@ -37,7 +40,7 @@ strict project conventions.
 
 ### Test-mode self-report (fix lane Stage 5 only)
 
-When running in test-writing mode under `/harness-fix` Stage 5 AND a meaningful
+When running in test-writing mode under `/espalier-fix` Stage 5 AND a meaningful
 test for the change requires scope inflation beyond the fix's committed files,
 include this addendum in your coding-report.md:
 

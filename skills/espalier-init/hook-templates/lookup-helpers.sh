@@ -1,5 +1,5 @@
 #!/bin/bash
-# Reverse-lookup helpers for /harness-fix Stage 0.
+# Reverse-lookup helpers for /espalier-fix Stage 0.
 # Sourced (not executed) by the skill. All functions are pure shell so they
 # can run in any POSIX-compatible environment.
 #
@@ -8,7 +8,7 @@
 #   _push_note_entry "<text>"          — append a `- note: ...` overflow row
 #   _dedupe_entries_preserve_primary   — drop dup slugs; primary wins over call_path
 #   _fuzzy_file_overlap_match <sha>    — fuzzy slug lookup by file-overlap heuristic
-#   _cache_append sha slug kind        — idempotent write to harness/.commit-index.tsv
+#   _cache_append sha slug kind        — idempotent write to espalier/.commit-index.tsv
 #   _maybe_warn_slow_scan <start_ns>   — warn (and maybe auto-build cache) if scan exceeded threshold
 #   _prompt_user_for_merge_decision    — fix-time fallback prompt (decision = ask-later)
 
@@ -73,7 +73,7 @@ _dedupe_entries_preserve_primary() {
   ENTRIES_LOOKUP=("${OUT_LOOKUP[@]}")
 }
 
-# Fuzzy: given a (squash) SHA, find the harness change whose Commits table
+# Fuzzy: given a (squash) SHA, find the Espalier change whose Commits table
 # has the largest overlap of file paths with this SHA's tree. Threshold 50%.
 # Stdout: slug ("feat/foo") or empty string. Used by Layer 3 fallback when no
 # squash hook recorded the mapping.
@@ -84,7 +84,7 @@ _fuzzy_file_overlap_match() {
   FILES=$(git diff-tree --no-commit-id --name-only -r "$SHA" 2>/dev/null)
   [ -z "$FILES" ] && return 0
 
-  for state in harness/changes/*/*/pipeline-state.md; do
+  for state in espalier/changes/*/*/pipeline-state.md; do
     [ -f "$state" ] || continue
     case "$state" in *_template*) continue ;; esac
 
@@ -101,7 +101,7 @@ _fuzzy_file_overlap_match() {
   TOTAL=$(echo "$FILES" | wc -l | tr -d ' ')
   THRESHOLD=$(( (TOTAL + 1) / 2 ))
   if [ "$BEST_COUNT" -ge "$THRESHOLD" ] && [ -n "$BEST_STATE" ]; then
-    SLUG=$(echo "$BEST_STATE" | sed 's|harness/changes/||; s|/pipeline-state.md||')
+    SLUG=$(echo "$BEST_STATE" | sed 's|espalier/changes/||; s|/pipeline-state.md||')
     echo "$SLUG"
   fi
 }
@@ -109,7 +109,7 @@ _fuzzy_file_overlap_match() {
 # Append one row to reverse-lookup cache, idempotent (skip if SHA+kind already present).
 _cache_append() {
   local SHA="$1" SLUG="$2" KIND="$3"
-  local CACHE="harness/.commit-index.tsv"
+  local CACHE="espalier/.commit-index.tsv"
 
   [ -z "$SHA" ] || [ -z "$SLUG" ] && return 0
   [ ! -f "$CACHE" ] && touch "$CACHE"
@@ -126,7 +126,8 @@ _maybe_warn_slow_scan() {
   local START="$1"
   local END THRESHOLD_MS DURATION_MS CHANGE_COUNT
 
-  THRESHOLD_MS="${HARNESS_CACHE_THRESHOLD_MS:-1000}"
+  # ESPALIER_CACHE_THRESHOLD_MS preferred; HARNESS_CACHE_THRESHOLD_MS honored for legacy callers.
+  THRESHOLD_MS="${ESPALIER_CACHE_THRESHOLD_MS:-${HARNESS_CACHE_THRESHOLD_MS:-1000}}"
   [ "$THRESHOLD_MS" = "0" ] && return 0
 
   END=$(date +%s%N 2>/dev/null || date +%s)
@@ -148,28 +149,27 @@ _maybe_warn_slow_scan() {
 
   [ "$DURATION_MS" -lt "$THRESHOLD_MS" ] && return 0
 
-  CHANGE_COUNT=$(find harness/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
+  CHANGE_COUNT=$(find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
   echo "WARNING: reverse-lookup scan took ${DURATION_MS}ms across ${CHANGE_COUNT} changes." >&2
 
-  if [ ! -f "harness/.commit-index.tsv" ]; then
+  if [ ! -f "espalier/.commit-index.tsv" ]; then
     echo "Building reverse-lookup cache automatically (one-time)..." >&2
-    if [ -x "harness/hooks/rebuild-commit-index.sh" ]; then
-      bash harness/hooks/rebuild-commit-index.sh
+    if [ -x "espalier/hooks/rebuild-commit-index.sh" ]; then
+      bash espalier/hooks/rebuild-commit-index.sh
       echo "Cache built. Future lookups will be O(1)." >&2
     else
-      echo "Cache builder not found at harness/hooks/rebuild-commit-index.sh — skipping auto-build." >&2
+      echo "Cache builder not found at espalier/hooks/rebuild-commit-index.sh — skipping auto-build." >&2
     fi
   else
     echo "Cache exists but scan still triggered (likely missed entries). Consider:" >&2
-    echo "  /harness-fix --rebuild-index   # full rebuild from pipeline-state.md files" >&2
+    echo "  /espalier-fix --rebuild-index   # full rebuild from pipeline-state.md files" >&2
   fi
 }
 
 # Fix-time prompt (only fires when DECISION=ask-later). Writes user's choice
-# to harness/.merge-hook-decision, then caller re-reads + re-loops the SHA.
-# This violates [[feedback-prompt-timing]] only nominally — it's the rescue
-# path for when init-time decision was deferred. After this fires once, all
-# future invocations are silent.
+# to espalier/.merge-hook-decision, then caller re-reads + re-loops the SHA.
+# This is the rescue path for when init-time decision was deferred. After this
+# fires once, all future invocations are silent.
 _prompt_user_for_merge_decision() {
   cat >&2 << 'EOF'
 
@@ -177,7 +177,7 @@ Heads up — first fix in this repo. Need to decide one thing.
 
 This repo's merge strategy affects bug-to-commit traceability.
 
-Options (write your choice to harness/.merge-hook-decision):
+Options (write your choice to espalier/.merge-hook-decision):
 
   not-needed    — Repo uses rebase or merge-commit; SHAs preserved on main
   installed     — Install post-merge git hook to record squash mappings (recommended for squash repos)
@@ -189,14 +189,15 @@ EOF
 
   # In an interactive skill, the orchestrator calls this and then uses
   # AskUserQuestion to capture the choice. In a non-interactive run, default
-  # to skip-only to avoid hanging.
-  if [ -z "$HARNESS_NONINTERACTIVE" ]; then
-    # Placeholder — actual harness-fix skill uses AskUserQuestion and writes the file.
+  # to skip-only to avoid hanging. ESPALIER_NONINTERACTIVE preferred;
+  # HARNESS_NONINTERACTIVE honored for legacy callers.
+  if [ -z "${ESPALIER_NONINTERACTIVE:-${HARNESS_NONINTERACTIVE:-}}" ]; then
+    # Placeholder — actual espalier-fix skill uses AskUserQuestion and writes the file.
     # If you're running this directly, edit the decision file by hand:
-    #   echo "fuzzy-allowed" > harness/.merge-hook-decision
+    #   echo "fuzzy-allowed" > espalier/.merge-hook-decision
     :
   else
-    echo "skip-only" > harness/.merge-hook-decision
+    echo "skip-only" > espalier/.merge-hook-decision
     echo "Non-interactive mode: defaulted to skip-only." >&2
   fi
 }
