@@ -1,24 +1,24 @@
 ---
-name: harness-fix
+name: espalier-fix
 description: Bug-fix orchestrator — 5-stage pipeline with auto-link to the change that introduced the bug
 ---
 
-# Harness Fix Runner
+# Espalier Fix Runner
 
 ## When to Use
 - "Fix the bug in <file>:<line>"
-- "/harness-fix <bug description>"
+- "/espalier-fix <bug description>"
 - "Bug: NPE at src/payment.ts:42"
 
 Do NOT use for:
-- Features ("add X") → use `/harness-run feat: …`
-- Refactors with no behaviour change → use `/harness-run refactor: …`
-- Fixes that obviously cross >5 files, multiple layers, or require schema changes → use `/harness-run fix: …` directly (full pipeline)
+- Features ("add X") → use `/espalier feat: …`
+- Refactors with no behaviour change → use `/espalier refactor: …`
+- Fixes that obviously cross >5 files, multiple layers, or require schema changes → use `/espalier fix: …` directly (full pipeline)
 
-## Pipeline Overview (5 stages, vs 10 for harness-run)
+## Pipeline Overview (5 stages, vs 10 for /espalier)
 
-| Stage | Name | Skipped from harness-run? |
-|-------|------|---------------------------|
+| Stage | Name | Skipped from /espalier? |
+|-------|------|-------------------------|
 | 0 | Auto-link Discovery | NEW (fix-only) |
 | 1 | Bug Requirements | Slimmer than feat reqs |
 | 3 | Coding | Same |
@@ -39,12 +39,12 @@ Skipped from full pipeline:
 |------|--------|
 | `--slug <name>` | Override auto-derived slug (see Slug Derivation below). Must match `^[a-z0-9][a-z0-9-]{0,79}$`. |
 | `--caused-by <slug>` | Skip blame, explicit causal link (e.g. `--caused-by feat/bulk-export-endpoint`). |
-| `--build-index` | Run `harness/hooks/rebuild-commit-index.sh`, then continue normally. |
-| `--rebuild-index` | Delete `harness/.commit-index.tsv`, then run rebuild (forces fresh state). |
+| `--build-index` | Run `espalier/hooks/rebuild-commit-index.sh`, then continue normally. |
+| `--rebuild-index` | Delete `espalier/.commit-index.tsv`, then run rebuild (forces fresh state). |
 | `--no-index` | Bypass reverse-lookup cache for this invocation only (debug). |
 
 Env vars:
-- `HARNESS_CACHE_THRESHOLD_MS=<ms>` — override the auto-build slow-scan threshold (default 1000ms; 0 = never warn).
+- `ESPALIER_CACHE_THRESHOLD_MS=<ms>` — override the auto-build slow-scan threshold (default 1000ms; 0 = never warn). Legacy `HARNESS_CACHE_THRESHOLD_MS` also honored.
 
 ### Flag Handling (parsed at invocation entry)
 
@@ -70,15 +70,15 @@ esac
 
 # Pre-Stage-0 actions
 if [ "$DO_REBUILD_INDEX" = "yes" ]; then
-  rm -f harness/.commit-index.tsv
-  bash harness/hooks/rebuild-commit-index.sh
+  rm -f espalier/.commit-index.tsv
+  bash espalier/hooks/rebuild-commit-index.sh
 elif [ "$DO_BUILD_INDEX" = "yes" ]; then
-  bash harness/hooks/rebuild-commit-index.sh
+  bash espalier/hooks/rebuild-commit-index.sh
 fi
 
 # Stage 0 then reads $NO_INDEX, $SLUG_OVERRIDE, $CAUSED_BY_OVERRIDE.
 # Source helpers once:
-. harness/hooks/lookup-helpers.sh
+. espalier/hooks/lookup-helpers.sh
 ```
 
 The remaining (flag-stripped) text becomes the bug description fed to Slug Derivation step 2+.
@@ -86,8 +86,8 @@ The remaining (flag-stripped) text becomes the bug description fed to Slug Deriv
 ## Slug & Path
 
 - Slug derivation: see Slug Derivation section below. Summary: sanitize bug input → kebab-case ASCII, max 80 chars; `--slug <name>` overrides; collision prompts user.
-- Path = `harness/changes/fix/{slug}/`
-- All files inherit from `harness/changes/_template/`.
+- Path = `espalier/changes/fix/{slug}/`
+- All files inherit from `espalier/changes/_template/`.
 
 ## Slug Derivation
 
@@ -101,7 +101,7 @@ If user passed `--slug <name>`:
 
 ### Step 2: Strip type prefix
 `fix: foo bar` → `foo bar`
-`feat: ignored` → error (wrong skill — harness-fix should only see fix-shape input)
+`feat: ignored` → error (wrong skill — espalier-fix should only see fix-shape input)
 
 ### Step 3: Lowercase
 `NPE In Cart` → `npe in cart`
@@ -147,7 +147,7 @@ prefix with `fix-`
 If starts with hyphen (post-sanitization edge case): prefix with `x-`
 
 ### Step 11: Collision detection + prompt
-Check `harness/changes/fix/{slug}/` (and tombstones at `harness/changes/fix/{slug}/TOMBSTONE.md`):
+Check `espalier/changes/fix/{slug}/` (and tombstones at `espalier/changes/fix/{slug}/TOMBSTONE.md`):
 
 | Existing state | Action |
 |----------------|--------|
@@ -162,7 +162,7 @@ Collision prompt (use `AskUserQuestion`):
 ```
 Slug collision detected.
 
-Existing: harness/changes/fix/{slug}/ — Status: {EXISTING_STATUS}
+Existing: espalier/changes/fix/{slug}/ — Status: {EXISTING_STATUS}
 {If PARTIAL_FIX: Root cause feat: {root_cause_feat}}
 {If COMPLETE: Closed on {date}}
 
@@ -177,18 +177,18 @@ Options:
 
 ### Step 12: Final validation
 - Confirm slug matches `^[a-z0-9][a-z0-9-]{0,79}$` one more time.
-- Confirm `harness/changes/fix/{slug}/` is now creatable (does not exist OR was user-confirmed for reuse).
+- Confirm `espalier/changes/fix/{slug}/` is now creatable (does not exist OR was user-confirmed for reuse).
 
 ## Before Starting
 
-1. Read `harness/pipeline.md` for stage definitions (Stages 3-7 unchanged from harness-run).
+1. Read `espalier/pipeline.md` for stage definitions (Stages 3-7 unchanged from /espalier).
 2. Check session resumption:
    ```bash
-   find harness/changes/fix -mindepth 2 -maxdepth 2 -name pipeline-state.md
+   find espalier/changes/fix -mindepth 2 -maxdepth 2 -name pipeline-state.md
    ```
    Read each, look for `Current Stage:` < 7 (in-progress).
 3. If matching slug found, RESUME from current stage.
-4. Otherwise, derive slug (above) and create new `harness/changes/fix/{slug}/`.
+4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`.
 
 ## Stage 0: Auto-Link Discovery (NEW)
 
@@ -200,7 +200,7 @@ Priority order (try each until one succeeds):
 
 | Priority | Source | Example | Extracts |
 |----------|--------|---------|----------|
-| 1 | `--caused-by <slug>` flag | `/harness-fix --caused-by feat/bulk-export NPE...` | slug directly, skip blame |
+| 1 | `--caused-by <slug>` flag | `/espalier-fix --caused-by feat/bulk-export NPE...` | slug directly, skip blame |
 | 2 | `file:line` pattern in bug text | `src/payment.ts:42` | file, line |
 | 3 | Stack trace block | `at handler (src/auth.ts:88:14)` | list of file:line frames |
 | 4 | Bare file path | `bug in src/payment.ts` | file only |
@@ -209,21 +209,21 @@ Priority order (try each until one succeeds):
 
 ### 0.2 Tiered reverse-lookup chain
 
-Per-SHA lookup runs through Layers 0-3. `harness/.merge-hook-decision`
-(written at `/harness-engineering` init via plan §6.5) governs Layer 3.
+Per-SHA lookup runs through Layers 0-3. `espalier/.merge-hook-decision`
+(written at `/espalier-init` time) governs Layer 3.
 
 > Prerequisite: source helpers once before this block runs (also done by Flag Handling section):
-> `. harness/hooks/lookup-helpers.sh`
+> `. espalier/hooks/lookup-helpers.sh`
 
 ```bash
-DECISION=$(cat harness/.merge-hook-decision 2>/dev/null || echo "ask-later")
+DECISION=$(cat espalier/.merge-hook-decision 2>/dev/null || echo "ask-later")
 
 # Resolve ask-later UPFRONT so the inner loop never hits a prompt.
 # (Prompt is the only path that needs user input mid-loop; hoisting avoids
 # the "skip-current-SHA after prompt" trap that `continue` inside `case` causes.)
 if [ "$DECISION" = "ask-later" ] || [ -z "$DECISION" ]; then
   _prompt_user_for_merge_decision
-  DECISION=$(cat harness/.merge-hook-decision 2>/dev/null || echo "skip-only")
+  DECISION=$(cat espalier/.merge-hook-decision 2>/dev/null || echo "skip-only")
 fi
 
 # Build entries in stack-trace order. Index 0 = primary, rest = call_path. Cap=5.
@@ -238,9 +238,9 @@ for IDX in "${!SHAS[@]}"; do
   SHA="${SHAS[$IDX]}"
   ROLE=$([ "$IDX" = "0" ] && echo "primary" || echo "call_path")
 
-  # Layer 0: cache hit (Phase 4.6 — fast path)
-  if [ "$NO_INDEX" != "yes" ] && [ -f "harness/.commit-index.tsv" ]; then
-    CACHE_HIT=$(grep "^$SHA	" harness/.commit-index.tsv 2>/dev/null | head -1)
+  # Layer 0: cache hit (fast path)
+  if [ "$NO_INDEX" != "yes" ] && [ -f "espalier/.commit-index.tsv" ]; then
+    CACHE_HIT=$(grep "^$SHA	" espalier/.commit-index.tsv 2>/dev/null | head -1)
     if [ -n "$CACHE_HIT" ]; then
       SLUG=$(echo "$CACHE_HIT" | cut -f2)
       KIND=$(echo "$CACHE_HIT" | cut -f3)
@@ -252,8 +252,8 @@ for IDX in "${!SHAS[@]}"; do
 
   # Layer 1: exact SHA match (scan + self-heal cache)
   SCAN_START=$(date +%s%N 2>/dev/null || date +%s)
-  SLUG=$(grep -lr "$SHA" harness/changes/*/*/pipeline-state.md 2>/dev/null \
-         | head -1 | sed 's|harness/changes/||; s|/pipeline-state.md||')
+  SLUG=$(grep -lr "$SHA" espalier/changes/*/*/pipeline-state.md 2>/dev/null \
+         | head -1 | sed 's|espalier/changes/||; s|/pipeline-state.md||')
   _maybe_warn_slow_scan "$SCAN_START"
   if [ -n "$SLUG" ]; then
     _push_entry "$SLUG" "$SHA" "$ROLE" "exact"
@@ -263,8 +263,8 @@ for IDX in "${!SHAS[@]}"; do
 
   # Layer 2: hook-recorded squash mapping (self-heal cache)
   SCAN_START=$(date +%s%N 2>/dev/null || date +%s)
-  SLUG=$(grep -lr "squashed_to: $SHA" harness/changes/*/*/pipeline-state.md 2>/dev/null \
-         | head -1 | sed 's|harness/changes/||; s|/pipeline-state.md||')
+  SLUG=$(grep -lr "squashed_to: $SHA" espalier/changes/*/*/pipeline-state.md 2>/dev/null \
+         | head -1 | sed 's|espalier/changes/||; s|/pipeline-state.md||')
   _maybe_warn_slow_scan "$SCAN_START"
   if [ -n "$SLUG" ]; then
     _push_entry "$SLUG" "$SHA" "$ROLE" "squash_hook"
@@ -303,7 +303,7 @@ _dedupe_entries_preserve_primary
 
 Helpers (`_push_entry`, `_push_note_entry`, `_dedupe_entries_preserve_primary`,
 `_fuzzy_file_overlap_match`, `_prompt_user_for_merge_decision`,
-`_cache_append`, `_maybe_warn_slow_scan`) live in `harness/hooks/lookup-helpers.sh`
+`_cache_append`, `_maybe_warn_slow_scan`) live in `espalier/hooks/lookup-helpers.sh`
 and are sourced at Stage 0 entry.
 
 ### 0.3 Per-entry frontmatter shape
@@ -334,9 +334,9 @@ caused_by:
 ### 0.4 Load linked context for Stage 1
 
 For each `caused_by` entry where slug ∉ {unknown, unknown_squash}:
-- Read `harness/changes/{slug}/requirements.md` (original intent)
-- Read `harness/changes/{slug}/coding-report.md` (what shipped)
-- Read `harness/changes/{slug}/review-record.md` (predicted concerns — especially dismissed P2/P3)
+- Read `espalier/changes/{slug}/requirements.md` (original intent)
+- Read `espalier/changes/{slug}/coding-report.md` (what shipped)
+- Read `espalier/changes/{slug}/review-record.md` (predicted concerns — especially dismissed P2/P3)
 
 If combined linked context > 8K tokens, summarize each linked change to acceptance-criteria + open P2/P3 findings only. Full files available via Read on demand during Stage 3.
 
@@ -350,7 +350,7 @@ Append to pipeline-state.md Stage History:
 
 ## Stage 1: Bug Requirements (slimmer than feat reqs)
 
-Write `harness/changes/fix/{slug}/requirements.md`:
+Write `espalier/changes/fix/{slug}/requirements.md`:
 
 ```yaml
 ---
@@ -390,21 +390,21 @@ Spawn sub-agent. Prompt:
 
 ```
 You are the harness-coder.
-Read harness/agents/harness-coder.md for full instructions.
+Read espalier/agents/harness-coder.md for full instructions.
 
 REQUIREMENT: {paste requirement summary from Stage 1}
 CAUSED BY: {caused_by list — read those changes' requirements + coding-report + review-record}
 TASK: Fix the bug described above. Stay within the file(s) identified.
 
 When done, write your coding report to:
-harness/changes/fix/{slug}/coding-report.md
+espalier/changes/fix/{slug}/coding-report.md
 ```
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
 ## Stage 4: Code Review
 
-Spawn `harness-reviewer`. Output to `harness/changes/fix/{slug}/review-record.md`.
+Spawn `harness-reviewer`. Output to `espalier/changes/fix/{slug}/review-record.md`.
 
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
@@ -415,9 +415,9 @@ Spawn `harness-coder` in testing mode:
 
 ```
 You are the harness-coder in TESTING MODE.
-Read harness/agents/harness-coder.md AND harness/skills/harness-testing/SKILL.md.
+Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
-WHAT WAS BUILT: Read harness/changes/fix/{slug}/coding-report.md.
+WHAT WAS BUILT: Read espalier/changes/fix/{slug}/coding-report.md.
 ORIGINAL CAUSE (for regression test scope): {paste caused_by entries}
 
 Write tests for the fix. Required:
@@ -431,12 +431,12 @@ additional files or crossing a layer boundary), append the Test Scope
 Signal block to your coding-report.md per harness-coder.md instructions —
 do NOT silently expand scope.
 
-Append test results to: harness/changes/fix/{slug}/coding-report.md
+Append test results to: espalier/changes/fix/{slug}/coding-report.md
 ```
 
 After sub-agent returns:
 ```bash
-COD="harness/changes/fix/${SLUG}/coding-report.md"
+COD="espalier/changes/fix/${SLUG}/coding-report.md"
 if grep -q "^- TEST_SCOPE_INFLATION: true" "$COD"; then
   # Fire late-escalation prompt — see "Stage 5/6 Late-Escalation Prompt"
   _fire_late_escalation_prompt 5
@@ -449,9 +449,9 @@ Spawn `harness-reviewer`:
 
 ```
 You are the harness-reviewer reviewing tests for a fix.
-Read harness/agents/harness-reviewer.md.
+Read espalier/agents/harness-reviewer.md.
 
-REVIEW: tests added in coding-report.md at harness/changes/fix/{slug}/.
+REVIEW: tests added in coding-report.md at espalier/changes/fix/{slug}/.
 CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
 
@@ -464,12 +464,12 @@ If the fix is correct given its current scope BUT the scope itself is wrong
 (symptom-mask, wrong layer, architectural concern), emit verdict
 ESCALATION_REQUIRED with the required Escalation Reason block.
 
-Write review to: harness/changes/fix/{slug}/review-record.md
+Write review to: espalier/changes/fix/{slug}/review-record.md
 ```
 
 After sub-agent returns:
 ```bash
-REV="harness/changes/fix/${SLUG}/review-record.md"
+REV="espalier/changes/fix/${SLUG}/review-record.md"
 if grep -q '^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
   _fire_late_escalation_prompt 6
 fi
@@ -483,10 +483,10 @@ Standard push. Then:
 
 ### 7.1 Record own commit
 
-Same as `harness-run` Stage 7 — append row to own pipeline-state.md `## Commits` table. Also self-heal the reverse-lookup cache:
+Same as `/espalier` Stage 7 — append row to own pipeline-state.md `## Commits` table. Also self-heal the reverse-lookup cache:
 
 ```bash
-. harness/hooks/lookup-helpers.sh
+. espalier/hooks/lookup-helpers.sh
 _cache_append "$(git rev-parse HEAD)" "fix/${SLUG}" "original"
 ```
 
@@ -511,7 +511,7 @@ for entry in parsed_yaml["caused_by"]:
 ```
 
 ```bash
-CAUSING_STATE="harness/changes/${CAUSING_SLUG}/pipeline-state.md"
+CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
 [ ! -f "$CAUSING_STATE" ] && continue
 
 # Ensure section exists (schema: Role + Lookup columns)
@@ -530,7 +530,7 @@ if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
   continue
 fi
 
-REASON=$(head -1 harness/changes/fix/${SLUG}/requirements.md | sed 's/^# Bug: //')
+REASON=$(head -1 espalier/changes/fix/${SLUG}/requirements.md | sed 's/^# Bug: //')
 DATE=$(date -u +%Y-%m-%d)
 echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $DATE |" >> "$CAUSING_STATE"
 ```
@@ -578,14 +578,14 @@ Tripped signals:
   - ...
 
 Options:
-  1. Escalate to /harness-run (recommended) — rename fix/{slug} → feat/{slug}-fix,
+  1. Escalate to /espalier (recommended) — rename fix/{slug} → feat/{slug}-fix,
      preserve caused_by + add escalated_from, reset Current Stage to 1.
   2. Continue as fix (override) — document override reason; accept risk.
   3. Abort — leave fix/{slug} as-is, Status: ABORTED.
 ```
 
-Migration mechanics: `mv harness/changes/fix/{slug} → harness/changes/feat/{slug}-fix`;
-mutate frontmatter (`type: feat`, `escalated_from: fix/{slug}`); reset Current Stage; hand off via `/harness-run --resume`.
+Migration mechanics: `mv espalier/changes/fix/{slug} → espalier/changes/feat/{slug}-fix`;
+mutate frontmatter (`type: feat`, `escalated_from: fix/{slug}`); reset Current Stage; hand off via `/espalier --resume`.
 
 ### Stage 5/6 Late-Escalation Prompt
 
@@ -602,23 +602,23 @@ Options:
   2. Late-escalate to feat lane (PRESERVE commit)
        → mv fix/{slug} → feat/{slug}-fix; tombstone left at old slot;
          Stage 3 commit stays on branch; reset Current Stage: 1;
-         resume via /harness-run --resume
+         resume via /espalier --resume
   3. Ship as partial fix + file root-cause feat
        → Continue to Stage 7; Status: PARTIAL_FIX
-       → Auto-create harness/changes/feat/{slug}-root-cause/ skeleton with
+       → Auto-create espalier/changes/feat/{slug}-root-cause/ skeleton with
          filed_from_partial_fix + inherited caused_by_chain
-       → User invokes /harness-run feat: ... later
+       → User invokes /espalier feat: ... later
 ```
 
 #### Tombstone in old fix slot (option 2 migration only)
 
 ```bash
-mkdir -p "harness/changes/fix/${SLUG}"
-cat > "harness/changes/fix/${SLUG}/TOMBSTONE.md" << EOF
+mkdir -p "espalier/changes/fix/${SLUG}"
+cat > "espalier/changes/fix/${SLUG}/TOMBSTONE.md" << EOF
 # Tombstone: fix/${SLUG} → feat/${NEW_SLUG}
 
 This fix was escalated late (at Stage ${ESCALATED_STAGE}) and migrated to:
-**harness/changes/feat/${NEW_SLUG}/**
+**espalier/changes/feat/${NEW_SLUG}/**
 
 All artifacts live there now. This file is a forwarding pointer only.
 
@@ -651,7 +651,7 @@ pipeline-state.md Status block:
 - Root Cause Status: PENDING (last checked: {date})
 ```
 
-Auto-skeleton at `harness/changes/feat/{slug}-root-cause/` inherits `caused_by` and adds `filed_from_partial_fix: fix/{slug}`. When that feat completes its own Stage 7, it writes back to the partial fix's pipeline-state.md `## Root Cause Addressed By` table (mechanism in `harness-run` Stage 7).
+Auto-skeleton at `espalier/changes/feat/{slug}-root-cause/` inherits `caused_by` and adds `filed_from_partial_fix: fix/{slug}`. When that feat completes its own Stage 7, it writes back to the partial fix's pipeline-state.md `## Root Cause Addressed By` table (mechanism in `/espalier` Stage 7).
 
 ## Completion
 

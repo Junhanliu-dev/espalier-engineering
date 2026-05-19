@@ -1,12 +1,15 @@
 #!/bin/bash
-# HARNESS_BACKLINK_HOOK v1
-# Installed by harness-engineering Phase 10.8 when user picks "install hook".
-# Records squash-merge SHA mappings so /harness-fix Stage 0 can reverse-look-up
+# ESPALIER_BACKLINK_HOOK v1
+# (Legacy marker HARNESS_BACKLINK_HOOK also recognized by /espalier-migrate for
+#  v0.3 installs.)
+#
+# Installed by /espalier-init Phase 9 when user picks "install hook".
+# Records squash-merge SHA mappings so /espalier-fix Stage 0 can reverse-look-up
 # bugs back to the original change.
 #
 # Safe to delete to disable. Safe to re-install (idempotent).
 # Runs after `git merge` / `git pull`. Detects squash commits (single parent +
-# PR-style message), finds source harness change by file overlap, appends
+# PR-style message), finds source Espalier change by file overlap, appends
 # `squashed_to:` row to that change's pipeline-state.md.
 
 MERGED_SHA=$(git rev-parse HEAD)
@@ -25,7 +28,7 @@ FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
 BEST_STATE=""
 BEST_COUNT=0
 NOW=$(date +%s)
-for state in harness/changes/*/*/pipeline-state.md; do
+for state in espalier/changes/*/*/pipeline-state.md; do
   [ -f "$state" ] || continue
 
   # Skip _template
@@ -67,11 +70,11 @@ EOF
   fi
   echo "| squashed_to: $MERGED_SHA | $(date -u +%Y-%m-%d) | ${BEST_COUNT}/${TOTAL_FILES} files |" >> "$BEST_STATE"
 
-  # Also update reverse-lookup cache if present (mirrors Phase 4.6 behaviour)
-  if [ -f "harness/.commit-index.tsv" ]; then
-    SLUG=$(echo "$BEST_STATE" | sed 's|harness/changes/||; s|/pipeline-state.md||')
-    if ! grep -qE "^${MERGED_SHA}	[^	]+	squashed_to	" harness/.commit-index.tsv; then
-      printf '%s\t%s\t%s\t%s\n' "$MERGED_SHA" "$SLUG" "squashed_to" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> harness/.commit-index.tsv
+  # Also update reverse-lookup cache if present
+  if [ -f "espalier/.commit-index.tsv" ]; then
+    SLUG=$(echo "$BEST_STATE" | sed 's|espalier/changes/||; s|/pipeline-state.md||')
+    if ! grep -qE "^${MERGED_SHA}	[^	]+	squashed_to	" espalier/.commit-index.tsv; then
+      printf '%s\t%s\t%s\t%s\n' "$MERGED_SHA" "$SLUG" "squashed_to" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> espalier/.commit-index.tsv
     fi
   fi
 fi

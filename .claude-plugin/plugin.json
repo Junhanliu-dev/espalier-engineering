@@ -1,11 +1,11 @@
 {
-  "name": "harness-engineering",
-  "description": "Discover an existing codebase's patterns and generate a Harness Engineering structure (rules, skills, agents, hooks, pipeline) so AI coders produce code matching that project's conventions",
-  "version": "0.3.0",
+  "name": "espalier-engineering",
+  "description": "Train your AI coders the way you'd train a vine — discover your codebase's actual patterns, then encode them as rules, skills, agents, hooks, and a guided pipeline so generated code lands inside your conventions on the first try, not the fifth",
+  "version": "0.4.0",
   "author": {
     "name": "Zayhan"
   },
-  "homepage": "https://github.com/Junhanliu-dev/harness-engineering",
-  "repository": "https://github.com/Junhanliu-dev/harness-engineering",
+  "homepage": "https://github.com/Junhanliu-dev/espalier-engineering",
+  "repository": "https://github.com/Junhanliu-dev/espalier-engineering",
   "license": "MIT"
 }

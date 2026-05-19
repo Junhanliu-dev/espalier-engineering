@@ -13,7 +13,7 @@ COMMAND=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin
 # Don't match unrelated mentions like `echo 'git push'` or comments.
 case "$COMMAND" in
   "git push"|"git push "*|*" git push"|*" git push "*)
-    exec bash "$CLAUDE_PROJECT_DIR/harness/hooks/pre-push-gate.sh"
+    exec bash "$CLAUDE_PROJECT_DIR/espalier/hooks/pre-push-gate.sh"
     ;;
 esac
 

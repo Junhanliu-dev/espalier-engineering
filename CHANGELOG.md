@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.4.0 — 2026-05-19
+
+The rebrand. Plugin renamed `harness-engineering` → `espalier-engineering`. Target-project directory `harness/` → `espalier/`. Slash commands collapsed and rebranded. Sub-agent identifiers kept for in-flight stability. Migration is mechanical via `/espalier-migrate`.
+
+> **Existing v0.1.x – v0.3.x users:** run `/espalier-migrate` from inside Claude Code. It auto-detects which migration(s) you need (v0.1→v0.2 typed-changes layout, v0.3→v0.4 rename, or both) and applies them in order. See [`docs/migrating-v0.3-to-v0.4.md`](./docs/migrating-v0.3-to-v0.4.md).
+
+### Breaking changes
+
+| Component | Before | After |
+|---|---|---|
+| Plugin name | `harness-engineering` | `espalier-engineering` |
+| GitHub repo | `Junhanliu-dev/harness-engineering` | `Junhanliu-dev/espalier-engineering` (redirects active) |
+| Target-project dir | `harness/` | `espalier/` |
+| Slash command | `/harness-engineering` | `/espalier-init` |
+| Slash command | `/harness-run <req>` | `/espalier <req>` (bare — no `-run` suffix) |
+| Slash command | `/harness-fix <bug>` | `/espalier-fix <bug>` |
+| Slash command | `/harness-migrate` | `/espalier-migrate` |
+| Child skill folders | `harness-{coding,review,testing,requirements,fix}` | `espalier-*` |
+| Child skill folder | `harness-run` | `espalier` (matches new bare slash command) |
+| `.claude/rules/` symlink names | `harness-{structure,standards,process}.md` | `espalier-*.md` |
+| `.claude/skills/` symlink names | `harness-*` | `espalier-*` (or bare `espalier`) |
+| `.claude/settings.json` hook paths | `harness/hooks/...` | `espalier/hooks/...` |
+| `CLAUDE.md` section header | `## Harness Engineering` | `## Espalier` |
+| `.gitignore` cache entry | `harness/.commit-index.tsv` | `espalier/.commit-index.tsv` |
+| Reverse-lookup cache | `harness/.commit-index.tsv` | `espalier/.commit-index.tsv` |
+| Bootstrap script | `scripts/bootstrap-harness.sh` | `scripts/bootstrap-espalier.sh` |
+| Env var | `HARNESS_PLUGIN_DIR` (still honored) | `ESPALIER_PLUGIN_DIR` (preferred) |
+| Env var | `HARNESS_CACHE_THRESHOLD_MS` (still honored) | `ESPALIER_CACHE_THRESHOLD_MS` (preferred) |
+| Env var | `HARNESS_NONINTERACTIVE` (still honored) | `ESPALIER_NONINTERACTIVE` (preferred) |
+| Post-merge hook marker | `HARNESS_BACKLINK_HOOK` (still detected) | `ESPALIER_BACKLINK_HOOK` (new installs) |
+
+### Not breaking (intentionally preserved)
+
+- **Sub-agent identifiers `harness-coder` / `harness-reviewer`** — internal names baked into orchestrator. Renaming would break any in-flight pipeline mid-stage.
+- **`.claude/agents/harness-{coder,reviewer}.md` filenames** — match agent identifiers above.
+- **Pipeline semantics** — 10 stages, gates, escalation paths, rollback rules, review cycle limits — all unchanged.
+- **Typed `changes/{type}/{slug}/` layout** — preserved through rename.
+- **Squash-merge decision values** — `not-needed | installed | fuzzy-allowed | skip-only | never-ask | ask-later`. Path moved (`harness/.merge-hook-decision` → `espalier/.merge-hook-decision`), content unchanged.
+- **Causal links, `Follow-up Fixes` tables, `Commits` tables in `pipeline-state.md`** — history rows reference old `harness/` paths in their text columns but stay readable. Pass `--rewrite-history` to the migration script if you want history bodies updated too.
+- **Legacy env vars + post-merge marker** — all `HARNESS_*` env vars and the `HARNESS_BACKLINK_HOOK` marker still recognized for graceful migration.
+
+### Added
+
+- **`/espalier-migrate` skill** (replaces `/harness-migrate`) — auto-detects install version (v0.1.x via missing `.merge-hook-decision`; v0.2.x–v0.3.x via present decision file with `harness/` dir; v0.4.x via `espalier/` dir) and dispatches to the correct migration script in correct order. Same dry-run-first + confirm pattern.
+- **`scripts/migrate-v0.3-to-v0.4.sh`** — mechanical rename migration: `git mv harness espalier`, child-skill renames, sed cross-refs, symlink rebuild, settings.json patch, CLAUDE.md/.gitignore/post-merge-hook updates, cache regen, 12 verification checks. Idempotent + dry-run + `--rewrite-history` opt-in.
+- **`docs/migrating-v0.3-to-v0.4.md`** — full rebrand migration guide with rename matrix, kept-stable list, pre-migration checklist, rollback, common issues, post-migration verification flow.
+
+### Changed
+
+- **`scripts/bootstrap-harness.sh` → `scripts/bootstrap-espalier.sh`** — every `harness/` path rewritten to `espalier/`, every child-skill name rewritten, plugin-dir auto-detect covers both new (`espalier-engineering`) and legacy (`harness-engineering`) install paths. `HARNESS_BACKLINK_HOOK` marker detection now accepts either variant (idempotent re-install).
+- **`scripts/migrate-v0.1-to-v0.2.sh`** — plugin-dir auto-detect extended to cover the new install paths; references to `/harness-migrate` updated to `/espalier-migrate` where appropriate. The script itself remains v0.1→v0.2 only (frozen behavior); rename is a separate migration.
+- **`.claude-plugin/{plugin,marketplace}.json`** — name → `espalier-engineering`, version → `0.4.0`, repo URL → `Junhanliu-dev/espalier-engineering`, description rewritten to lead with the espalier-vine metaphor.
+- **All skill SKILL.md frontmatter `name:` fields** — updated to match renamed folders.
+- **All template + reference + hook files** — path refs, skill name refs, slash command mentions updated. Identifier matrix:
+  - **Renamed:** `harness/`, `harness-{coding,review,testing,requirements,fix}`, `harness-run`, `harness-engineering`, `harness-migrate`, `bootstrap-harness.sh`, settings.json hook paths.
+  - **Untouched:** `harness-coder`, `harness-reviewer`.
+- **`README.md`** — rewritten to lead with the espalier-vine metaphor (training a vine flat along a wall = training the AI flat along your codebase patterns). 30-second install up top. Slash command table. v0.4.0 breaking-change banner. Restated philosophy + 5 principles.
+- **`docs/migrating-v0.1-to-v0.2.md`** — preserved (still the source of truth for the older typed-changes migration), but now cross-references the new v0.3→v0.4 guide and uses updated plugin install paths.
+
+### Migration script test coverage
+
+`scripts/test-bootstrap.sh` retained; updated all assertions to `espalier/` paths and `espalier-*` skill names. All 32 assertions still passing on macOS.
+
+### Why this release
+
+Three reasons:
+
+1. **Brand fit.** "Harness engineering" conveyed the mechanism but felt mechanical. "Espalier" carries the same idea — training a living thing to grow along a structure — with a metaphor that maps cleanly to what the tool actually does: discover the shape your code already has, then train the AI to grow along it.
+2. **Command ergonomics.** `/harness-run feat: add stripe checkout` was 8 keystrokes of overhead before the actual requirement. `/espalier feat: add stripe checkout` cuts that to 2. The full pipeline is the *main* thing this tool does; it deserves the bare verb.
+3. **Path consistency.** `harness/` lived under `~/your-project/` while the plugin was named `harness-engineering`. Now everything reads `espalier-*` end to end — plugin, repo, dir, slash commands, child skills, env vars. One name, one search.
+
+The two-track migration (`/espalier-migrate` handles both v0.1→v0.2 and v0.3→v0.4) means existing users upgrade in-place without manually editing settings.json, symlinks, or scattered string refs.
+
 ## 0.3.0 — 2026-05-19
 
 Init-speedup release. `/harness-engineering` first run is now ~30-50% faster on a fresh repo via parallelism + a bundled bootstrap script. **Zero workflow semantic change** — every artifact in `harness/` is byte-equivalent to v0.2.x output (modulo discovery-driven substitutions).

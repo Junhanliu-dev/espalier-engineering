@@ -4,36 +4,36 @@
 
 ### 1. Requirements Analysis
 - **Trigger:** New requirement received
-- **Load:** Read harness/skills/harness-requirements/SKILL.md
+- **Load:** Read espalier/skills/espalier-requirements/SKILL.md
 - **Execute:** Main agent produces requirements doc
 - **Gate:** Requirements doc exists with acceptance criteria (≥ 2 criteria)
 - **Human checkpoint:** Confirm understanding before proceeding
-- **Output:** harness/changes/{slug}/requirements.md
+- **Output:** espalier/changes/{slug}/requirements.md
 
 ### 2. Requirements Review
 - **Trigger:** Requirements doc complete
-- **Load:** Read harness/skills/harness-review/SKILL.md
+- **Load:** Read espalier/skills/espalier-review/SKILL.md
 - **Execute:** Main agent reviews the requirements doc
 - **Gate:** No P0/P1 findings remaining
 - **Limit:** Max 3 review rounds → escalate to human
-- **Output:** harness/changes/{slug}/review-record.md (append)
+- **Output:** espalier/changes/{slug}/review-record.md (append)
 
 ### 3. Coding Implementation
 - **Trigger:** Requirements approved
-- **Load:** Spawn `harness-coder` agent (see harness/agents/harness-coder.md)
+- **Load:** Spawn `harness-coder` agent (see espalier/agents/harness-coder.md)
 - **Execute:** Sub-agent implements per task decomposition
 - **Gate:** All sub-tasks done + code builds + lint passes
 - **Constraint:** One sub-agent invocation per sub-task
-- **Output:** Code changes + harness/changes/{slug}/coding-report.md
+- **Output:** Code changes + espalier/changes/{slug}/coding-report.md
 
 ### 4. Code Review
 - **Trigger:** Implementation complete
-- **Load:** Spawn `harness-reviewer` agent (see harness/agents/harness-reviewer.md)
+- **Load:** Spawn `harness-reviewer` agent (see espalier/agents/harness-reviewer.md)
 - **Execute:** Reviewer reads diff, checks against review skill
 - **Gate:** No P0 findings remaining
 - **Limit:** Max 2 review rounds → escalate to human
 - **Rollback:** P0 found → back to Stage 3 (re-spawn coder with review findings)
-- **Output:** harness/changes/{slug}/review-record.md (append)
+- **Output:** espalier/changes/{slug}/review-record.md (append)
 
 ### 5. Test Writing
 - **Trigger:** Code review passed
@@ -55,7 +55,7 @@
   - Branch name matches convention
   - No merge conflicts
 - **Human checkpoint:** Confirm push target
-- **Output:** `harness/changes/{type}/{slug}/pipeline-state.md` gains a `## Commits` table row (Stage 7, SHA, files) — read by `/harness-fix` reverse lookup.
+- **Output:** `espalier/changes/{type}/{slug}/pipeline-state.md` gains a `## Commits` table row (Stage 7, SHA, files) — read by `/espalier-fix` reverse lookup.
 
 ### 8. CI Verification
 - **Gate (PROGRAMMATIC — all must be true):**
@@ -68,7 +68,7 @@
   - `total_tests == 0` → Stage 5
   - Compile/build failure → Stage 3
   - Lint failure → Stage 3
-- **Output:** harness/changes/{slug}/ci-result.md
+- **Output:** espalier/changes/{slug}/ci-result.md
 
 ### 9. Deployment Verification
 - **Human checkpoint:** Confirm deployment parameters

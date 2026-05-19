@@ -1,24 +1,24 @@
 {
-  "name": "harness-engineering",
+  "name": "espalier-engineering",
   "owner": {
     "name": "Zayhan"
   },
-  "description": "Marketplace publishing the harness-engineering skill",
-  "version": "0.3.0",
+  "description": "Marketplace publishing the Espalier Engineering plugin — auto-discovered, project-specific guardrails for AI coding agents",
+  "version": "0.4.0",
   "plugins": [
     {
-      "name": "harness-engineering",
+      "name": "espalier-engineering",
       "source": {
         "source": "github",
-        "repo": "Junhanliu-dev/harness-engineering"
+        "repo": "Junhanliu-dev/espalier-engineering"
       },
-      "description": "Discover an existing codebase's patterns and generate a Harness Engineering structure tailored to that project's language and conventions",
-      "version": "0.3.0",
+      "description": "Train your AI coders the way you'd train a vine — discover your codebase's actual patterns, then encode them as rules, skills, agents, hooks, and a guided pipeline so generated code lands inside your conventions on the first try, not the fifth",
+      "version": "0.4.0",
       "author": {
         "name": "Zayhan"
       },
-      "homepage": "https://github.com/Junhanliu-dev/harness-engineering",
-      "repository": "https://github.com/Junhanliu-dev/harness-engineering",
+      "homepage": "https://github.com/Junhanliu-dev/espalier-engineering",
+      "repository": "https://github.com/Junhanliu-dev/espalier-engineering",
       "license": "MIT"
     }
   ]

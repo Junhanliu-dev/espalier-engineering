@@ -3,8 +3,8 @@
 # Blocks git push unless all conditions are met
 
 # Find the most-recently-modified pipeline-state.md across typed subdirs
-# (harness/changes/{type}/{slug}/pipeline-state.md — depth 3 from CHANGES_DIR).
-CHANGES_DIR="harness/changes"
+# (espalier/changes/{type}/{slug}/pipeline-state.md — depth 3 from CHANGES_DIR).
+CHANGES_DIR="espalier/changes"
 
 # stat format differs between BSD (macOS) and GNU (Linux)
 if [ "$(uname)" = "Darwin" ]; then
@@ -19,7 +19,7 @@ STATE_FILE=$(find "$CHANGES_DIR" -mindepth 3 -maxdepth 3 -name pipeline-state.md
              | sort -rn | head -1 | cut -d' ' -f2-)
 
 if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
-  echo "WARNING: No harness change record found. Pushing without pipeline tracking."
+  echo "WARNING: No Espalier change record found. Pushing without pipeline tracking."
   exit 0  # Allow but warn
 fi
 
