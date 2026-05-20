@@ -6,7 +6,7 @@ Thanks for the interest. This doc tells you how the project is laid out, what ki
 
 ```
 .claude-plugin/          # plugin manifests (plugin.json, marketplace.json)
-scripts/                 # bootstrap-espalier.sh, migrate-v0.1-to-v0.2.sh, migrate-v0.3-to-v0.4.sh, test-bootstrap.sh
+scripts/                 # bootstrap-espalier.sh, migrate-v0.1-to-v0.2.sh, migrate-v0.3-to-v0.4.sh, migrate-v0.4-to-v0.5.sh, test-bootstrap.sh
 skills/
 ├── espalier-init/       # the main /espalier-init skill (Phase 0-3 orchestrator)
 │   ├── SKILL.md         # phase index — entrypoint
@@ -36,7 +36,7 @@ export ESPALIER_PLUGIN_DIR=~/repos/espalier-engineering/skills/espalier-init
 ## Running tests
 
 ```bash
-# Bootstrap smoke suite — 33 assertions covering all phases of bootstrap-espalier.sh
+# Bootstrap smoke suite — 43 assertions covering all phases of bootstrap-espalier.sh
 bash scripts/test-bootstrap.sh --verbose
 ```
 
@@ -58,9 +58,9 @@ done
 | New child skill template | `skills/espalier-init/templates/skills/` | Add to bootstrap's Stage 3 cp list; SKILL.md `name:` must equal folder name |
 | New hook template | `skills/espalier-init/hook-templates/` | Add to bootstrap's Stage 4 cp list; chmod-glob picks it up |
 | Discovery scout addition (Phase 1) | `skills/espalier-init/references/discovery-checklist.md` | Add to "Parallel Execution Recipe" + update SKILL.md Phase 1 |
-| Validation check | `scripts/bootstrap-espalier.sh` Stage 11 | Increment `/24` count in `run_check` calls; add row to `references/validation.md` |
+| Validation check | `scripts/bootstrap-espalier.sh` Stage 11 | Bump the `/28` total in `run_check`; add the check; add a row to `references/validation.md` |
 | Docs / typos / examples | `README.md`, `docs/`, in-file comments | No tests needed |
-| New migration (e.g. v0.4 → v0.5) | `scripts/migrate-v0.4-to-v0.5.sh` + update `/espalier-migrate` detection | Follow the v0.3→v0.4 script as template |
+| New migration (e.g. v0.5 → v0.6) | `scripts/migrate-v0.5-to-v0.6.sh` + update `/espalier-migrate` detection | Follow an existing `migrate-v*.sh` as template |
 
 ## Cross-platform requirements
 
@@ -74,7 +74,7 @@ The migration script's `_rewrite_file()` is the reference pattern for portable s
 ## Pull request checklist
 
 - [ ] Branch named `feat/<short-desc>` or `fix/<short-desc>` or `docs/<short-desc>`
-- [ ] `scripts/test-bootstrap.sh --verbose` passes 33/33
+- [ ] `scripts/test-bootstrap.sh --verbose` passes 43/43
 - [ ] All shell scripts pass `bash -n` under `/bin/bash` (macOS 3.2.57)
 - [ ] If changing migration scripts, dry-run + apply tested against synthetic v0.3 fixture under both `/bin/bash` and homebrew bash
 - [ ] CHANGELOG.md updated under the next version heading

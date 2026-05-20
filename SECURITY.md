@@ -6,7 +6,8 @@ Only the latest minor version receives fixes. Older versions are not patched.
 
 | Version | Supported |
 |---------|-----------|
-| 0.4.x   | ✓         |
+| 0.5.x   | ✓         |
+| 0.4.x   | use `/espalier-migrate` to upgrade |
 | 0.3.x   | use `/espalier-migrate` to upgrade |
 | 0.2.x   | use `/espalier-migrate` to upgrade |
 | 0.1.x   | use `/espalier-migrate` to upgrade |

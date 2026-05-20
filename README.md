@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.4.0 (BREAKING) — the rebrand.** Plugin `harness-engineering` → `espalier`. Slash commands `/harness-run` → `/espalier`, `/harness-fix` → `/espalier-fix`, `/harness-engineering` → `/espalier-init`. Target-project directory `harness/` → `espalier/`. Child skills renamed (`harness-coding` → `espalier-coding`, etc.). **Sub-agent names `harness-coder` / `harness-reviewer` kept** (internal identifiers; renaming would break in-flight pipelines).
+> **v0.5.0 — doc-drift detection.** Espalier-generated rules, wiki, specs, and hooks no longer silently rot as the codebase evolves: a post-merge drift detector, reviewer convention-drift capture, a cross-PR convention index, the gated `/espalier-prune` refresh skill, and a periodic `/espalier-doctor` scan. Non-breaking.
 >
-> **Existing v0.1.x – v0.3.x users:** run `/espalier-migrate`. It auto-detects which migration(s) you need and applies them in order. See [`docs/migrating-v0.3-to-v0.4.md`](./docs/migrating-v0.3-to-v0.4.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (v0.1→v0.2→v0.4→v0.5) in order. See [`docs/migrating-v0.4-to-v0.5.md`](./docs/migrating-v0.4-to-v0.5.md).
 
 ---
 
@@ -33,10 +33,10 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 ```
 espalier/
 ├── rules/                  # always-loaded: engineering structure, coding standards, dev process
-├── skills/                 # phase-loaded: coding, review, testing, requirements, /espalier, /espalier-fix
+├── skills/                 # phase-loaded: coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor
 ├── agents/                 # delegated: harness-coder, harness-reviewer (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
-├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge backlink
+├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
 ├── pipeline.md             # 10-stage workflow with explicit gates and rollback rules
 └── changes/                # typed audit trail: feat/, fix/, refactor/ — one dir per requirement
 ```
@@ -65,6 +65,10 @@ Requirement-prefix routing:
 For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link discovery** — the bug-fix gets linked back to the feature change that introduced it (via git blame + reverse-lookup cache + squash-merge mapping). The causing change's `pipeline-state.md` gains a `## Follow-up Fixes` row. Six months later, when someone wonders "why does this feature have 4 fixes against it", the audit trail is right there.
 
 Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link.
+
+### Keeping the guardrails in sync
+
+The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, v0.5.0 keeps them honest: a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
 
 ## Install
 
@@ -113,10 +117,10 @@ ln -sf /path/to/espalier-engineering/skills/espalier-init .claude/skills/espalie
 
 On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's a one-time tax — every future `/espalier` and `/espalier-fix` reuses the generated structure. You earn the time back inside the first few requirements via dropped rework rounds.
 
-- **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy + sub-agent tool scope.
+- **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~10 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, CI, unwritten rules, layer specs), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge hook install + .gitignore + 24 parallel validation checks.
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 28 validation checks.
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -134,7 +138,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (24 parallel checks, no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (28 checks, no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 
@@ -210,6 +214,8 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 |---|---|
 | `/espalier <req>` (full 10-stage pipeline) | MEDIUM — pipeline stages + coding/review sub-agents |
 | `/espalier-fix <bug>` (5-stage lane) | LIGHT-MEDIUM |
+| `/espalier-prune <path>` (refresh a stale artifact) | LIGHT — one scout per file + a gated diff |
+| `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
 | `/espalier-migrate` | LIGHT — script-driven, low LLM usage |
 | Re-run `/espalier-init` (already bootstrapped) | TRIVIAL — validate-only, ~few K tokens |
 
@@ -242,13 +248,15 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Status
 
+`v0.5.0` — **doc-drift detection.** Generated rules/wiki/specs/hooks are kept in sync with the codebase as it evolves: a post-merge drift detector writing a gitignored sidecar, reviewer convention-drift capture, a cross-PR convention index, the gated `/espalier-prune` refresh skill, a periodic `/espalier-doctor` re-scout, a consolidated Stage 0 pre-flight, a notify-only Stage 8.5, and validation checks 25–28. Non-breaking — drift detection is additive. New `migrate-v0.4-to-v0.5.sh` and a three-stage `/espalier-migrate` chain.
+
 `v0.4.0` — **the rebrand.** Plugin renamed `harness-engineering` → `espalier-engineering`. Target-project directory `harness/` → `espalier/`. Slash commands collapsed: full pipeline is now `/espalier` (was `/harness-run`), bug-fix lane is `/espalier-fix` (was `/harness-fix`), init is `/espalier-init` (was `/harness-engineering`), migration is `/espalier-migrate`. Sub-agent identifiers `harness-coder` / `harness-reviewer` kept for in-flight stability. New `/espalier-migrate` shim detects v0.1.x or v0.3.x installs and dispatches to the right migration script. GitHub repo renamed `harness-engineering` → `espalier-engineering` (GitHub maintains redirects). README now documents per-run token cost + Claude Max plan budget.
 
 `v0.3.0` — init speedup. `/harness-engineering` first run on a fresh repo ~30-50% faster (20+ min → 10-15 min on a medium codebase). Parallel discovery scouts, parallel substitution writes, bundled bootstrap script collapsing Phase 8 (Hooks) + Phase 10 (Wiring) + Phase 11 (Validation) into one idempotent invocation. Plus fixes for several latent v0.2.x bugs.
 
 `v0.2.0` — bug-fix lane (`/harness-fix`), typed `harness/changes/{type}/{slug}/` layout, causal back-links between fixes and the changes that introduced them, escalation paths (including late-stage), squash-merge resilience with optional post-merge hook, and self-healing reverse-lookup cache.
 
-See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
+See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.4-to-v0.5.md](./docs/migrating-v0.4-to-v0.5.md) for the v0.5 doc-drift upgrade, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
 
 Schema and templates may still change. Please file issues with the Espalier output you'd expect to see for your stack.
 

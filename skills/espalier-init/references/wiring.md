@@ -1,6 +1,6 @@
 # Phase 10: Wiring (Connect Espalier to Claude Code Runtime)
 
-> **v0.4.0+ note:** Phase 10 is bundled inside `scripts/bootstrap-espalier.sh` (Stages 5-10 of that script). Normal flow does NOT execute the manual steps below — they're retained for **debugging / manual recovery**. If `/espalier-init` fails mid-wiring, the steps below let you finish by hand.
+> **v0.5.0 note:** `scripts/bootstrap-espalier.sh` is the source of truth for wiring — it bundles all of Phase 10 (Stages 5-11) and is kept current. The manual steps below are a **v0.4-era illustration** of *what* wiring does; they do NOT include the v0.5 doc-drift components — the `drift-detect.sh` / `drift-helpers.sh` / `parse-drift-blocks.py` hooks, the `espalier-prune` + `espalier-doctor` skills, the post-merge dispatcher, the drift sidecars in `.gitignore`, and `espalier/.doctor-cadence`. For real manual recovery after a failed wiring, re-run `bash scripts/bootstrap-espalier.sh --wire-only` (or `--force`) — do not hand-replay the steps below.
 
 Generated files are inert until wired into the execution environment. Run these steps in order.
 
