@@ -97,6 +97,24 @@ Constraints:
   in scope, emit a Convention Observation instead (a lower-bar report — see the
   Convention Observations section below).
 
+## Convention Observations
+
+Separate from — and lower-bar than — a Convention Drift block: any time code
+diverges from a rule, even a SINGLE occurrence, emit an Observation. Do NOT
+assign an aggregation key; emit only what you can see locally. The orchestrator
+canonicalizes keys across reviews (a fresh isolated reviewer cannot).
+
+```
+## Convention Observations
+- description: "controllers return Result<T,E> instead of throwing"
+  location: src/controllers/userController.ts:42
+  rule_file: espalier/rules/coding-standards.md
+```
+
+Emit one `- description:` entry per divergence. A Convention Drift block (2+
+occurrences, high confidence) and a Convention Observation (any occurrence) are
+not mutually exclusive — a strong drift may warrant both.
+
 ## You Must NOT
 
 - Edit or fix the code yourself (that's the coder's job)
