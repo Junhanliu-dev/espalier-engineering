@@ -17,6 +17,10 @@ strict project conventions.
 3. Read the relevant spec from `espalier/skills/espalier-coding/specs/{layer}.md`
 4. Find 1-2 existing files in that layer as reference patterns
 5. Follow the template structure exactly
+6. Stale-doc check: `cut -f1 espalier/.drift-state.tsv 2>/dev/null` lists every
+   flagged file (repo-relative). If a rule or spec you rely on is listed, note
+   it in coding-report.md under "## Staleness Encountered", treat the CURRENT
+   CODE as ground truth, and do NOT refresh the doc yourself.
 
 ## Your Constraints
 

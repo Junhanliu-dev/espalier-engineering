@@ -190,6 +190,38 @@ Options:
 3. If matching slug found, RESUME from current stage.
 4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`.
 
+## Stage 0 Pre-Flight (drift + conventions + doctor)
+
+Run this BEFORE Stage 0 Auto-Link Discovery. Source the drift helpers:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+```
+
+Gather all three signals BEFORE prompting:
+1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
+   into fresh / aging / stale / critical / expired.
+2. **CONV** — if `espalier/.conventions.tsv` exists, scan for any `pattern_key`
+   with >= 3 `diverges` rows (promotion candidates).
+3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
+
+If all three are empty/false → no prompt, continue to Stage 0 Auto-Link Discovery.
+Otherwise issue ONE `AskUserQuestion` summarising all three:
+
+```
+Pre-flight found:
+  - {N} stale doc(s): {tier breakdown}
+  - {M} convention(s) over the promotion threshold
+  - doctor scan due ({cadence})
+Options:
+  1. Handle now — run /espalier-prune + review conventions, then resume
+  2. Proceed    — continue the pipeline with current docs
+  3. Abort
+```
+
+Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
+If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
+
 ## Stage 0: Auto-Link Discovery (NEW)
 
 > Fully specified in plan §6 (Phase 4). Summary follows; see plan for full code.
