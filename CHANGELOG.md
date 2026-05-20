@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.5.0 — 2026-05-20
+
+Doc-drift detection. The artifacts `/espalier-init` generates — rules, wiki, layer specs, hooks — no longer silently rot as the codebase evolves. v0.5.0 adds detection, surfacing, gated remediation, and validation, **without ever auto-overwriting a doc** and without a hook that dirties the working tree.
+
+> **Existing users:** run `/espalier-migrate`. A v0.4.x install gets the v0.4→v0.5 upgrade; v0.1.x–v0.3.x installs get the full chain (v0.1→v0.2→v0.4→v0.5) applied in order. See [`docs/migrating-v0.4-to-v0.5.md`](./docs/migrating-v0.4-to-v0.5.md).
+
+### The problem
+
+`/espalier-init` writes the project's rules, wiki, specs, and hooks once. After init they were never refreshed. A new architectural layer, a schema change, a convention that shifted during review — each leaves a generated artifact describing a codebase that no longer exists. Worst case: a stale rule sits in the Always context layer, auto-loaded every session, actively misguiding every future agent run.
+
+### Added
+
+- **Post-merge drift detector** — `drift-detect.sh`, installed unconditionally, runs on every merge/pull. Diffs `ORIG_HEAD..HEAD` and flags drifted artifacts (new/removed layers, cross-layer moves, schema/route/dependency/CI/lint-config changes) into a gitignored sidecar, `espalier/.drift-state.tsv`. Heuristic, cheap, never edits a doc.
+- **`drift-helpers.sh`** — pure-bash shared library (bash-3.2 safe — no associative arrays), sourced by every drift consumer. Sidecar upsert, staleness tiering, convention-index append, doctor cadence, run-mode detection.
+- **Reviewer convention-drift capture** — a file diff cannot see a convention shift ("controllers now return `Result<T,E>` instead of throwing"); only the reviewer can. `harness-reviewer.md` gains a Convention Drift Reporting protocol; `parse-drift-blocks.py` parses the emitted blocks at Stage 4.
+- **Cross-PR convention index** — `espalier/.conventions.tsv` (tracked). The reviewer emits lower-bar Convention Observations; the orchestrator canonicalizes their keys across reviews; when one `pattern_key` reaches 3 `diverges` rows the Stage 0 pre-flight surfaces a promote / reject / exception / wait prompt.
+- **`/espalier-prune`** — the only component that edits a generated doc. Per flagged file: re-run the matching discovery scout, two-way-diff current vs proposed, gated apply by file class (wiki / rules / specs / hooks). Interactive, never silent; unattended runs only write a report.
+- **`/espalier-doctor`** — periodic re-scout that catches what the file-diff detector and the reviewer miss: silent refactors that change no file structure, and drift that landed before this clone existed. Cadence (`every-change` / `weekly` / `monthly` / `manual`) is chosen at init and activity-gated — an idle repo never triggers a scan.
+- **Stage 0 pre-flight** — one consolidated `AskUserQuestion` at the start of `/espalier` and `/espalier-fix`, summarising stale docs (tiered), conventions over the promotion threshold, and a due doctor scan. Replaces what would otherwise be three separate prompts.
+- **Stage 8.5** — a notify-only doc-drift check between Stage 8 (CI verify) and Stage 9 (deploy). Writes a table to the change's `doc-patches.md`, surfaces one line, blocks nothing.
+- **Validation checks 25–28** — stale-artifact tiers (Policy 3: fresh / aging / stale / critical / expired by age), plus structural checks for `.drift-state.tsv`, `.conventions.tsv`, and `.doctor-cadence`.
+- **Phase 0 Q3** — doctor cadence, chosen alongside the squash-merge strategy and sub-agent tool scope.
+- **`scripts/migrate-v0.4-to-v0.5.sh`** — the v0.4→v0.5 upgrade. `/espalier-migrate` now detects three migration stages and applies the needed chain in order.
+
+### Changed
+
+- **`scripts/bootstrap-espalier.sh`** — Stage 4 copies the three new drift hooks; Stage 9 installs a stable post-merge **dispatcher** instead of inlining `post-merge-backlink.sh` (this also fixes a pre-existing bug — the inline copy meant a plugin update never reached an installed hook; the dispatcher calls scripts by path); Stage 10 gitignores five drift sidecars; Stage 11 grew from 24 to 28 checks. New flags: `--doctor-cadence`, `--ignore-drift` (+ `--ignore-drift-reason`).
+- **The post-merge hook is now installed unconditionally.** Previously it was installed only when the squash-merge decision was `installed`. The dispatcher always runs `drift-detect.sh`; `post-merge-backlink.sh` is still gated — now at runtime, by `espalier/.merge-hook-decision` — so flipping that file toggles backlink with no hook reinstall.
+- **`hook-templates/pre-push-gate.sh`** prints a non-blocking "an /espalier-doctor scan is due" reminder.
+- **`espalier.md` / `espalier-fix.md` / `harness-coder.md` / `harness-reviewer.md` / `pipeline.md`** — Stage 0 pre-flight, Stage 4 drift-capture glue, Stage 7 convention-index staging, Stage 8.5, reader-side stale-doc gates for the coder and reviewer sub-agents.
+- **Phase 0** is now a three-question `AskUserQuestion` (squash strategy, sub-agent tools, doctor cadence).
+
+### Not breaking
+
+- **Pipeline semantics** — 10 stages, gates, escalation, rollback — unchanged. Stage 8.5 is a label, not a numeric stage; `Current Stage:` never holds `8.5`, so `pre-push-gate.sh`'s integer parse is unaffected.
+- **The 24 original validation checks** keep their semantics — only check #20 was repointed from the backlink marker to the dispatcher marker (both verify a working post-merge hook).
+- **Sub-agent identifiers `harness-coder` / `harness-reviewer`, typed `changes/{type}/{slug}/` layout, squash-merge decision values** — unchanged.
+- **Drift detection is additive** — a v0.4 install that never migrates keeps working exactly as before.
+- **Drift state is gitignored** — no automation writes a tracked file; no `git pull` and no pipeline stage is left with a dirty working tree.
+
+### Migration
+
+`/espalier-migrate` auto-detects the install version and applies the needed migration chain. For a v0.4.x install that is just the v0.4→v0.5 step: `bootstrap-espalier.sh --force` (drift hooks, the two new skills, the dispatcher, gitignore, `.doctor-cadence`, refreshed pure-copy skills) plus an anchor-patch of the three LLM-substituted files bootstrap cannot regenerate (`harness-coder.md`, `harness-reviewer.md`, `pre-push-gate.sh`). Idempotent; dry-run-first. Full guide: [`docs/migrating-v0.4-to-v0.5.md`](./docs/migrating-v0.4-to-v0.5.md).
+
+### Why this release
+
+Generated guardrails that describe a codebase as it was on init day are worse than no guardrails — the reviewer trusts a stale `coding-standards.md`, approves wrong-pattern code, and the drift compounds. v0.5.0 closes the loop: detect drift mechanically where possible (file diffs, reviewer judgment, cross-PR aggregation, periodic re-scout), surface it at the moments work already pauses (Stage 0, push, CI), and refresh only through an explicit, gated `/espalier-prune`. Defense-in-depth, never an auto-overwrite.
+
+## 0.4.1 — 2026-05-19
+
+Patch: `scripts/migrate-v0.3-to-v0.4.sh` portability on macOS.
+
+- `declare -A` (associative arrays, bash 4+) silently no-op'd on macOS system bash 3.2, then `${!ARRAY[@]}` tripped `set -u`. Replaced with parallel indexed arrays (`SKILL_OLD` / `SKILL_NEW`).
+- A `sed -E` alternation anchor (`(^|[^chars])`) is rejected by BSD `sed` with "parentheses not balanced". Replaced with a two-pass substitution (line-start and non-word-boundary handled separately). BSD + GNU compatible.
+
+Verified end-to-end on `/bin/bash` 3.2.57 and homebrew bash 5.x.
+
 ## 0.4.0 — 2026-05-19
 
 The rebrand. Plugin renamed `harness-engineering` → `espalier-engineering`. Target-project directory `harness/` → `espalier/`. Slash commands collapsed and rebranded. Sub-agent identifiers kept for in-flight stability. Migration is mechanical via `/espalier-migrate`.
