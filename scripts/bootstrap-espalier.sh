@@ -18,9 +18,9 @@
 #   - Creates symlinks via portable abspath helper (R-extra).
 #   - Appends CLAUDE.md Espalier section (idempotent grep-guard).
 #   - Merges .claude/settings.json hooks (Appendix A algorithm).
-#   - Persists squash-merge decision + installs post-merge hook if needed.
-#   - Appends .gitignore entry for commit-index cache.
-#   - Runs 24 validation checks in parallel (R6).
+#   - Persists squash-merge decision + installs the post-merge dispatcher.
+#   - Appends .gitignore entries for the commit-index + drift sidecars.
+#   - Runs 28 validation checks (R6).
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -42,7 +42,9 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (24-check parallel validation).
+#   --validate-only          Only Stage 11 (28-check validation).
+#   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
+#   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
 set -u
 
@@ -55,6 +57,8 @@ MERGE_DECISION=""
 DRY_RUN=no
 SKIP_PROMPT=no
 FORCE=no
+IGNORE_DRIFT=no
+IGNORE_DRIFT_REASON=""
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -66,11 +70,13 @@ for arg in "$@"; do
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
+    --ignore-drift)         IGNORE_DRIFT=yes ;;
+    --ignore-drift-reason=*) IGNORE_DRIFT_REASON="${arg#--ignore-drift-reason=}" ;;
     --copy-only)            MODE="copy-only" ;;
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,49p' "$0"
+      sed -n '2,48p' "$0"
       exit 0
       ;;
     *)
@@ -201,6 +207,15 @@ esac
 
 log "Mode: $MODE | project: $PROJECT_DIR | plugin: $PLUGIN_DIR | lang: $LANG_VARIANT"
 
+# Resolve the --ignore-drift audit reason once (prompt only when interactive).
+if [ "$IGNORE_DRIFT" = "yes" ] && [ -z "$IGNORE_DRIFT_REASON" ]; then
+  if [ "$SKIP_PROMPT" = "no" ] && [ -t 0 ]; then
+    printf '[bootstrap] --ignore-drift: reason for ignoring expired drift? '
+    read -r IGNORE_DRIFT_REASON
+  fi
+  [ -z "$IGNORE_DRIFT_REASON" ] && IGNORE_DRIFT_REASON="(no reason given)"
+fi
+
 # --- Stage 2: Make directories ----------------------------------------------
 
 stage_mkdirs() {
@@ -245,6 +260,8 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/post-merge-backlink.sh' espalier/hooks/post-merge-backlink.sh"
   run "cp '$PLUGIN_DIR/hook-templates/lookup-helpers.sh' espalier/hooks/lookup-helpers.sh"
   run "cp '$PLUGIN_DIR/hook-templates/rebuild-commit-index.sh' espalier/hooks/rebuild-commit-index.sh"
+  run "cp '$PLUGIN_DIR/hook-templates/drift-detect.sh' espalier/hooks/drift-detect.sh"
+  run "cp '$PLUGIN_DIR/hook-templates/drift-helpers.sh' espalier/hooks/drift-helpers.sh"
   # R10 — chmod every *.sh in espalier/hooks/ (catches LLM-written pre-push-gate.sh
   # and check-layer-boundaries.sh from Phase 2-7 Write batch).
   if [ "$DRY_RUN" = "yes" ]; then
@@ -435,22 +452,22 @@ except Exception as e:
 PYMERGE
 }
 
-# --- Stage 9: Squash-merge decision + post-merge hook -----------------------
+# --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
 stage_merge_decision() {
-  log "Stage 9: merge decision = $MERGE_DECISION"
+  log "Stage 9: merge decision = $MERGE_DECISION + post-merge dispatcher"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] write espalier/.merge-hook-decision = $MERGE_DECISION"
-    [ "$MERGE_DECISION" = "installed" ] && echo "[dry-run] install post-merge hook"
+    echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
     return
   fi
 
   echo "$MERGE_DECISION" > espalier/.merge-hook-decision
 
-  if [ "$MERGE_DECISION" != "installed" ]; then
-    log "  Hook install skipped (decision=$MERGE_DECISION)"
-    return
-  fi
+  # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must
+  # run on every merge regardless of the squash-merge decision. Whether
+  # post-merge-backlink.sh runs is gated at RUNTIME by .merge-hook-decision, so
+  # flipping that file toggles backlink with no hook reinstall.
 
   # Detect husky
   HUSKY_PRESENT=no
@@ -468,27 +485,54 @@ stage_merge_decision() {
     HOOK_DST=".git/hooks/post-merge"
   fi
 
-  HOOK_SRC="espalier/hooks/post-merge-backlink.sh"
-
   if [ ! -d "$(dirname "$HOOK_DST")" ]; then
     log "  ERROR: $(dirname "$HOOK_DST") does not exist (run 'git init' first?)"
     return
   fi
 
-  # Detect existing install via either v0.4 marker (ESPALIER_BACKLINK_HOOK) or
-  # legacy v0.2/v0.3 marker (HARNESS_BACKLINK_HOOK).
-  if [ -f "$HOOK_DST" ] && grep -qE "(ESPALIER|HARNESS)_BACKLINK_HOOK" "$HOOK_DST" 2>/dev/null; then
-    log "  Post-merge hook already installed"
-  elif [ -f "$HOOK_DST" ]; then
-    echo "" >> "$HOOK_DST"
-    cat "$HOOK_SRC" >> "$HOOK_DST"
-    chmod +x "$HOOK_DST"
-    log "  Appended Espalier section to existing $HOOK_DST"
-  else
-    cp "$HOOK_SRC" "$HOOK_DST"
-    chmod +x "$HOOK_DST"
-    log "  Installed $HOOK_DST"
+  # Already on the dispatcher → nothing to do (idempotent).
+  if [ -f "$HOOK_DST" ] && grep -q "ESPALIER_POSTMERGE_DISPATCH" "$HOOK_DST" 2>/dev/null; then
+    log "  Post-merge dispatcher already installed"
+    return
   fi
+
+  # Strip a legacy inlined backlink block. Pre-dispatcher bootstraps copied or
+  # appended the whole post-merge-backlink.sh into the hook; that block runs
+  # from its marker comment (or the shebang just above it) to EOF.
+  if [ -f "$HOOK_DST" ] && grep -qE "ESPALIER_BACKLINK_HOOK|HARNESS_BACKLINK_HOOK" "$HOOK_DST" 2>/dev/null; then
+    MLINE=$(grep -nE "ESPALIER_BACKLINK_HOOK|HARNESS_BACKLINK_HOOK" "$HOOK_DST" | head -1 | cut -d: -f1)
+    START="$MLINE"
+    if [ "$MLINE" -gt 1 ]; then
+      PREV=$(sed -n "$((MLINE - 1))p" "$HOOK_DST")
+      [ "$PREV" = "#!/bin/bash" ] && START=$((MLINE - 1))
+    fi
+    STRIP_TMP=$(mktemp)
+    if [ "$START" -gt 1 ]; then
+      sed -n "1,$((START - 1))p" "$HOOK_DST" > "$STRIP_TMP"
+    fi
+    mv "$STRIP_TMP" "$HOOK_DST"
+    log "  Stripped legacy inlined backlink block from $HOOK_DST"
+  fi
+
+  # Write (fresh) or append (preserving a user hook) the dispatcher block.
+  if [ -s "$HOOK_DST" ]; then
+    printf '\n' >> "$HOOK_DST"
+  else
+    echo "#!/bin/bash" > "$HOOK_DST"
+  fi
+  cat >> "$HOOK_DST" << 'DISPATCH'
+# >>> ESPALIER_POSTMERGE_DISPATCH v1 >>>
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$ROOT" || exit 0
+[ -f espalier/hooks/drift-detect.sh ] && bash espalier/hooks/drift-detect.sh
+if [ "$(cat espalier/.merge-hook-decision 2>/dev/null)" = "installed" ]; then
+  [ -f espalier/hooks/post-merge-backlink.sh ] && bash espalier/hooks/post-merge-backlink.sh
+fi
+# <<< ESPALIER_POSTMERGE_DISPATCH v1 <<<
+exit 0
+DISPATCH
+  chmod +x "$HOOK_DST"
+  log "  Installed post-merge dispatcher → $HOOK_DST"
 }
 
 # --- Stage 10: .gitignore append --------------------------------------------
@@ -496,25 +540,33 @@ stage_merge_decision() {
 stage_gitignore() {
   log "Stage 10: .gitignore append (idempotent + newline guard)"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] append 'espalier/.commit-index.tsv' to .gitignore"
+    echo "[dry-run] append espalier cache + drift-sidecar entries to .gitignore"
     return
   fi
-  if grep -qxF "espalier/.commit-index.tsv" .gitignore 2>/dev/null; then
-    log "  .gitignore already has entry — skipping"
-    return
-  fi
-  if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then
-    printf '\n' >> .gitignore
-  fi
-  echo "espalier/.commit-index.tsv" >> .gitignore
+  # commit-index cache + the five drift sidecars (.drift-state.tsv* glob also
+  # covers mktemp temp files). Each entry appended once, with a newline guard.
+  printf '%s\n' \
+    "espalier/.commit-index.tsv" \
+    "espalier/.drift-state.tsv*" \
+    "espalier/.drift.log" \
+    "espalier/.drift-report.md" \
+    "espalier/.doctor-last-run" \
+    "espalier/.drift-overrides.log" \
+  | while IFS= read -r entry; do
+      grep -qxF "$entry" .gitignore 2>/dev/null && continue
+      if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then
+        printf '\n' >> .gitignore
+      fi
+      echo "$entry" >> .gitignore
+    done
 }
 
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  log "Stage 11: validation (24 checks in parallel — R6)"
+  log "Stage 11: validation (28 checks — R6)"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] would run 24 parallel validation checks (skipped — nothing to validate yet)"
+    echo "[dry-run] would run 28 validation checks (skipped — nothing to validate yet)"
     return 0
   fi
 
@@ -530,13 +582,53 @@ stage_validate() {
     # like $name leaking into outer scope), (b) `exit` inside cmd killing
     # the run_check function.
     if ( eval "$cmd" ) >/dev/null 2>&1; then
-      echo "[$n/24] OK   $check_name" > "$tmpdir/$idx"
+      echo "[$n/28] OK   $check_name" > "$tmpdir/$idx"
     else
       local err
       err=$( ( eval "$cmd" ) 2>&1 | head -1 )
-      echo "[$n/24] FAIL $check_name: $err" > "$tmpdir/$idx"
+      echo "[$n/28] FAIL $check_name: $err" > "$tmpdir/$idx"
       echo "fail" > "$tmpdir/$idx.fail"
     fi
+  }
+
+  # Check #25 — invoked DIRECTLY (not via run_check): the run_check harness
+  # discards stdout, which would swallow #25's per-tier table.
+  run_check_25() {
+    [ -f espalier/.drift-state.tsv ] || { echo "[25/28] OK   stale-tiers: no drift"; return 0; }
+    local NOW; NOW=$(date -u +%s)
+    local fresh=0 aging=0 stale=0 critical=0 expired=0
+    while IFS=$'\t' read -r FILE SHA FIRST_SEEN REASON; do
+      [ -z "$FILE" ] && continue
+      local TS_SEC
+      if [ "$(uname)" = "Darwin" ]; then
+        TS_SEC=$(date -juf %Y-%m-%dT%H:%M:%SZ "$FIRST_SEEN" +%s 2>/dev/null)
+      else
+        TS_SEC=$(date -d "$FIRST_SEEN" +%s 2>/dev/null)
+      fi
+      [ -z "$TS_SEC" ] && { echo "  WARN bad stale_first_seen: $FILE"; continue; }
+      local AGE=$(( (NOW - TS_SEC) / 86400 ))
+      if   [ "$AGE" -lt 14 ]; then fresh=$((fresh+1))
+      elif [ "$AGE" -lt 30 ]; then aging=$((aging+1));       echo "  [aging]    ${AGE}d  $FILE"
+      elif [ "$AGE" -lt 60 ]; then stale=$((stale+1));       echo "  [stale]    ${AGE}d  $FILE"
+      elif [ "$AGE" -lt 90 ]; then critical=$((critical+1)); echo "  [critical] ${AGE}d  $FILE"
+      else expired=$((expired+1));                           echo "  [expired]  ${AGE}d  $FILE"
+      fi
+    done < espalier/.drift-state.tsv
+    echo "[25/28] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
+    [ "$critical" -gt 0 ] && echo "  WARN: $critical artifact(s) 60-90d stale"
+    if [ "$expired" -gt 0 ]; then
+      if [ "${IGNORE_DRIFT:-no}" = "yes" ]; then
+        local who; who=$(git config user.email 2>/dev/null || echo unknown)
+        printf '%s\t%s\texpired=%s\treason=%s\n' \
+          "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$who" "$expired" "${IGNORE_DRIFT_REASON:-(no reason given)}" \
+          >> espalier/.drift-overrides.log
+        echo "  OVERRIDE: $expired expired artifact(s) ignored (--ignore-drift) — logged"
+      else
+        echo "  FAIL: $expired expired (>90d) — run /espalier-prune --all-stale"
+        return 1
+      fi
+    fi
+    return 0
   }
 
   run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
@@ -558,31 +650,31 @@ stage_validate() {
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
-  run_check 20 "post-merge-installed" '
-    DECISION=$(cat espalier/.merge-hook-decision 2>/dev/null);
-    if [ "$DECISION" = "installed" ]; then
-      grep -qE "(ESPALIER|HARNESS)_BACKLINK_HOOK" .git/hooks/post-merge 2>/dev/null || grep -qE "(ESPALIER|HARNESS)_BACKLINK_HOOK" .husky/post-merge 2>/dev/null;
-    else
-      exit 0;
-    fi' &
+  run_check 20 "post-merge-dispatcher" 'grep -qE "ESPALIER_POSTMERGE_DISPATCH" .git/hooks/post-merge 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
   run_check 21 "rebuild-script"      'test -x espalier/hooks/rebuild-commit-index.sh' &
   run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
   run_check 24 "cache-tsv-format"    '[ ! -s espalier/.commit-index.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.commit-index.tsv' &
+  run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
+  run_check 27 "conventions-format"  '[ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv' &
+  run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
 
   wait
 
-  # Emit sorted output (deterministic order)
-  cat "$tmpdir"/[0-9]* 2>/dev/null
+  # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
+  # must reach stdout, which the run_check harness discards), then 26-28.
+  cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
+  run_check_25 || echo "fail" > "$tmpdir/25.fail"
+  cat "$tmpdir"/2[6-8] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"
 
   if [ "$failed" -gt 0 ]; then
-    log "Validation: $failed/24 FAILED"
+    log "Validation: $failed/28 FAILED"
     return 1
   fi
-  log "Validation: 24/24 passed"
+  log "Validation: 28/28 passed"
   return 0
 }
 
