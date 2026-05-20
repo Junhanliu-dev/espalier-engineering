@@ -151,6 +151,10 @@ assert "merge decision persisted"               "grep -q ask-later '$TMP/espalie
 assert "CLAUDE.md has Espalier section"         "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 assert ".claude/settings.json valid JSON"       "python3 -c 'import json,sys; json.load(open(\"$TMP/.claude/settings.json\"))'"
 assert "gitignore has cache entry"              "grep -qxF 'espalier/.commit-index.tsv' '$TMP/.gitignore'"
+assert "drift-detect.sh copied"                 "[ -f '$TMP/espalier/hooks/drift-detect.sh' ]"
+assert "drift-helpers.sh copied"                "[ -f '$TMP/espalier/hooks/drift-helpers.sh' ]"
+assert "post-merge dispatcher installed"        "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
+assert "gitignore has drift-state glob"         "grep -qxF 'espalier/.drift-state.tsv*' '$TMP/.gitignore'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 3: Idempotent re-run (detects complete install → validate only) ─
@@ -247,7 +251,7 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/24\]' | head -3 | sed 's/\[//;s/\/24\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/28\]' | head -3 | sed 's/\[//;s/\/28\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
