@@ -18,6 +18,11 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
 
 ## Review Process
 
+0. Pre-flight: if a rule or wiki file material to this review is listed in
+   `espalier/.drift-state.tsv`, add a line to your `### Summary`:
+   "STALE CONTEXT: {file} flagged stale — findings checked against current
+   code, not the stale doc." This is a note only — do NOT change the
+   PASS/FAIL verdict because of staleness.
 1. Read the coding report from the coder agent (what was done)
 2. Read each changed/created file
 3. For each file, check against:
