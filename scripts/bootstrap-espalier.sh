@@ -12,8 +12,8 @@
 #
 # This script then runs ONE invocation that:
 #   - Creates remaining directories (idempotent against existing).
-#   - Copies pure-copy templates (pipeline.md, espalier/espalier-fix/
-#     espalier-requirements SKILL.md, non-substitution hooks).
+#   - Copies pure-copy templates (pipeline.md, espalier, espalier-fix,
+#     espalier-requirements, espalier-prune, espalier-doctor SKILL.md + hooks).
 #   - chmod +x every espalier/hooks/*.sh (catches LLM-written hooks too — R10).
 #   - Creates symlinks via portable abspath helper (R-extra).
 #   - Appends CLAUDE.md Espalier section (idempotent grep-guard).
@@ -35,6 +35,7 @@
 #                            $HARNESS_PLUGIN_DIR) + common locations.
 #   --lang=<ts|py|go|unsupported>
 #                            Boundary-check variant. "unsupported" emits a no-op.
+#   --doctor-cadence=<val>   every-change | weekly | monthly | manual (default: weekly).
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -59,6 +60,7 @@ SKIP_PROMPT=no
 FORCE=no
 IGNORE_DRIFT=no
 IGNORE_DRIFT_REASON=""
+DOCTOR_CADENCE=weekly
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -67,6 +69,7 @@ for arg in "$@"; do
     --plugin-dir=*)         PLUGIN_DIR="${arg#--plugin-dir=}" ;;
     --lang=*)               LANG_VARIANT="${arg#--lang=}" ;;
     --merge-decision=*)     MERGE_DECISION="${arg#--merge-decision=}" ;;
+    --doctor-cadence=*)     DOCTOR_CADENCE="${arg#--doctor-cadence=}" ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -76,7 +79,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,48p' "$0"
+      sed -n '2,49p' "$0"
       exit 0
       ;;
     *)
@@ -205,6 +208,15 @@ case "$LANG_VARIANT" in
     ;;
 esac
 
+# Validate --doctor-cadence
+case "$DOCTOR_CADENCE" in
+  every-change|weekly|monthly|manual) ;;
+  *)
+    echo "WARNING: unknown --doctor-cadence='$DOCTOR_CADENCE', falling back to 'weekly'" >&2
+    DOCTOR_CADENCE=weekly
+    ;;
+esac
+
 log "Mode: $MODE | project: $PROJECT_DIR | plugin: $PLUGIN_DIR | lang: $LANG_VARIANT"
 
 # Resolve the --ignore-drift audit reason once (prompt only when interactive).
@@ -228,6 +240,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier"
   run "mkdir -p espalier/skills/espalier-fix"
   run "mkdir -p espalier/skills/espalier-prune"
+  run "mkdir -p espalier/skills/espalier-doctor"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/hooks"
   run "mkdir -p espalier/wiki"
@@ -251,6 +264,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-fix.md' espalier/skills/espalier-fix/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-requirements.md' espalier/skills/espalier-requirements/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-prune.md' espalier/skills/espalier-prune/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-doctor.md' espalier/skills/espalier-doctor/SKILL.md"
 }
 
 # --- Stage 4: Hooks (non-substitution subset) + chmod-glob (R10) ------------
@@ -290,7 +304,7 @@ stage_symlinks() {
   safe_ln "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
   safe_ln "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
   safe_ln "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
-  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix espalier-prune; do
+  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix espalier-prune espalier-doctor; do
     safe_ln "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
   done
   # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
@@ -458,14 +472,24 @@ PYMERGE
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
 stage_merge_decision() {
-  log "Stage 9: merge decision = $MERGE_DECISION + post-merge dispatcher"
+  log "Stage 9: persist Phase 0 decisions + post-merge dispatcher"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] write espalier/.merge-hook-decision = $MERGE_DECISION"
+    echo "[dry-run] write espalier/.doctor-cadence = $DOCTOR_CADENCE (if absent)"
     echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
     return
   fi
 
   echo "$MERGE_DECISION" > espalier/.merge-hook-decision
+
+  # espalier/.doctor-cadence — tracked, cadence-line only. Written ONCE; never
+  # auto-rewritten, so a user's later edit to the cadence survives re-bootstrap.
+  if [ -f espalier/.doctor-cadence ]; then
+    log "  espalier/.doctor-cadence already exists — preserving"
+  else
+    echo "cadence: $DOCTOR_CADENCE" > espalier/.doctor-cadence
+    log "  wrote espalier/.doctor-cadence = $DOCTOR_CADENCE"
+  fi
 
   # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must
   # run on every merge regardless of the squash-merge decision. Whether

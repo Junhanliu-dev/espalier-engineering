@@ -2,6 +2,14 @@
 # Pre-push quality gate
 # Blocks git push unless all conditions are met
 
+# Doctor-cadence reminder — non-blocking, printed before any gate logic so it
+# fires on every push regardless of gate outcome (the gate has early-exit
+# paths). Never affects the exit code.
+if [ -f espalier/hooks/drift-helpers.sh ]; then
+  . espalier/hooks/drift-helpers.sh
+  doctor_due && echo "Reminder: an /espalier-doctor drift scan is due."
+fi
+
 # Find the most-recently-modified pipeline-state.md across typed subdirs
 # (espalier/changes/{type}/{slug}/pipeline-state.md — depth 3 from CHANGES_DIR).
 CHANGES_DIR="espalier/changes"
