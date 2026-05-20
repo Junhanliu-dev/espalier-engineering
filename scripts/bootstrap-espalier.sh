@@ -262,6 +262,7 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/rebuild-commit-index.sh' espalier/hooks/rebuild-commit-index.sh"
   run "cp '$PLUGIN_DIR/hook-templates/drift-detect.sh' espalier/hooks/drift-detect.sh"
   run "cp '$PLUGIN_DIR/hook-templates/drift-helpers.sh' espalier/hooks/drift-helpers.sh"
+  run "cp '$PLUGIN_DIR/hook-templates/parse-drift-blocks.py' espalier/hooks/parse-drift-blocks.py"
   # R10 — chmod every *.sh in espalier/hooks/ (catches LLM-written pre-push-gate.sh
   # and check-layer-boundaries.sh from Phase 2-7 Write batch).
   if [ "$DRY_RUN" = "yes" ]; then

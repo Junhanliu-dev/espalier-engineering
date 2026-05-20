@@ -153,6 +153,7 @@ assert ".claude/settings.json valid JSON"       "python3 -c 'import json,sys; js
 assert "gitignore has cache entry"              "grep -qxF 'espalier/.commit-index.tsv' '$TMP/.gitignore'"
 assert "drift-detect.sh copied"                 "[ -f '$TMP/espalier/hooks/drift-detect.sh' ]"
 assert "drift-helpers.sh copied"                "[ -f '$TMP/espalier/hooks/drift-helpers.sh' ]"
+assert "parse-drift-blocks.py copied"           "[ -f '$TMP/espalier/hooks/parse-drift-blocks.py' ]"
 assert "post-merge dispatcher installed"        "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
 assert "gitignore has drift-state glob"         "grep -qxF 'espalier/.drift-state.tsv*' '$TMP/.gitignore'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
