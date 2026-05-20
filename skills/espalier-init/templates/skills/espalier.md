@@ -140,6 +140,41 @@ Agent tool:
     Append review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
+### Stage 4 Post-Review: Convention Drift Capture
+
+After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
+Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
+
+> Variables in scope: `TYPE` and `SLUG` are the active change's type/slug.
+
+```bash
+. espalier/hooks/drift-helpers.sh
+REV="espalier/changes/${TYPE}/${SLUG}/review-record.md"
+[ -f "$REV" ] || exit 0
+SHA=$(git rev-parse HEAD)
+
+python3 espalier/hooks/parse-drift-blocks.py "$REV" \
+| while IFS=$'\t' read -r KIND RULE_FILE COUPLED; do
+  case "$KIND" in
+    DRIFT)
+      mark_stale "$RULE_FILE" "$SHA" "convention drift flagged in ${TYPE}/${SLUG} review"
+      LINE="convention_drift: $RULE_FILE"
+      [ -n "$COUPLED" ] && LINE="$LINE (coupled_with: $COUPLED)"
+      echo "$LINE" >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
+      ;;
+    MALFORMED)
+      echo "P0: malformed Convention Drift block — $RULE_FILE" \
+        >> "espalier/changes/${TYPE}/${SLUG}/review-record.md"
+      ;;
+  esac
+done
+```
+
+A `MALFORMED` line means the reviewer bundled unrelated drifts into one block —
+it is written back as a P0 so the next review round splits them. `coupled_with`
+blocks resurface together at the next Stage 0 pre-flight (promote-together /
+reject-together / split).
+
 ### State File Format
 
 Parse `{type}` from the requirement prefix:
