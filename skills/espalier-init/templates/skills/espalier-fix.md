@@ -222,6 +222,10 @@ Options:
 Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
 If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
 
+For a `pattern_key` at the promotion threshold (>= 3 `diverges` rows), handle it
+per the `espalier` skill's Convention Promotion section — the same four options
+(promote / reject / exception / wait).
+
 ## Stage 0: Auto-Link Discovery (NEW)
 
 > Fully specified in plan §6 (Phase 4). Summary follows; see plan for full code.
@@ -441,7 +445,7 @@ Spawn `harness-reviewer`. Output to `espalier/changes/fix/{slug}/review-record.m
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
 
-### Stage 4 Post-Review: Convention Drift Capture
+### Stage 4 Post-Review: Drift & Convention Index
 
 After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
 Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
@@ -473,6 +477,27 @@ done
 
 A `MALFORMED` line means the reviewer bundled unrelated drifts into one block —
 it is written back as a P0 so the next review round splits them.
+
+**Convention Observations → the convention index.** The reviewer also emits
+lower-bar Convention Observations (see `harness-reviewer.md`) — one per
+divergence, with NO aggregation key. The orchestrator assigns the key. For each
+Observation in `review-record.md`:
+
+1. Read existing keys: `cut -f3 espalier/.conventions.tsv 2>/dev/null | sort -u`.
+2. Map the Observation's `description` to an existing `pattern_key`, or mint a
+   new kebab-case key.
+3. Append the row:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+append_convention "fix/${SLUG}" "$PATTERN_KEY" "$LOCATION"
+```
+
+`append_convention` sanitizes every field and de-dupes on
+(change_slug, pattern_key, location). `espalier/.conventions.tsv` is tracked and
+append-only — columns `date · change_slug · pattern_key · location · status`.
+When a `pattern_key` reaches 3 `diverges` rows it is a promotion candidate,
+surfaced at the next Stage 0 pre-flight.
 
 ## Stage 5: Test Writing
 
@@ -541,6 +566,16 @@ fi
 ```
 
 ## Stage 7: Push (with back-link)
+
+### 7.0 Stage the convention index
+
+If this run appended to `espalier/.conventions.tsv` (Stage 4) or flipped a
+row's status, stage it BEFORE the push commit so the tracked file lands in this
+fix's commit and the Stage 7 clean-tree gate stays green:
+
+```bash
+git add espalier/.conventions.tsv
+```
 
 Standard push. Then:
 

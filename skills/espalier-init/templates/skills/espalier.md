@@ -54,6 +54,37 @@ Options:
 Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
 If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
 
+### Convention Promotion
+
+When the Stage 0 pre-flight reports a `pattern_key` with >= 3 `diverges` rows in
+`espalier/.conventions.tsv` and the user picks "Handle now", surface the
+candidate with `AskUserQuestion`:
+
+```
+Convention "{pattern_key}" has diverged in {N} changes:
+  {change_slug : location, one per row}
+Options:
+  1. Promote   — bless the new pattern in the rule file, deprecate the old.
+  2. Reject    — the new pattern is wrong; code should conform to the rule.
+  3. Exception — sanction it under the rule's "## Exceptions" (a carve-out,
+                 not a new default).
+  4. Wait      — leave the rows; re-prompt at the next occurrence.
+```
+
+- **Promote** — the orchestrator edits the rule file DIRECTLY (not
+  `/espalier-prune`: prune re-runs a scout, which re-derives the rule from a
+  code base that is now a MIX of old + new and cannot make the decision). Then
+  flip those rows' status `diverges` → `promoted`.
+- **Reject** — flip those rows → `rejected`. The threshold counts only
+  `diverges`, so a rejected pattern stops counting.
+- **Exception** — append under the rule's "## Exceptions"; flip rows → `exception`.
+- **Wait** — leave rows `diverges`.
+
+Flip a row's status by editing `espalier/.conventions.tsv` — change the 5th tab
+field (`status`) of every matching row. The edit is committed by the same
+Stage 0 → Stage 7 run (the orchestrator stages `.conventions.tsv` at Stage 7).
+`coupled_with` candidates are surfaced together — promote/reject them as a set.
+
 ### Session Resumption
 
 On every invocation, check:
@@ -140,7 +171,7 @@ Agent tool:
     Append review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
-### Stage 4 Post-Review: Convention Drift Capture
+### Stage 4 Post-Review: Drift & Convention Index
 
 After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
 Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
@@ -175,6 +206,31 @@ it is written back as a P0 so the next review round splits them. `coupled_with`
 blocks resurface together at the next Stage 0 pre-flight (promote-together /
 reject-together / split).
 
+**Convention Observations → the convention index.** The reviewer also emits
+lower-bar Convention Observations (see `harness-reviewer.md`) — one per
+divergence, with NO aggregation key. The orchestrator assigns the key: a fresh
+isolated reviewer cannot (three reviews of one pattern would coin three keys and
+the count would never reach the threshold). For each Observation in
+`review-record.md`:
+
+1. Read existing keys: `cut -f3 espalier/.conventions.tsv 2>/dev/null | sort -u`.
+2. Map the Observation's `description` to an existing `pattern_key`, or mint a
+   new kebab-case key.
+3. Append the row:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+append_convention "${TYPE}/${SLUG}" "$PATTERN_KEY" "$LOCATION"
+```
+
+`append_convention` sanitizes every field and de-dupes on
+(change_slug, pattern_key, location), so re-running Stage 4 never inflates the
+count. `espalier/.conventions.tsv` is tracked and append-only — columns
+`date · change_slug · pattern_key · location · status` (+ optional 6th
+`coupled_with`); `status` ∈ `diverges | promoted | rejected | exception`. When a
+`pattern_key` reaches 3 `diverges` rows it is a promotion candidate, surfaced at
+the next Stage 0 pre-flight (see Convention Promotion).
+
 ### State File Format
 
 Parse `{type}` from the requirement prefix:
@@ -205,6 +261,19 @@ Create `espalier/changes/{type}/{slug}/pipeline-state.md`:
 | 2 | PASSED | 2025-01-15T10:05 | 1 round, no P0s |
 | 3 | IN_PROGRESS | 2025-01-15T10:10 | |
 ```
+
+### Stage 7: Stage the Convention Index
+
+If this run appended to `espalier/.conventions.tsv` (Stage 4) or flipped a
+row's status (Convention Promotion), stage the file into the Stage 7 commit
+alongside `espalier/changes/{type}/{slug}/*`:
+
+```bash
+git add espalier/.conventions.tsv
+```
+
+`.conventions.tsv` is tracked; staging it here keeps the working tree clean for
+the Stage 7 gate and never leaves an automation-written file uncommitted.
 
 ### Stage 7 Commit Recording
 
