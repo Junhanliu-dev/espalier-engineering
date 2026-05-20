@@ -38,7 +38,7 @@ espalier/
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
 ├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
 ├── pipeline.md             # 10-stage workflow with explicit gates and rollback rules
-└── changes/                # typed audit trail: feat/, fix/, refactor/ — one dir per requirement
+└── changes/                # typed audit trail: feat/, fix/, refactor/, docs/ — one dir per requirement
 ```
 
 Plus symlinks into `.claude/` so Claude Code discovers everything, plus a `.claude/settings.json` hook entry for the quality gates.
@@ -157,7 +157,7 @@ The cost compares **once-per-repo** against **every-request-forever**:
 | Every request: human catches "this doesn't match our patterns" and explains them again | Patterns enforced by `harness-reviewer` agent automatically; human reviews business logic only |
 | Implicit/forgotten unwritten rules cause silent drift across the codebase | Rules encoded in `coding-standards.md`, enforced by reviewer + pre-push hook |
 
-**Math:** A typical feature request without harness consumes 2-4× the tokens of a single `/espalier` invocation (because the agent re-loads the codebase into context per round, and there are 3-5 rounds). Across ~5-10 feature requests, you earn back the `/espalier-init` cost. Across a quarter of work, the savings compound substantially.
+**Math:** A typical feature request without Espalier consumes 2-4× the tokens of a single `/espalier` invocation (because the agent re-loads the codebase into context per round, and there are 3-5 rounds). Across ~5-10 feature requests, you earn back the `/espalier-init` cost. Across a quarter of work, the savings compound substantially.
 
 **Side benefits beyond cost:**
 - **Convention consistency** — codebase doesn't drift toward whatever-the-model-felt-like-today
