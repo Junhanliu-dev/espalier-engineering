@@ -71,6 +71,32 @@ Examples of when to use:
 
 Do NOT use ESCALATION_REQUIRED to escape a hard review — if the fix is wrong, use FAIL. Use ESCALATION_REQUIRED only when the work shown is reasonable but the bug-fix framing itself needs to change.
 
+## Convention Drift Reporting
+
+If during review you observe one OR MORE recurring code patterns that differ
+from project rules and are now used in 2+ places, emit a Convention Drift block
+for EACH distinct drift, in exactly this shape:
+
+```
+## Convention Drift
+- Rule file: espalier/rules/coding-standards.md (or specs/{layer}.md)
+- Old convention: "{quoted from the rule}"
+- New convention observed: "{what the code does now}"
+- Evidence files: {2+ files showing the new pattern}
+- Recommendation: update rule | document exception | reject this code
+- coupled_with: {optional — another rule file whose drift depends on this one}
+```
+
+Constraints:
+- DO NOT silently approve code that violates a rule — emit the block first.
+- DO NOT use Convention Drift for one-off exceptions. 2+ evidence files required.
+- DO NOT bundle unrelated drifts. One drift = one block. A block with two
+  `- Rule file:` lines is malformed and will be rejected by the parser.
+- Checking 2+ occurrences is a bounded grep over the layer you are already
+  reviewing — NOT a whole-codebase audit. If you cannot confirm 2+ from files
+  in scope, emit a Convention Observation instead (a lower-bar report — see the
+  Convention Observations section below).
+
 ## You Must NOT
 
 - Edit or fix the code yourself (that's the coder's job)

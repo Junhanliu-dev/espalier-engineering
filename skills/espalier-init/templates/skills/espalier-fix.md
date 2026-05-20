@@ -441,6 +441,39 @@ Spawn `harness-reviewer`. Output to `espalier/changes/fix/{slug}/review-record.m
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
 
+### Stage 4 Post-Review: Convention Drift Capture
+
+After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
+Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
+
+> Variable in scope: `SLUG` is this fix's slug (no `fix/` prefix).
+
+```bash
+. espalier/hooks/drift-helpers.sh
+REV="espalier/changes/fix/${SLUG}/review-record.md"
+[ -f "$REV" ] || exit 0
+SHA=$(git rev-parse HEAD)
+
+python3 espalier/hooks/parse-drift-blocks.py "$REV" \
+| while IFS=$'\t' read -r KIND RULE_FILE COUPLED; do
+  case "$KIND" in
+    DRIFT)
+      mark_stale "$RULE_FILE" "$SHA" "convention drift flagged in fix/${SLUG} review"
+      LINE="convention_drift: $RULE_FILE"
+      [ -n "$COUPLED" ] && LINE="$LINE (coupled_with: $COUPLED)"
+      echo "$LINE" >> "espalier/changes/fix/${SLUG}/pipeline-state.md"
+      ;;
+    MALFORMED)
+      echo "P0: malformed Convention Drift block — $RULE_FILE" \
+        >> "espalier/changes/fix/${SLUG}/review-record.md"
+      ;;
+  esac
+done
+```
+
+A `MALFORMED` line means the reviewer bundled unrelated drifts into one block —
+it is written back as a P0 so the next review round splits them.
+
 ## Stage 5: Test Writing
 
 Spawn `harness-coder` in testing mode:
