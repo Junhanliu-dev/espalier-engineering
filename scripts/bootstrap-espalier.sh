@@ -227,6 +227,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-requirements"
   run "mkdir -p espalier/skills/espalier"
   run "mkdir -p espalier/skills/espalier-fix"
+  run "mkdir -p espalier/skills/espalier-prune"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/hooks"
   run "mkdir -p espalier/wiki"
@@ -249,6 +250,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier.md' espalier/skills/espalier/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-fix.md' espalier/skills/espalier-fix/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-requirements.md' espalier/skills/espalier-requirements/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-prune.md' espalier/skills/espalier-prune/SKILL.md"
 }
 
 # --- Stage 4: Hooks (non-substitution subset) + chmod-glob (R10) ------------
@@ -288,7 +290,7 @@ stage_symlinks() {
   safe_ln "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
   safe_ln "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
   safe_ln "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
-  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix; do
+  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix espalier-prune; do
     safe_ln "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
   done
   # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer

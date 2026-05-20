@@ -143,6 +143,8 @@ assert "espalier/skills/espalier-fix/SKILL.md exists" "[ -f '$TMP/espalier/skill
 assert ".claude/rules symlinks exist"     "[ -L '$TMP/.claude/rules/espalier-structure.md' ]"
 assert ".claude/skills/espalier-coding link" "[ -L '$TMP/.claude/skills/espalier-coding' ]"
 assert ".claude/skills/espalier (main) link" "[ -L '$TMP/.claude/skills/espalier' ]"
+assert "espalier-prune skill copied"        "[ -f '$TMP/espalier/skills/espalier-prune/SKILL.md' ]"
+assert ".claude/skills/espalier-prune link" "[ -L '$TMP/.claude/skills/espalier-prune' ]"
 assert ".claude/agents/harness-coder link"  "[ -L '$TMP/.claude/agents/harness-coder.md' ]"
 assert "pre-push-gate.sh executable (R10)"      "[ -x '$TMP/espalier/hooks/pre-push-gate.sh' ]"
 assert "check-layer-boundaries.sh executable"   "[ -x '$TMP/espalier/hooks/check-layer-boundaries.sh' ]"
