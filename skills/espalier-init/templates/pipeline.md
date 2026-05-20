@@ -70,6 +70,18 @@
   - Lint failure → Stage 3
 - **Output:** espalier/changes/{slug}/ci-result.md
 
+### 8.5 Doc Drift Check (notify-only)
+- **Trigger:** Stage 8 (CI) passed
+- **Execute:** read `espalier/.drift-state.tsv`; if any docs are flagged, append
+  a notify table to the change's `doc-patches.md` and surface one line
+- **Gate:** none — notify-only. Edits no rule/wiki/spec file, prompts nothing,
+  never blocks the pipeline.
+- **Note:** "8.5" is a label, NOT a numeric stage. `pipeline-state.md`
+  `Current Stage:` never holds `8.5` — the orchestrator runs this as a sub-step
+  between Stage 8 and Stage 9 and records it in the Stage History notes only.
+  This keeps `pre-push-gate.sh`'s integer stage parse correct.
+- **Output:** `espalier/changes/{type}/{slug}/doc-patches.md` (created on demand)
+
 ### 9. Deployment Verification
 - **Human checkpoint:** Confirm deployment parameters
 - **Gate:** Health/smoke check passes in target environment

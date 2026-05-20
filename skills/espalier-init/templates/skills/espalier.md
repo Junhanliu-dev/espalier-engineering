@@ -348,6 +348,47 @@ EOF
 fi
 ```
 
+### Stage 8.5 — Doc Drift Check (notify-only)
+
+Runs as a sub-step between Stage 8 (CI verify) and Stage 9 (deploy). It edits no
+doc, prompts nothing, blocks nothing — it only surfaces drift this run may have
+caused.
+
+> "8.5" is a label, not a numeric stage. Do NOT write `Current Stage: 8.5` to
+> pipeline-state.md — it would break `pre-push-gate.sh`'s integer stage parse.
+> Record Stage 8.5 only in the Stage History notes.
+
+```bash
+. espalier/hooks/drift-helpers.sh
+STALE=$(stale_files)
+PATCHES="espalier/changes/${TYPE}/${SLUG}/doc-patches.md"
+
+if [ -z "$STALE" ]; then
+  echo "Stage 8.5: no drift."
+else
+  {
+    echo ""
+    echo "## Stage 8.5 Doc Drift (notify-only)"
+    echo "| File | Tier | Reason |"
+    echo "|------|------|--------|"
+    printf '%s\n' "$STALE" | while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      tier=$(classify_tier "$f")
+      reason=$(awk -F'\t' -v x="$f" '$1==x {print $4; exit}' espalier/.drift-state.tsv)
+      echo "| $f | $tier | $reason |"
+    done
+  } >> "$PATCHES"
+  N=$(printf '%s\n' "$STALE" | grep -c .)
+  echo "Stage 8.5: $N stale doc(s) — run /espalier-prune to refresh. (Not blocking; pipeline continues.)"
+fi
+```
+
+`doc-patches.md` is a per-change artifact created on demand under
+`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Stage 8.5 touches no
+rule/wiki/spec file, so it cannot dirty a project-level doc. Advance to Stage 9
+regardless of the result. In-pipeline auto-apply is a v2 item — refresh stays a
+deliberate `/espalier-prune`.
+
 ### Rollback Protocol
 
 When a gate fails:
