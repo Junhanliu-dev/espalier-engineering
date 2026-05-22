@@ -348,7 +348,7 @@ mkdir -p espalier
 
 # 2. Wire it
 mkdir -p .claude/rules
-ln -sf "$(pwd)/espalier/coding-standards.md" .claude/rules/espalier-standards.md
+ln -sfn "$(pwd)/espalier/coding-standards.md" .claude/rules/espalier-standards.md
 
 # 3. Reference in CLAUDE.md
 cat >> CLAUDE.md << 'EOF'

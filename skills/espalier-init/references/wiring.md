@@ -11,9 +11,9 @@ Generated files are inert until wired into the execution environment. Run these 
 mkdir -p .claude/rules
 
 # Symlink Espalier rules (auto-loaded every session)
-ln -sf "$(pwd)/espalier/rules/engineering-structure.md" .claude/rules/espalier-structure.md
-ln -sf "$(pwd)/espalier/rules/coding-standards.md" .claude/rules/espalier-standards.md
-ln -sf "$(pwd)/espalier/rules/development-process.md" .claude/rules/espalier-process.md
+ln -sfn "$(pwd)/espalier/rules/engineering-structure.md" .claude/rules/espalier-structure.md
+ln -sfn "$(pwd)/espalier/rules/coding-standards.md" .claude/rules/espalier-standards.md
+ln -sfn "$(pwd)/espalier/rules/development-process.md" .claude/rules/espalier-process.md
 ```
 
 ## 10.2 Wire Skills → Discoverable Slash Commands
@@ -22,12 +22,12 @@ ln -sf "$(pwd)/espalier/rules/development-process.md" .claude/rules/espalier-pro
 mkdir -p .claude/skills
 
 # Symlink Espalier skills
-ln -sf "$(pwd)/espalier/skills/espalier-coding" .claude/skills/espalier-coding
-ln -sf "$(pwd)/espalier/skills/espalier-review" .claude/skills/espalier-review
-ln -sf "$(pwd)/espalier/skills/espalier-testing" .claude/skills/espalier-testing
-ln -sf "$(pwd)/espalier/skills/espalier-requirements" .claude/skills/espalier-requirements
-ln -sf "$(pwd)/espalier/skills/espalier" .claude/skills/espalier
-ln -sf "$(pwd)/espalier/skills/espalier-fix" .claude/skills/espalier-fix
+ln -sfn "$(pwd)/espalier/skills/espalier-coding" .claude/skills/espalier-coding
+ln -sfn "$(pwd)/espalier/skills/espalier-review" .claude/skills/espalier-review
+ln -sfn "$(pwd)/espalier/skills/espalier-testing" .claude/skills/espalier-testing
+ln -sfn "$(pwd)/espalier/skills/espalier-requirements" .claude/skills/espalier-requirements
+ln -sfn "$(pwd)/espalier/skills/espalier" .claude/skills/espalier
+ln -sfn "$(pwd)/espalier/skills/espalier-fix" .claude/skills/espalier-fix
 ```
 
 ## 10.3 Wire Sub-Agents → Agent Definitions
@@ -37,8 +37,8 @@ mkdir -p .claude/agents
 
 # Symlink Espalier agent definitions
 # (Identifier names kept as harness-coder/harness-reviewer for stability across v0.4 rename.)
-ln -sf "$(pwd)/espalier/agents/harness-coder.md" .claude/agents/harness-coder.md
-ln -sf "$(pwd)/espalier/agents/harness-reviewer.md" .claude/agents/harness-reviewer.md
+ln -sfn "$(pwd)/espalier/agents/harness-coder.md" .claude/agents/harness-coder.md
+ln -sfn "$(pwd)/espalier/agents/harness-reviewer.md" .claude/agents/harness-reviewer.md
 ```
 
 These agents are now available for the Agent tool to reference.

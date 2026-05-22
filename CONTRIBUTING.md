@@ -26,8 +26,8 @@ git clone git@github.com:Junhanliu-dev/espalier-engineering.git ~/repos/espalier
 cd ~/repos/espalier-engineering
 
 # Sideload the skill into Claude Code for testing
-ln -sf ~/repos/espalier-engineering/skills/espalier-init    ~/.claude/skills/espalier-init
-ln -sf ~/repos/espalier-engineering/skills/espalier-migrate ~/.claude/skills/espalier-migrate
+ln -sfn ~/repos/espalier-engineering/skills/espalier-init    ~/.claude/skills/espalier-init
+ln -sfn ~/repos/espalier-engineering/skills/espalier-migrate ~/.claude/skills/espalier-migrate
 export ESPALIER_PLUGIN_DIR=~/repos/espalier-engineering/skills/espalier-init
 
 # Restart Claude Code so skills are picked up

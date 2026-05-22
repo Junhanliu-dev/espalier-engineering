@@ -175,6 +175,11 @@ RERUN_EXIT=$?
 assert "re-run exit 0"                          "[ $RERUN_EXIT -eq 0 ]"
 assert "re-run detected complete install"       "echo \"\$RERUN_OUT\" | grep -q 'Existing complete install'"
 assert "re-run ran validation only"             "echo \"\$RERUN_OUT\" | grep -q 'Validation:'"
+# Regression: a re-run must not nest a self-symlink inside each skill dir.
+# Pre-fix, `ln -sf` dereferenced the existing .claude/skills/<X> symlink-to-dir
+# and dropped espalier/skills/<X>/<X> -> <X>. -type l at depth 2 catches only
+# that — SKILL.md is a file, specs/ is a real dir.
+assert "re-run left no nested skill symlinks"   "[ -z \"\$(find '$TMP/espalier/skills' -mindepth 2 -maxdepth 2 -type l)\" ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 4: --force overrides re-run detection ───────────────────────────
@@ -185,6 +190,7 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 FORCE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
 assert "--force does NOT trigger re-run path"   "echo \"\$FORCE_OUT\" | grep -qv 'Existing complete install'"
+assert "--force re-run left no nested symlinks" "[ -z \"\$(find '$TMP/espalier/skills' -mindepth 2 -maxdepth 2 -type l)\" ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 5: --copy-only debug flag still works ──────────────────────────

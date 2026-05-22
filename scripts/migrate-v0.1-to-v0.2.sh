@@ -180,7 +180,7 @@ if [ "$NEEDS_FIX_SKILL" = "yes" ]; then
   echo "==> Installing harness-fix skill"
   run mkdir -p harness/skills/harness-fix
   run cp "$PLUGIN_DIR/templates/skills/harness-fix.md" harness/skills/harness-fix/SKILL.md
-  run ln -sf "\$(pwd)/harness/skills/harness-fix" .claude/skills/harness-fix
+  run ln -sfn "\$(pwd)/harness/skills/harness-fix" .claude/skills/harness-fix
 fi
 
 # --- Step 5: agent template updates (back up first) -------------------------
