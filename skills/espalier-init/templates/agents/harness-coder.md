@@ -66,3 +66,20 @@ Do NOT set this signal if you can write a meaningful test within the original fi
 - Skip the build/lint check
 - Modify files outside the task scope
 - Add features not in the requirements
+
+## Editing Discipline
+
+Modify files with the `Edit` tool (exact-string replacement); create new files
+with `Write`. NEVER edit a file by shelling out — no `python3` / `sed` / `awk`
+heredocs that read a file, splice it by string offset, and write it back.
+
+Shell-splicing is banned because it:
+- bypasses the `post-edit-wrapper.sh` PostToolUse hook, so the layer-boundary
+  check never runs on the change;
+- leaves no reviewable diff for the reviewer agent — just an opaque file write;
+- relies on brittle literal offsets (`str.index`) that silently corrupt the
+  file when whitespace or surrounding code shifts.
+
+For a structural change `Edit` cannot express cleanly, use a real codemod for
+the language (e.g. ts-morph / jscodeshift for TS/JS) — not a hand-rolled
+string splice.

@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5 you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, and the v0.5.3 coder-agent patch you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -13,12 +13,12 @@ description: Migrate an existing harness/espalier install to the current Espalie
 
 ## When NOT to Use
 - Fresh project with no existing `harness/` or `espalier/` dir → use `/espalier-init` instead.
-- Already on v0.5.0 (`espalier/hooks/drift-detect.sh` + `espalier/.doctor-cadence` present) → no migration needed.
+- Already fully up to date — `/espalier-migrate` detects this itself and exits cleanly with no changes.
 
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to THREE migrations may apply, always in this order:
+version. Up to FOUR migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -29,10 +29,14 @@ version. Up to THREE migrations may apply, always in this order:
 3. **v0.4.x → v0.5.0** — doc-drift detection: drift hooks, the
    `/espalier-prune` + `/espalier-doctor` skills, the post-merge dispatcher,
    `.doctor-cadence`. Mechanical: `scripts/migrate-v0.4-to-v0.5.sh`.
+4. **v0.5.0–v0.5.2 → v0.5.3** — appends the `## Editing Discipline` section to
+   the coder sub-agent (`espalier/agents/harness-coder.md`). Mechanical:
+   `scripts/migrate-v0.5.2-to-v0.5.3.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL THREE; a v0.3.x
-install needs the last two; a v0.4.x install needs only the last.
+confirmation, apply in order. A v0.1.x install needs ALL FOUR; a v0.3.x
+install needs the last three; a v0.4.x install needs the last two; a
+v0.5.0–v0.5.2 install needs only the v0.5.3 patch.
 
 ### Step 1: Preflight + detect install version
 
@@ -42,6 +46,7 @@ Run from the current working directory (must be the target project root):
 NEEDS_V01_V02=no
 NEEDS_V03_V04=no
 NEEDS_V04_V05=no
+NEEDS_V05_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -56,13 +61,23 @@ if [ -d "harness" ]; then
   fi
   NEEDS_V03_V04=yes          # harness/ always needs the rename
   NEEDS_V04_V05=yes          # ...then the doc-drift upgrade
+  NEEDS_V05_PATCH=yes        # ...then the v0.5.3 coder-agent patch
 elif [ -d "espalier" ]; then
-  # Already renamed — distinguish v0.4.x from v0.5.0.
-  if [ -f "espalier/hooks/drift-detect.sh" ] && [ -f "espalier/.doctor-cadence" ]; then
-    echo "Already on v0.5.0. Nothing to do."
-    exit 0
+  # Already renamed. v0.4.x still needs the doc-drift upgrade.
+  if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
+    NEEDS_V04_V05=yes        # v0.4.x → doc-drift upgrade
   fi
-  NEEDS_V04_V05=yes          # v0.4.x → doc-drift upgrade
+  # v0.5.3: harness-coder.md gains an "## Editing Discipline" section. It is a
+  # per-project file, so a plugin update never reaches an existing install.
+  if ! grep -qF "## Editing Discipline" espalier/agents/harness-coder.md 2>/dev/null; then
+    NEEDS_V05_PATCH=yes
+  fi
+fi
+
+if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
+   && [ "$NEEDS_V04_V05" = no ] && [ "$NEEDS_V05_PATCH" = no ]; then
+  echo "Already fully up to date. Nothing to do."
+  exit 0
 fi
 ```
 
@@ -82,7 +97,7 @@ for candidate in \
   "$HOME/repos/harness-engineering" \
   "$HOME/SBM_Projects/espalier-engineering" \
   "$HOME/SBM_Projects/harness-engineering"; do
-  if [ -f "$candidate/scripts/migrate-v0.4-to-v0.5.sh" ]; then
+  if [ -f "$candidate/scripts/migrate-v0.5.2-to-v0.5.3.sh" ]; then
     PLUGIN_DIR="$candidate"
     break
   fi
@@ -96,7 +111,7 @@ if [ -z "$PLUGIN_DIR" ]; then
 fi
 ```
 
-If `migrate-v0.4-to-v0.5.sh` is missing but older scripts exist, the plugin
+If `migrate-v0.5.2-to-v0.5.3.sh` is missing but older scripts exist, the plugin
 itself is out of date — tell the user to `/plugin update espalier-engineering`
 first.
 
@@ -109,6 +124,7 @@ verbatim:
 [ "$NEEDS_V01_V02" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.1-to-v0.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR/skills/espalier-init"
 [ "$NEEDS_V03_V04" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.3-to-v0.4.sh" --dry-run
 [ "$NEEDS_V04_V05" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.4-to-v0.5.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V05_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5.2-to-v0.5.3.sh" --dry-run
 ```
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
@@ -151,6 +167,7 @@ completed.
 [ "$NEEDS_V01_V02" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.1-to-v0.2.sh" --yes
 [ "$NEEDS_V03_V04" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.3-to-v0.4.sh" --yes
 [ "$NEEDS_V04_V05" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.4-to-v0.5.sh" --yes --plugin-dir="$PLUGIN_DIR" --doctor-cadence="$DOCTOR_CADENCE"
+[ "$NEEDS_V05_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5.2-to-v0.5.3.sh" --yes
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -213,6 +230,13 @@ Migration applied. Recommended next steps:
 | `--yes` | Skip apply confirmation prompt |
 | `--doctor-cadence=<val>` | `/espalier-doctor` cadence: `every-change\|weekly\|monthly\|manual` (default `weekly`) |
 | `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+**v0.5.2→v0.5.3 (`migrate-v0.5.2-to-v0.5.3.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show the section that would be appended |
+| `--yes` | Skip the apply confirmation prompt |
 
 ## Anti-Patterns
 
