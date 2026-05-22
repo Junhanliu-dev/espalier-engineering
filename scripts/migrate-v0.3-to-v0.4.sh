@@ -273,14 +273,15 @@ else
 
   mkdir -p .claude/rules .claude/skills .claude/agents
 
-  ln -sf "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
-  ln -sf "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
-  ln -sf "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
+  ln -sfn "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
+  ln -sfn "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
+  ln -sfn "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
   for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix; do
-    [ -d "espalier/skills/$s" ] && ln -sf "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
+    # -n: replace an existing symlink-to-dir in place, don't nest inside it.
+    [ -d "espalier/skills/$s" ] && ln -sfn "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
   done
-  ln -sf "$(abspath espalier/agents/harness-coder.md)"    .claude/agents/harness-coder.md
-  ln -sf "$(abspath espalier/agents/harness-reviewer.md)" .claude/agents/harness-reviewer.md
+  ln -sfn "$(abspath espalier/agents/harness-coder.md)"    .claude/agents/harness-coder.md
+  ln -sfn "$(abspath espalier/agents/harness-reviewer.md)" .claude/agents/harness-reviewer.md
 fi
 
 # --- Step 6: patch .claude/settings.json hook paths -------------------------

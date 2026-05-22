@@ -116,9 +116,11 @@ safe_ln() {
     exit 1
   fi
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] ln -sf \"$src\" \"$dst\""
+    echo "[dry-run] ln -sfn \"$src\" \"$dst\""
   else
-    ln -sf "$src" "$dst"
+    # -n: if dst is already a symlink-to-dir, replace the link itself —
+    # without -n, ln dereferences it and nests the new link inside (re-run bug).
+    ln -sfn "$src" "$dst"
   fi
 }
 

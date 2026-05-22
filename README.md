@@ -97,7 +97,7 @@ For users not on the plugin path, or while iterating:
 
 ```bash
 git clone https://github.com/Junhanliu-dev/espalier-engineering ~/repos/espalier-engineering
-ln -sf ~/repos/espalier-engineering/skills/espalier-init ~/.claude/skills/espalier-init
+ln -sfn ~/repos/espalier-engineering/skills/espalier-init ~/.claude/skills/espalier-init
 ```
 
 Restart Claude Code. The skill is now discoverable.
@@ -110,7 +110,7 @@ Drop the skill inside a single project rather than installing globally:
 
 ```bash
 mkdir -p .claude/skills
-ln -sf /path/to/espalier-engineering/skills/espalier-init .claude/skills/espalier-init
+ln -sfn /path/to/espalier-engineering/skills/espalier-init .claude/skills/espalier-init
 ```
 
 ## How `/espalier-init` Works
