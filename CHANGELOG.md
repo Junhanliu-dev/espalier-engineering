@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.5 — 2026-05-22
+
+Patch: skill symlinks stop nesting a self-referencing loop on a wiring re-run.
+
+- **`scripts/bootstrap-espalier.sh`** — `safe_ln` wired skills with `ln -sf`. On a re-run (`bootstrap --force`, or a migration that re-wires), the destination `.claude/skills/<skill>` already exists as a symlink to a directory. Without `-n`, `ln` follows that symlink and creates the new link *inside* the real directory — `espalier/skills/<skill>/<skill>` pointing back at its own parent — instead of replacing the link. A v0.4→v0.5 migration re-run left eight such self-referencing loops in a target repo (one per skill); they break recursive directory walks — `find`, drift scans, backups. `safe_ln` now passes `ln -sfn`; `-n` (no-dereference) is portable across BSD and GNU `ln`.
+- **`scripts/migrate-v0.1-to-v0.2.sh`, `scripts/migrate-v0.3-to-v0.4.sh`** — the raw `ln -sf` calls that wire skills, rules, and agents had the same defect; both now use `ln -sfn`.
+- **`skills/espalier-init/SKILL.md`, `skills/espalier-init/references/wiring.md`, `README.md`, `CONTRIBUTING.md`** — the documented manual `ln -sf` wiring commands, which a user or the init skill runs by hand, updated to `ln -sfn` so a re-run is safe.
+- **`scripts/test-bootstrap.sh`** — Test 3 and Test 4 both re-run the bootstrap but only asserted the `.claude/skills/<skill>` link still existed — true even with the nested loop present, which is why the bug shipped. Each now also asserts no symlink exists two levels deep under `espalier/skills/`, the exact signature of the bug.
+
+No behavior change for a first-time `/espalier-init` — the bug only triggered when wiring ran a second time over existing symlinks. An install that already accrued the loops can clear them with `find espalier/skills -mindepth 2 -maxdepth 2 -type l -delete` (removes only the stray links, not the skills).
+
 ## 0.5.4 — 2026-05-22
 
 Patch: skills resolve their own plugin directory instead of guessing paths.
