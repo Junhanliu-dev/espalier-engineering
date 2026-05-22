@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.2 — 2026-05-22
+
+Patch: the `core.hooksPath` fix from v0.5.1 extended to the migration scripts.
+
+- `scripts/migrate-v0.4-to-v0.5.sh` — the Step 3 "post-merge dispatcher installed" verification grepped a hard-coded `.git/hooks/post-merge`, the same blind spot v0.5.1 fixed in the bootstrap. On a `core.hooksPath` repo the migration itself succeeded (Step 1 runs the now-fixed `bootstrap-espalier.sh --force`) but the check reported a false failure. It now resolves `core.hooksPath`.
+- `scripts/migrate-v0.1-to-v0.2.sh` — the post-merge hook install now resolves `core.hooksPath` instead of assuming `.git/hooks/`.
+- `scripts/migrate-v0.3-to-v0.4.sh` — the `harness/` → `espalier/` hook-path rewrite now resolves `core.hooksPath` when locating the live hook.
+- `docs/migrating-v0.4-to-v0.5.md` — the manual post-migration verification snippet honors `core.hooksPath`.
+
+No behavior change for repos without `core.hooksPath` set. The canonical resolution (with the outside-repo skip) lives in `bootstrap-espalier.sh` Stage 9; the migration scripts do a plain resolve and the chain's final `bootstrap --force` is the safety net.
+
 ## 0.5.1 — 2026-05-22
 
 Patch: `scripts/bootstrap-espalier.sh` now honors `git config core.hooksPath`.
