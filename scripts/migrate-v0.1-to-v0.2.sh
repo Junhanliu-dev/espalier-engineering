@@ -236,12 +236,14 @@ PROMPT
 
   if [ "$DECISION" = "installed" ]; then
     echo "==> Installing post-merge hook"
+    # Honor core.hooksPath — git ignores .git/hooks entirely when it is set.
     if [ -d ".husky" ]; then
       HOOK_DST=".husky/post-merge"
     else
-      HOOK_DST=".git/hooks/post-merge"
+      HOOK_DST="$(git config core.hooksPath 2>/dev/null || echo .git/hooks)/post-merge"
     fi
     SRC="harness/hooks/post-merge-backlink.sh"
+    run mkdir -p "$(dirname "$HOOK_DST")"
     if [ -f "$HOOK_DST" ] && ! grep -q "HARNESS_BACKLINK_HOOK" "$HOOK_DST"; then
       run "cat \"$SRC\" >> \"$HOOK_DST\""
     elif [ ! -f "$HOOK_DST" ]; then

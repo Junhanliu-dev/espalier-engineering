@@ -324,7 +324,9 @@ if [ -f ".gitignore" ]; then
   fi
 fi
 
-for HOOK in .git/hooks/post-merge .husky/post-merge; do
+# Honor core.hooksPath — the live post-merge hook may not be under .git/hooks.
+HOOKS_DIR=$(git config core.hooksPath 2>/dev/null || echo .git/hooks)
+for HOOK in "$HOOKS_DIR/post-merge" .husky/post-merge; do
   [ -f "$HOOK" ] || continue
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] rewrite $HOOK (harness/ paths → espalier/)"

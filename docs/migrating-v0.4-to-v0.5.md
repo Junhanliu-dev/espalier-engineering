@@ -80,7 +80,7 @@ The script's 13 checks cover the essentials. Manual smoke after:
 ```bash
 test -f espalier/hooks/drift-detect.sh && echo "drift hooks installed"
 test -L .claude/skills/espalier-prune && test -L .claude/skills/espalier-doctor && echo "new skills wired"
-grep -q ESPALIER_POSTMERGE_DISPATCH .git/hooks/post-merge 2>/dev/null && echo "dispatcher installed"
+_hd=$(git config core.hooksPath 2>/dev/null); grep -q ESPALIER_POSTMERGE_DISPATCH "${_hd:-.git/hooks}/post-merge" .husky/post-merge 2>/dev/null && echo "dispatcher installed"
 cat espalier/.doctor-cadence
 ```
 
