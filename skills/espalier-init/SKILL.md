@@ -266,9 +266,13 @@ Spec template (`templates/skills/espalier-coding-spec.md`) has **no frontmatter*
 
 Run:
 ```bash
-bash $PLUGIN_DIR/scripts/bootstrap-espalier.sh \
+# ${CLAUDE_SKILL_DIR} is this skill's directory (<plugin>/skills/espalier-init).
+# bootstrap-espalier.sh sits at the plugin root (../../scripts/); its
+# --plugin-dir wants the dir holding hook-templates/ + templates/ — which is
+# this skill's own directory. Resolves the installed plugin in any layout.
+bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
   --project-dir=. \
-  --plugin-dir=$PLUGIN_DIR \
+  --plugin-dir="${CLAUDE_SKILL_DIR}" \
   --lang=$LANG \
   --merge-decision=$MERGE_DECISION \
   --doctor-cadence=$DOCTOR_CADENCE
