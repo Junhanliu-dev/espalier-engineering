@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3 — 2026-05-22
+
+Patch: the coder sub-agent gets an explicit editing-discipline rule.
+
+- **`templates/agents/harness-coder.md`** — new `## Editing Discipline` section. The coder agent ships with `Bash` in its tool list and previously had no rule on *how* to edit files, so it could (and did) edit source by shelling out to `python3`/`sed`/`awk` heredocs that splice a file by string offset. That bypasses the `post-edit-wrapper.sh` PostToolUse hook (layer-boundary checks never run), leaves no reviewable diff, and corrupts the file when whitespace shifts. The new section requires the `Edit`/`Write` tools and bans shell-splicing.
+- **`scripts/migrate-v0.5.2-to-v0.5.3.sh`** — new. `harness-coder.md` is written per-project at `/espalier-init` time, so a plugin update never reaches an existing install. This script appends the `## Editing Discipline` section to `espalier/agents/harness-coder.md` in an existing repo. Idempotent, `--dry-run`/`--yes` flags, pure bash.
+- **`skills/espalier-migrate/SKILL.md`** — `/espalier-migrate` now detects when the coder-agent patch is needed (content check on `harness-coder.md`) and applies `migrate-v0.5.2-to-v0.5.3.sh` as the final step of the chain.
+
+No behavior change for fresh `/espalier-init` runs beyond the new agent rule.
+
 ## 0.5.2 — 2026-05-22
 
 Patch: the `core.hooksPath` fix from v0.5.1 extended to the migration scripts.
