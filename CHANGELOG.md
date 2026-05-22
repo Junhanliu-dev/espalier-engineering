@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1 — 2026-05-22
+
+Patch: `scripts/bootstrap-espalier.sh` now honors `git config core.hooksPath`.
+
+- Bootstrap Stage 9 wrote the post-merge dispatcher to a hard-coded `.git/hooks/post-merge` (or `.husky/post-merge`). When a repo sets `core.hooksPath` — husky v9, lefthook, or an org-wide global hooks dir — git ignores `.git/hooks` entirely, so the dispatcher landed at a path git never reads: `drift-detect.sh` and `post-merge-backlink.sh` silently never ran. Stage 9 now resolves `core.hooksPath` and installs to git's real hooks dir.
+- A `core.hooksPath` that points outside the repo (e.g. a stale absolute path inherited from a repo copy/rename) cannot be wired safely — Stage 9 now skips the install and prints a fix instead of a false success. A value containing `..` is rejected for the same reason.
+- Validation check 20 (`post-merge-dispatcher`) greps the resolved hooks dir instead of the fixed `.git/hooks` path, so it can no longer report a green check for a dispatcher git will never execute.
+- `scripts/test-bootstrap.sh` gains Test 12 — covers the inside-repo install and the outside-repo refusal.
+
+Verified with the smoke suite (51 asserts across 12 tests) and a live end-to-end run: a `core.hooksPath` repo, the real bootstrap, and a real `git merge` firing the dispatcher.
+
 ## 0.5.0 — 2026-05-20
 
 Doc-drift detection. The artifacts `/espalier-init` generates — rules, wiki, layer specs, hooks — no longer silently rot as the codebase evolves. v0.5.0 adds detection, surfacing, gated remediation, and validation, **without ever auto-overwriting a doc** and without a hook that dirties the working tree.
