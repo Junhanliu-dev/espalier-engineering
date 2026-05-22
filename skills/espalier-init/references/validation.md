@@ -27,7 +27,7 @@ After all generation and wiring is complete, validate end-to-end.
 | 17 | Merge-hook decision cached | `cat espalier/.merge-hook-decision` | One of: not-needed, installed, fuzzy-allowed, skip-only, never-ask, ask-later |
 | 18 | Hook template copied | `test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh` | Exit 0 |
 | 19 | Lookup helpers present | `test -f espalier/hooks/lookup-helpers.sh` | Exit 0 |
-| 20 | Post-merge dispatcher installed | `grep -qE "ESPALIER_POSTMERGE_DISPATCH" .git/hooks/post-merge .husky/post-merge 2>/dev/null` | Match found (dispatcher installed unconditionally; runs drift-detect every merge, backlink only when decision=installed) |
+| 20 | Post-merge dispatcher installed | `_hd=$(git config core.hooksPath); grep -qE "ESPALIER_POSTMERGE_DISPATCH" "${_hd:-.git/hooks}/post-merge" .husky/post-merge 2>/dev/null` | Match found at git's real hooks dir — `core.hooksPath` is honored. Dispatcher installed unconditionally; runs drift-detect every merge, backlink only when decision=installed. If `core.hooksPath` points outside the repo, bootstrap skips the install and warns. |
 | 21 | Rebuild script present + executable | `test -x espalier/hooks/rebuild-commit-index.sh` | Exit 0 |
 | 22 | .gitignore excludes cache | `grep -qxF "espalier/.commit-index.tsv" .gitignore` | Exit 0 |
 | 23 | Manual rebuild produces valid cache | `bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv` | All exit 0 |
