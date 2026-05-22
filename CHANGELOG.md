@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.4 — 2026-05-22
+
+Patch: skills resolve their own plugin directory instead of guessing paths.
+
+- **`skills/espalier-migrate/SKILL.md`** — Step 2 located the plugin scripts with a hard-coded list of guessed paths (`~/.claude/plugins/<name>`, `~/repos/...`, `~/SBM_Projects/...`). None matched Claude Code's actual marketplace layout (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`), so `/espalier-migrate` either failed outright for a normal install, or — if a same-named dev checkout happened to sit in `$HOME` — silently ran *that* checkout's scripts instead of the installed plugin. It now derives the plugin root from `${CLAUDE_SKILL_DIR}` (the skill's own directory, set by Claude Code), which resolves the installed plugin in every layout.
+- **`skills/espalier-init/SKILL.md`** — Phase 3 invoked `bootstrap-espalier.sh` through `$PLUGIN_DIR`, a variable the skill never defined. It now uses `${CLAUDE_SKILL_DIR}` for both the script path and bootstrap's `--plugin-dir`.
+
+`${CLAUDE_PLUGIN_ROOT}` is not available to skill-spawned Bash — `${CLAUDE_SKILL_DIR}` is the documented mechanism. An `ESPALIER_PLUGIN_DIR` override plus a dev-checkout fallback remain for the rare case the variable is unset.
+
 ## 0.5.3 — 2026-05-22
 
 Patch: the coder sub-agent gets an explicit editing-discipline rule.
