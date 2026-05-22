@@ -10,6 +10,7 @@
 #   - settings.json merge preserves user hooks
 #   - portable abspath works without realpath binary
 #   - parallel validation produces sorted output + correct exit code
+#   - core.hooksPath honored (inside-repo install; outside-repo refusal)
 #
 # Usage: bash scripts/test-bootstrap.sh [--keep] [--verbose]
 
@@ -271,6 +272,36 @@ assert "rejects invalid merge-decision"         "echo \"\$INVALID_OUT\" | grep -
 MISSING_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "rejects missing merge-decision"         "echo \"\$MISSING_OUT\" | grep -q 'required for mode'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 12: core.hooksPath honored ──────────────────────────────────────
+echo "Test 12: core.hooksPath honored"
+
+# 12a — core.hooksPath set INSIDE the repo: the dispatcher must land in that
+#       dir, NOT in .git/hooks, and validation check 20 must still pass.
+TMP=$(mktemp -d -t smoke12a.XXXX)
+make_smoke_repo "$TMP"
+( cd "$TMP" && mkdir -p .githooks && git config core.hooksPath .githooks )
+simulate_llm_writes "$TMP" ts
+HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
+assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
+assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
+assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/28] OK'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
+#       warn, write nothing, and validation check 20 must fail (honest red).
+TMP=$(mktemp -d -t smoke12b.XXXX)
+OUTSIDE=$(mktemp -d -t smoke12bout.XXXX)
+make_smoke_repo "$TMP"
+( cd "$TMP" && git config core.hooksPath "$OUTSIDE" )
+simulate_llm_writes "$TMP" ts
+HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
+assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
+assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
+assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/28] FAIL'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""

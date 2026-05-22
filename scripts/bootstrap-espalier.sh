@@ -506,15 +506,61 @@ stage_merge_decision() {
     fi
   fi
 
+  # Resolve where git ACTUALLY looks for hooks. A set core.hooksPath overrides
+  # .git/hooks entirely, so a dispatcher written to .git/hooks would be a silent
+  # no-op. husky manages its own core.hooksPath (-> .husky/_) and routes
+  # .husky/post-merge for us, so when husky is present we trust it.
+  HOOK_DST=""
   if [ "$HUSKY_PRESENT" = "yes" ]; then
     HOOK_DST=".husky/post-merge"
   else
-    HOOK_DST=".git/hooks/post-merge"
+    HOOKS_PATH_CFG=$(git config core.hooksPath 2>/dev/null || true)
+    if [ -z "$HOOKS_PATH_CFG" ]; then
+      HOOK_DST=".git/hooks/post-merge"
+    else
+      # core.hooksPath is set and husky is not managing it. The dispatcher must
+      # land where git reads — and only if that is inside this repo. A hooksPath
+      # pointing elsewhere (another repo, a global hooks dir) cannot be wired.
+      REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+      HOOKS_DIR_ABS=""
+      case "$HOOKS_PATH_CFG" in
+        *..*) ;;                                                 # '..' may escape the repo — reject
+        /*)   HOOKS_DIR_ABS="${HOOKS_PATH_CFG%/}" ;;             # absolute
+        *)    HOOKS_DIR_ABS="$REPO_ROOT/${HOOKS_PATH_CFG%/}" ;;  # relative to repo root
+      esac
+      if [ -z "$HOOKS_DIR_ABS" ]; then
+        log "  WARN: core.hooksPath ('$HOOKS_PATH_CFG') contains '..' — cannot place"
+        log "        the post-merge dispatcher safely. Skipping hook install."
+        log "        Fix core.hooksPath, then re-run: bash bootstrap-espalier.sh --wire-only ..."
+      else
+        case "$HOOKS_DIR_ABS/" in
+          "$REPO_ROOT"/*)
+            HOOK_DST="$HOOKS_DIR_ABS/post-merge"
+            log "  core.hooksPath set → targeting $HOOK_DST"
+            ;;
+          *)
+            log "  WARN: core.hooksPath ('$HOOKS_PATH_CFG') points outside this repo."
+            log "        git ignores .git/hooks here, so the post-merge dispatcher"
+            log "        cannot be installed — drift-detect + squash-backlink will NOT run."
+            log "        Fix: 'git config --unset core.hooksPath' (or point it inside the"
+            log "        repo), then re-run: bash bootstrap-espalier.sh --wire-only ..."
+            ;;
+        esac
+      fi
+    fi
   fi
 
-  if [ ! -d "$(dirname "$HOOK_DST")" ]; then
-    log "  ERROR: $(dirname "$HOOK_DST") does not exist (run 'git init' first?)"
-    return
+  if [ -z "$HOOK_DST" ]; then
+    return   # hooks dir unreachable — warning already emitted; check #20 will flag it
+  fi
+
+  HOOK_DST_PARENT=$(dirname "$HOOK_DST")
+  if [ ! -d "$HOOK_DST_PARENT" ]; then
+    if [ "$HOOK_DST_PARENT" = ".git/hooks" ]; then
+      log "  ERROR: .git/hooks does not exist (run 'git init' first?)"
+      return
+    fi
+    mkdir -p "$HOOK_DST_PARENT" || { log "  ERROR: cannot create $HOOK_DST_PARENT"; return; }
   fi
 
   # Already on the dispatcher → nothing to do (idempotent).
@@ -677,7 +723,7 @@ stage_validate() {
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
-  run_check 20 "post-merge-dispatcher" 'grep -qE "ESPALIER_POSTMERGE_DISPATCH" .git/hooks/post-merge 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
+  run_check 20 "post-merge-dispatcher" '_hd=$(git config core.hooksPath 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
   run_check 21 "rebuild-script"      'test -x espalier/hooks/rebuild-commit-index.sh' &
   run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
