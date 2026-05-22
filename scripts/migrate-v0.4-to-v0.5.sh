@@ -308,7 +308,7 @@ else
   check "espalier-doctor skill present"    "test -f espalier/skills/espalier-doctor/SKILL.md"
   check ".claude/skills/espalier-prune link"  "test -L .claude/skills/espalier-prune"
   check ".claude/skills/espalier-doctor link" "test -L .claude/skills/espalier-doctor"
-  check "post-merge dispatcher installed"  "grep -qE 'ESPALIER_POSTMERGE_DISPATCH' .git/hooks/post-merge .husky/post-merge 2>/dev/null"
+  check "post-merge dispatcher installed"  '_hd=$(git config core.hooksPath 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" .husky/post-merge 2>/dev/null'
   check ".doctor-cadence written"          "grep -qE '^cadence: (every-change|weekly|monthly|manual)$' espalier/.doctor-cadence"
   check ".gitignore has drift sidecars"    "grep -qxF 'espalier/.drift-state.tsv*' .gitignore"
   check "harness-coder.md patched"         "grep -q 'Stale-doc check:' espalier/agents/harness-coder.md"
