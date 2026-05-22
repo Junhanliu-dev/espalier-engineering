@@ -85,35 +85,44 @@ Report the detected plan to the user (which migration(s) will run).
 
 ### Step 2: Locate migration scripts
 
-Search common plugin install paths for the plugin root (contains `scripts/`):
+The skill resolves its own plugin root — no path guessing. `${CLAUDE_SKILL_DIR}`
+is set by Claude Code to the directory of the running skill
+(`<plugin>/skills/espalier-migrate`); the plugin root, where `scripts/` lives,
+is two levels up. This resolves the *installed* plugin in every layout —
+marketplace cache (`~/.claude/plugins/cache/...`), dev checkout, or symlink —
+never a stray `$HOME` checkout that merely shares the name.
 
 ```bash
 PLUGIN_DIR=""
-for candidate in \
-  "$HOME/.claude/plugins/espalier-engineering" \
-  "$HOME/.claude/plugins/espalier" \
-  "$HOME/.claude/plugins/harness-engineering" \
-  "$HOME/repos/espalier-engineering" \
-  "$HOME/repos/harness-engineering" \
-  "$HOME/SBM_Projects/espalier-engineering" \
-  "$HOME/SBM_Projects/harness-engineering"; do
-  if [ -f "$candidate/scripts/migrate-v0.5.2-to-v0.5.3.sh" ]; then
-    PLUGIN_DIR="$candidate"
-    break
-  fi
-done
+# Primary: derive the plugin root from the skill's own location.
+if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.5.2-to-v0.5.3.sh" ]; then
+  PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
+fi
+
+# Fallback (rare — e.g. CLAUDE_SKILL_DIR unset): explicit override, then a
+# known dev-checkout location.
+if [ -z "$PLUGIN_DIR" ]; then
+  for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/SBM_Projects/espalier-engineering"; do
+    [ -n "$candidate" ] || continue
+    if [ -f "$candidate/scripts/migrate-v0.5.2-to-v0.5.3.sh" ]; then
+      PLUGIN_DIR="$candidate"
+      break
+    fi
+  done
+fi
 
 if [ -z "$PLUGIN_DIR" ]; then
-  echo "ERROR: couldn't find Espalier plugin scripts in standard locations." >&2
-  echo "Update the plugin first: /plugin update espalier-engineering" >&2
+  echo "ERROR: couldn't locate the Espalier plugin." >&2
+  echo "If it is installed, update it: /plugin update espalier-engineering" >&2
   echo "Or set ESPALIER_PLUGIN_DIR to your espalier-engineering checkout." >&2
   exit 1
 fi
 ```
 
-If `migrate-v0.5.2-to-v0.5.3.sh` is missing but older scripts exist, the plugin
-itself is out of date — tell the user to `/plugin update espalier-engineering`
-first.
+If the primary path misses and the fallback fires, the plugin install is
+likely stale (no `migrate-v0.5.2-to-v0.5.3.sh`) — tell the user to
+`/plugin update espalier-engineering` first.
 
 ### Step 3: Show dry-run preview for each applicable migration
 
