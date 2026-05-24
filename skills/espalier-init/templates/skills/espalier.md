@@ -22,6 +22,22 @@ all 10 stages defined in `espalier/pipeline.md`.
    - If found, read `pipeline-state.md` and RESUME from the current stage
    - If not found, create a new directory and start from Stage 1
 
+### Flag Parsing
+
+The invocation may carry flags BEFORE the requirement. Scan tokens from the start:
+while a token looks like `--flag`, consume it; stop at the first token that does
+not — everything from there on is the requirement text (so a `--word` inside the
+requirement itself is never mistaken for a flag).
+
+| Flag | Effect |
+|------|--------|
+| `--no-grill` | Set `GRILL_DISABLED=yes` — Stage 1 skips the requirement grill. |
+| `--resume` | Recognized no-op. Resumption is already automatic (see Session Resumption); accept and drop the token. |
+
+An unrecognized leading `--token` is NOT absorbed into the requirement — warn the
+user (`unrecognized flag: --token; ignoring`) and drop it. Only the flags above are
+recognized.
+
 ### Stage 0 Pre-Flight (drift + conventions + doctor)
 
 Run this BEFORE Stage 1. Source the drift helpers:

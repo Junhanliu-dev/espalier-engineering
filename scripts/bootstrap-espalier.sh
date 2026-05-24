@@ -13,7 +13,7 @@
 # This script then runs ONE invocation that:
 #   - Creates remaining directories (idempotent against existing).
 #   - Copies pure-copy templates (pipeline.md, espalier, espalier-fix,
-#     espalier-requirements, espalier-prune, espalier-doctor SKILL.md + hooks).
+#     espalier-requirements, espalier-grill, espalier-prune, espalier-doctor SKILL.md + hooks).
 #   - chmod +x every espalier/hooks/*.sh (catches LLM-written hooks too — R10).
 #   - Creates symlinks via portable abspath helper (R-extra).
 #   - Appends CLAUDE.md Espalier section (idempotent grep-guard).
@@ -239,6 +239,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-review"
   run "mkdir -p espalier/skills/espalier-testing"
   run "mkdir -p espalier/skills/espalier-requirements"
+  run "mkdir -p espalier/skills/espalier-grill"
   run "mkdir -p espalier/skills/espalier"
   run "mkdir -p espalier/skills/espalier-fix"
   run "mkdir -p espalier/skills/espalier-prune"
@@ -265,6 +266,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier.md' espalier/skills/espalier/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-fix.md' espalier/skills/espalier-fix/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-requirements.md' espalier/skills/espalier-requirements/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-grill.md' espalier/skills/espalier-grill/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-prune.md' espalier/skills/espalier-prune/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-doctor.md' espalier/skills/espalier-doctor/SKILL.md"
 }
@@ -306,7 +308,7 @@ stage_symlinks() {
   safe_ln "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
   safe_ln "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
   safe_ln "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
-  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier espalier-fix espalier-prune espalier-doctor; do
+  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor; do
     safe_ln "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
   done
   # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
@@ -707,7 +709,7 @@ stage_validate() {
   }
 
   run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier .claude/skills/espalier-fix' &
+  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix' &
   run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md' &
   run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
   run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
