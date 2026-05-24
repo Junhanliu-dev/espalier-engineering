@@ -1,0 +1,2425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Espalier Engineering — train your AI coders like a vine</title>
+<meta name="description" content="Discover your codebase's actual patterns, then encode them as Claude Code rules, skills, agents, hooks, and a guided pipeline so generated code lands inside your conventions on the first try, not the fifth.">
+<meta property="og:title" content="Espalier Engineering">
+<meta property="og:description" content="Train your AI coders like you'd train a vine.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,0..100;1,9..144,300..700,0..100&family=Instrument+Sans:ital,wght@0,400..600;1,400..600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+<style>
+:root {
+  --bg: #0d1612;
+  --bg-elev: #131d18;
+  --bg-deep: #08100c;
+  --paper: #ebe4d3;
+  --paper-muted: #d4cdba;
+  --ink: #e8e4d8;
+  --ink-muted: #a8a89a;
+  --ink-dim: #6b7268;
+  --vine: #8fb288;
+  --vine-deep: #4a7c59;
+  --brass: #c9a961;
+  --brass-dim: #8c7644;
+  --oxide: #c26b5e;
+  --hair: rgba(232, 228, 216, 0.12);
+  --hair-strong: rgba(232, 228, 216, 0.22);
+  --grid: rgba(232, 228, 216, 0.04);
+
+  --f-display: "Fraunces", "Times New Roman", serif;
+  --f-body: "Instrument Sans", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Paper grain overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Subtle grid background */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+}
+
+::selection { background: var(--brass); color: var(--bg); }
+
+a { color: inherit; text-decoration: none; }
+
+/* ───────────────────────────── NAV ───────────────────────────── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(13, 22, 18, 0.72);
+  border-bottom: 1px solid var(--hair);
+}
+.nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--f-display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.brand svg { color: var(--vine); }
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.nav-right a { transition: color 0.2s; }
+.nav-right a:hover { color: var(--ink); }
+.nav-pill {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--hair-strong);
+  border-radius: 100px;
+  color: var(--brass);
+}
+
+/* ───────────────────────────── LAYOUT ───────────────────────────── */
+section { position: relative; z-index: 1; }
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* Plate marker — botanical-textbook section labels */
+.plate {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 32px;
+}
+.plate-num {
+  display: inline-block;
+  padding: 4px 10px;
+  border: 1px solid var(--brass-dim);
+  color: var(--brass);
+  font-size: 10px;
+}
+.plate-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--brass-dim), transparent);
+  max-width: 120px;
+}
+
+h1, h2, h3, h4 { font-family: var(--f-display); font-weight: 400; letter-spacing: -0.02em; line-height: 1.05; }
+h1 { font-variation-settings: "opsz" 144, "SOFT" 40; }
+h2 { font-variation-settings: "opsz" 72, "SOFT" 30; font-size: clamp(2.2rem, 4.5vw, 3.4rem); }
+h3 { font-variation-settings: "opsz" 24, "SOFT" 20; font-size: 1.4rem; font-weight: 500; }
+em { font-style: italic; font-variation-settings: "opsz" 144, "SOFT" 60; color: var(--vine); }
+
+/* ───────────────────────────── HERO ───────────────────────────── */
+.hero {
+  padding: 80px 0 120px;
+  position: relative;
+}
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--vine);
+  padding: 8px 14px;
+  border: 1px solid var(--vine-deep);
+  border-radius: 100px;
+  background: rgba(74, 124, 89, 0.08);
+  margin-bottom: 28px;
+}
+.eyebrow-dot {
+  width: 6px; height: 6px;
+  background: var(--vine);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--vine);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.hero h1 {
+  font-size: clamp(2.8rem, 6vw, 5.4rem);
+  font-weight: 400;
+  margin-bottom: 28px;
+  font-variation-settings: "opsz" 144, "SOFT" 40, "wght" 380;
+}
+
+.lede {
+  font-size: 19px;
+  color: var(--ink-muted);
+  max-width: 540px;
+  line-height: 1.55;
+  margin-bottom: 40px;
+}
+
+.terminal {
+  background: var(--bg-deep);
+  border: 1px solid var(--hair-strong);
+  border-radius: 6px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px -20px rgba(0,0,0,0.5);
+}
+.terminal-bar {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.terminal-bar::before {
+  content: "";
+  display: flex;
+  gap: 6px;
+  width: 36px;
+  background-image: radial-gradient(circle, var(--ink-dim) 3.5px, transparent 4px);
+  background-size: 12px 12px;
+  background-repeat: repeat-x;
+  height: 8px;
+}
+.terminal-body {
+  padding: 18px 18px 20px;
+}
+.terminal-body .line { display: flex; gap: 10px; padding: 2px 0; }
+.terminal-body .prompt { color: var(--brass); user-select: none; }
+.terminal-body .cmd { color: var(--ink); }
+.terminal-body .cmd-arg { color: var(--vine); }
+
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: all 0.2s;
+  font-family: var(--f-body);
+  cursor: pointer;
+  border: none;
+}
+.btn-primary {
+  background: var(--paper);
+  color: var(--bg);
+}
+.btn-primary:hover {
+  background: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 30px -10px rgba(232, 228, 216, 0.3);
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px solid var(--hair-strong);
+}
+.btn-secondary:hover {
+  color: var(--ink);
+  border-color: var(--vine);
+}
+
+/* ───────────────── ESPALIER ILLUSTRATION ───────────────── */
+.espalier-frame {
+  position: relative;
+  aspect-ratio: 1 / 1.36;
+  cursor: crosshair;
+}
+.espalier-frame svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Background atmospheric glow */
+.esp-aura { opacity: 0.9; }
+
+/* Decorative border + corner ornaments */
+.esp-border-outer { stroke: rgba(201,169,97,0.20); stroke-width: 0.5; fill: none; }
+.esp-border-inner { stroke: rgba(201,169,97,0.10); stroke-width: 0.3; fill: none; }
+.esp-corners path { stroke: var(--brass); stroke-width: 1; fill: none; }
+.esp-corners circle { fill: var(--brass); }
+
+/* Title plate */
+.esp-title-line { stroke: var(--brass-dim); stroke-width: 0.4; }
+.esp-plate-label {
+  font-family: var(--f-mono);
+  font-size: 7.5px;
+  fill: var(--brass);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.esp-plate-sub {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 7px;
+  fill: var(--ink-dim);
+  letter-spacing: 0.04em;
+  font-variation-settings: "opsz" 9, "SOFT" 50, "wght" 360;
+}
+
+/* Scale ruler */
+.esp-ruler-line, .esp-ruler-tick {
+  stroke: var(--ink-dim);
+  stroke-width: 0.4;
+}
+.esp-ruler-num {
+  font-family: var(--f-mono);
+  font-size: 6.5px;
+  fill: var(--ink-dim);
+  letter-spacing: 0.05em;
+}
+
+/* Training wires (cordons) */
+.esp-wire {
+  stroke: var(--vine-deep);
+  stroke-width: 0.5;
+  fill: none;
+}
+
+/* Tier annotation kinds (right side) */
+.esp-anno-kind {
+  font-family: var(--f-mono);
+  font-size: 6.5px;
+  fill: var(--ink-dim);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Roots */
+.esp-root {
+  stroke: var(--vine-deep);
+  stroke-width: 0.9;
+  fill: none;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+/* Trunk with grain */
+.esp-trunk {
+  stroke: var(--paper);
+  stroke-width: 1.8;
+  fill: none;
+  opacity: 0.95;
+  stroke-linecap: round;
+}
+.esp-trunk-grain {
+  stroke: var(--paper-muted);
+  stroke-width: 0.4;
+  fill: none;
+  opacity: 0.45;
+}
+
+/* Goblet branches */
+.esp-branch {
+  stroke: var(--vine);
+  stroke-width: 1.4;
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* Brass knots */
+.esp-knot {
+  fill: var(--brass);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.esp-knot-main {
+  fill: var(--brass);
+  stroke: var(--bg);
+  stroke-width: 0.6;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Leaves with veins */
+.esp-leaf-rotator {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+.esp-leaf {
+  fill: var(--vine);
+}
+.esp-leaf-vein {
+  stroke: var(--vine-deep);
+  stroke-width: 0.35;
+  opacity: 0.7;
+}
+
+/* Fruit clusters (grapes) */
+.esp-fruit-cluster {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: filter 0.25s ease-out;
+  will-change: transform, filter;
+}
+.esp-fruit-cluster.glow {
+  filter: drop-shadow(0 0 5px rgba(201,169,97,0.85))
+          drop-shadow(0 0 14px rgba(201,169,97,0.45));
+}
+.esp-fruit {
+  fill: var(--brass);
+  stroke: var(--bg);
+  stroke-width: 0.35;
+}
+.esp-fruit-stem {
+  stroke: var(--vine-deep);
+  stroke-width: 0.6;
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* Labels above fruits */
+.esp-fruit-label {
+  font-family: var(--f-mono);
+  font-size: 8.5px;
+  fill: var(--paper);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+.esp-fruit-sublabel {
+  font-family: var(--f-mono);
+  font-size: 5.5px;
+  fill: var(--brass);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Bottom rootstock caption */
+.esp-caption-line { stroke: var(--brass-dim); stroke-width: 0.3; }
+.esp-caption-main {
+  font-family: var(--f-mono);
+  font-size: 7.5px;
+  fill: var(--brass);
+  letter-spacing: 0.22em;
+}
+.esp-caption-sub {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 7px;
+  fill: var(--ink-dim);
+  letter-spacing: 0.04em;
+  font-variation-settings: "opsz" 9, "SOFT" 50, "wght" 360;
+}
+
+/* Falling leaves (drifting in air) */
+.esp-falling-leaf {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+  opacity: 0;
+}
+
+/* Spotlight overlay (cursor light) */
+.esp-spotlight {
+  position: absolute;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    rgba(201, 169, 97, 0.24) 0%,
+    rgba(143, 178, 136, 0.10) 30%,
+    rgba(201, 169, 97, 0.04) 55%,
+    transparent 75%);
+  pointer-events: none;
+  opacity: 0;
+  left: 0;
+  top: 0;
+  margin-left: -170px;
+  margin-top: -170px;
+  mix-blend-mode: screen;
+  z-index: 2;
+  filter: blur(7px);
+  will-change: transform, opacity;
+}
+
+/* ───────────────────────────── SECTIONS ───────────────────────────── */
+section.standard { padding: 100px 0; border-top: 1px solid var(--hair); }
+
+.section-head {
+  display: grid;
+  grid-template-columns: 1fr 1.8fr;
+  gap: 80px;
+  margin-bottom: 60px;
+}
+.section-head h2 {
+  max-width: 14ch;
+}
+.section-head .intro {
+  font-size: 18px;
+  color: var(--ink-muted);
+  padding-top: 8px;
+  max-width: 60ch;
+}
+
+/* ───────────────── PROBLEM ───────────────── */
+.problem-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 40px;
+}
+.problem-item {
+  padding: 32px;
+  border-top: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
+}
+.problem-item:nth-child(odd) { border-left: none; }
+.problem-item:nth-child(1), .problem-item:nth-child(2) { border-top: none; }
+.problem-item .pi-mono {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--oxide);
+  margin-bottom: 14px;
+  display: block;
+  letter-spacing: 0.02em;
+}
+.problem-item p {
+  color: var(--ink-muted);
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.problem-conclusion {
+  margin-top: 56px;
+  padding: 40px 0;
+  border-top: 1px solid var(--vine-deep);
+  border-bottom: 1px solid var(--vine-deep);
+  text-align: center;
+}
+.problem-conclusion p {
+  font-family: var(--f-display);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-variation-settings: "opsz" 72, "SOFT" 40, "wght" 380;
+  font-style: italic;
+  color: var(--paper);
+  max-width: 28ch;
+  margin: 0 auto;
+}
+
+/* ───────────────── SOLUTION + METRIC ───────────────── */
+.metric-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 80px;
+  align-items: center;
+  margin: 40px 0;
+  padding: 60px 0;
+}
+.metric-row .label {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--ink-dim);
+  margin-bottom: 16px;
+}
+.metric-big {
+  font-family: var(--f-display);
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  font-variation-settings: "opsz" 144, "SOFT" 30, "wght" 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.metric-big .strike {
+  position: relative;
+  color: var(--ink-dim);
+}
+.metric-big .strike::after {
+  content: "";
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  top: 55%;
+  height: 3px;
+  background: var(--oxide);
+  transform: rotate(-3deg);
+}
+.metric-big .arrow {
+  font-family: var(--f-mono);
+  color: var(--brass);
+  margin: 0 0.3em;
+  font-size: 0.6em;
+  vertical-align: middle;
+  font-variation-settings: normal;
+}
+.metric-big .winner {
+  color: var(--vine);
+}
+.metric-explainer { color: var(--ink-muted); font-size: 16px; max-width: 38ch; }
+
+.mech-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 40px;
+}
+.mech-card {
+  padding: 32px 28px;
+  border: 1px solid var(--hair);
+  background: linear-gradient(180deg, var(--bg-elev), var(--bg));
+  border-radius: 4px;
+  position: relative;
+}
+.mech-card .mech-num {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-family: var(--f-mono);
+  color: var(--brass);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+.mech-card h3 {
+  margin-bottom: 14px;
+  color: var(--paper);
+}
+.mech-card p { color: var(--ink-muted); font-size: 15px; line-height: 1.55; }
+.mech-card .verb {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-bottom: 16px;
+  background: var(--vine-deep);
+  color: var(--paper);
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* ───────────────── FILE TREE ───────────────── */
+.tree-layout {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 60px;
+  margin-top: 40px;
+}
+.tree {
+  font-family: var(--f-mono);
+  font-size: 13.5px;
+  line-height: 1.95;
+  background: var(--bg-deep);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  padding: 28px 24px;
+  color: var(--ink-muted);
+  user-select: none;
+}
+.tree-root { color: var(--vine); margin-bottom: 4px; font-weight: 500; }
+.tree-row {
+  display: block;
+  padding: 1px 6px;
+  margin-left: -6px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.15s, color 0.15s;
+  white-space: pre;
+}
+.tree-row .gloss { color: var(--ink-dim); margin-left: 4px; }
+.tree-row.active { background: rgba(143, 178, 136, 0.08); color: var(--paper); }
+.tree-row.active .gloss { color: var(--vine); }
+.tree-row:hover { background: rgba(143, 178, 136, 0.05); color: var(--ink); }
+
+.tree-detail {
+  border-left: 1px solid var(--hair);
+  padding-left: 40px;
+  align-self: start;
+  position: sticky;
+  top: 100px;
+}
+.detail-kind {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid var(--brass-dim);
+  color: var(--brass);
+  margin-bottom: 20px;
+}
+.detail-name {
+  font-family: var(--f-mono);
+  font-size: 22px;
+  color: var(--paper);
+  margin-bottom: 18px;
+}
+.detail-desc {
+  color: var(--ink-muted);
+  line-height: 1.65;
+  margin-bottom: 16px;
+}
+.detail-loaded {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--vine);
+  padding-top: 16px;
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.detail-loaded .dot {
+  width: 8px; height: 8px;
+  background: var(--vine);
+  border-radius: 50%;
+}
+
+/* ───────────────── PIPELINES ───────────────── */
+.pipe-block {
+  margin-top: 50px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+.pipe-head {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.pipe-cmd {
+  font-family: var(--f-mono);
+  font-size: 18px;
+  color: var(--brass);
+}
+.pipe-cmd .arg { color: var(--ink-dim); }
+.pipe-title {
+  font-family: var(--f-display);
+  font-size: 1.5rem;
+  font-variation-settings: "opsz" 24, "SOFT" 30, "wght" 420;
+  color: var(--paper);
+}
+.pipe-desc { color: var(--ink-muted); font-size: 14.5px; max-width: 50ch; }
+.pipe-stages {
+  padding: 40px 24px;
+  overflow-x: auto;
+}
+.pipe-stages svg { display: block; width: 100%; height: auto; min-width: 700px; }
+
+.prefix-table {
+  width: 100%;
+  margin-top: 56px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.prefix-table th, .prefix-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--hair);
+}
+.prefix-table th {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.prefix-table td:first-child { font-family: var(--f-mono); color: var(--brass); }
+.prefix-table td:last-child { font-family: var(--f-mono); color: var(--vine); font-size: 13px; }
+.prefix-table tr:last-child td { border-bottom: none; }
+
+/* ───────────────── DRIFT ───────────────── */
+.drift-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 40px;
+}
+.drift-flow {
+  background: var(--bg-deep);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  padding: 32px;
+  position: relative;
+}
+.drift-step {
+  display: flex;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--hair);
+}
+.drift-step:last-child { border-bottom: none; }
+.drift-step-num {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--brass);
+  letter-spacing: 0.15em;
+  flex-shrink: 0;
+  width: 28px;
+  padding-top: 3px;
+}
+.drift-step-body { color: var(--ink-muted); font-size: 14.5px; }
+.drift-step-body strong { color: var(--paper); font-weight: 500; font-family: var(--f-mono); font-size: 13px; }
+
+.drift-note {
+  margin-top: 40px;
+  padding: 20px 24px;
+  border-left: 2px solid var(--brass);
+  background: rgba(201, 169, 97, 0.05);
+  color: var(--paper);
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 19px;
+  font-variation-settings: "opsz" 24, "SOFT" 50, "wght" 380;
+}
+
+/* ───────────────── COST ───────────────── */
+.cost-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 40px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cost-col {
+  padding: 36px 32px;
+}
+.cost-col + .cost-col {
+  border-left: 1px solid var(--hair);
+  background: linear-gradient(180deg, rgba(74,124,89,0.06), transparent);
+}
+.cost-col h3 {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 28px;
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.cost-col + .cost-col h3 { color: var(--vine); }
+.cost-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hair);
+  color: var(--ink-muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.cost-item:last-child { border-bottom: none; }
+.cost-item strong {
+  display: block;
+  color: var(--paper);
+  font-weight: 500;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.cost-table {
+  margin-top: 56px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.cost-table th, .cost-table td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--hair);
+  font-size: 14.5px;
+}
+.cost-table th {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.cost-table td:last-child { font-family: var(--f-mono); color: var(--brass); text-align: right; }
+.cost-table tr.highlight td:last-child { color: var(--vine); font-weight: 500; }
+
+/* ───────────────── PRINCIPLES ───────────────── */
+.principles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  margin-top: 40px;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+.principle {
+  padding: 32px 24px;
+  border-left: 1px solid var(--hair);
+  position: relative;
+}
+.principle:first-child { border-left: none; }
+.principle-num {
+  font-family: var(--f-display);
+  font-variation-settings: "opsz" 144, "SOFT" 30, "wght" 400;
+  font-size: 56px;
+  color: var(--brass);
+  line-height: 1;
+  margin-bottom: 24px;
+}
+.principle h3 {
+  font-family: var(--f-display);
+  font-size: 19px;
+  font-variation-settings: "opsz" 24, "SOFT" 40, "wght" 460;
+  color: var(--paper);
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+.principle p {
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  line-height: 1.55;
+}
+
+.principles-quote {
+  margin-top: 56px;
+  padding: 0 40px;
+  text-align: center;
+}
+.principles-quote p {
+  font-family: var(--f-display);
+  font-variation-settings: "opsz" 144, "SOFT" 60, "wght" 380;
+  font-style: italic;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  color: var(--paper);
+  max-width: 50ch;
+  margin: 0 auto;
+  line-height: 1.35;
+}
+.principles-quote .attrib {
+  font-family: var(--f-mono);
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-top: 20px;
+}
+
+/* ───────────────── INSTALL ───────────────── */
+.install-tabs {
+  display: flex;
+  gap: 0;
+  margin-top: 40px;
+  border-bottom: 1px solid var(--hair);
+}
+.install-tab {
+  padding: 14px 24px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  letter-spacing: 0.02em;
+}
+.install-tab:hover { color: var(--ink); }
+.install-tab.active {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+.install-panel { display: none; padding-top: 32px; }
+.install-panel.active { display: block; }
+.install-panel p {
+  color: var(--ink-muted);
+  margin-bottom: 20px;
+  font-size: 15px;
+  max-width: 60ch;
+}
+
+/* ───────────────── FOOTER ───────────────── */
+footer {
+  margin-top: 100px;
+  padding: 60px 0 40px;
+  border-top: 1px solid var(--hair);
+  position: relative;
+  z-index: 1;
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 60px;
+}
+.footer-grid h4 {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 18px;
+  font-weight: 500;
+}
+.footer-grid ul { list-style: none; }
+.footer-grid li { margin-bottom: 10px; }
+.footer-grid a {
+  color: var(--ink-muted);
+  font-size: 14px;
+  transition: color 0.2s;
+}
+.footer-grid a:hover { color: var(--ink); }
+.footer-brand p {
+  color: var(--ink-muted);
+  font-size: 14px;
+  max-width: 36ch;
+  margin-top: 16px;
+  line-height: 1.5;
+}
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--hair);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* ───────────────────────────── RESPONSIVE ───────────────────────────── */
+@media (max-width: 980px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 60px; }
+  .espalier-frame { max-width: 480px; margin: 0 auto; }
+  .section-head { grid-template-columns: 1fr; gap: 24px; margin-bottom: 40px; }
+  .metric-row { grid-template-columns: 1fr; gap: 40px; }
+  .mech-grid { grid-template-columns: 1fr; }
+  .tree-layout { grid-template-columns: 1fr; }
+  .tree-detail { border-left: none; padding-left: 0; padding-top: 32px; border-top: 1px solid var(--hair); position: static; }
+  .drift-grid { grid-template-columns: 1fr; }
+  .cost-compare { grid-template-columns: 1fr; }
+  .cost-col + .cost-col { border-left: none; border-top: 1px solid var(--hair); }
+  .principles { grid-template-columns: 1fr 1fr; }
+  .principle { border-left: none; border-top: 1px solid var(--hair); }
+  .principle:nth-child(2) { border-top: 1px solid var(--hair); }
+  .principle:nth-child(odd) { border-right: 1px solid var(--hair); }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .problem-grid { grid-template-columns: 1fr; }
+  .problem-item { border-left: none; }
+  .problem-item:nth-child(1) { border-top: none; }
+  .problem-item:nth-child(n+2) { border-top: 1px solid var(--hair); }
+}
+
+@media (max-width: 600px) {
+  .wrap { padding: 0 20px; }
+  .nav-inner { padding: 14px 20px; }
+  .nav-right { gap: 16px; }
+  .nav-pill { display: none; }
+  .hero { padding: 60px 0 80px; }
+  section.standard { padding: 70px 0; }
+  .principles { grid-template-columns: 1fr; }
+  .principle:nth-child(odd) { border-right: none; }
+  .principle:nth-child(1) { border-top: none; }
+  .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+  .install-tab { padding: 12px 14px; font-size: 12px; }
+  .mech-card { padding: 24px 22px; }
+  .hero-ctas { flex-direction: column; align-items: stretch; }
+  .btn-primary, .btn-secondary { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ──────────────── NAV ──────────────── -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M11 2 L11 20" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M2 6 L20 6 M2 11 L20 11 M2 16 L20 16" stroke="currentColor" stroke-width="0.6" opacity="0.6"/>
+        <circle cx="11" cy="6" r="1.2" fill="#c9a961"/>
+        <circle cx="11" cy="11" r="1.2" fill="#c9a961"/>
+        <circle cx="11" cy="16" r="1.2" fill="#c9a961"/>
+        <path d="M4 6 Q 6 4 7 6" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <path d="M18 6 Q 16 4 15 6" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <path d="M4 11 Q 6 9 7 11" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <path d="M18 11 Q 16 9 15 11" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <path d="M4 16 Q 6 14 7 16" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+        <path d="M18 16 Q 16 14 15 16" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/>
+      </svg>
+      Espalier
+    </a>
+    <div class="nav-right">
+      <span class="nav-pill">v0.5.4</span>
+      <a href="#install">Install</a>
+      <a href="#cost">Cost</a>
+      <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ──────────────── HERO ──────────────── -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-text">
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span>
+          v0.5.0 — doc-drift detection
+        </div>
+        <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
+        <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
+
+        <div class="terminal">
+          <div class="terminal-bar">claude code</div>
+          <div class="terminal-body">
+            <div class="line"><span class="prompt">$</span><span class="cmd">/plugin marketplace add <span class="cmd-arg">Junhanliu-dev/espalier-engineering</span></span></div>
+            <div class="line"><span class="prompt">$</span><span class="cmd">/plugin install <span class="cmd-arg">espalier-engineering@espalier-engineering</span></span></div>
+            <div class="line"><span class="prompt">$</span><span class="cmd">/espalier-init</span></div>
+          </div>
+        </div>
+
+        <div class="hero-ctas">
+          <a href="https://github.com/Junhanliu-dev/espalier-engineering" class="btn-primary">
+            View on GitHub
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 11 L11 3 M11 3 L11 9 M11 3 L5 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          </a>
+          <a href="#how" class="btn-secondary">How it works</a>
+        </div>
+      </div>
+
+      <!-- ESPALIER ILLUSTRATION -->
+      <div class="espalier-frame">
+        <svg viewBox="0 0 500 720" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="esp-aura-grad" cx="50%" cy="48%" r="55%">
+              <stop offset="0%" stop-color="#c9a961" stop-opacity="0.10"/>
+              <stop offset="40%" stop-color="#4a7c59" stop-opacity="0.04"/>
+              <stop offset="100%" stop-color="#0d1612" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+
+          <!-- Atmospheric aura behind the espalier -->
+          <ellipse class="esp-aura" cx="250" cy="380" rx="220" ry="310" fill="url(#esp-aura-grad)"/>
+
+          <!-- Decorative double-border + corner ornaments -->
+          <g class="esp-border">
+            <rect class="esp-border-outer" x="14" y="14" width="472" height="692"/>
+            <rect class="esp-border-inner" x="22" y="22" width="456" height="676"/>
+          </g>
+          <g class="esp-corners">
+            <g transform="translate(22, 22)"><path d="M0 8 L 0 0 L 8 0"/><circle cx="0" cy="0" r="2.4"/></g>
+            <g transform="translate(478, 22)"><path d="M-8 0 L 0 0 L 0 8"/><circle cx="0" cy="0" r="2.4"/></g>
+            <g transform="translate(22, 698)"><path d="M0 -8 L 0 0 L 8 0"/><circle cx="0" cy="0" r="2.4"/></g>
+            <g transform="translate(478, 698)"><path d="M-8 0 L 0 0 L 0 -8"/><circle cx="0" cy="0" r="2.4"/></g>
+          </g>
+
+          <!-- Title plate -->
+          <g class="esp-title">
+            <line class="esp-title-line" x1="80" y1="48" x2="200" y2="48"/>
+            <line class="esp-title-line" x1="300" y1="48" x2="420" y2="48"/>
+            <text class="esp-plate-label" x="250" y="51" text-anchor="middle">PLATE I · ESPALIER EN GOBLET</text>
+            <text class="esp-plate-sub" x="250" y="66" text-anchor="middle">Vitis methodicus &#8228; trained 2026</text>
+          </g>
+
+          <!-- Scale ruler (left edge) -->
+          <g class="esp-ruler">
+            <line class="esp-ruler-line" x1="42" y1="120" x2="42" y2="470"/>
+            <line class="esp-ruler-tick" x1="42" y1="120" x2="48" y2="120"/>
+            <line class="esp-ruler-tick" x1="42" y1="190" x2="48" y2="190"/>
+            <line class="esp-ruler-tick" x1="42" y1="260" x2="48" y2="260"/>
+            <line class="esp-ruler-tick" x1="42" y1="330" x2="48" y2="330"/>
+            <line class="esp-ruler-tick" x1="42" y1="400" x2="48" y2="400"/>
+            <line class="esp-ruler-tick" x1="42" y1="470" x2="48" y2="470"/>
+            <text class="esp-ruler-num" x="51" y="123">50</text>
+            <text class="esp-ruler-num" x="51" y="193">40</text>
+            <text class="esp-ruler-num" x="51" y="263">30</text>
+            <text class="esp-ruler-num" x="51" y="333">20</text>
+            <text class="esp-ruler-num" x="51" y="403">10</text>
+            <text class="esp-ruler-num" x="51" y="473">0 CM</text>
+          </g>
+
+          <!-- Falling leaves layer (animated by GSAP) -->
+          <g class="esp-falling">
+            <g class="esp-falling-leaf">
+              <ellipse rx="5" ry="2" fill="#4a7c59"/>
+              <line x1="-5" y1="0" x2="5" y2="0" stroke="#0d1612" stroke-width="0.3"/>
+            </g>
+            <g class="esp-falling-leaf">
+              <ellipse rx="4.5" ry="1.8" fill="#4a7c59"/>
+              <line x1="-4.5" y1="0" x2="4.5" y2="0" stroke="#0d1612" stroke-width="0.3"/>
+            </g>
+            <g class="esp-falling-leaf">
+              <ellipse rx="5" ry="2" fill="#8fb288"/>
+              <line x1="-5" y1="0" x2="5" y2="0" stroke="#0d1612" stroke-width="0.3"/>
+            </g>
+            <g class="esp-falling-leaf">
+              <ellipse rx="4" ry="1.5" fill="#c9a961"/>
+              <line x1="-4" y1="0" x2="4" y2="0" stroke="#0d1612" stroke-width="0.3"/>
+            </g>
+            <g class="esp-falling-leaf">
+              <ellipse rx="4.5" ry="1.7" fill="#4a7c59"/>
+              <line x1="-4.5" y1="0" x2="4.5" y2="0" stroke="#0d1612" stroke-width="0.3"/>
+            </g>
+          </g>
+
+          <!-- Horizontal training wires (3 cordons) -->
+          <g class="esp-wires">
+            <line class="esp-wire" x1="60" y1="110" x2="440" y2="110"/>
+            <line class="esp-wire" x1="60" y1="200" x2="440" y2="200"/>
+            <line class="esp-wire" x1="60" y1="305" x2="440" y2="305"/>
+          </g>
+
+          <!-- Tier kind labels (right side aligned to wires) -->
+          <g class="esp-anno-kinds">
+            <text class="esp-anno-kind" x="447" y="113">harvest tier</text>
+            <text class="esp-anno-kind" x="447" y="203">training ii</text>
+            <text class="esp-anno-kind" x="447" y="308">training i</text>
+          </g>
+
+          <!-- Roots (spreading underground) -->
+          <g class="esp-roots">
+            <path class="esp-root" d="M250 580 Q 218 605 175 615 Q 130 622 95 626"/>
+            <path class="esp-root" d="M250 580 Q 224 610 195 632 Q 168 648 142 658"/>
+            <path class="esp-root" d="M250 580 Q 246 615 244 642 Q 242 658 240 672"/>
+            <path class="esp-root" d="M250 580 Q 254 615 256 642 Q 258 658 260 672"/>
+            <path class="esp-root" d="M250 580 Q 276 610 305 632 Q 332 648 358 658"/>
+            <path class="esp-root" d="M250 580 Q 282 605 325 615 Q 370 622 405 626"/>
+            <path class="esp-root" d="M250 580 Q 232 605 205 612"/>
+            <path class="esp-root" d="M250 580 Q 268 605 295 612"/>
+          </g>
+
+          <!-- Trunk with grain texture -->
+          <g class="esp-trunk-group">
+            <path class="esp-trunk" d="M252 580 Q 250 530 252 490 Q 254 462 250 440"/>
+            <path class="esp-trunk-grain" d="M247 575 Q 246 530 247 490 Q 248 463 246 444"/>
+            <path class="esp-trunk-grain" d="M255 573 Q 256 528 255 488 Q 254 461 256 442"/>
+          </g>
+
+          <!-- Goblet branches (5 curving arms from trunk to top) -->
+          <g class="esp-branches">
+            <path class="esp-branch" d="M250 440 Q 130 290 100 110"/>
+            <path class="esp-branch" d="M250 440 Q 215 290 175 110"/>
+            <path class="esp-branch" d="M250 440 L 250 110"/>
+            <path class="esp-branch" d="M250 440 Q 285 290 325 110"/>
+            <path class="esp-branch" d="M250 440 Q 370 290 400 110"/>
+          </g>
+
+          <!-- Brass knots: main junction + at each wire-branch crossing -->
+          <g class="esp-knots">
+            <circle class="esp-knot-main" cx="250" cy="440" r="5"/>
+            <!-- training i wire (y=305) -->
+            <circle class="esp-knot" cx="148" cy="305" r="3"/>
+            <circle class="esp-knot" cx="218" cy="305" r="3"/>
+            <circle class="esp-knot" cx="250" cy="305" r="3"/>
+            <circle class="esp-knot" cx="282" cy="305" r="3"/>
+            <circle class="esp-knot" cx="352" cy="305" r="3"/>
+            <!-- training ii wire (y=200) -->
+            <circle class="esp-knot" cx="115" cy="200" r="3"/>
+            <circle class="esp-knot" cx="190" cy="200" r="3"/>
+            <circle class="esp-knot" cx="250" cy="200" r="3"/>
+            <circle class="esp-knot" cx="310" cy="200" r="3"/>
+            <circle class="esp-knot" cx="385" cy="200" r="3"/>
+            <!-- harvest tier wire (y=110) -->
+            <circle class="esp-knot" cx="100" cy="110" r="3"/>
+            <circle class="esp-knot" cx="175" cy="110" r="3"/>
+            <circle class="esp-knot" cx="250" cy="110" r="3"/>
+            <circle class="esp-knot" cx="325" cy="110" r="3"/>
+            <circle class="esp-knot" cx="400" cy="110" r="3"/>
+          </g>
+
+          <!-- Leaves along branches (each: outer g positions, inner g rotates naturally, .esp-leaf-rotator handles rustle) -->
+          <g class="esp-leaves">
+            <!-- Branch 1 (far left) -->
+            <g transform="translate(195, 370)"><g transform="rotate(-32)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="7" ry="2.6"/><line class="esp-leaf-vein" x1="-7" y1="0" x2="7" y2="0"/></g></g></g>
+            <g transform="translate(158, 245)"><g transform="rotate(-55)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6.5" ry="2.4"/><line class="esp-leaf-vein" x1="-6.5" y1="0" x2="6.5" y2="0"/></g></g></g>
+            <g transform="translate(118, 150)"><g transform="rotate(-78)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6" ry="2.3"/><line class="esp-leaf-vein" x1="-6" y1="0" x2="6" y2="0"/></g></g></g>
+
+            <!-- Branch 2 (left) -->
+            <g transform="translate(232, 370)"><g transform="rotate(-22)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="7" ry="2.6"/><line class="esp-leaf-vein" x1="-7" y1="0" x2="7" y2="0"/></g></g></g>
+            <g transform="translate(213, 245)"><g transform="rotate(-42)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6.5" ry="2.4"/><line class="esp-leaf-vein" x1="-6.5" y1="0" x2="6.5" y2="0"/></g></g></g>
+            <g transform="translate(188, 150)"><g transform="rotate(-62)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6" ry="2.3"/><line class="esp-leaf-vein" x1="-6" y1="0" x2="6" y2="0"/></g></g></g>
+
+            <!-- Branch 3 (center, leaves on alternating sides) -->
+            <g transform="translate(240, 370)"><g transform="rotate(-88)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="7" ry="2.6"/><line class="esp-leaf-vein" x1="-7" y1="0" x2="7" y2="0"/></g></g></g>
+            <g transform="translate(260, 245)"><g transform="rotate(88)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6.5" ry="2.4"/><line class="esp-leaf-vein" x1="-6.5" y1="0" x2="6.5" y2="0"/></g></g></g>
+            <g transform="translate(242, 150)"><g transform="rotate(-88)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6" ry="2.3"/><line class="esp-leaf-vein" x1="-6" y1="0" x2="6" y2="0"/></g></g></g>
+
+            <!-- Branch 4 (right) -->
+            <g transform="translate(268, 370)"><g transform="rotate(22)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="7" ry="2.6"/><line class="esp-leaf-vein" x1="-7" y1="0" x2="7" y2="0"/></g></g></g>
+            <g transform="translate(287, 245)"><g transform="rotate(42)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6.5" ry="2.4"/><line class="esp-leaf-vein" x1="-6.5" y1="0" x2="6.5" y2="0"/></g></g></g>
+            <g transform="translate(312, 150)"><g transform="rotate(62)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6" ry="2.3"/><line class="esp-leaf-vein" x1="-6" y1="0" x2="6" y2="0"/></g></g></g>
+
+            <!-- Branch 5 (far right) -->
+            <g transform="translate(305, 370)"><g transform="rotate(32)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="7" ry="2.6"/><line class="esp-leaf-vein" x1="-7" y1="0" x2="7" y2="0"/></g></g></g>
+            <g transform="translate(342, 245)"><g transform="rotate(55)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6.5" ry="2.4"/><line class="esp-leaf-vein" x1="-6.5" y1="0" x2="6.5" y2="0"/></g></g></g>
+            <g transform="translate(382, 150)"><g transform="rotate(78)"><g class="esp-leaf-rotator"><ellipse class="esp-leaf" rx="6" ry="2.3"/><line class="esp-leaf-vein" x1="-6" y1="0" x2="6" y2="0"/></g></g></g>
+          </g>
+
+          <!-- Fruit clusters (grape bunches) at top of each branch -->
+          <g class="esp-fruits">
+            <g class="esp-fruit-cluster" transform="translate(100, 110)">
+              <path class="esp-fruit-stem" d="M0 -4 L 0 2"/>
+              <circle class="esp-fruit" cx="0" cy="2" r="3.6"/>
+              <circle class="esp-fruit" cx="-5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="-3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="0" cy="8" r="2.8"/>
+            </g>
+            <g class="esp-fruit-cluster" transform="translate(175, 110)">
+              <path class="esp-fruit-stem" d="M0 -4 L 0 2"/>
+              <circle class="esp-fruit" cx="0" cy="2" r="3.6"/>
+              <circle class="esp-fruit" cx="-5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="-3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="0" cy="8" r="2.8"/>
+            </g>
+            <g class="esp-fruit-cluster" transform="translate(250, 110)">
+              <path class="esp-fruit-stem" d="M0 -4 L 0 2"/>
+              <circle class="esp-fruit" cx="0" cy="2" r="3.6"/>
+              <circle class="esp-fruit" cx="-5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="-3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="0" cy="8" r="2.8"/>
+            </g>
+            <g class="esp-fruit-cluster" transform="translate(325, 110)">
+              <path class="esp-fruit-stem" d="M0 -4 L 0 2"/>
+              <circle class="esp-fruit" cx="0" cy="2" r="3.6"/>
+              <circle class="esp-fruit" cx="-5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="-3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="0" cy="8" r="2.8"/>
+            </g>
+            <g class="esp-fruit-cluster" transform="translate(400, 110)">
+              <path class="esp-fruit-stem" d="M0 -4 L 0 2"/>
+              <circle class="esp-fruit" cx="0" cy="2" r="3.6"/>
+              <circle class="esp-fruit" cx="-5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="5" cy="0" r="3.2"/>
+              <circle class="esp-fruit" cx="-3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="3" cy="5" r="3.2"/>
+              <circle class="esp-fruit" cx="0" cy="8" r="2.8"/>
+            </g>
+          </g>
+
+          <!-- Artifact labels above each fruit cluster -->
+          <g class="esp-fruit-labels">
+            <text class="esp-fruit-label" x="100" y="86" text-anchor="middle">wiki/</text>
+            <text class="esp-fruit-sublabel" x="100" y="96" text-anchor="middle">on-demand</text>
+            <text class="esp-fruit-label" x="175" y="86" text-anchor="middle">hooks/</text>
+            <text class="esp-fruit-sublabel" x="175" y="96" text-anchor="middle">programmatic</text>
+            <text class="esp-fruit-label" x="250" y="86" text-anchor="middle">agents/</text>
+            <text class="esp-fruit-sublabel" x="250" y="96" text-anchor="middle">delegated</text>
+            <text class="esp-fruit-label" x="325" y="86" text-anchor="middle">skills/</text>
+            <text class="esp-fruit-sublabel" x="325" y="96" text-anchor="middle">phase-loaded</text>
+            <text class="esp-fruit-label" x="400" y="86" text-anchor="middle">rules/</text>
+            <text class="esp-fruit-sublabel" x="400" y="96" text-anchor="middle">always loaded</text>
+          </g>
+
+          <!-- Bottom rootstock caption -->
+          <g class="esp-caption">
+            <line class="esp-caption-line" x1="80" y1="680" x2="220" y2="680"/>
+            <line class="esp-caption-line" x1="280" y1="680" x2="420" y2="680"/>
+            <text class="esp-caption-main" x="250" y="683" text-anchor="middle">/ESPALIER-INIT &#8228; ROOTSTOCK</text>
+            <text class="esp-caption-sub" x="250" y="698" text-anchor="middle">Fig. 1a &#8212; Pattern discovery &amp; encoding</text>
+          </g>
+        </svg>
+        <div class="esp-spotlight"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── PROBLEM ──────────────── -->
+<section class="standard" id="problem">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">02</span>
+      <span>The problem</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Plausible code that doesn't fit.</h2>
+      <p class="intro">AI coders write plausible-looking code that doesn't match your codebase. It's not a model intelligence problem. It's an <em>unwritten rules</em> problem — patterns every experienced developer on the team knows but nobody documented. The model can't read your team's Slack history.</p>
+    </div>
+
+    <div class="problem-grid">
+      <div class="problem-item">
+        <span class="pi-mono">// invented</span>
+        <p>It writes a new <code style="font-family:var(--f-mono);color:var(--paper)">formatDate()</code> helper when you already have one three folders away.</p>
+      </div>
+      <div class="problem-item">
+        <span class="pi-mono">// split</span>
+        <p>It carves a component into four files when the team keeps colocated views in one.</p>
+      </div>
+      <div class="problem-item">
+        <span class="pi-mono">// picked</span>
+        <p>It reaches for <code style="font-family:var(--f-mono);color:var(--paper)">winston</code> when the project standardised on <code style="font-family:var(--f-mono);color:var(--paper)">pino</code> two years ago.</p>
+      </div>
+      <div class="problem-item">
+        <span class="pi-mono">// threw</span>
+        <p>It handles errors with <code style="font-family:var(--f-mono);color:var(--paper)">throw</code> when your repo committed to <code style="font-family:var(--f-mono);color:var(--paper)">Result&lt;T&gt;</code> in 2022.</p>
+      </div>
+    </div>
+
+    <div class="problem-conclusion">
+      <p>The model can't read your team's Slack history.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── SOLUTION ──────────────── -->
+<section class="standard" id="how">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">03</span>
+      <span>The solution</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Train the vine, then let it grow.</h2>
+      <p class="intro">Espalier reads your code, extracts those rules, and writes them down as machine-enforceable constraints. The next time the AI codes, it loads your project's rules automatically and follows them. A reviewer agent — different agent, different tool set — checks against the same rules before any commit lands.</p>
+    </div>
+
+    <div class="metric-row">
+      <div>
+        <div class="label">Rework cycles</div>
+        <div class="metric-big">
+          <span class="strike">3–5</span>
+          <span class="arrow">⟶</span>
+          <span class="winner">typically 1</span>
+        </div>
+      </div>
+      <div class="metric-explainer">
+        The first attempt lands inside your conventions because the conventions are loaded with the prompt and enforced by the reviewer. The middle four rounds vanish.
+      </div>
+    </div>
+
+    <div class="mech-grid">
+      <div class="mech-card">
+        <span class="mech-num">i.</span>
+        <span class="verb">Discover</span>
+        <h3>Read your code first.</h3>
+        <p>Ten concurrent scouts inspect architecture, coding patterns, testing posture, CI, unwritten rules, and per-layer specs. An oracle pulls vendor docs in parallel. No templates from other projects.</p>
+      </div>
+      <div class="mech-card">
+        <span class="mech-num">ii.</span>
+        <span class="verb">Encode</span>
+        <h3>Write the rules down.</h3>
+        <p>Patterns become <code style="font-family:var(--f-mono);color:var(--paper);font-size:13px">rules/</code> always-loaded into Claude Code, <code style="font-family:var(--f-mono);color:var(--paper);font-size:13px">skills/</code> loaded per phase, <code style="font-family:var(--f-mono);color:var(--paper);font-size:13px">wiki/</code> on demand. Every rule cites the observed pattern that justifies it.</p>
+      </div>
+      <div class="mech-card">
+        <span class="mech-num">iii.</span>
+        <span class="verb">Enforce</span>
+        <h3>Gate every stage.</h3>
+        <p>A separate reviewer agent (Read/Grep only — no Write) checks each output. Pre-push hooks block layer-boundary violations. Failed gates roll back; rollback counters escalate to humans.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── WHAT IT GENERATES ──────────────── -->
+<section class="standard" id="generated">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">04</span>
+      <span>What it generates</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Inside the espalier/&nbsp;directory.</h2>
+      <p class="intro">After <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-init</code>, a single per-project directory wires into Claude Code via symlinks. Hover any path to see what it does and when it loads.</p>
+    </div>
+
+    <div class="tree-layout">
+      <div class="tree">
+        <div class="tree-root">espalier/</div>
+<span class="tree-row" data-key="rules">├── rules/                  <span class="gloss"># engineering structure, coding standards</span></span>
+<span class="tree-row" data-key="skills">├── skills/                 <span class="gloss"># coding, review, testing, /espalier-fix, /espalier-prune…</span></span>
+<span class="tree-row" data-key="agents">├── agents/                 <span class="gloss"># harness-coder, harness-reviewer</span></span>
+<span class="tree-row" data-key="wiki">├── wiki/                   <span class="gloss"># architecture, data models, critical paths</span></span>
+<span class="tree-row" data-key="hooks">├── hooks/                  <span class="gloss"># layer boundary, pre-push, post-merge drift</span></span>
+<span class="tree-row" data-key="pipeline">├── pipeline.md             <span class="gloss"># 10-stage workflow with gates &amp; rollback</span></span>
+<span class="tree-row" data-key="changes">└── changes/                <span class="gloss"># feat/, fix/, refactor/, docs/ — one dir per req</span></span>
+      </div>
+
+      <div class="tree-detail" id="tree-detail">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── TWO PIPELINES ──────────────── -->
+<section class="standard" id="pipelines">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">05</span>
+      <span>The two pipelines</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>One full lane, one bug lane.</h2>
+      <p class="intro">After init, your repo exposes two orchestrators. Each stage has a programmatic gate, each gate either passes deterministically or rolls back. Brass dots are gates; failed gates accumulate into a counter that triggers human escalation.</p>
+    </div>
+
+    <!-- /espalier -->
+    <div class="pipe-block">
+      <div class="pipe-head">
+        <div>
+          <div class="pipe-cmd">/espalier <span class="arg">&lt;requirement&gt;</span></div>
+          <div class="pipe-title" style="margin-top:8px">Full 10-stage pipeline</div>
+        </div>
+        <div class="pipe-desc">For features, refactors, and large fixes. Requirement → reqs review → coding (sub-agent) → code review (different sub-agent) → tests → test review → push → CI verify → deploy verify → user confirmation.</div>
+      </div>
+      <div class="pipe-stages">
+        <svg viewBox="0 0 1000 140" xmlns="http://www.w3.org/2000/svg">
+          <!-- Wire -->
+          <line x1="40" y1="70" x2="960" y2="70" stroke="#4a7c59" stroke-width="0.6"/>
+
+          <!-- Stage definitions -->
+          <g font-family="JetBrains Mono, monospace" font-size="9" fill="#a8a89a" letter-spacing="0.1em" text-anchor="middle">
+            <!-- 10 stages -->
+            <g transform="translate(80,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">01</text>
+              <text y="20" fill="#e8e4d8">requirement</text>
+            </g>
+            <g transform="translate(170,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">02</text>
+              <text y="20" fill="#e8e4d8">reqs review</text>
+            </g>
+            <g transform="translate(260,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">03</text>
+              <text y="20" fill="#e8e4d8">coding</text>
+              <text y="32" font-size="7" fill="#8fb288">sub-agent</text>
+            </g>
+            <g transform="translate(350,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">04</text>
+              <text y="20" fill="#e8e4d8">code review</text>
+              <text y="32" font-size="7" fill="#8fb288">different agent</text>
+            </g>
+            <g transform="translate(440,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">05</text>
+              <text y="20" fill="#e8e4d8">tests</text>
+            </g>
+            <g transform="translate(530,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">06</text>
+              <text y="20" fill="#e8e4d8">test review</text>
+            </g>
+            <g transform="translate(620,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">07</text>
+              <text y="20" fill="#e8e4d8">push</text>
+            </g>
+            <g transform="translate(710,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">08</text>
+              <text y="20" fill="#e8e4d8">CI verify</text>
+            </g>
+            <g transform="translate(800,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">09</text>
+              <text y="20" fill="#e8e4d8">deploy verify</text>
+            </g>
+            <g transform="translate(900,70)">
+              <circle r="6" fill="#8fb288"/>
+              <text y="-12" fill="#8fb288">10</text>
+              <text y="20" fill="#e8e4d8">confirm</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- /espalier-fix -->
+    <div class="pipe-block">
+      <div class="pipe-head">
+        <div>
+          <div class="pipe-cmd">/espalier-fix <span class="arg">&lt;bug&gt;</span></div>
+          <div class="pipe-title" style="margin-top:8px">5-stage bug-fix lane</div>
+        </div>
+        <div class="pipe-desc">Slimmer than the full pipeline. Stage 0 auto-link discovery walks <code style="font-family:var(--f-mono);color:var(--vine);font-size:13px">git blame</code> + reverse-lookup cache + squash-merge mapping to bind the fix back to the feature change that caused it.</div>
+      </div>
+      <div class="pipe-stages">
+        <svg viewBox="0 0 1000 140" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="70" x2="960" y2="70" stroke="#4a7c59" stroke-width="0.6"/>
+
+          <g font-family="JetBrains Mono, monospace" font-size="9" fill="#a8a89a" letter-spacing="0.1em" text-anchor="middle">
+            <g transform="translate(120,70)">
+              <circle r="7" fill="#c26b5e"/>
+              <circle r="3" fill="#0d1612"/>
+              <text y="-15" fill="#c26b5e">00</text>
+              <text y="22" fill="#e8e4d8">auto-link</text>
+              <text y="34" font-size="7" fill="#c26b5e">causal binding</text>
+            </g>
+            <g transform="translate(290,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">01</text>
+              <text y="20" fill="#e8e4d8">reproduce</text>
+            </g>
+            <g transform="translate(460,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">02</text>
+              <text y="20" fill="#e8e4d8">fix</text>
+              <text y="32" font-size="7" fill="#8fb288">sub-agent</text>
+            </g>
+            <g transform="translate(630,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">03</text>
+              <text y="20" fill="#e8e4d8">regression test</text>
+            </g>
+            <g transform="translate(800,70)">
+              <circle r="5" fill="#c9a961"/>
+              <text y="-12" fill="#c9a961">04</text>
+              <text y="20" fill="#e8e4d8">push + CI</text>
+            </g>
+            <g transform="translate(920,70)">
+              <circle r="6" fill="#8fb288"/>
+              <text y="-12" fill="#8fb288">05</text>
+              <text y="20" fill="#e8e4d8">confirm</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <table class="prefix-table">
+      <thead>
+        <tr>
+          <th>Prefix</th>
+          <th>Type</th>
+          <th>Output directory</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>feat: (or no prefix)</td>
+          <td>Feature</td>
+          <td>espalier/changes/feat/&lt;slug&gt;/</td>
+        </tr>
+        <tr>
+          <td>refactor:</td>
+          <td>Refactor</td>
+          <td>espalier/changes/refactor/&lt;slug&gt;/</td>
+        </tr>
+        <tr>
+          <td>docs:</td>
+          <td>Docs</td>
+          <td>espalier/changes/docs/&lt;slug&gt;/</td>
+        </tr>
+        <tr>
+          <td>fix:</td>
+          <td>Bug fix</td>
+          <td>use /espalier-fix instead</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ──────────────── DRIFT (v0.5.0) ──────────────── -->
+<section class="standard" id="drift">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">06</span>
+      <span>v0.5.0 · doc-drift detection</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Keep the guardrails honest.</h2>
+      <p class="intro">The artifacts <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-init</code> generates describe your codebase on init day. As code evolves, v0.5.0 keeps them in sync — without ever silently overwriting anything you wrote.</p>
+    </div>
+
+    <div class="drift-grid">
+      <div class="drift-flow">
+        <div class="drift-step">
+          <div class="drift-step-num">i</div>
+          <div class="drift-step-body"><strong>post-merge hook</strong> detects drift in generated docs and writes a gitignored sidecar — your tree stays clean.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">ii</div>
+          <div class="drift-step-body"><strong>reviewer agent</strong> captures convention shifts a file diff can't see and adds them to a cross-PR convention index.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iii</div>
+          <div class="drift-step-body"><strong>Stage 0 pre-flight</strong> on every pipeline run surfaces all drift in one place before any new work begins.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iv</div>
+          <div class="drift-step-body"><strong>/espalier-prune &lt;path&gt;</strong> refreshes a flagged artifact via a single scout and a gated diff.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">v</div>
+          <div class="drift-step-body"><strong>/espalier-doctor</strong> runs a periodic scan, re-scouting a handful of artifacts to catch drift no diff caught.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="drift-note">
+          Nothing is ever auto-overwritten. Every refresh is gated by you.
+        </div>
+        <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          Existing users on v0.4.x or earlier run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your installed version and applies the migration chain (v0.1 → v0.2 → v0.4 → v0.5) in order.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Drift detection is additive. <span style="color:var(--paper)">Non-breaking</span> for v0.4 installs.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── COST ──────────────── -->
+<section class="standard" id="cost">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">07</span>
+      <span>Cost, honestly</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Once-per-repo vs. every-request-forever.</h2>
+      <p class="intro"><code style="font-family:var(--f-mono);color:var(--vine)">/espalier-init</code> is a heavy one-time tax — typically 10–15 minutes on a medium codebase (~150 source files). Every subsequent <code style="font-family:var(--f-mono);color:var(--vine)">/espalier</code> and <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-fix</code> reuses what's generated.</p>
+    </div>
+
+    <div class="cost-compare">
+      <div class="cost-col">
+        <h3>Without Espalier</h3>
+        <div class="cost-item">
+          <strong>Re-discovery every request</strong>
+          Agent re-reads source files into context each time. Same exploration, same tokens, every time.
+        </div>
+        <div class="cost-item">
+          <strong>3–5 review rounds</strong>
+          Code doesn't fit, reviewer flags it, agent retries — across the full conversation per request.
+        </div>
+        <div class="cost-item">
+          <strong>Human re-explains</strong>
+          You catch "this doesn't match our patterns" and re-articulate them by hand each round.
+        </div>
+        <div class="cost-item">
+          <strong>Silent drift</strong>
+          Implicit rules forgotten across the codebase as the model picks whatever-it-felt-like-today.
+        </div>
+      </div>
+      <div class="cost-col">
+        <h3>With Espalier</h3>
+        <div class="cost-item">
+          <strong>Conventions loaded once</strong>
+          ~3K tokens from <code style="font-family:var(--f-mono);color:var(--vine)">rules/</code>, always cached, no re-discovery.
+        </div>
+        <div class="cost-item">
+          <strong>Typically 1 round</strong>
+          Code lands inside conventions on the first attempt because the conventions are in the prompt.
+        </div>
+        <div class="cost-item">
+          <strong>Reviewer agent enforces</strong>
+          You review business logic only. Pattern adherence is automatic.
+        </div>
+        <div class="cost-item">
+          <strong>Drift detected, not silent</strong>
+          Post-merge hook + reviewer + <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-doctor</code> flag artifacts as they age.
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:80px; margin-bottom:8px; color:var(--paper); font-size:1.2rem">Per <code style="font-family:var(--f-mono);color:var(--brass);font-size:1rem">/espalier-init</code> in USD</h3>
+    <p style="color:var(--ink-muted); margin-bottom:20px; font-size:14px">Medium repo, ~150 source files. Across ~5–10 features you earn this back via dropped rework rounds.</p>
+    <table class="cost-table">
+      <thead>
+        <tr>
+          <th>Setup</th>
+          <th style="text-align:right">Per run</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Opus everywhere (no cache)</td><td>$10–20</td></tr>
+        <tr><td>Opus main + Sonnet scouts (no cache)</td><td>$4–8</td></tr>
+        <tr class="highlight"><td>Opus main + Sonnet scouts + cache hits (typical)</td><td>$2–5</td></tr>
+        <tr><td>Sonnet everywhere + cache</td><td>$1–3</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ──────────────── PRINCIPLES ──────────────── -->
+<section class="standard" id="philosophy">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">08</span>
+      <span>Philosophy</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Five principles.</h2>
+      <p class="intro">When an agent makes an error, engineer its elimination — not with prompt tweaks, but with files, rules, automated checks, and system structure.</p>
+    </div>
+
+    <div class="principles">
+      <div class="principle">
+        <div class="principle-num">i.</div>
+        <h3>Discover,<br>don't&nbsp;prescribe.</h3>
+        <p>Read the actual code, extract patterns. Never impose templates from other projects.</p>
+      </div>
+      <div class="principle">
+        <div class="principle-num">ii.</div>
+        <h3>Gates are programmatic.</h3>
+        <p><code style="font-family:var(--f-mono);color:var(--vine);font-size:11px">ci_status == 'success' AND tests_passed == total</code>, not "check if CI passes".</p>
+      </div>
+      <div class="principle">
+        <div class="principle-num">iii.</div>
+        <h3>Separate execution from judgment.</h3>
+        <p>Coder and reviewer are different invocations with different tool sets. Reviewer gets Read/Grep only.</p>
+      </div>
+      <div class="principle">
+        <div class="principle-num">iv.</div>
+        <h3>Context in&nbsp;layers.</h3>
+        <p>Rules always loaded. Skills per phase. Agents see only their scope. Wiki on demand.</p>
+      </div>
+      <div class="principle">
+        <div class="principle-num">v.</div>
+        <h3>Every rule has a reason.</h3>
+        <p>Either reflects an observed pattern, or prevents a known failure mode. Nothing arbitrary.</p>
+      </div>
+    </div>
+
+    <div class="principles-quote">
+      <p>An espalier is a tree that hasn't forgotten what shape it's meant to&nbsp;hold.</p>
+      <div class="attrib">Anonymous · 1839</div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── INSTALL ──────────────── -->
+<section class="standard" id="install">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">09</span>
+      <span>Install</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Three ways&nbsp;in.</h2>
+      <p class="intro">Marketplace install is the standard path. Manual clone is for hacking on Espalier itself. Project-scoped drops a single skill into one repo without going global.</p>
+    </div>
+
+    <div class="install-tabs" role="tablist">
+      <button class="install-tab active" data-tab="market">Marketplace</button>
+      <button class="install-tab" data-tab="manual">Manual git clone</button>
+      <button class="install-tab" data-tab="project">Project-scoped</button>
+    </div>
+
+    <div class="install-panel active" id="panel-market">
+      <p>Recommended. Updates flow in via <code style="font-family:var(--f-mono);color:var(--vine)">/plugin update espalier-engineering</code>.</p>
+      <div class="terminal">
+        <div class="terminal-bar">claude code · marketplace</div>
+        <div class="terminal-body">
+          <div class="line"><span class="prompt">$</span><span class="cmd">/plugin marketplace add <span class="cmd-arg">Junhanliu-dev/espalier-engineering</span></span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd">/plugin install <span class="cmd-arg">espalier-engineering@espalier-engineering</span></span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd"><span style="color:var(--ink-dim)"># in any project:</span></span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd">/espalier-init</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-panel" id="panel-manual">
+      <p>For users not on the plugin path, or while iterating on Espalier itself.</p>
+      <div class="terminal">
+        <div class="terminal-bar">shell · manual</div>
+        <div class="terminal-body">
+          <div class="line"><span class="prompt">$</span><span class="cmd">git clone <span class="cmd-arg">https://github.com/Junhanliu-dev/espalier-engineering</span> ~/repos/espalier-engineering</span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd">ln -sfn ~/repos/espalier-engineering/skills/espalier-init \</span></div>
+          <div class="line"><span class="prompt"> </span><span class="cmd">     ~/.claude/skills/espalier-init</span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd"><span style="color:var(--ink-dim)"># restart Claude Code, then in any project:</span></span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd">/espalier-init</span></div>
+        </div>
+      </div>
+      <p style="margin-top:20px; font-size:14px">Update with <code style="font-family:var(--f-mono);color:var(--vine)">cd ~/repos/espalier-engineering && git pull</code>.</p>
+    </div>
+
+    <div class="install-panel" id="panel-project">
+      <p>Drop the skill inside a single project rather than installing globally.</p>
+      <div class="terminal">
+        <div class="terminal-bar">shell · project-scoped</div>
+        <div class="terminal-body">
+          <div class="line"><span class="prompt">$</span><span class="cmd">mkdir -p .claude/skills</span></div>
+          <div class="line"><span class="prompt">$</span><span class="cmd">ln -sfn <span class="cmd-arg">/path/to/espalier-engineering/skills/espalier-init</span> \</span></div>
+          <div class="line"><span class="prompt"> </span><span class="cmd">     .claude/skills/espalier-init</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────── FOOTER ──────────────── -->
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="brand">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M11 2 L11 20" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M2 6 L20 6 M2 11 L20 11 M2 16 L20 16" stroke="currentColor" stroke-width="0.6" opacity="0.6"/>
+            <circle cx="11" cy="6" r="1.2" fill="#c9a961"/>
+            <circle cx="11" cy="11" r="1.2" fill="#c9a961"/>
+            <circle cx="11" cy="16" r="1.2" fill="#c9a961"/>
+          </svg>
+          Espalier
+        </a>
+        <p>Train your AI coders the way you'd train a vine — discover the patterns, encode the constraints, let the code grow along the wire.</p>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering">Repository</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/CHANGELOG.md">Changelog</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/releases">Releases</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/issues">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Migration</h4>
+        <ul>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.4-to-v0.5.md">v0.4 → v0.5</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.3-to-v0.4.md">v0.3 → v0.4</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.1-to-v0.2.md">v0.1 → v0.2</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <ul>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/CONTRIBUTING.md">Contributing</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/SECURITY.md">Security</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/LICENSE">MIT License</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>© 2026 · Espalier Engineering</div>
+      <div>v0.5.4 — plugin-dir resolution via CLAUDE_SKILL_DIR</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ──────────────── Espalier animations (GSAP) ────────────────
+(function() {
+  if (typeof gsap === 'undefined') return;
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const isTouch = window.matchMedia('(hover: none)').matches;
+  const frame = document.querySelector('.espalier-frame');
+  if (!frame) return;
+
+  const aura          = frame.querySelector('.esp-aura');
+  const borderOuter   = frame.querySelector('.esp-border-outer');
+  const borderInner   = frame.querySelector('.esp-border-inner');
+  const corners       = frame.querySelectorAll('.esp-corners g');
+  const titleLines    = frame.querySelectorAll('.esp-title-line');
+  const plateLabel    = frame.querySelector('.esp-plate-label');
+  const plateSub      = frame.querySelector('.esp-plate-sub');
+  const rulerLine     = frame.querySelector('.esp-ruler-line');
+  const rulerTicks    = frame.querySelectorAll('.esp-ruler-tick');
+  const rulerNums     = frame.querySelectorAll('.esp-ruler-num');
+  const wires         = frame.querySelectorAll('.esp-wire');
+  const annoKinds     = frame.querySelectorAll('.esp-anno-kind');
+  const roots         = frame.querySelectorAll('.esp-root');
+  const trunk         = frame.querySelector('.esp-trunk');
+  const trunkGrain    = frame.querySelectorAll('.esp-trunk-grain');
+  const branches      = frame.querySelectorAll('.esp-branch');
+  const knots         = frame.querySelectorAll('.esp-knot, .esp-knot-main');
+  const leafRotators  = frame.querySelectorAll('.esp-leaf-rotator');
+  const fruitClusters = frame.querySelectorAll('.esp-fruit-cluster');
+  const fruitLabels   = frame.querySelectorAll('.esp-fruit-label, .esp-fruit-sublabel');
+  const captionLines  = frame.querySelectorAll('.esp-caption-line');
+  const captionTexts  = frame.querySelectorAll('.esp-caption-main, .esp-caption-sub');
+  const fallingLeaves = frame.querySelectorAll('.esp-falling-leaf');
+  const spotlight     = frame.querySelector('.esp-spotlight');
+
+  // Stroke-dash all draw-in elements
+  function dash(el) {
+    if (!el || !el.getTotalLength) return;
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = len;
+    el.style.strokeDashoffset = len;
+  }
+  wires.forEach(dash);
+  branches.forEach(dash);
+  roots.forEach(dash);
+  dash(trunk);
+  trunkGrain.forEach(dash);
+  titleLines.forEach(dash);
+  dash(rulerLine);
+  rulerTicks.forEach(dash);
+  captionLines.forEach(dash);
+  if (borderOuter) {
+    const p = borderOuter.getBBox();
+    const len = (p.width + p.height) * 2;
+    borderOuter.style.strokeDasharray = len;
+    borderOuter.style.strokeDashoffset = len;
+  }
+  if (borderInner) {
+    const p = borderInner.getBBox();
+    const len = (p.width + p.height) * 2;
+    borderInner.style.strokeDasharray = len;
+    borderInner.style.strokeDashoffset = len;
+  }
+
+  // Initial states
+  gsap.set([knots, leafRotators, fruitClusters], { opacity: 0, scale: 0, transformOrigin: '50% 50%' });
+  gsap.set([annoKinds, rulerNums, plateLabel, plateSub, corners, captionTexts, fruitLabels], { opacity: 0 });
+  if (aura) gsap.set(aura, { opacity: 0 });
+
+  if (reduced) {
+    // Skip animation, show everything
+    gsap.set([wires, branches, roots, trunk, trunkGrain, titleLines, rulerLine, rulerTicks, captionLines, borderOuter, borderInner], { strokeDashoffset: 0 });
+    gsap.set([knots, leafRotators, fruitClusters], { opacity: 1, scale: 1 });
+    gsap.set([annoKinds, rulerNums, plateLabel, plateSub, corners, captionTexts, fruitLabels, aura], { opacity: 1 });
+    return;
+  }
+
+  // ─── Entrance timeline ───
+  const tl = gsap.timeline({ delay: 0.25, defaults: { ease: 'power2.out' } });
+
+  tl
+    // Aura fades up
+    .to(aura, { opacity: 0.9, duration: 1.5, ease: 'power1.out' }, 0)
+
+    // Border + corners
+    .to(borderOuter, { strokeDashoffset: 0, duration: 1.8, ease: 'power2.inOut' }, 0)
+    .to(borderInner, { strokeDashoffset: 0, duration: 1.5, ease: 'power2.inOut' }, 0.1)
+    .to(corners, { opacity: 1, duration: 0.4, stagger: 0.05 }, 0.3)
+
+    // Title plate
+    .to(titleLines, { strokeDashoffset: 0, duration: 0.6, stagger: 0.05 }, 0.4)
+    .to(plateLabel, { opacity: 1, duration: 0.5 }, 0.6)
+    .to(plateSub, { opacity: 1, duration: 0.5 }, 0.75)
+
+    // Scale ruler
+    .to(rulerLine, { strokeDashoffset: 0, duration: 0.7, ease: 'power2.out' }, 0.5)
+    .to(rulerTicks, { strokeDashoffset: 0, duration: 0.3, stagger: 0.04 }, 0.8)
+    .to(rulerNums, { opacity: 1, duration: 0.4, stagger: 0.04 }, 0.9)
+
+    // Roots emerge first (botanical sequence — roots before trunk)
+    .to(roots, { strokeDashoffset: 0, duration: 1.2, stagger: 0.06, ease: 'power2.out' }, 0.7)
+
+    // Trunk rises upward
+    .to(trunk, { strokeDashoffset: 0, duration: 1.1, ease: 'power2.inOut' }, 1.5)
+    .to(trunkGrain, { strokeDashoffset: 0, duration: 0.9, stagger: 0.1, ease: 'power1.out' }, 1.7)
+
+    // Wires draw across
+    .to(wires, { strokeDashoffset: 0, duration: 1.2, stagger: 0.1, ease: 'power3.out' }, 1.9)
+
+    // Right-side tier labels
+    .to(annoKinds, { opacity: 1, duration: 0.5, stagger: 0.06 }, 2.3)
+
+    // Goblet branches sprout from junction outward + upward
+    .to(branches, { strokeDashoffset: 0, duration: 1.4, stagger: 0.07, ease: 'power2.out' }, 2.2)
+
+    // Brass knots pop at every junction
+    .to(knots, {
+      opacity: 1, scale: 1,
+      duration: 0.5, stagger: 0.025,
+      ease: 'back.out(2.5)'
+    }, 2.8)
+
+    // Leaves unfurl up each branch
+    .to(leafRotators, {
+      opacity: 1, scale: 1,
+      duration: 0.55, stagger: 0.03,
+      ease: 'back.out(1.7)'
+    }, 3.2)
+
+    // Fruit clusters pop at top
+    .to(fruitClusters, {
+      opacity: 1, scale: 1,
+      duration: 0.7, stagger: 0.08,
+      ease: 'back.out(2.2)'
+    }, 3.6)
+
+    // Labels above fruits
+    .to(fruitLabels, { opacity: 1, duration: 0.5, stagger: 0.04 }, 4.1)
+
+    // Bottom caption
+    .to(captionLines, { strokeDashoffset: 0, duration: 0.7, stagger: 0.06 }, 4.2)
+    .to(captionTexts, { opacity: 1, duration: 0.5, stagger: 0.08 }, 4.4)
+
+    // Hand off to ambient
+    .call(startAmbient, [], '-=0.3');
+
+  // ─── Ambient idle: wind, sway, falling leaves ───
+  function startAmbient() {
+    // Leaves rustle — each on its own random period
+    leafRotators.forEach((leaf) => {
+      gsap.to(leaf, {
+        rotation: (Math.random() < 0.5 ? -1 : 1) * (2.5 + Math.random() * 3),
+        duration: 1.6 + Math.random() * 1.8,
+        repeat: -1, yoyo: true,
+        ease: 'sine.inOut',
+        delay: Math.random() * 1.5
+      });
+    });
+
+    // Fruit clusters bob like real grape bunches under their own weight
+    fruitClusters.forEach((cluster) => {
+      gsap.to(cluster, {
+        y: 1.5 + Math.random() * 1.2,
+        rotation: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random()),
+        duration: 2.2 + Math.random() * 1.8,
+        repeat: -1, yoyo: true,
+        ease: 'sine.inOut',
+        delay: Math.random() * 2
+      });
+    });
+
+    // Trunk has a slow imperceptible breath
+    if (trunk) {
+      gsap.to(trunk, {
+        x: 0.6, duration: 5.5,
+        repeat: -1, yoyo: true,
+        ease: 'sine.inOut'
+      });
+    }
+
+    // Knots pulse very subtly
+    knots.forEach((knot, i) => {
+      gsap.to(knot, {
+        opacity: 0.78,
+        duration: 2.2 + i * 0.15,
+        repeat: -1, yoyo: true,
+        ease: 'sine.inOut',
+        delay: i * 0.25
+      });
+    });
+
+    // Aura breathes
+    if (aura) {
+      gsap.to(aura, {
+        opacity: 1, duration: 4,
+        repeat: -1, yoyo: true,
+        ease: 'sine.inOut'
+      });
+    }
+
+    // Falling leaves drift down continuously
+    fallingLeaves.forEach((leaf, i) => {
+      setupFallingLeaf(leaf, i);
+    });
+  }
+
+  function setupFallingLeaf(leaf, i) {
+    const startPositions = [80, 180, 280, 360, 440];
+
+    function dropOnce() {
+      const startX = startPositions[i % startPositions.length] + (Math.random() * 60 - 30);
+      const fallDur = 13 + Math.random() * 8;
+      const driftAmp = 35 + Math.random() * 45;
+      const driftDir = Math.random() < 0.5 ? -1 : 1;
+      const totalRot = (Math.random() * 2 - 1) * 720;
+      const startDelay = Math.random() * 5;
+
+      gsap.set(leaf, { x: startX, y: -30, rotation: 0, opacity: 0 });
+
+      const lt = gsap.timeline({ delay: startDelay, onComplete: dropOnce });
+      // Fade in at top
+      lt.to(leaf, { opacity: 0.55 + Math.random() * 0.25, duration: 1.5 }, 0);
+      // Vertical fall
+      lt.to(leaf, {
+        y: 750,
+        rotation: totalRot,
+        duration: fallDur,
+        ease: 'none'
+      }, 0);
+      // Horizontal sine drift
+      lt.to(leaf, {
+        x: startX + driftDir * driftAmp,
+        duration: fallDur / 4,
+        repeat: 3,
+        yoyo: true,
+        ease: 'sine.inOut'
+      }, 0);
+      // Fade out near bottom
+      lt.to(leaf, { opacity: 0, duration: 2 }, fallDur - 2);
+    }
+
+    dropOnce();
+  }
+
+  // ─── Mouse interactions ───
+  if (isTouch) return;
+
+  const layers = [
+    { sel: '.esp-roots',         depth:  5 },
+    { sel: '.esp-trunk-group',   depth:  7 },
+    { sel: '.esp-wires',         depth:  4 },
+    { sel: '.esp-anno-kinds',    depth:  6 },
+    { sel: '.esp-branches',      depth: 10 },
+    { sel: '.esp-knots',         depth:  8 },
+    { sel: '.esp-leaves',        depth: 14 },
+    { sel: '.esp-fruits',        depth: 20 },
+    { sel: '.esp-fruit-labels',  depth: 16 },
+    { sel: '.esp-falling',       depth:  9 }
+  ];
+
+  const setters = layers.map(l => {
+    const el = frame.querySelector(l.sel);
+    if (!el) return null;
+    return {
+      depth: l.depth,
+      setX: gsap.quickTo(el, 'x', { duration: 0.75, ease: 'power3.out' }),
+      setY: gsap.quickTo(el, 'y', { duration: 0.75, ease: 'power3.out' })
+    };
+  }).filter(Boolean);
+
+  let setSpotX, setSpotY;
+  if (spotlight) {
+    setSpotX = gsap.quickTo(spotlight, 'x', { duration: 0.25, ease: 'power2.out' });
+    setSpotY = gsap.quickTo(spotlight, 'y', { duration: 0.25, ease: 'power2.out' });
+  }
+
+  // Magnetic cluster state
+  const clusterState = new WeakMap();
+  fruitClusters.forEach(c => clusterState.set(c, { active: false }));
+
+  function onMove(e) {
+    const rect = frame.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const nx = (cx - rect.width / 2)  / rect.width;
+    const ny = (cy - rect.height / 2) / rect.height;
+
+    setters.forEach(s => {
+      s.setX(nx * s.depth);
+      s.setY(ny * s.depth);
+    });
+
+    if (setSpotX) { setSpotX(cx); setSpotY(cy); }
+
+    // Magnetic fruit clusters
+    fruitClusters.forEach(cluster => {
+      const cr = cluster.getBoundingClientRect();
+      const fx = cr.left + cr.width  / 2 - rect.left;
+      const fy = cr.top  + cr.height / 2 - rect.top;
+      const dx = cx - fx;
+      const dy = cy - fy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const RADIUS = 80;
+      const state = clusterState.get(cluster);
+
+      if (dist < RADIUS) {
+        const force = 1 - dist / RADIUS;
+        if (!state.active) {
+          state.active = true;
+          cluster.classList.add('glow');
+        }
+        gsap.to(cluster, {
+          scale: 1 + force * 0.55,
+          duration: 0.25,
+          ease: 'power2.out',
+          overwrite: 'auto'
+        });
+      } else if (state.active) {
+        state.active = false;
+        cluster.classList.remove('glow');
+        gsap.to(cluster, {
+          scale: 1,
+          duration: 0.55,
+          ease: 'power2.out',
+          overwrite: 'auto'
+        });
+      }
+    });
+  }
+
+  frame.addEventListener('mouseenter', () => {
+    if (spotlight) gsap.to(spotlight, { opacity: 1, duration: 0.4 });
+  });
+
+  frame.addEventListener('mouseleave', () => {
+    setters.forEach(s => { s.setX(0); s.setY(0); });
+    if (spotlight) gsap.to(spotlight, { opacity: 0, duration: 0.5 });
+    fruitClusters.forEach(cluster => {
+      cluster.classList.remove('glow');
+      clusterState.set(cluster, { active: false });
+      gsap.to(cluster, { scale: 1, duration: 0.55, ease: 'power2.out', overwrite: 'auto' });
+    });
+  });
+
+  frame.addEventListener('mousemove', onMove, { passive: true });
+})();
+
+// ──────────────── Tree-hover interaction ────────────────
+const treeData = {
+  rules: {
+    kind: 'Always loaded',
+    name: 'espalier/rules/',
+    desc: 'Engineering structure, coding standards, dev process. Loaded into every Claude Code session for this project — about 3K tokens, always cached. These are the constraints every other artifact references.',
+    loaded: 'Loaded on every prompt'
+  },
+  skills: {
+    kind: 'Phase-loaded',
+    name: 'espalier/skills/',
+    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
+    loaded: 'Loaded per pipeline phase'
+  },
+  agents: {
+    kind: 'Delegated',
+    name: 'espalier/agents/',
+    desc: 'harness-coder (Write/Edit/Bash) and harness-reviewer (Read/Grep/Glob/Bash only). Separate invocations, separate tool sets — execution and judgment must come from different agents.',
+    loaded: 'Spawned by orchestrator'
+  },
+  wiki: {
+    kind: 'On-demand',
+    name: 'espalier/wiki/',
+    desc: 'Architecture, data models, critical paths, external services. Heavy context the coder loads only when the requirement touches it. Discovered by scouts during /espalier-init.',
+    loaded: 'Loaded on reference'
+  },
+  hooks: {
+    kind: 'Programmatic gates',
+    name: 'espalier/hooks/',
+    desc: 'Layer boundary check, pre-push gate, post-merge drift detect + backlink. Wired into .claude/settings.json via atomic merge — your existing hooks are preserved.',
+    loaded: 'Runs on git events'
+  },
+  pipeline: {
+    kind: 'Workflow definition',
+    name: 'espalier/pipeline.md',
+    desc: 'The 10-stage workflow with explicit gates and rollback rules. Each stage has pass/fail criteria, retry policy, and an escalation path. Failed gates accumulate into a counter that triggers human review.',
+    loaded: 'Loaded by /espalier orchestrator'
+  },
+  changes: {
+    kind: 'Typed audit trail',
+    name: 'espalier/changes/',
+    desc: 'feat/, fix/, refactor/, docs/ — one directory per requirement. Each contains pipeline-state.md, sub-agent outputs, commit SHAs, and (for fixes) a causal back-link to the feature that introduced the bug.',
+    loaded: 'Created per requirement'
+  }
+};
+
+const detailEl = document.getElementById('tree-detail');
+const treeRows = document.querySelectorAll('.tree-row');
+
+function setDetail(key) {
+  const d = treeData[key];
+  if (!d) return;
+  detailEl.innerHTML = `
+    <div class="detail-kind">${d.kind}</div>
+    <div class="detail-name">${d.name}</div>
+    <div class="detail-desc">${d.desc}</div>
+    <div class="detail-loaded"><span class="dot"></span>${d.loaded}</div>
+  `;
+  treeRows.forEach(r => r.classList.toggle('active', r.dataset.key === key));
+}
+
+treeRows.forEach(row => {
+  row.addEventListener('mouseenter', () => setDetail(row.dataset.key));
+  row.addEventListener('click', () => setDetail(row.dataset.key));
+  row.addEventListener('focus', () => setDetail(row.dataset.key));
+  row.setAttribute('tabindex', '0');
+});
+
+// Init detail with first item
+setDetail('rules');
+
+// ──────────────── Install tabs ────────────────
+document.querySelectorAll('.install-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.install-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.install-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
