@@ -42,6 +42,7 @@ Skipped from full pipeline:
 | `--build-index` | Run `espalier/hooks/rebuild-commit-index.sh`, then continue normally. |
 | `--rebuild-index` | Delete `espalier/.commit-index.tsv`, then run rebuild (forces fresh state). |
 | `--no-index` | Bypass reverse-lookup cache for this invocation only (debug). |
+| `--no-grill` | Skip the Stage 1 diagnosis grill for this invocation. |
 
 Env vars:
 - `ESPALIER_CACHE_THRESHOLD_MS=<ms>` — override the auto-build slow-scan threshold (default 1000ms; 0 = never warn). Legacy `HARNESS_CACHE_THRESHOLD_MS` also honored.
@@ -57,6 +58,7 @@ CAUSED_BY_OVERRIDE=""
 NO_INDEX="no"
 DO_BUILD_INDEX="no"
 DO_REBUILD_INDEX="no"
+GRILL_DISABLED="no"
 
 # Walk tokens, extract flags
 # (Orchestrator parses argv; below is the variable contract — not literal bash)
@@ -64,6 +66,7 @@ case "$flag" in
   --slug)          SLUG_OVERRIDE="$next_arg" ;;
   --caused-by)     CAUSED_BY_OVERRIDE="$next_arg" ;;
   --no-index)      NO_INDEX="yes" ;;
+  --no-grill)      GRILL_DISABLED="yes" ;;
   --build-index)   DO_BUILD_INDEX="yes" ;;
   --rebuild-index) DO_REBUILD_INDEX="yes" ;;
 esac
@@ -406,6 +409,11 @@ caused_by:           # populated by Stage 0
 ## Reproduction
 {steps to reproduce}
 
+## Root Cause
+{the confirmed cause — file:line and why. Populated by the Stage 1 grill
+(diagnosis mode); use "unconfirmed — <hypothesis>" only if grilling could not
+verify it against the code}
+
 ## Expected behaviour
 {what should happen instead}
 
@@ -417,6 +425,13 @@ caused_by:           # populated by Stage 0
 ## Out of scope
 {anything reporter asked for that isn't this specific bug}
 ```
+
+**Grill the diagnosis.** Unless the invocation passed `--no-grill`
+(`GRILL_DISABLED=yes`), invoke the `espalier-grill` skill in `diagnosis` mode once
+the draft above is written. Grill interrogates the root cause and reproduction
+(adaptive depth — a well-anchored bug with a clean repro is skipped), verifies the
+claimed cause against the code, and writes its findings into the `## Root Cause`
+and `## Reproduction` sections. Record its verdict for pipeline-state.md.
 
 **Escalation Gate (Stage 1):** see "Escalation Gates" section below.
 

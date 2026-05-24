@@ -48,7 +48,11 @@ Rule: Each sub-task should touch ≤ 5 files. If more, decompose further.
 1. Read the requirement carefully
 2. Read relevant wiki/ files for business context
 3. Read engineering-structure.md to understand affected modules
-4. Ask clarifying questions if acceptance criteria are ambiguous
+4. **Grill the requirement.** Unless the pipeline passed `--no-grill`, invoke the
+   `espalier-grill` skill in `spec` mode. Grill interrogates the requirement
+   (adaptive depth — it may skip a crisp one) and writes resolved decisions into
+   the Acceptance Criteria and Scope Definition sections above. Record its verdict
+   (`GRILLED` / `SKIPPED: <reason>`) — the orchestrator logs it to pipeline-state.md.
 5. Produce the structured output above
 
 ## Anti-Patterns

@@ -4,8 +4,8 @@
 
 ### 1. Requirements Analysis
 - **Trigger:** New requirement received
-- **Load:** Read espalier/skills/espalier-requirements/SKILL.md
-- **Execute:** Main agent produces requirements doc
+- **Load:** Read espalier/skills/espalier-requirements/SKILL.md (which invokes espalier-grill)
+- **Execute:** Main agent produces the requirements doc; `espalier-grill` interrogates it (adaptive depth) unless `--no-grill` was passed
 - **Gate:** Requirements doc exists with acceptance criteria (≥ 2 criteria)
 - **Human checkpoint:** Confirm understanding before proceeding
 - **Output:** espalier/changes/{slug}/requirements.md

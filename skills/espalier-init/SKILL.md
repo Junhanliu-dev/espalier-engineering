@@ -64,6 +64,7 @@ project-root/
 │   │   ├── espalier-review/SKILL.md
 │   │   ├── espalier-testing/SKILL.md
 │   │   ├── espalier-requirements/SKILL.md
+│   │   ├── espalier-grill/SKILL.md             # Stage 1 interrogation (invoked by espalier + espalier-fix)
 │   │   ├── espalier/SKILL.md                   # main pipeline orchestrator (slash: /espalier)
 │   │   ├── espalier-fix/SKILL.md               # bug-fix lane (5-stage; slash: /espalier-fix)
 │   │   ├── espalier-prune/SKILL.md             # stale-artifact refresh (slash: /espalier-prune)
@@ -281,7 +282,7 @@ bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
 Bootstrap runs all 11 internal stages in one shell process:
 
 - **Stages 1-2:** preflight + `mkdir -p` (idempotent — Phase 2 Writes already created some dirs).
-- **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements,espalier-prune,espalier-doctor}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
+- **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements,espalier-grill,espalier-prune,espalier-doctor}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
 - **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index, drift-detect, drift-helpers, parse-drift-blocks.py) + `chmod +x espalier/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
 - **Stage 5:** safe symlinks `.claude/{rules,skills,agents}/*` → `espalier/...` (refuses if target is regular file; uses portable `abspath`).
 - **Stage 6:** heredoc `espalier/changes/_template/pipeline-state.md`.
