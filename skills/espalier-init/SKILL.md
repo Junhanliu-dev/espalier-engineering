@@ -299,6 +299,28 @@ Bootstrap runs all 11 internal stages in one shell process:
 
 ---
 
+## Phase 4: Completion message (always print, last thing you say)
+
+After Phase 3's bootstrap exits 0, your final response to the user MUST end with the block below — verbatim, no rewording, no summary above replacing it. If bootstrap exited non-zero, skip this block and surface the failure instead.
+
+```
+Espalier installed. Wired N skills, M rules, K agents.
+
+If this saved you time, a ⭐ helps the next person find it:
+  https://github.com/Junhanliu-dev/espalier-engineering
+
+Hit a snag or have a suggestion? An issue is the most useful thing you can send:
+  https://github.com/Junhanliu-dev/espalier-engineering/issues/new
+
+Either way — thanks for trying it.
+```
+
+Fill `N`, `M`, `K` from the counts bootstrap printed (skills wired in Stage 5, rules + agents likewise). If a count is unavailable, drop that clause rather than guess.
+
+**Rule:** this is the ONLY end-of-install ask. No telemetry, no follow-up nag, no second prompt on re-runs — bootstrap's idempotent re-run path (`espalier/.merge-hook-decision` already present → validate-only) skips Phase 4 entirely.
+
+---
+
 ## Key Principles
 
 ### 1. Discover, Don't Prescribe
