@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.5.0 — doc-drift detection.** Espalier-generated rules, wiki, specs, and hooks no longer silently rot as the codebase evolves: a post-merge drift detector, reviewer convention-drift capture, a cross-PR convention index, the gated `/espalier-prune` refresh skill, and a periodic `/espalier-doctor` scan. Non-breaking.
+> **v0.6.0 — Stage 1 grilling.** Before any code is written, `/espalier` and `/espalier-fix` now interrogate the Stage 1 input — scoring concrete ambiguity signals in a requirement (or a bug diagnosis) and asking only as many questions as its vagueness warrants, with the answers landing in `requirements.md`. On by default; `--no-grill` to skip; auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and non-breaking.
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (v0.1→v0.2→v0.4→v0.5) in order. See [`docs/migrating-v0.4-to-v0.5.md`](./docs/migrating-v0.4-to-v0.5.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.5→v0.6) in order. See [`docs/migrating-v0.5-to-v0.6.md`](./docs/migrating-v0.5-to-v0.6.md).
 
 ---
 
@@ -70,7 +70,7 @@ Includes scope-creep escalation gates (predictive + reactive + test-scope + revi
 
 ### Keeping the guardrails in sync
 
-The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, v0.5.0 keeps them honest: a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
+The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, Espalier keeps them honest (since v0.5.0): a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
 
 ## Install
 
