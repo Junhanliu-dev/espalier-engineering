@@ -37,7 +37,7 @@ Skipped from full pipeline:
 
 | Flag | Effect |
 |------|--------|
-| `--slug <name>` | Override auto-derived slug (see Slug Derivation below). Must match `^[a-z0-9][a-z0-9-]{0,79}$`. |
+| `--slug <name>` | Override auto-derived slug (see Slug Derivation below). Literal — no date prefix added. Must match `^[a-z0-9][a-z0-9-]{0,90}$`; prefer `YYYY-MM-DD-<name>` to keep chronological sort. |
 | `--caused-by <slug>` | Skip blame, explicit causal link (e.g. `--caused-by feat/bulk-export-endpoint`). |
 | `--build-index` | Run `espalier/hooks/rebuild-commit-index.sh`, then continue normally. |
 | `--rebuild-index` | Delete `espalier/.commit-index.tsv`, then run rebuild (forces fresh state). |
@@ -88,17 +88,23 @@ The remaining (flag-stripped) text becomes the bug description fed to Slug Deriv
 
 ## Slug & Path
 
-- Slug derivation: see Slug Derivation section below. Summary: sanitize bug input → kebab-case ASCII, max 80 chars; `--slug <name>` overrides; collision prompts user.
-- Path = `espalier/changes/fix/{slug}/`
+- Slug derivation: see Slug Derivation section below. Summary: sanitize bug input → kebab-case ASCII `{kebab}` (max 80 chars), then date-prefix → `{slug}` = `{YYYY-MM-DD}-{kebab}`; `--slug <name>` overrides literally; collision prompts user.
+- Path = `espalier/changes/fix/{slug}/` (e.g. `espalier/changes/fix/2026-06-02-npe-in-cart/`)
 - All files inherit from `espalier/changes/_template/`.
 
 ## Slug Derivation
 
-Slug is produced by this pipeline. All steps are deterministic except step 1 (override) and step 11 (collision prompt).
+Steps 2–10 produce `{kebab}` (the deterministic identity tail). Step 10.5
+date-prefixes it into the final `{slug}`. All steps are deterministic except
+step 1 (override) and step 11 (collision prompt).
 
 ### Step 1: Override check
 If user passed `--slug <name>`:
-  - Validate: must match `^[a-z0-9][a-z0-9-]{0,79}$` (≤ 80 chars, kebab, starts non-hyphen)
+  - The override is **literal** — taken as the full `{slug}` verbatim, no date
+    prefix is added (the user owns the whole name). To keep chronological sort,
+    prefer passing `--slug YYYY-MM-DD-<name>`.
+  - Validate: must match `^[a-z0-9][a-z0-9-]{0,90}$` (≤ 91 chars, kebab, starts
+    non-hyphen). The wider cap leaves room for a `YYYY-MM-DD-` prefix.
   - If valid, skip to step 11 (collision check).
   - If invalid, error and exit with message showing the regex.
 
@@ -139,8 +145,9 @@ Examples:
 - If > 80, cut at last hyphen ≤ 80. If no hyphen in first 80 chars, hard-cut at 80.
 
 ### Step 8: Empty-result fallback
-If empty after sanitization (e.g., all-symbol input or ASCII-strip-emptied CJK), use:
-`fix-{YYYYMMDD-HHMMSS}` (UTC timestamp, e.g., `fix-20260518-143022`)
+If empty after sanitization (e.g., all-symbol input or ASCII-strip-emptied CJK), use
+`{kebab}` = `fix-{HHMMSS}` (UTC time, e.g., `fix-143022`). Step 10.5 prepends the
+date, giving a final slug like `2026-06-02-fix-143022` (no doubled date).
 
 ### Step 9: Reserved-name prefix
 If slug ∈ {con, aux, nul, prn, com1..9, lpt1..9} (Windows reserved):
@@ -149,16 +156,40 @@ prefix with `fix-`
 ### Step 10: Leading-hyphen guard
 If starts with hyphen (post-sanitization edge case): prefix with `x-`
 
+This completes `{kebab}` (the deterministic identity tail).
+
+### Step 10.5: Date prefix
+Prepend the UTC creation date so change folders sort chronologically:
+
+```bash
+DATE="$(date -u +%Y-%m-%d)"   # ISO date — lexical sort == chronological sort
+SLUG="${DATE}-${kebab}"       # e.g. 2026-06-02-npe-in-cart
+```
+
+`{slug}` = `{YYYY-MM-DD}-{kebab}`. The ISO date MUST be a *prefix* (a trailing
+date does not sort). Reverse-lookup and the commit index derive their slug from
+the folder basename, so the dated slug flows through unchanged.
+
 ### Step 11: Collision detection + prompt
-Check `espalier/changes/fix/{slug}/` (and tombstones at `espalier/changes/fix/{slug}/TOMBSTONE.md`):
+Match by `{kebab}` **tail**, not exact `{slug}` — re-deriving on a later day
+yields a new date prefix, so an exact match would miss an in-progress fix from a
+prior day. Glob existing dirs and compare the part after the `YYYY-MM-DD-`:
+
+```bash
+shopt -s nullglob
+matches=(espalier/changes/fix/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-"${kebab}")
+```
+
+For each match read its `pipeline-state.md` Status (and tombstones at
+`<match>/TOMBSTONE.md`):
 
 | Existing state | Action |
 |----------------|--------|
-| No directory | Use slug. Done. |
-| Directory exists, Status: IN_PROGRESS | Resume that fix. Announce "Resuming fix/{slug} from Stage {N}". |
-| Directory exists, terminal Status (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED / ESCALATED_LATE) | **Prompt user** (below) |
-| Directory exists, Status: PARTIAL_FIX | **Prompt user** (below) |
-| Only `TOMBSTONE.md` exists (legacy migration) | Follow tombstone pointer; ask user "fix/{slug} was migrated to feat/{target}. New fix at fix/{slug}-2, or work on feat/{target} instead?" |
+| No tail match | Use `{slug}` (today's date + kebab). Done. |
+| Match exists, Status: IN_PROGRESS | Resume that fix. Announce "Resuming fix/{matched-slug} from Stage {N}". |
+| Match exists, terminal Status (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED / ESCALATED_LATE) | **Prompt user** (below) — a same-name fix on a new day is usually a *new* dated folder, but confirm intent. |
+| Match exists, Status: PARTIAL_FIX | **Prompt user** (below) |
+| Only `TOMBSTONE.md` exists (legacy migration) | Follow tombstone pointer; ask user "fix/{matched-slug} was migrated to feat/{target}. New fix at fix/{slug}, or work on feat/{target} instead?" |
 
 Collision prompt (use `AskUserQuestion`):
 
@@ -179,7 +210,9 @@ Options:
 ```
 
 ### Step 12: Final validation
-- Confirm slug matches `^[a-z0-9][a-z0-9-]{0,79}$` one more time.
+- Confirm the dated slug matches `^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]{0,79}$`
+  (a `--slug` literal override that omits the date is instead allowed by the
+  step-1 regex `^[a-z0-9][a-z0-9-]{0,90}$`).
 - Confirm `espalier/changes/fix/{slug}/` is now creatable (does not exist OR was user-confirmed for reuse).
 
 ## Before Starting
