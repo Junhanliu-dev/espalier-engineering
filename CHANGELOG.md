@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-06-02
+
+Minor: **Stage 1 grilling** — the pipeline now interrogates a requirement or a bug diagnosis before any code is written. Plus chronologically-sortable change folders.
+
+- **`skills/espalier-init/templates/skills/espalier-grill.md`** — new `espalier-grill` skill. An under-specified requirement (or an unconfirmed diagnosis) that passes Stage 1 is trusted by every later stage, and no later gate audits it. Grill is that audit: it counts concrete ambiguity *signals* in the Stage 1 input (undefined terms, unstated actors, missing failure behaviour, hidden quantifiers, unscoped edge cases; for fixes: unconfirmed cause, weak reproduction), maps the count to a depth tier, and runs an adaptive sequential interrogation that resolves each gap into the change's `requirements.md`. Two modes: `spec` (from `/espalier`) and `diagnosis` (from `/espalier-fix`). Invoked *by* Stage 1 — never a user-facing slash command. Skips itself with verdict `SKIPPED: non-interactive` when there is no TTY, so an unattended pipeline never hangs on a grill question.
+- **`templates/skills/espalier.md`, `espalier-fix.md`, `espalier-requirements.md`** — Stage 1 of both pipelines now invokes the grill. On by default; opt out per-invocation with `--no-grill` (parsed via `GRILL_DISABLED` in `/espalier`, a `--no-grill` flag in `/espalier-fix`).
+- **`eval/grill/`** — eval harness for the skill: nine fixtures across three buckets (full-depth, light-touch, skip), a scoring rubric, and `run.sh`.
+- **`scripts/migrate-v0.5-to-v0.6.sh`** — idempotent target-repo upgrade. Backs up any customised pipeline skill on diff (`<file>.pre-v0.6.bak`), then `bootstrap --force` installs the grill skill, refreshes the four changed pipeline templates, and symlinks the new skill. `--dry-run` / `--yes` flags.
+- **Dated change folders** — change folders now use `{slug}` = `YYYY-MM-DD-{kebab}` (UTC creation date as a prefix), so a listing of `changes/{feat,fix,refactor}/` orders chronologically (ISO date prefix makes lexical sort == chronological sort). Fix-lane collision/resume matches by the `{kebab}` tail (re-deriving on a later day changes the prefix), `--slug` override is literal, and reverse-lookup is unaffected (it derives slug from the folder basename). Existing undated folders are untouched; the v0.6 migration's template refresh carries the change to new pipeline runs.
+
+Stage 1 grilling is additive and interactive-only — non-breaking for fresh installs and unattended runs. See [docs/migrating-v0.5-to-v0.6.md](./docs/migrating-v0.5-to-v0.6.md).
+
 ## 0.5.6 — 2026-05-26
 
 Minor: `/espalier-init` now ends with a telemetry-free feedback prompt.

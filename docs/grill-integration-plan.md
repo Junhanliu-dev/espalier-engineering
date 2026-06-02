@@ -1,7 +1,7 @@
 # Grill Integration Plan — espalier-engineering
 
-**Status:** Draft v2 — pre-mortem mitigations applied
-**Target version:** v0.6.0 (current: v0.5.5)
+**Status:** ✅ Shipped in v0.6.0 (2026-06-02)
+**Target version:** v0.6.0
 **Type:** Feature, non-breaking
 
 ## 1. Goal

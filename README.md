@@ -33,7 +33,7 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 ```
 espalier/
 ├── rules/                  # always-loaded: engineering structure, coding standards, dev process
-├── skills/                 # phase-loaded: coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor
+├── skills/                 # phase-loaded: coding, review, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor
 ├── agents/                 # delegated: harness-coder, harness-reviewer (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
 ├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
@@ -51,7 +51,9 @@ After init, your repo exposes two orchestrators:
 
 For features, refactors, and large fixes. Drives requirement → reqs review → coding (sub-agent) → code review (different sub-agent) → tests → test review → push → CI verify → deploy verify → user confirmation. Every stage has a programmatic gate; failed gates roll back; rollback counters trigger human escalation.
 
-Requirement-prefix routing:
+**Stage 1 grilling** (v0.6.0): before any code is written, Stage 1 interrogates the requirement — counting concrete ambiguity signals (undefined terms, unstated actors, missing failure behaviour, unscoped edge cases) and asking only as many questions as the input's vagueness warrants. The resolved answers land in `requirements.md`, so later stages execute a spec they can't misread. On by default; skip an invocation with `--no-grill`, and auto-skipped on a non-interactive (no-TTY) run.
+
+Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so change dirs sort chronologically):
 
 | Prefix | Type | Output dir |
 |---|---|---|
@@ -64,7 +66,7 @@ Requirement-prefix routing:
 
 For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link discovery** — the bug-fix gets linked back to the feature change that introduced it (via git blame + reverse-lookup cache + squash-merge mapping). The causing change's `pipeline-state.md` gains a `## Follow-up Fixes` row. Six months later, when someone wonders "why does this feature have 4 fixes against it", the audit trail is right there.
 
-Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link.
+Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link. Stage 1 grilling (v0.6.0) runs here too, in `diagnosis` mode: it pressure-tests the bug's *root cause* and reproduction before any fix is coded, so the lane isn't patching a symptom on an unconfirmed theory.
 
 ### Keeping the guardrails in sync
 
@@ -248,6 +250,8 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Status
 
+`v0.6.0` — **Stage 1 grilling.** A new `espalier-grill` skill interrogates the Stage 1 input before any code is written — adaptive sequential questioning that scores ambiguity signals and resolves them into `requirements.md`, in `spec` mode for `/espalier` and `diagnosis` mode for `/espalier-fix`. On by default, `--no-grill` to skip, auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and interactive-only — non-breaking. New `migrate-v0.5-to-v0.6.sh` and an `eval/grill/` harness.
+
 `v0.5.0` — **doc-drift detection.** Generated rules/wiki/specs/hooks are kept in sync with the codebase as it evolves: a post-merge drift detector writing a gitignored sidecar, reviewer convention-drift capture, a cross-PR convention index, the gated `/espalier-prune` refresh skill, a periodic `/espalier-doctor` re-scout, a consolidated Stage 0 pre-flight, a notify-only Stage 8.5, and validation checks 25–28. Non-breaking — drift detection is additive. New `migrate-v0.4-to-v0.5.sh` and a three-stage `/espalier-migrate` chain.
 
 `v0.4.0` — **the rebrand.** Plugin renamed `harness-engineering` → `espalier-engineering`. Target-project directory `harness/` → `espalier/`. Slash commands collapsed: full pipeline is now `/espalier` (was `/harness-run`), bug-fix lane is `/espalier-fix` (was `/harness-fix`), init is `/espalier-init` (was `/harness-engineering`), migration is `/espalier-migrate`. Sub-agent identifiers `harness-coder` / `harness-reviewer` kept for in-flight stability. New `/espalier-migrate` shim detects v0.1.x or v0.3.x installs and dispatches to the right migration script. GitHub repo renamed `harness-engineering` → `espalier-engineering` (GitHub maintains redirects). README now documents per-run token cost + Claude Max plan budget.
@@ -256,7 +260,7 @@ MIT — see [LICENSE](./LICENSE).
 
 `v0.2.0` — bug-fix lane (`/harness-fix`), typed `harness/changes/{type}/{slug}/` layout, causal back-links between fixes and the changes that introduced them, escalation paths (including late-stage), squash-merge resilience with optional post-merge hook, and self-healing reverse-lookup cache.
 
-See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.4-to-v0.5.md](./docs/migrating-v0.4-to-v0.5.md) for the v0.5 doc-drift upgrade, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
+See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.5-to-v0.6.md](./docs/migrating-v0.5-to-v0.6.md) for the v0.6 Stage 1 grill upgrade, [docs/migrating-v0.4-to-v0.5.md](./docs/migrating-v0.4-to-v0.5.md) for the v0.5 doc-drift upgrade, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
 
 Schema and templates may still change. Please file issues with the Espalier output you'd expect to see for your stack.
 
