@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.5.4</span>
+      <span class="nav-pill">v0.6.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1146,7 +1146,7 @@ footer {
       <div class="hero-text">
         <div class="eyebrow">
           <span class="eyebrow-dot"></span>
-          v0.5.0 — doc-drift detection
+          v0.6.0 — Stage 1 grilling
         </div>
         <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
         <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
@@ -1707,11 +1707,62 @@ footer {
   </div>
 </section>
 
+<!-- ──────────────── GRILL (v0.6.0) ──────────────── -->
+<section class="standard" id="grill">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">06</span>
+      <span>v0.6.0 · Stage 1 grilling</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Interrogate the spec before the code.</h2>
+      <p class="intro">A vague requirement — or an unconfirmed bug diagnosis — that passes Stage 1 is trusted by every later stage, and no later gate audits it. <code style="font-family:var(--f-mono);color:var(--vine)">/espalier</code> now grills that input first, turning an under-specified ask into one a coding agent can execute without guessing.</p>
+    </div>
+
+    <div class="drift-grid">
+      <div class="drift-flow">
+        <div class="drift-step">
+          <div class="drift-step-num">i</div>
+          <div class="drift-step-body"><strong>score the ambiguity</strong> — count concrete signals: undefined terms, unstated actors, missing failure behaviour, hidden quantifiers, unscoped edge cases.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">ii</div>
+          <div class="drift-step-body"><strong>choose a depth</strong> — the signal count maps to a tier, so a crisp spec gets waved through and a fuzzy one gets pressed.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iii</div>
+          <div class="drift-step-body"><strong>ask, adaptively</strong> — a short sequential interrogation, only as many questions as the vagueness warrants. Each answer lands in <code style="font-family:var(--f-mono);color:var(--vine)">requirements.md</code>.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iv</div>
+          <div class="drift-step-body"><strong>two modes</strong> — <code style="font-family:var(--f-mono);color:var(--vine)">spec</code> for <code style="font-family:var(--f-mono);color:var(--vine)">/espalier</code> requirements, <code style="font-family:var(--f-mono);color:var(--vine)">diagnosis</code> for <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-fix</code> root causes — so the lane never patches a symptom on an unconfirmed theory.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="drift-note">
+          On by default. <code style="font-family:var(--f-mono);color:var(--vine)">--no-grill</code> skips one invocation; an unattended (no-TTY) run auto-skips so the pipeline never hangs.
+        </div>
+        <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          Change folders are now date-prefixed — <code style="font-family:var(--f-mono);color:var(--vine)">changes/feat/2026-06-02-add-login/</code> — so a directory listing sorts chronologically.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.5 → v0.6) in order.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Stage 1 grilling is additive and interactive-only. <span style="color:var(--paper)">Non-breaking.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ──────────────── DRIFT (v0.5.0) ──────────────── -->
 <section class="standard" id="drift">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">06</span>
+      <span class="plate-num">07</span>
       <span>v0.5.0 · doc-drift detection</span>
       <span class="plate-line"></span>
     </div>
@@ -1763,7 +1814,7 @@ footer {
 <section class="standard" id="cost">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">07</span>
+      <span class="plate-num">08</span>
       <span>Cost, honestly</span>
       <span class="plate-line"></span>
     </div>
@@ -1836,7 +1887,7 @@ footer {
 <section class="standard" id="philosophy">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">08</span>
+      <span class="plate-num">09</span>
       <span>Philosophy</span>
       <span class="plate-line"></span>
     </div>
@@ -1884,7 +1935,7 @@ footer {
 <section class="standard" id="install">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">09</span>
+      <span class="plate-num">10</span>
       <span>Install</span>
       <span class="plate-line"></span>
     </div>
@@ -1970,6 +2021,7 @@ footer {
       <div>
         <h4>Migration</h4>
         <ul>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.5-to-v0.6.md">v0.5 → v0.6</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.4-to-v0.5.md">v0.4 → v0.5</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.3-to-v0.4.md">v0.3 → v0.4</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.1-to-v0.2.md">v0.1 → v0.2</a></li>
@@ -1987,7 +2039,7 @@ footer {
     </div>
     <div class="footer-bottom">
       <div>© 2026 · Espalier Engineering</div>
-      <div>v0.5.4 — plugin-dir resolution via CLAUDE_SKILL_DIR</div>
+      <div>v0.6.0 — Stage 1 grill + dated change folders</div>
     </div>
   </div>
 </footer>
