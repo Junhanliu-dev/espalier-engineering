@@ -256,7 +256,21 @@ Parse `{type}` from the requirement prefix:
 - `docs: <text>` → type = `docs`
 - Anything else → type = `feat` (default)
 
-Then derive `{slug}` from the remainder of the requirement (kebab-case, max 60 chars, strip slashes).
+Then derive `{kebab}` from the remainder of the requirement (kebab-case, max 60 chars, strip slashes).
+
+**Date-prefix the slug** so change folders sort chronologically in a directory
+listing:
+
+```bash
+DATE="$(date -u +%Y-%m-%d)"   # ISO date, UTC — lexical sort == chronological sort
+SLUG="${DATE}-${kebab}"       # e.g. 2026-06-02-add-login-rate-limit
+```
+
+`{slug}` = `{YYYY-MM-DD}-{kebab}` everywhere below. The ISO date MUST be a
+*prefix* (not a suffix) — only a leading `YYYY-MM-DD` makes lexical sort equal
+chronological sort. Session Resumption (above) globs `pipeline-state.md` by path
+and reads Status, so the date prefix never breaks resume. Reverse-lookup derives
+its slug from the folder basename, so the dated slug flows through unchanged.
 
 Create `espalier/changes/{type}/{slug}/pipeline-state.md`:
 

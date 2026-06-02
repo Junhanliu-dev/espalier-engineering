@@ -75,7 +75,7 @@ project-root/
 │   ├── pipeline.md
 │   └── changes/                    # typed: feat/, fix/, refactor/, …
 │       ├── _template/              # requirements.md, task-breakdown.md, coding-report.md, review-record.md, pipeline-state.md, ci-result.md
-│       ├── feat/{slug}/            # full pipeline outputs
+│       ├── feat/{slug}/            # full pipeline outputs   ({slug} = YYYY-MM-DD-<name>, sorts chronologically)
 │       ├── fix/{slug}/             # fix-lane outputs (with caused_by frontmatter)
 │       └── refactor/{slug}/        # (future)
 └── src/  (existing code)
