@@ -5,3 +5,4 @@
 .tldrignore
 SKILL.original.md
 __pycache__/
+.in_use/
