@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.6 — 2026-05-26
+
+Minor: `/espalier-init` now ends with a telemetry-free feedback prompt.
+
+- **`skills/espalier-init/SKILL.md`** — new Phase 4 (Completion message). After Phase 3's bootstrap exits 0, the install agent prints a fixed block confirming the install, linking the repo for a ⭐, and linking `issues/new` for feedback. No metrics, no callback, no follow-up nag. Skipped on idempotent re-runs (the `espalier/.merge-hook-decision` marker file signals a re-run) and skipped on non-zero bootstrap exit so a failure surfaces instead.
+
+Rationale: prior to this, a successful install ended in silence — no moment where the user was prompted to acknowledge it worked. Silent installs convert to neither stars (which help the next visitor evaluate the plugin) nor issues (which are the only useful signal back). A single one-shot ask at the natural celebratory moment captures a slice of each without resembling a tracking mechanism.
+
 ## 0.5.5 — 2026-05-22
 
 Patch: skill symlinks stop nesting a self-referencing loop on a wiring re-run.
