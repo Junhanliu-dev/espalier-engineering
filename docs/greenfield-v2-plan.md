@@ -1,6 +1,6 @@
 # Greenfield v2 Plan — espalier-engineering
 
-**Status:** 📝 Planned
+**Status:** ✅ Implemented in v0.7.0 (2026-06-11). LLM-judged interview evals (`eval/greenfield/run.sh`) seeded but not yet run/validated — see §9 discipline notes.
 **Target version:** v0.7.0
 **Type:** Feature, non-breaking (additive — fires only on bare repos / explicit `/espalier-new`)
 
@@ -318,4 +318,4 @@ Feature is additive and plugin-side only. To disable: remove `skills/espalier-ne
 
 ## 14. Status / next step
 
-Plan written 2026-06-11 from grill session (5 rounds, 19 locked decisions). Next: **P1 — Flow core**.
+Plan written 2026-06-11 from grill session (5 rounds, 19 locked decisions). P1–P6 implemented same day, one commit per phase. Smoke-tested live: Vite, FastAPI (boot+healthz), Flutter (create+analyze+test), Next.js, uv lib build, Go CLI; `scaffold-asserts.sh backend` green end-to-end. Outstanding: run + judge-validate the interview evals, full bare-dir→bootstrap e2e on a real first user run.

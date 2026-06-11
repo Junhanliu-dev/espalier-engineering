@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-06-11
+
+Minor: **Greenfield mode** — Espalier now works on an empty folder. An adaptive interview (product brief + stack), a production-grade scaffold via the ecosystem's own tools, deploy-ready config, a build-and-boot verification gate, then convergence into the normal discovery pipeline. Plan: [docs/greenfield-v2-plan.md](./docs/greenfield-v2-plan.md).
+
+- **`skills/espalier-new/SKILL.md`** — new `/espalier-new` command: bare-folder check (warns and stops on a repo that already has code), then runs the greenfield flow. `/espalier-init` gains a **Phase −1 Entry Gate** that auto-detects a bare repo (no package manifest, no source files) and routes to the same flow — non-bare repos see byte-identical behavior to v0.6.0.
+- **`skills/espalier-init/references/greenfield.md`** — full rewrite as the flow core: adaptive grill (express mode; product brief; track + shape rounds; hard question caps; recommended default on every question), optional example-repo input (read-only; copy-&-adapt fast-path when the example already has `espalier/`), stack resolution (hybrid curated-plus-verify or full live research; BYO-stack protocol for uncurated ecosystems), scaffold proposal with confirm-before-run, install→build→lint→test→boot verification gate (≤ 2 fix attempts, inventory-based rollback offer), guided-first-deploy offer, and convergence rules.
+- **`skills/espalier-init/references/greenfield/`** — nine per-track deep dives, each a 7-section contract (question bank → stack candidates → scaffold sequence → deploy-ready config → test pyramid → release process → verification commands): `frontend`, `backend`, `fullstack`, `mobile`, `cms`, `microservices` (forcing-constraint gate + 3-service cap), `cli-library`, `desktop` (signing as stubs, never blocking), plus `deploy-targets.md` — guided first-deploy flows for Vercel / Fly.io / Railway / Cloudflare / Docker-VPS and a research-per-run protocol for anything else. Hard rules throughout: scaffolder syntax verified live before running (curated tables are candidates, not gospel), secrets never written to files.
+- **`skills/espalier-init/references/wiki-templates.md`** — greenfield runs add two wiki artifacts: `wiki/product-brief.md` (seeds future Stage 1 grills) and `wiki/stack-decisions.md` (every choice with rationale, rejected alternatives, decided-by, verification date); the scaffold itself is recorded as the project's first `changes/feat/<date>-greenfield-scaffold/` entry.
+- **`eval/greenfield/`** — eval harness: 8 interview fixtures (vague / precise / express / BYO / example-with-and-without-espalier / non-bare refusal / mobile-store), an LLM-judge rubric (track resolution, round budget, defaults discipline, forbidden behaviors), and `scaffold-asserts.sh` — scripted live scaffold + verification + secrets-scan per core track, the regression net for scaffolder drift.
+
+Greenfield is additive and plugin-side only — the Entry Gate fires only on bare repos (previously undefined behavior), the generated target-project schema is unchanged, and **no migration is needed** for existing installs.
+
 ## 0.6.0 — 2026-06-02
 
 Minor: **Stage 1 grilling** — the pipeline now interrogates a requirement or a bug diagnosis before any code is written. Plus chronologically-sortable change folders.

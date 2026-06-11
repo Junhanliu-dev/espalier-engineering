@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.6.0 — Stage 1 grilling.** Before any code is written, `/espalier` and `/espalier-fix` now interrogate the Stage 1 input — scoring concrete ambiguity signals in a requirement (or a bug diagnosis) and asking only as many questions as its vagueness warrants, with the answers landing in `requirements.md`. On by default; `--no-grill` to skip; auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and non-breaking.
+> **v0.7.0 — Greenfield mode.** Espalier now works on an **empty folder**: `/espalier-new` (or `/espalier-init`, which auto-detects a bare repo) interviews you — product brief, then stack — recommends a current production-grade stack across nine tracks (frontend, backend, fullstack, mobile, CMS, microservices, CLI/library, desktop, bring-your-own), scaffolds it with the ecosystem's own tools, wires deploy-ready config (Dockerfile/CI/env/runbook), verifies the skeleton builds and boots, offers a guided first deploy to a live URL, and then converges into the normal discovery pipeline. Additive and plugin-side only — **no migration needed**; non-bare repos behave exactly as v0.6.0.
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.5→v0.6) in order. See [`docs/migrating-v0.5-to-v0.6.md`](./docs/migrating-v0.5-to-v0.6.md).
+> **Existing users:** nothing to migrate for v0.7. If you're on ≤ v0.5, run `/espalier-migrate` — it auto-detects your install version and applies the needed chain in order.
 
 ---
 
@@ -67,6 +67,14 @@ Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so
 For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link discovery** — the bug-fix gets linked back to the feature change that introduced it (via git blame + reverse-lookup cache + squash-merge mapping). The causing change's `pipeline-state.md` gains a `## Follow-up Fixes` row. Six months later, when someone wonders "why does this feature have 4 fixes against it", the audit trail is right there.
 
 Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link. Stage 1 grilling (v0.6.0) runs here too, in `diagnosis` mode: it pressure-tests the bug's *root cause* and reproduction before any fix is coded, so the lane isn't patching a symptom on an unconfirmed theory.
+
+### `/espalier-new` — greenfield (empty folder → production-ready project)
+
+The two pipelines above need code to exist. `/espalier-new` (v0.7.0) is for the day before that: point it at an empty folder and it runs an **adaptive grill** — what does the product do, for whom, at what scale; then track and stack — and scaffolds a production-grade skeleton using the ecosystem's own scaffolder (never hand-rolled boilerplate). Nine tracks: pure frontend, pure backend, fullstack monorepo, mobile (Flutter/Expo), Next.js + headless CMS, microservices, CLI/library, desktop (Tauri/Electron), and bring-your-own-stack via live research.
+
+Every scaffold ships **deploy-ready**: Dockerfile where applicable, CI with a deploy stage, `.env.example`, a runbook — and must pass a verification gate (install → build → lint → test → boot) before Espalier will hand it over. A **guided first deploy** (Vercel / Fly.io / Railway / Cloudflare / Docker-VPS) is offered so the session can end with a live URL. An **express mode** skips the interview for best-practice defaults; every choice (asked or defaulted) is recorded in `espalier/wiki/stack-decisions.md`, the product brief lands in `espalier/wiki/product-brief.md`, and the scaffold itself becomes the project's first `changes/` entry — the audit trail starts at birth. Afterwards the normal discovery pipeline runs on the fresh scaffold, so the harness encodes the real conventions just created.
+
+`/espalier-init` on a bare repo routes to the same flow automatically (Phase −1 Entry Gate); on a repo with code, behavior is unchanged.
 
 ### Keeping the guardrails in sync
 
@@ -249,6 +257,8 @@ Five guiding principles:
 MIT — see [LICENSE](./LICENSE).
 
 ## Status
+
+`v0.7.0` — **Greenfield mode.** Espalier works on an empty folder: new `/espalier-new` command + a Phase −1 Entry Gate in `/espalier-init` that auto-detects bare repos. Adaptive grill (product brief + stack, express mode available), nine per-track playbooks with live-verified scaffolder commands, deploy-ready config, a build-and-boot verification gate, guided first deploy, and two new wiki artifacts (`product-brief.md`, `stack-decisions.md`). New `eval/greenfield/` harness (interview fixtures + scripted scaffold assertions). Additive and plugin-side only — no migration needed.
 
 `v0.6.0` — **Stage 1 grilling.** A new `espalier-grill` skill interrogates the Stage 1 input before any code is written — adaptive sequential questioning that scores ambiguity signals and resolves them into `requirements.md`, in `spec` mode for `/espalier` and `diagnosis` mode for `/espalier-fix`. On by default, `--no-grill` to skip, auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and interactive-only — non-breaking. New `migrate-v0.5-to-v0.6.sh` and an `eval/grill/` harness.
 
