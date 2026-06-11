@@ -277,6 +277,8 @@ Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 - `espalier/wiki/critical-paths.md`           ← DISCOVERY.critical_paths (scout 1.9)
 - `espalier/wiki/external-services.md`        ← DISCOVERY.external_services (scout 1.10)
 
+Greenfield runs only (repo came through Phase −1 → `references/greenfield.md`) add two more wiki files — `espalier/wiki/product-brief.md` + `espalier/wiki/stack-decisions.md` — from the grill answers and stack-resolution record (stubs in `references/wiki-templates.md`, greenfield section).
+
 **Hooks with placeholders** (2 files):
 - `espalier/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks
 - `espalier/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-${LANG}.sh`, rewrite `case` block from DISCOVERY.layers. If LANG ∉ {ts,py,go}, emit a no-op script (`#!/bin/bash\nexit 0`).
