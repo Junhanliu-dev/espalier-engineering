@@ -178,10 +178,16 @@ that defeats "discover, don't prescribe."
 1. Present the full plan in plain text: stack + why (tied to brief answers),
    scaffolder command(s), prod add-ons, persistence, deploy target + CI
    provider, test tooling, release shape. One block, scannable.
-2. **Confirm before running** — the scaffolder writes into `.`. Surface that
-   many scaffolders refuse a non-empty directory (`.git`/README usually
-   fine; if the scaffolder balks, scaffold into a temp dir and move contents
-   in, preserving `.git`).
+2. **Confirm before running** — the scaffolder writes into `.`. Many
+   scaffolders refuse a non-empty directory when run non-interactively
+   (create-vite cancels even over just README + a log file). If the
+   scaffolder balks, use the **temp-dir fallback**: scaffold into a temp
+   dir, copy contents in, preserve `.git`. Two traps verified in sandbox
+   testing:
+   - the copy CLOBBERS same-named files — save the user's README (and any
+     other pre-existing file) first, restore or merge after;
+   - the manifest inherits the temp dir's name — fix `package.json`
+     `name` (or the equivalent) to the real project name after the move.
 3. Run, in order: scaffolder → prod add-ons → persistence wiring (compose
    dev db + migrations where the track calls for it) → deploy-ready config
    (Dockerfile where applicable, CI workflow incl. deploy stage,
