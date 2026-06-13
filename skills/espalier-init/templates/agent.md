@@ -23,6 +23,7 @@ following the Espalier structure below.
 | Wiki | espalier/wiki/ | Business context | On demand |
 | Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
 | Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator (5-stage) | Via /espalier-fix |
+| Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting

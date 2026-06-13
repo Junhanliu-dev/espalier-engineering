@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.6.0 — Stage 1 grilling.** Before any code is written, `/espalier` and `/espalier-fix` now interrogate the Stage 1 input — scoring concrete ambiguity signals in a requirement (or a bug diagnosis) and asking only as many questions as its vagueness warrants, with the answers landing in `requirements.md`. On by default; `--no-grill` to skip; auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and non-breaking.
+> **v0.7.0 — read-only ask lane.** New `/espalier-ask <question>` answers "how does X work / where is Y / why is Z built this way / what changed recently" from your `espalier/` wiki, rules, and change history first — verified against the actual code — falling back to a codebase search when the docs are silent. Read-only: it never edits a doc. As byproducts it opportunistically flags a stale wiki it caught mid-answer, and logs a question the docs couldn't answer as a wiki gap. Purely additive — no pipeline change.
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.5→v0.6) in order. See [`docs/migrating-v0.5-to-v0.6.md`](./docs/migrating-v0.5-to-v0.6.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.6→v0.7) in order. See [`docs/migrating-v0.6-to-v0.7.md`](./docs/migrating-v0.6-to-v0.7.md).
 
 ---
 
@@ -33,7 +33,7 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 ```
 espalier/
 ├── rules/                  # always-loaded: engineering structure, coding standards, dev process
-├── skills/                 # phase-loaded: coding, review, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor
+├── skills/                 # phase-loaded: coding, review, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask
 ├── agents/                 # delegated: harness-coder, harness-reviewer (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
 ├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
@@ -68,9 +68,15 @@ For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link disc
 
 Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link. Stage 1 grilling (v0.6.0) runs here too, in `diagnosis` mode: it pressure-tests the bug's *root cause* and reproduction before any fix is coded, so the lane isn't patching a symptom on an unconfirmed theory.
 
+### `/espalier-ask <question>` — read-only Q&A (v0.7.0)
+
+For "how does X work", "where is Y handled", "why is Z built this way", "what changed recently in X". Instead of exploring the codebase from scratch, it reads your `espalier/` docs first — the wiki for *how/where*, the change history (`requirements.md`, `review-record.md`) for *why* — then **verifies every doc claim against the actual code** before answering, and falls back to a codebase search when the docs come up short. Every claim is sourced (doc path and/or `file:line`).
+
+It is strictly read-only and not a pipeline lane — no stages, no gates, no `changes/` folder. Its only writes are two notify-only sidecars: if a doc it read contradicts the code, it flags that doc stale (the same signal `/espalier-doctor` produces) and points you at `/espalier-prune`; if the docs couldn't answer at all, it logs the question to `espalier/.ask-gaps.tsv` (git-tracked) as evidence of what the wiki should cover next.
+
 ### Keeping the guardrails in sync
 
-The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, Espalier keeps them honest (since v0.5.0): a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
+The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, Espalier keeps them honest (since v0.5.0): a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. `/espalier-ask` (v0.7.0) chips in opportunistically — a stale doc it trips over while answering a question gets flagged the same way, and a question the docs can't answer is logged to `espalier/.ask-gaps.tsv` as a wiki-gap backlog. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
 
 ## Install
 
@@ -122,7 +128,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~10 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, CI, unwritten rules, layer specs), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 28 validation checks.
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 29 validation checks.
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -140,7 +146,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (28 checks, no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (29 checks, no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 
@@ -218,6 +224,7 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 | `/espalier-fix <bug>` (5-stage lane) | LIGHT-MEDIUM |
 | `/espalier-prune <path>` (refresh a stale artifact) | LIGHT — one scout per file + a gated diff |
 | `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
+| `/espalier-ask <question>` (read-only Q&A) | LIGHT — reads a few docs + verifies against code; no sub-agents |
 | `/espalier-migrate` | LIGHT — script-driven, low LLM usage |
 | Re-run `/espalier-init` (already bootstrapped) | TRIVIAL — validate-only, ~few K tokens |
 
@@ -249,6 +256,8 @@ Five guiding principles:
 MIT — see [LICENSE](./LICENSE).
 
 ## Status
+
+`v0.7.0` — **read-only ask lane.** A new `espalier-ask` skill answers questions about the codebase from the `espalier/` wiki, rules, and change history first — classifying the question (where/how/why/what-changed), verifying every doc claim against the actual code, and falling back to a codebase search when the docs are silent. Read-only: it never edits a doc. Two notify-only byproducts — it flags a stale wiki it caught mid-answer (the `/espalier-doctor` signal) and logs an unanswerable question to a git-tracked `espalier/.ask-gaps.tsv` wiki-gap backlog. Purely additive — no pipeline change. New `migrate-v0.6-to-v0.7.sh` and an `eval/ask/` harness.
 
 `v0.6.0` — **Stage 1 grilling.** A new `espalier-grill` skill interrogates the Stage 1 input before any code is written — adaptive sequential questioning that scores ambiguity signals and resolves them into `requirements.md`, in `spec` mode for `/espalier` and `diagnosis` mode for `/espalier-fix`. On by default, `--no-grill` to skip, auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and interactive-only — non-breaking. New `migrate-v0.5-to-v0.6.sh` and an `eval/grill/` harness.
 
