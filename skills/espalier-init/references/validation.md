@@ -1,6 +1,6 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 28 checks: 27 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override. The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 29 checks: 28 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override. The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
 
 After all generation and wiring is complete, validate end-to-end.
 
@@ -36,6 +36,7 @@ After all generation and wiring is complete, validate end-to-end.
 | 26 | Drift-state TSV structural | `[ ! -s espalier/.drift-state.tsv ] \|\| awk -F'\t' 'NF != 4 { exit 1 }' espalier/.drift-state.tsv` | Exit 0 (absent/empty allowed; every row has 4 tab-separated fields) |
 | 27 | Conventions TSV structural | `[ ! -s espalier/.conventions.tsv ] \|\| awk -F'\t' 'NF != 5 && NF != 6 { exit 1 }' espalier/.conventions.tsv` | Exit 0 (absent/empty allowed; every row has 5 or 6 tab-separated fields) |
 | 28 | Doctor cadence valid | `[ ! -f espalier/.doctor-cadence ] \|\| grep -qE '^cadence: (every-change\|weekly\|monthly\|manual)$' espalier/.doctor-cadence` | Exit 0 (absent allowed; if present, `cadence:` is a known value) |
+| 29 | espalier-ask skill present | `test -f .claude/skills/espalier-ask/SKILL.md` | Symlink resolves to the read-only Q&A skill |
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

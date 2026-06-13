@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, and the v0.5.3 coder-agent patch you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), and v0.6→v0.7 (read-only /espalier-ask lane) you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to FIVE migrations may apply, always in this order:
+version. Up to SIX migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -35,12 +35,15 @@ version. Up to FIVE migrations may apply, always in this order:
 5. **v0.5.x → v0.6.0** — Stage 1 grilling: installs the `espalier-grill` skill,
    refreshes the four changed pipeline templates (which also date-prefix change
    folders). Mechanical: `scripts/migrate-v0.5-to-v0.6.sh`.
+6. **v0.6.x → v0.7.0** — read-only ask lane: installs the `espalier-ask` skill,
+   patches CLAUDE.md + `espalier/agent.md` to mention `/espalier-ask`. Purely
+   additive — no pipeline change. Mechanical: `scripts/migrate-v0.6-to-v0.7.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL FIVE; a v0.3.x
-install needs the last four; a v0.4.x install needs the last three; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then the v0.6 grill; a v0.5.3+
-install needs only the v0.6 grill.
+confirmation, apply in order. A v0.1.x install needs ALL SIX; a v0.3.x
+install needs the last five; a v0.4.x install needs the last four; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 then v0.7; a v0.5.3–v0.5.x
+install needs v0.6 then v0.7; a v0.6.x install needs only v0.7.
 
 ### Step 1: Preflight + detect install version
 
@@ -52,6 +55,7 @@ NEEDS_V03_V04=no
 NEEDS_V04_V05=no
 NEEDS_V05_PATCH=no
 NEEDS_V05_V06=no
+NEEDS_V06_V07=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -68,6 +72,7 @@ if [ -d "harness" ]; then
   NEEDS_V04_V05=yes          # ...then the doc-drift upgrade
   NEEDS_V05_PATCH=yes        # ...then the v0.5.3 coder-agent patch
   NEEDS_V05_V06=yes          # ...then the v0.6 Stage 1 grill
+  NEEDS_V06_V07=yes          # ...then the v0.7 ask lane
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -84,11 +89,17 @@ elif [ -d "espalier" ]; then
      || ! grep -q "Grill the requirement" espalier/skills/espalier-requirements/SKILL.md 2>/dev/null; then
     NEEDS_V05_V06=yes
   fi
+  # v0.7.0: the espalier-ask skill is new. Its absence signals a pre-v0.7
+  # install (independent of grill — migrations run in order, so v0.6 installs
+  # grill before v0.7 installs ask).
+  if [ ! -f "espalier/skills/espalier-ask/SKILL.md" ]; then
+    NEEDS_V06_V07=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V04_V05" = no ] && [ "$NEEDS_V05_PATCH" = no ] \
-   && [ "$NEEDS_V05_V06" = no ]; then
+   && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -109,7 +120,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.5-to-v0.6.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.6-to-v0.7.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -118,7 +129,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/SBM_Projects/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.5-to-v0.6.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.6-to-v0.7.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -134,7 +145,7 @@ fi
 ```
 
 If the primary path misses and the fallback fires, the plugin install is
-likely stale (no `migrate-v0.5-to-v0.6.sh`) — tell the user to
+likely stale (no `migrate-v0.6-to-v0.7.sh`) — tell the user to
 `/plugin update espalier-engineering` first.
 
 ### Step 3: Show dry-run preview for each applicable migration
@@ -148,6 +159,7 @@ verbatim:
 [ "$NEEDS_V04_V05" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.4-to-v0.5.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V05_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5.2-to-v0.5.3.sh" --dry-run
 [ "$NEEDS_V05_V06" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5-to-v0.6.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
@@ -192,6 +204,7 @@ completed.
 [ "$NEEDS_V04_V05" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.4-to-v0.5.sh" --yes --plugin-dir="$PLUGIN_DIR" --doctor-cadence="$DOCTOR_CADENCE"
 [ "$NEEDS_V05_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5.2-to-v0.5.3.sh" --yes
 [ "$NEEDS_V05_V06" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5-to-v0.6.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -274,6 +287,21 @@ Backs up any customised pipeline skill on diff (`<file>.pre-v0.6.bak`), then
 `bootstrap --force` installs the `espalier-grill` skill and refreshes the four
 changed pipeline templates (which also date-prefix new change folders).
 Idempotent — re-running detects an already-v0.6 install and no-ops.
+
+**v0.6→v0.7 (`migrate-v0.6-to-v0.7.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up any customised pure-copy pipeline file on diff (`<file>.pre-v0.7.bak`),
+then `bootstrap --force` installs the `espalier-ask` skill and symlinks it.
+Also patches CLAUDE.md + `espalier/agent.md` to mention `/espalier-ask` (the
+bootstrap CLAUDE.md writer is append-once and never touches agent.md).
+Purely additive — no pipeline change. Idempotent — re-running detects an
+already-v0.7 install and no-ops.
 
 ## Anti-Patterns
 

@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.6.0</span>
+      <span class="nav-pill">v0.7.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1146,7 +1146,7 @@ footer {
       <div class="hero-text">
         <div class="eyebrow">
           <span class="eyebrow-dot"></span>
-          v0.6.0 — Stage 1 grilling
+          v0.7.0 — read-only ask lane
         </div>
         <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
         <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
@@ -1519,7 +1519,7 @@ footer {
       <div class="tree">
         <div class="tree-root">espalier/</div>
 <span class="tree-row" data-key="rules">├── rules/                  <span class="gloss"># engineering structure, coding standards</span></span>
-<span class="tree-row" data-key="skills">├── skills/                 <span class="gloss"># coding, review, testing, /espalier-fix, /espalier-prune…</span></span>
+<span class="tree-row" data-key="skills">├── skills/                 <span class="gloss"># coding, review, testing, /espalier-fix, /espalier-prune, /espalier-ask…</span></span>
 <span class="tree-row" data-key="agents">├── agents/                 <span class="gloss"># harness-coder, harness-reviewer</span></span>
 <span class="tree-row" data-key="wiki">├── wiki/                   <span class="gloss"># architecture, data models, critical paths</span></span>
 <span class="tree-row" data-key="hooks">├── hooks/                  <span class="gloss"># layer boundary, pre-push, post-merge drift</span></span>
@@ -1707,11 +1707,62 @@ footer {
   </div>
 </section>
 
+<!-- ──────────────── ASK (v0.7.0) ──────────────── -->
+<section class="standard" id="ask">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">06</span>
+      <span>v0.7.0 · read-only ask lane</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Ask the codebase. Answered from your docs, checked against the code.</h2>
+      <p class="intro"><code style="font-family:var(--f-mono);color:var(--vine)">/espalier-ask &lt;question&gt;</code> answers "how does this work / where is it / why is it built this way / what changed recently" — reading the <code style="font-family:var(--f-mono);color:var(--vine)">espalier/</code> docs you already paid to build, instead of crawling the whole codebase from scratch every time.</p>
+    </div>
+
+    <div class="drift-grid">
+      <div class="drift-flow">
+        <div class="drift-step">
+          <div class="drift-step-num">i</div>
+          <div class="drift-step-body"><strong>classify</strong> — where / how / why / what-changed, so the question hits the right source: the wiki for <em>how/where</em>, the change history for <em>why</em>.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">ii</div>
+          <div class="drift-step-body"><strong>read the docs first</strong> — wiki, rules, and <code style="font-family:var(--f-mono);color:var(--vine)">changes/</code> records, before any from-scratch codebase search.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iii</div>
+          <div class="drift-step-body"><strong>verify against code</strong> — every doc claim is confirmed by reading the cited file before it lands in the answer. The wiki is the map; the code is the truth.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iv</div>
+          <div class="drift-step-body"><strong>answer with sources</strong> — doc path and <code style="font-family:var(--f-mono);color:var(--vine)">file:line</code> on every claim; fall back to a code search when the docs come up short.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="drift-note">
+          Strictly read-only — never edits a doc, never opens a <code style="font-family:var(--f-mono);color:var(--vine)">changes/</code> folder. No stages, no gates.
+        </div>
+        <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          Two notify-only byproducts: a stale wiki it trips over while answering gets <span style="color:var(--paper)">flagged</span> (the same signal <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-doctor</code> produces, pointing you at <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-prune</code>), and a question the docs can't answer is logged to a git-tracked <code style="font-family:var(--f-mono);color:var(--vine)">.ask-gaps.tsv</code> — a backlog of what the wiki should cover next.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.6 → v0.7) in order.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Purely additive — no pipeline change. <span style="color:var(--paper)">Non-breaking.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ──────────────── GRILL (v0.6.0) ──────────────── -->
 <section class="standard" id="grill">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">06</span>
+      <span class="plate-num">07</span>
       <span>v0.6.0 · Stage 1 grilling</span>
       <span class="plate-line"></span>
     </div>
@@ -1762,7 +1813,7 @@ footer {
 <section class="standard" id="drift">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">07</span>
+      <span class="plate-num">08</span>
       <span>v0.5.0 · doc-drift detection</span>
       <span class="plate-line"></span>
     </div>
@@ -1814,7 +1865,7 @@ footer {
 <section class="standard" id="cost">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">08</span>
+      <span class="plate-num">09</span>
       <span>Cost, honestly</span>
       <span class="plate-line"></span>
     </div>
@@ -1887,7 +1938,7 @@ footer {
 <section class="standard" id="philosophy">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">09</span>
+      <span class="plate-num">10</span>
       <span>Philosophy</span>
       <span class="plate-line"></span>
     </div>
@@ -1935,7 +1986,7 @@ footer {
 <section class="standard" id="install">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">10</span>
+      <span class="plate-num">11</span>
       <span>Install</span>
       <span class="plate-line"></span>
     </div>
@@ -2039,7 +2090,7 @@ footer {
     </div>
     <div class="footer-bottom">
       <div>© 2026 · Espalier Engineering</div>
-      <div>v0.6.0 — Stage 1 grill + dated change folders</div>
+      <div>v0.7.0 — read-only /espalier-ask lane</div>
     </div>
   </div>
 </footer>
@@ -2402,7 +2453,7 @@ const treeData = {
   skills: {
     kind: 'Phase-loaded',
     name: 'espalier/skills/',
-    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
+    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
     loaded: 'Loaded per pipeline phase'
   },
   agents: {

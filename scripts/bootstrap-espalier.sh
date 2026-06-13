@@ -20,7 +20,7 @@
 #   - Merges .claude/settings.json hooks (Appendix A algorithm).
 #   - Persists squash-merge decision + installs the post-merge dispatcher.
 #   - Appends .gitignore entries for the commit-index + drift sidecars.
-#   - Runs 28 validation checks (R6).
+#   - Runs 29 validation checks (R6).
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -43,7 +43,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (28-check validation).
+#   --validate-only          Only Stage 11 (29-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -244,6 +244,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-fix"
   run "mkdir -p espalier/skills/espalier-prune"
   run "mkdir -p espalier/skills/espalier-doctor"
+  run "mkdir -p espalier/skills/espalier-ask"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/hooks"
   run "mkdir -p espalier/wiki"
@@ -269,6 +270,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-grill.md' espalier/skills/espalier-grill/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-prune.md' espalier/skills/espalier-prune/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-doctor.md' espalier/skills/espalier-doctor/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-ask.md' espalier/skills/espalier-ask/SKILL.md"
 }
 
 # --- Stage 4: Hooks (non-substitution subset) + chmod-glob (R10) ------------
@@ -308,7 +310,7 @@ stage_symlinks() {
   safe_ln "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
   safe_ln "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
   safe_ln "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
-  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor; do
+  for s in espalier-coding espalier-review espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask; do
     safe_ln "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
   done
   # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
@@ -364,6 +366,8 @@ This project uses Espalier for AI code quality — auto-discovered, project-spec
 **For any implementation work**, use `/espalier <requirement>` to execute the full pipeline.
 
 **For bug fixes**, use `/espalier-fix <bug>` for the slim 5-stage lane.
+
+**For questions** ("how does X work", "where is Y"), use `/espalier-ask <question>` — read-only, answers from espalier/ docs first.
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
@@ -641,9 +645,9 @@ stage_gitignore() {
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  log "Stage 11: validation (28 checks — R6)"
+  log "Stage 11: validation (29 checks — R6)"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] would run 28 validation checks (skipped — nothing to validate yet)"
+    echo "[dry-run] would run 29 validation checks (skipped — nothing to validate yet)"
     return 0
   fi
 
@@ -659,11 +663,11 @@ stage_validate() {
     # like $name leaking into outer scope), (b) `exit` inside cmd killing
     # the run_check function.
     if ( eval "$cmd" ) >/dev/null 2>&1; then
-      echo "[$n/28] OK   $check_name" > "$tmpdir/$idx"
+      echo "[$n/29] OK   $check_name" > "$tmpdir/$idx"
     else
       local err
       err=$( ( eval "$cmd" ) 2>&1 | head -1 )
-      echo "[$n/28] FAIL $check_name: $err" > "$tmpdir/$idx"
+      echo "[$n/29] FAIL $check_name: $err" > "$tmpdir/$idx"
       echo "fail" > "$tmpdir/$idx.fail"
     fi
   }
@@ -671,7 +675,7 @@ stage_validate() {
   # Check #25 — invoked DIRECTLY (not via run_check): the run_check harness
   # discards stdout, which would swallow #25's per-tier table.
   run_check_25() {
-    [ -f espalier/.drift-state.tsv ] || { echo "[25/28] OK   stale-tiers: no drift"; return 0; }
+    [ -f espalier/.drift-state.tsv ] || { echo "[25/29] OK   stale-tiers: no drift"; return 0; }
     local NOW; NOW=$(date -u +%s)
     local fresh=0 aging=0 stale=0 critical=0 expired=0
     while IFS=$'\t' read -r FILE SHA FIRST_SEEN REASON; do
@@ -691,7 +695,7 @@ stage_validate() {
       else expired=$((expired+1));                           echo "  [expired]  ${AGE}d  $FILE"
       fi
     done < espalier/.drift-state.tsv
-    echo "[25/28] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
+    echo "[25/29] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
     [ "$critical" -gt 0 ] && echo "  WARN: $critical artifact(s) 60-90d stale"
     if [ "$expired" -gt 0 ]; then
       if [ "${IGNORE_DRIFT:-no}" = "yes" ]; then
@@ -709,7 +713,7 @@ stage_validate() {
   }
 
   run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix' &
+  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-ask' &
   run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md' &
   run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
   run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
@@ -735,23 +739,24 @@ stage_validate() {
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
   run_check 27 "conventions-format"  '[ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv' &
   run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
+  run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-28.
+  # must reach stdout, which the run_check harness discards), then 26-29.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-8] 2>/dev/null
+  cat "$tmpdir"/2[6-9] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"
 
   if [ "$failed" -gt 0 ]; then
-    log "Validation: $failed/28 FAILED"
+    log "Validation: $failed/29 FAILED"
     return 1
   fi
-  log "Validation: 28/28 passed"
+  log "Validation: 29/29 passed"
   return 0
 }
 

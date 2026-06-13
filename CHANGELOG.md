@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 — 2026-06-13
+
+Minor: **read-only `/espalier-ask` lane** — answer questions about the codebase from the `espalier/` docs first, verified against the code. Purely additive; no pipeline change.
+
+- **`skills/espalier-init/templates/skills/espalier-ask.md`** — new `espalier-ask` skill. Answers "how / where / why / what-changed" questions by classifying the question, reading the `espalier/` docs that bear on it (wiki for *how/where*, `changes/*/requirements.md` + `review-record.md` for *why*), verifying every doc-sourced claim against the cited code before asserting it, and falling back to a from-scratch codebase search when the docs are silent. Every claim is sourced (doc path and/or `file:line`). Strictly read-only — it is not a pipeline lane (no stages, gates, or `changes/` folder) and never edits a doc. Two notify-only byproducts: a wiki it reads that contradicts the code is flagged via the existing `mark_stale` drift sidecar (reason `ask-verify: …`, pointing the user at `/espalier-prune`), and a question the docs cannot answer is appended to a git-tracked `espalier/.ask-gaps.tsv` as a wiki-gap backlog. Degrades gracefully — missing wiki/`changes/` or no `espalier/` dir at all → answer from code, write nothing, never crash.
+- **`scripts/bootstrap-espalier.sh`** — Stage 2 makes `espalier/skills/espalier-ask/`, Stage 3 copies the SKILL.md, Stage 5 symlinks `.claude/skills/espalier-ask`, Stage 7's `CLAUDE.md` block gains a `/espalier-ask` line, and Stage 11 adds validation check 29 (`espalier-ask-skill`) plus the skill in check 2's load list — the validation total moves 28 → 29.
+- **`skills/espalier-init/templates/agent.md`** — the config-index table gains an `Ask` row (`Via /espalier-ask`).
+- **`scripts/migrate-v0.6-to-v0.7.sh`** — idempotent target-repo upgrade. Backs up any customised pure-copy pipeline file on diff (`<file>.pre-v0.7.bak`) since `bootstrap --force` re-copies them all, runs `bootstrap --force` to install + wire the skill, then patches `CLAUDE.md` and `espalier/agent.md` to mention `/espalier-ask` (bootstrap's `CLAUDE.md` writer is append-once and never touches the per-project `agent.md`). `--dry-run` / `--yes` / `--plugin-dir=` flags.
+- **`skills/espalier-migrate/SKILL.md`** — the auto-detect chain gains the v0.6 → v0.7 step (a sixth migration; `espalier-ask` skill absent ⇒ needed). Also fixes a stale `description` that had never been updated past the v0.5.3 patch.
+- **`eval/ask/`** — eval harness for the skill: fixtures across five buckets (classify, docs-first, drift, gap, no-install), a two-gate rubric (deterministic sidecar/behaviour assertions + an LLM answer-quality judge), and `run.sh`, which materializes a temp git repo per fixture before running the skill.
+
+`/espalier-ask` is read-only and additive — non-breaking for every existing install and unattended runs. See [docs/migrating-v0.6-to-v0.7.md](./docs/migrating-v0.6-to-v0.7.md).
+
 ## 0.6.0 — 2026-06-02
 
 Minor: **Stage 1 grilling** — the pipeline now interrogates a requirement or a bug diagnosis before any code is written. Plus chronologically-sortable change folders.
