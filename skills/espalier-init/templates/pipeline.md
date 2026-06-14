@@ -7,7 +7,6 @@
 - **Load:** Read espalier/skills/espalier-requirements/SKILL.md (which invokes espalier-grill)
 - **Execute:** Main agent produces the requirements doc; `espalier-grill` interrogates it (adaptive depth) unless `--no-grill` was passed
 - **Gate:** Requirements doc exists with acceptance criteria (≥ 2 criteria)
-- **Human checkpoint:** Confirm understanding before proceeding
 - **Output:** espalier/changes/{slug}/requirements.md
 
 ### 2. Requirements Review
@@ -16,6 +15,9 @@
 - **Execute:** Main agent reviews the requirements doc
 - **Gate:** No P0/P1 findings remaining
 - **Limit:** Max 3 review rounds → escalate to human
+- **Human checkpoint (BLOCKING):** user approves `requirements.md` before ANY
+  coding. Stage 3 does not start on a Stage 2 PASS alone — see the espalier
+  skill → "Requirements Approval Gate". Auto-approved only on a no-TTY run.
 - **Output:** espalier/changes/{slug}/review-record.md (append)
 
 ### 3. Coding Implementation

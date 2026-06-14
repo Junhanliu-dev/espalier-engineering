@@ -468,6 +468,37 @@ and `## Reproduction` sections. Record its verdict for pipeline-state.md.
 
 **Escalation Gate (Stage 1):** see "Escalation Gates" section below.
 
+## Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
+
+MANDATORY. After Stage 1 writes `requirements.md` and the diagnosis grill
+resolves the root cause, STOP. Do NOT chain straight into Stage 3 coding — that
+is the bug this gate closes. No code has been written yet; get explicit user
+sign-off first.
+
+**Order:** run the Stage 1 Escalation Gate FIRST (it may migrate the fix to the
+feat lane). Only if the fix stays in-lane does this approval gate fire.
+
+1. Present a concise summary: the one-line bug, confirmed root cause (file:line),
+   reproduction, and acceptance criteria.
+2. Ask with `AskUserQuestion`:
+
+   ```
+   Bug diagnosed and requirements written. Nothing has been coded yet.
+   Approve to start Stage 3 (Coding)?
+
+   Options:
+     1. Approve — proceed to the fix.
+     2. Edit    — tell me what to change; I revise requirements.md and re-ask.
+     3. Abort   — stop here; leave requirements.md as a draft (Status: ABORTED).
+   ```
+
+3. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
+   **Abort**, write Status: ABORTED and stop.
+
+**Non-interactive exception:** on a no-TTY run (same condition that auto-skips
+the grill), auto-approve and record it in the Stage History. Interactive runs
+ALWAYS prompt.
+
 ## Stage 3: Coding
 
 Spawn sub-agent. Prompt:
