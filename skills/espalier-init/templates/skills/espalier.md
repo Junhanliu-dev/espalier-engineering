@@ -123,9 +123,46 @@ For each stage:
 5. **Verify gate:** Check the quality gate
 6. **Record:** Append result to pipeline-state.md
 7. **Decision:**
-   - PASS → advance to next stage
+   - PASS → advance to next stage (EXCEPT the Stage 2 → Stage 3 transition: the
+     **Requirements Approval Gate** below must pass first — a Stage 2 PASS alone
+     does NOT authorize coding)
    - FAIL → follow rollback path
    - HUMAN → pause and ask user (use AskUserQuestion tool)
+
+### Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
+
+MANDATORY. Must NOT be skipped on a PASS. Stages 1 (requirements written +
+grilled) and 2 (requirements review) finish WITHOUT writing any code. Do NOT
+chain Stage 1 → 2 → 3 automatically — that is the bug this gate closes. After
+Stage 2's gate passes (no P0/P1 reqs findings), HALT and get explicit user
+sign-off on `requirements.md` before Stage 3.
+
+1. Present a concise summary of the final `requirements.md`: the one-line goal,
+   the acceptance criteria, and anything the Stage 1 grill resolved or marked
+   out-of-scope.
+2. Ask with `AskUserQuestion`:
+
+   ```
+   Requirements are written and reviewed. Nothing has been coded yet.
+   Approve to start Stage 3 (Coding)?
+
+   Options:
+     1. Approve — proceed to coding.
+     2. Edit    — tell me what to change; I revise requirements.md and re-ask.
+     3. Abort   — stop here; leave requirements.md as a draft (Status: ABORTED).
+   ```
+
+3. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
+   per the feedback, re-run the Stage 2 gate, and re-present this gate. On
+   **Abort**, write Status: ABORTED to pipeline-state.md and stop.
+
+**Non-interactive exception:** on a no-TTY run (same condition that auto-skips
+the Stage 1 grill), this gate cannot prompt — record `requirements auto-approved
+(non-interactive)` in the Stage History and proceed. Interactive runs ALWAYS
+prompt.
+
+Record the outcome in pipeline-state.md Stage History (e.g.
+`| 2 | PASSED | … | Requirements approved by user |`).
 
 ### Sub-Agent Delegation
 

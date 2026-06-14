@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 — 2026-06-15
+
+Minor: **requirements approval gate** — both pipelines now STOP after the requirement is written and reviewed, and wait for explicit user sign-off before any code is written. Previously Stage 1 → Stage 2 → Stage 3 chained automatically, so coding began the moment the requirement doc existed.
+
+- **`skills/espalier-init/templates/skills/espalier.md`** — new **Requirements Approval Gate** (BLOCKING) between Stage 2 (requirements review) and Stage 3 (coding). After Stage 2's gate passes, the orchestrator presents the final `requirements.md` (goal, acceptance criteria, what the Stage 1 grill resolved/scoped-out) and asks via `AskUserQuestion` → Approve / Edit / Abort. Coding starts only on **Approve**; **Edit** revises the doc, re-runs the Stage 2 gate, and re-asks; **Abort** writes `Status: ABORTED`. The Stage Execution Protocol's `PASS → advance` rule now explicitly carves out the Stage 2 → Stage 3 transition so a Stage 2 PASS alone no longer authorizes coding.
+- **`skills/espalier-init/templates/skills/espalier-fix.md`** — same gate for the 5-stage fix lane, placed after Stage 1 (bug requirements + diagnosis grill) and before Stage 3. Runs *after* the Stage 1 escalation gate (escalation may migrate the fix to the feat lane first); only an in-lane fix reaches the approval gate.
+- **`skills/espalier-init/templates/pipeline.md`** — removed the weak Stage 1 "Confirm understanding" checkpoint (it never fired — Stage 1's gate passed silently and the orchestrator advanced). The blocking human checkpoint now sits on Stage 2, pointing at the espalier skill's Requirements Approval Gate.
+- **Non-interactive exception** — on a no-TTY run (the same condition that auto-skips the Stage 1 grill), the gate cannot prompt: it auto-approves and records `requirements auto-approved (non-interactive)` in the Stage History, so unattended pipelines never hang. Interactive runs ALWAYS prompt.
+- **`scripts/migrate-v0.7-to-v0.8.sh`** — idempotent target-repo upgrade. Backs up any customised pure-copy pipeline file on diff (`<file>.pre-v0.8.bak`) since `bootstrap --force` re-copies them all, then runs `bootstrap --force` to refresh the three changed templates (`pipeline.md`, `espalier`, `espalier-fix`) and verifies the gate text is present. `--dry-run` / `--yes` / `--plugin-dir=` flags.
+- **`skills/espalier-migrate/SKILL.md`** — the auto-detect chain gains the v0.7 → v0.8 step (a seventh migration; the approval-gate text absent from `espalier/skills/espalier/SKILL.md` ⇒ needed).
+
+The approval gate is interactive-only — non-breaking for unattended runs (auto-approve) and fresh installs. See [docs/migrating-v0.7-to-v0.8.md](./docs/migrating-v0.7-to-v0.8.md).
+
 ## 0.7.0 — 2026-06-13
 
 Minor: **read-only `/espalier-ask` lane** — answer questions about the codebase from the `espalier/` docs first, verified against the code. Purely additive; no pipeline change.

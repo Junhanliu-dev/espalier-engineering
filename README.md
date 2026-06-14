@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.7.0 — read-only ask lane.** New `/espalier-ask <question>` answers "how does X work / where is Y / why is Z built this way / what changed recently" from your `espalier/` wiki, rules, and change history first — verified against the actual code — falling back to a codebase search when the docs are silent. Read-only: it never edits a doc. As byproducts it opportunistically flags a stale wiki it caught mid-answer, and logs a question the docs couldn't answer as a wiki gap. Purely additive — no pipeline change.
+> **v0.8.0 — requirements approval gate.** Both pipelines now STOP after the requirement is written and reviewed, and wait for your explicit sign-off before any code is written (Approve / Edit / Abort). Previously Stage 1 → Stage 2 → Stage 3 chained automatically, so coding started the moment the requirement doc existed. Interactive-only — a no-TTY run auto-approves so unattended pipelines never hang. No new skill, no new stage; a refresh of the existing pipeline templates.
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.6→v0.7) in order. See [`docs/migrating-v0.6-to-v0.7.md`](./docs/migrating-v0.6-to-v0.7.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.6→v0.7→v0.8) in order. See [`docs/migrating-v0.7-to-v0.8.md`](./docs/migrating-v0.7-to-v0.8.md).
 
 ---
 
@@ -53,6 +53,8 @@ For features, refactors, and large fixes. Drives requirement → reqs review →
 
 **Stage 1 grilling** (v0.6.0): before any code is written, Stage 1 interrogates the requirement — counting concrete ambiguity signals (undefined terms, unstated actors, missing failure behaviour, unscoped edge cases) and asking only as many questions as the input's vagueness warrants. The resolved answers land in `requirements.md`, so later stages execute a spec they can't misread. On by default; skip an invocation with `--no-grill`, and auto-skipped on a non-interactive (no-TTY) run.
 
+**Requirements approval gate** (v0.8.0): after the requirement is written (Stage 1) and reviewed (Stage 2), the pipeline STOPS and waits for your explicit sign-off — Approve / Edit / Abort — before Stage 3 (coding) starts. A Stage 2 PASS no longer authorizes coding on its own. Interactive-only: a no-TTY run auto-approves so unattended pipelines never hang.
+
 Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so change dirs sort chronologically):
 
 | Prefix | Type | Output dir |
@@ -66,7 +68,7 @@ Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so
 
 For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link discovery** — the bug-fix gets linked back to the feature change that introduced it (via git blame + reverse-lookup cache + squash-merge mapping). The causing change's `pipeline-state.md` gains a `## Follow-up Fixes` row. Six months later, when someone wonders "why does this feature have 4 fixes against it", the audit trail is right there.
 
-Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link. Stage 1 grilling (v0.6.0) runs here too, in `diagnosis` mode: it pressure-tests the bug's *root cause* and reproduction before any fix is coded, so the lane isn't patching a symptom on an unconfirmed theory.
+Includes scope-creep escalation gates (predictive + reactive + test-scope + reviewer-flagged) — fix-lane work that exceeds its scope gets cleanly migrated to the full pipeline mid-flight without losing the causal link. Stage 1 grilling (v0.6.0) runs here too, in `diagnosis` mode: it pressure-tests the bug's *root cause* and reproduction before any fix is coded, so the lane isn't patching a symptom on an unconfirmed theory. The v0.8.0 requirements approval gate applies here as well — after the bug requirements + diagnosis are written, the lane stops for your sign-off before coding (it fires after the Stage 1 escalation gate, so only an in-lane fix reaches it).
 
 ### `/espalier-ask <question>` — read-only Q&A (v0.7.0)
 
@@ -257,6 +259,8 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Status
 
+`v0.8.0` — **requirements approval gate.** Both pipelines now stop after the requirement is written and reviewed and wait for explicit user sign-off (Approve / Edit / Abort) before any code is written — closing the old behaviour where Stage 1 → Stage 2 → Stage 3 chained automatically and coding began the moment the requirement doc existed. The full pipeline gates between Stage 2 (review) and Stage 3 (coding); the fix lane gates after Stage 1 (after its escalation gate). Interactive-only — a no-TTY run auto-approves so unattended pipelines never hang. No new skill or stage — a refresh of the three pipeline templates. New `migrate-v0.7-to-v0.8.sh`.
+
 `v0.7.0` — **read-only ask lane.** A new `espalier-ask` skill answers questions about the codebase from the `espalier/` wiki, rules, and change history first — classifying the question (where/how/why/what-changed), verifying every doc claim against the actual code, and falling back to a codebase search when the docs are silent. Read-only: it never edits a doc. Two notify-only byproducts — it flags a stale wiki it caught mid-answer (the `/espalier-doctor` signal) and logs an unanswerable question to a git-tracked `espalier/.ask-gaps.tsv` wiki-gap backlog. Purely additive — no pipeline change. New `migrate-v0.6-to-v0.7.sh` and an `eval/ask/` harness.
 
 `v0.6.0` — **Stage 1 grilling.** A new `espalier-grill` skill interrogates the Stage 1 input before any code is written — adaptive sequential questioning that scores ambiguity signals and resolves them into `requirements.md`, in `spec` mode for `/espalier` and `diagnosis` mode for `/espalier-fix`. On by default, `--no-grill` to skip, auto-skipped without a TTY. Change folders are now date-prefixed (`YYYY-MM-DD-<slug>`) so they sort chronologically. Additive and interactive-only — non-breaking. New `migrate-v0.5-to-v0.6.sh` and an `eval/grill/` harness.
@@ -269,7 +273,7 @@ MIT — see [LICENSE](./LICENSE).
 
 `v0.2.0` — bug-fix lane (`/harness-fix`), typed `harness/changes/{type}/{slug}/` layout, causal back-links between fixes and the changes that introduced them, escalation paths (including late-stage), squash-merge resilience with optional post-merge hook, and self-healing reverse-lookup cache.
 
-See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.5-to-v0.6.md](./docs/migrating-v0.5-to-v0.6.md) for the v0.6 Stage 1 grill upgrade, [docs/migrating-v0.4-to-v0.5.md](./docs/migrating-v0.4-to-v0.5.md) for the v0.5 doc-drift upgrade, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
+See [CHANGELOG.md](./CHANGELOG.md) for full release notes, [docs/migrating-v0.7-to-v0.8.md](./docs/migrating-v0.7-to-v0.8.md) for the v0.8 requirements approval gate upgrade, [docs/migrating-v0.6-to-v0.7.md](./docs/migrating-v0.6-to-v0.7.md) for the v0.7 read-only ask lane, [docs/migrating-v0.5-to-v0.6.md](./docs/migrating-v0.5-to-v0.6.md) for the v0.6 Stage 1 grill upgrade, [docs/migrating-v0.4-to-v0.5.md](./docs/migrating-v0.4-to-v0.5.md) for the v0.5 doc-drift upgrade, [docs/migrating-v0.3-to-v0.4.md](./docs/migrating-v0.3-to-v0.4.md) for the v0.4 rebrand migration, and [docs/migrating-v0.1-to-v0.2.md](./docs/migrating-v0.1-to-v0.2.md) for the older typed-changes migration.
 
 Schema and templates may still change. Please file issues with the Espalier output you'd expect to see for your stack.
 
