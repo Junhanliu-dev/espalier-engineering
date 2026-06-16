@@ -4,7 +4,7 @@ mode: spec
 expected_tier: full
 expected_signals: 6
 planted_ambiguities:
-  - "faster" has no target metric or baseline
+  - '"faster" has no target metric or baseline'
   - which dashboard (multiple exist)
   - which "errors" are in scope
   - what improved "better" error handling means concretely
