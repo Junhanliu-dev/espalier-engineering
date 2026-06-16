@@ -6,7 +6,7 @@ expected_signals: 6
 planted_ambiguities:
   - no anchor — no file, line, or stack trace
   - no reproduction steps
-  - "broken" — the actual symptom is undefined
+  - '"broken" — the actual symptom is undefined'
   - no root cause proposed or confirmed
   - the expected behaviour is not stated
   - which step of checkout (cart, payment, confirmation)

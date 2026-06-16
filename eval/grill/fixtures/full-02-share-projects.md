@@ -8,7 +8,7 @@ planted_ambiguities:
   - what permissions the recipient gets (view, edit)
   - whether sharing can be revoked
   - whether the recipient is notified
-  - "share" is undefined — a copy vs live shared access
+  - '"share" is undefined — a copy vs live shared access'
   - edge case — a shared-with user is later deleted
   - edge case — the project owner is later deleted
 answer_script:
