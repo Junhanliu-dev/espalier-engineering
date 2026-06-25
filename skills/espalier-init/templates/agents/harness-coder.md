@@ -83,3 +83,35 @@ Shell-splicing is banned because it:
 For a structural change `Edit` cannot express cleanly, use a real codemod for
 the language (e.g. ts-morph / jscodeshift for TS/JS) — not a hand-rolled
 string splice.
+
+## Change Impact Analysis (do this BEFORE writing code)
+
+Most avoidable rework comes from changing a value's *happy path* while ignoring
+the other surfaces that read or constrain the same thing. Before coding, map the
+blast radius of the change:
+
+1. **Enumerate every surface that produces, reads, validates, or persists what
+   you are changing — not just the one call path in front of you.** Depending on
+   the stack, these include: admin / CRUD / back-office UIs, API request
+   validation, client-side forms and their validators, data already persisted in
+   storage, event / queue consumers, and other callers of the function or field.
+   The layer spec and `engineering-structure.md` tell you which surfaces exist in
+   THIS project — let them, not assumption, define the list.
+2. **A value that becomes system-derived must stop being user-required —
+   everywhere.** When you make a field auto-generated, defaulted, or computed, any
+   "required" / "must not be empty" constraint that used to force a human to
+   supply it now fights the generator. Server-side generation can satisfy the API
+   path while a UI- or client-level required check still blocks the user *before*
+   your code runs. Relax the constraint on every surface, not just the one you
+   exercised.
+3. **When you mirror an existing working element, copy its WHOLE configuration,
+   not one attribute.** If a sibling field / route / handler already does what you
+   want and works, replicate its full shape — validation flags, visibility / UI
+   settings, access rules, everything — not just the one hook or line you came
+   for. Copying half a working pattern ships half a working feature.
+4. **Record the blast radius.** Note any non-obvious surface you touched (or
+   deliberately did not) in coding-report.md "Notes", so the reviewer can confirm
+   it rather than re-derive it.
+
+The goal is to surface a cross-surface impact at coding time, not discover it as
+a fix round after the change ships.
