@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.7.0</span>
+      <span class="nav-pill">v0.8.1</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1146,7 +1146,7 @@ footer {
       <div class="hero-text">
         <div class="eyebrow">
           <span class="eyebrow-dot"></span>
-          v0.7.0 — read-only ask lane
+          v0.8.0 — requirements approval gate
         </div>
         <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
         <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
@@ -1707,11 +1707,62 @@ footer {
   </div>
 </section>
 
+<!-- ──────────────── APPROVAL GATE (v0.8.0) ──────────────── -->
+<section class="standard" id="approval">
+  <div class="wrap">
+    <div class="plate">
+      <span class="plate-num">06</span>
+      <span>v0.8.0 · requirements approval gate</span>
+      <span class="plate-line"></span>
+    </div>
+    <div class="section-head">
+      <h2>Sign off the requirement before a line of code is written.</h2>
+      <p class="intro">Stage 1 → Stage 2 → Stage 3 used to chain automatically — coding began the moment the requirement doc existed. Now both pipelines <span style="color:var(--paper)">stop</span> after the requirement is written and reviewed, and wait for your explicit go-ahead. A Stage 2 PASS no longer authorizes coding on its own.</p>
+    </div>
+
+    <div class="drift-grid">
+      <div class="drift-flow">
+        <div class="drift-step">
+          <div class="drift-step-num">i</div>
+          <div class="drift-step-body"><strong>write</strong> — Stage 1 produces the requirement, grilled into <code style="font-family:var(--f-mono);color:var(--vine)">requirements.md</code>.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">ii</div>
+          <div class="drift-step-body"><strong>review</strong> — Stage 2 checks it for completeness and scope.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iii</div>
+          <div class="drift-step-body"><strong>gate</strong> — the pipeline halts on <em>Approve / Edit / Abort</em>. The full pipeline gates between review and coding; the fix lane gates after Stage 1, downstream of its escalation gate.</div>
+        </div>
+        <div class="drift-step">
+          <div class="drift-step-num">iv</div>
+          <div class="drift-step-body"><strong>then code</strong> — only an explicit <em>Approve</em> lets Stage 3 begin.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="drift-note">
+          Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
+        </div>
+        <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.7 → v0.8 → v0.8.1) in order.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          Purely additive — no pipeline change. <span style="color:var(--paper)">Non-breaking.</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ──────────────── ASK (v0.7.0) ──────────────── -->
 <section class="standard" id="ask">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">06</span>
+      <span class="plate-num">07</span>
       <span>v0.7.0 · read-only ask lane</span>
       <span class="plate-line"></span>
     </div>
@@ -1762,7 +1813,7 @@ footer {
 <section class="standard" id="grill">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">07</span>
+      <span class="plate-num">08</span>
       <span>v0.6.0 · Stage 1 grilling</span>
       <span class="plate-line"></span>
     </div>
@@ -1813,7 +1864,7 @@ footer {
 <section class="standard" id="drift">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">08</span>
+      <span class="plate-num">09</span>
       <span>v0.5.0 · doc-drift detection</span>
       <span class="plate-line"></span>
     </div>
@@ -1865,7 +1916,7 @@ footer {
 <section class="standard" id="cost">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">09</span>
+      <span class="plate-num">10</span>
       <span>Cost, honestly</span>
       <span class="plate-line"></span>
     </div>
@@ -1938,7 +1989,7 @@ footer {
 <section class="standard" id="philosophy">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">10</span>
+      <span class="plate-num">11</span>
       <span>Philosophy</span>
       <span class="plate-line"></span>
     </div>
@@ -1986,7 +2037,7 @@ footer {
 <section class="standard" id="install">
   <div class="wrap">
     <div class="plate">
-      <span class="plate-num">11</span>
+      <span class="plate-num">12</span>
       <span>Install</span>
       <span class="plate-line"></span>
     </div>
@@ -2072,6 +2123,8 @@ footer {
       <div>
         <h4>Migration</h4>
         <ul>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.7-to-v0.8.md">v0.7 → v0.8</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.6-to-v0.7.md">v0.6 → v0.7</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.5-to-v0.6.md">v0.5 → v0.6</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.4-to-v0.5.md">v0.4 → v0.5</a></li>
           <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.3-to-v0.4.md">v0.3 → v0.4</a></li>
@@ -2090,7 +2143,7 @@ footer {
     </div>
     <div class="footer-bottom">
       <div>© 2026 · Espalier Engineering</div>
-      <div>v0.7.0 — read-only /espalier-ask lane</div>
+      <div>v0.8.0 — requirements approval gate</div>
     </div>
   </div>
 </footer>
