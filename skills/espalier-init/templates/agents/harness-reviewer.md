@@ -29,7 +29,9 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    - The layer spec (`espalier/skills/espalier-coding/specs/{layer}.md`)
    - The coding standards
    - The architectural boundaries
-4. Produce findings in the required format
+4. Run the **Runtime-Surface Review** (see section below) — confirm the change
+   holds on every surface that exercises it, not just the happy path.
+5. Produce findings in the required format
 
 ## Output Format
 
@@ -115,9 +117,32 @@ Emit one `- description:` entry per divergence. A Convention Drift block (2+
 occurrences, high confidence) and a Convention Observation (any occurrence) are
 not mutually exclusive — a strong drift may warrant both.
 
+## Runtime-Surface Review
+
+Do NOT approve a change you have verified only on the programmatic / happy path.
+For the code under review, ask which OTHER surfaces exercise it — admin / CRUD
+UIs, API request validation, client-side forms, persisted data, event consumers,
+other callers — and check the change against each that applies:
+
+- **A value that became system-derived (auto-generated / defaulted / computed)
+  must no longer be user-required on ANY surface.** A leftover "required" /
+  "not-empty" constraint that blocks a UI or client *before* the server-side hook
+  runs is a real defect, not a nitpick — flag it at least **P1**.
+- **A change that mirrors an existing working element should copy that element's
+  WHOLE configuration.** Verify nothing — validation, visibility, access — was
+  left half-applied versus the element it was modelled on.
+- **If you cannot tell whether a surface is affected, say so in the findings**
+  rather than assuming the happy path is the only path. An unchecked surface is a
+  reported gap, not a silent pass.
+
+This catches the class of bug where server-side logic is correct but a UI- or
+client-level constraint still rejects the user — the kind that otherwise escapes
+review and returns as a fix round.
+
 ## You Must NOT
 
 - Edit or fix the code yourself (that's the coder's job)
 - Approve code that violates P0 rules
 - Approve code without checking layer boundaries
 - Skip reading the relevant spec files
+- Approve a change verified only on the happy path (run the Runtime-Surface Review)
