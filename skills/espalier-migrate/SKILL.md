@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), and v0.7→v0.8 (requirements approval gate) you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), and the v0.8.1 impact-analysis agent patch you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to SEVEN migrations may apply, always in this order:
+version. Up to EIGHT migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -43,13 +43,23 @@ version. Up to SEVEN migrations may apply, always in this order:
    pipelines STOP for explicit user sign-off after the requirement is written +
    reviewed, before any code is written (no-TTY runs auto-approve). Mechanical:
    `scripts/migrate-v0.7-to-v0.8.sh`.
+8. **v0.8.0 → v0.8.1** — impact-analysis agent patch: appends a
+   `## Change Impact Analysis` section to the coder sub-agent
+   (`espalier/agents/harness-coder.md`) and a `## Runtime-Surface Review` section
+   to the reviewer sub-agent (`espalier/agents/harness-reviewer.md`). Both make
+   the agents reason about every surface a change touches (admin UIs, API
+   validation, client forms, persisted data, other callers) — not just the
+   programmatic happy path — so a now-derived value left user-required on a UI is
+   caught at coding/review instead of returning as a fix round. Mechanical:
+   `scripts/migrate-v0.8-to-v0.8.1.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL SEVEN; a v0.3.x
-install needs the last six; a v0.4.x install needs the last five; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6, v0.7, v0.8; a
-v0.5.3–v0.5.x install needs v0.6, v0.7, v0.8; a v0.6.x install needs v0.7 then
-v0.8; a v0.7.x install needs only v0.8.
+confirmation, apply in order. A v0.1.x install needs ALL EIGHT; a v0.3.x
+install needs the last seven; a v0.4.x install needs the last six; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6, v0.7, v0.8, v0.8.1; a
+v0.5.3–v0.5.x install needs v0.6, v0.7, v0.8, v0.8.1; a v0.6.x install needs
+v0.7, v0.8, v0.8.1; a v0.7.x install needs v0.8 then v0.8.1; a v0.8.0 install
+needs only the v0.8.1 patch.
 
 ### Step 1: Preflight + detect install version
 
@@ -63,6 +73,7 @@ NEEDS_V05_PATCH=no
 NEEDS_V05_V06=no
 NEEDS_V06_V07=no
 NEEDS_V07_V08=no
+NEEDS_V08_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -81,6 +92,7 @@ if [ -d "harness" ]; then
   NEEDS_V05_V06=yes          # ...then the v0.6 Stage 1 grill
   NEEDS_V06_V07=yes          # ...then the v0.7 ask lane
   NEEDS_V07_V08=yes          # ...then the v0.8 approval gate
+  NEEDS_V08_PATCH=yes        # ...then the v0.8.1 impact-analysis agent patch
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -108,12 +120,19 @@ elif [ -d "espalier" ]; then
   if ! grep -q "Requirements Approval Gate" espalier/skills/espalier/SKILL.md 2>/dev/null; then
     NEEDS_V07_V08=yes
   fi
+  # v0.8.1: the two sub-agents gain change-impact / runtime-surface guidance.
+  # Per-project files, so a plugin update never reaches an existing install.
+  # Either section missing signals a pre-v0.8.1 install.
+  if ! grep -qF "## Change Impact Analysis" espalier/agents/harness-coder.md 2>/dev/null \
+     || ! grep -qF "## Runtime-Surface Review" espalier/agents/harness-reviewer.md 2>/dev/null; then
+    NEEDS_V08_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V04_V05" = no ] && [ "$NEEDS_V05_PATCH" = no ] \
    && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ] \
-   && [ "$NEEDS_V07_V08" = no ]; then
+   && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -175,6 +194,7 @@ verbatim:
 [ "$NEEDS_V05_V06" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5-to-v0.6.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V07_V08" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.7-to-v0.8.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V08_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8-to-v0.8.1.sh" --dry-run
 ```
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
@@ -221,6 +241,7 @@ completed.
 [ "$NEEDS_V05_V06" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.5-to-v0.6.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V07_V08" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.7-to-v0.8.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V08_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8-to-v0.8.1.sh" --yes
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -333,6 +354,20 @@ then `bootstrap --force` refreshes the three changed pipeline templates
 gate that stops both pipelines for explicit user sign-off before any code is
 written (no-TTY runs auto-approve). No new skill, no pipeline stage added.
 Idempotent — re-running detects an already-v0.8 install and no-ops.
+
+**v0.8→v0.8.1 (`migrate-v0.8-to-v0.8.1.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show the sections that would be appended |
+| `--yes` | Skip the apply confirmation prompt |
+
+Appends a `## Change Impact Analysis` section to `harness-coder.md` and a
+`## Runtime-Surface Review` section to `harness-reviewer.md` (both per-project
+files a plugin update cannot reach). Patches each file independently and is
+idempotent per file — re-running detects already-patched agents and no-ops. No
+`--plugin-dir` needed (the patch appends inline text; the flag is accepted and
+ignored for a uniform call signature).
 
 ## Anti-Patterns
 

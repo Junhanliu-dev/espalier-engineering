@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.1 — 2026-06-25
+
+Patch: **change-impact / runtime-surface guidance for the sub-agents** — the coder and reviewer now reason about *every* surface a change touches (admin/CRUD UIs, API validation, client forms, persisted data, other callers), not just the programmatic happy path. This closes a class of avoidable fix-round: a value made system-derived (auto-generated/defaulted/computed) that is left user-required on a UI, so server-side generation succeeds while the UI still blocks the user before the hook runs.
+
+- **`skills/espalier-init/templates/agents/harness-coder.md`** — new **`## Change Impact Analysis`** section (run before writing code): enumerate every surface that produces/reads/validates/persists the thing being changed; a value that becomes system-derived must stop being user-required *everywhere*; when mirroring a working element copy its WHOLE configuration, not one attribute; record the blast radius in coding-report.md "Notes". Stack-agnostic prose — concrete surfaces come from the project's own layer specs / `engineering-structure.md`.
+- **`skills/espalier-init/templates/agents/harness-reviewer.md`** — new **`## Runtime-Surface Review`** section + a Review Process step that points at it: never approve a change verified only on the happy path; a leftover "required"/"not-empty" constraint on a now-derived value that blocks a UI/client before the server hook runs is a **P1** defect; an unchecked surface is a reported gap, not a silent pass. A matching `You Must NOT` bullet is added.
+- **`scripts/migrate-v0.8-to-v0.8.1.sh`** — idempotent target-repo upgrade. Both agent files are written per-project at `/espalier-init` time, so a plugin update never reaches an existing install; this script appends the two sections (one per file), patching each independently and no-opping per file if already present. `--dry-run` / `--yes` flags (`--plugin-dir` accepted and ignored — the patch appends inline text). macOS `/bin/bash` 3.2 compatible.
+- **`skills/espalier-migrate/SKILL.md`** — the auto-detect chain gains the v0.8 → v0.8.1 step (an eighth migration; either agent section absent ⇒ needed), plus dry-run/apply lines and a flags table.
+
+Purely additive agent guidance — non-breaking for every existing install, fresh installs, and unattended runs. No migrating doc (a patch, like v0.5.3).
+
 ## 0.8.0 — 2026-06-15
 
 Minor: **requirements approval gate** — both pipelines now STOP after the requirement is written and reviewed, and wait for explicit user sign-off before any code is written. Previously Stage 1 → Stage 2 → Stage 3 chained automatically, so coding began the moment the requirement doc existed.
