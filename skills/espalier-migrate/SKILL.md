@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), and the v0.8.1 impact-analysis agent patch you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, and the v0.9.0 security audit you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to EIGHT migrations may apply, always in this order:
+version. Up to TEN migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -52,14 +52,28 @@ version. Up to EIGHT migrations may apply, always in this order:
    programmatic happy path — so a now-derived value left user-required on a UI is
    caught at coding/review instead of returning as a fix round. Mechanical:
    `scripts/migrate-v0.8-to-v0.8.1.sh`.
+9. **v0.8.1 → v0.8.2** — re-review fixpoint loop + push-gate certificate: code
+   review becomes a loop — every coder fix is re-reviewed until a fresh review of
+   the current code returns zero P0 — and the push gate blocks unless the pushed
+   code matches the fingerprint the last review saw. Refreshes the two pure-copy
+   pipeline files (`pipeline.md`, `espalier-fix`), appends a `## Re-review Rounds`
+   section to `harness-reviewer.md`, and inserts the certificate check into
+   `pre-push-gate.sh`. Mechanical: `scripts/migrate-v0.8.1-to-v0.8.2.sh`.
+10. **v0.8.2 → v0.9.0** — security audit: a new `harness-security` agent joins
+   Stage 4 as a review panel; a `security-standards` rule + `espalier-security`
+   skill are added, and the coder/reviewer/testing/push-gate gain security
+   sections. Creates the three new files, `bootstrap --force` refreshes the
+   pure-copy pipeline + symlinks + runs the 32-check validation, and surgical
+   appends patch the per-project files. Mechanical:
+   `scripts/migrate-v0.8.2-to-v0.9.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL EIGHT; a v0.3.x
-install needs the last seven; a v0.4.x install needs the last six; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6, v0.7, v0.8, v0.8.1; a
-v0.5.3–v0.5.x install needs v0.6, v0.7, v0.8, v0.8.1; a v0.6.x install needs
-v0.7, v0.8, v0.8.1; a v0.7.x install needs v0.8 then v0.8.1; a v0.8.0 install
-needs only the v0.8.1 patch.
+confirmation, apply in order. A v0.1.x install needs ALL TEN; a v0.3.x
+install needs the last nine; a v0.4.x install needs the last eight; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.0; a v0.5.3–v0.5.x
+install needs v0.6 … v0.9.0; a v0.6.x install needs v0.7 … v0.9.0; a v0.7.x
+install needs v0.8 … v0.9.0; a v0.8.0 install needs v0.8.1 … v0.9.0; a v0.8.1
+install needs v0.8.2 then v0.9.0; a v0.8.2 install needs only v0.9.0.
 
 ### Step 1: Preflight + detect install version
 
@@ -74,6 +88,8 @@ NEEDS_V05_V06=no
 NEEDS_V06_V07=no
 NEEDS_V07_V08=no
 NEEDS_V08_PATCH=no
+NEEDS_V082_PATCH=no
+NEEDS_V09_MINOR=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -93,6 +109,8 @@ if [ -d "harness" ]; then
   NEEDS_V06_V07=yes          # ...then the v0.7 ask lane
   NEEDS_V07_V08=yes          # ...then the v0.8 approval gate
   NEEDS_V08_PATCH=yes        # ...then the v0.8.1 impact-analysis agent patch
+  NEEDS_V082_PATCH=yes       # ...then the v0.8.2 re-review fixpoint loop
+  NEEDS_V09_MINOR=yes        # ...then the v0.9.0 security audit
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -127,12 +145,31 @@ elif [ -d "espalier" ]; then
      || ! grep -qF "## Runtime-Surface Review" espalier/agents/harness-reviewer.md 2>/dev/null; then
     NEEDS_V08_PATCH=yes
   fi
+  # v0.8.2: code review becomes a fixpoint loop + push-gate certificate. The loop
+  # rides the pure-copy pipeline files; the reviewer gains a Re-review Rounds
+  # section and the push gate gains a Reviewed-Diff certificate (both per-project
+  # files a plugin update cannot reach). Any of the three missing ⇒ pre-v0.8.2.
+  if ! grep -qF "fixpoint loop" espalier/pipeline.md 2>/dev/null \
+     || ! grep -qF "## Re-review Rounds" espalier/agents/harness-reviewer.md 2>/dev/null \
+     || ! grep -qF "Reviewed-Diff:" espalier/hooks/pre-push-gate.sh 2>/dev/null; then
+    NEEDS_V082_PATCH=yes
+  fi
+  # v0.9.0: the security audit. A new harness-security agent joins Stage 4 as a
+  # review panel; a security-standards rule + espalier-security skill are added and
+  # the coder/reviewer/gate gain security sections. The "review panel" text rides
+  # the pure-copy pipeline; harness-security.md is a new per-project file a plugin
+  # update cannot reach — either absent ⇒ pre-v0.9.0.
+  if ! grep -qF "review panel" espalier/pipeline.md 2>/dev/null \
+     || [ ! -f espalier/agents/harness-security.md ]; then
+    NEEDS_V09_MINOR=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V04_V05" = no ] && [ "$NEEDS_V05_PATCH" = no ] \
    && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ] \
-   && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ]; then
+   && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ] \
+   && [ "$NEEDS_V082_PATCH" = no ] && [ "$NEEDS_V09_MINOR" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -195,6 +232,8 @@ verbatim:
 [ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V07_V08" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.7-to-v0.8.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V08_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8-to-v0.8.1.sh" --dry-run
+[ "$NEEDS_V082_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.1-to-v0.8.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
@@ -242,6 +281,8 @@ completed.
 [ "$NEEDS_V06_V07" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.6-to-v0.7.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V07_V08" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.7-to-v0.8.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V08_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8-to-v0.8.1.sh" --yes
+[ "$NEEDS_V082_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.1-to-v0.8.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -368,6 +409,38 @@ files a plugin update cannot reach). Patches each file independently and is
 idempotent per file — re-running detects already-patched agents and no-ops. No
 `--plugin-dir` needed (the patch appends inline text; the flag is accepted and
 ignored for a uniform call signature).
+
+**v0.8.1→v0.8.2 (`migrate-v0.8.1-to-v0.8.2.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up any customised pure-copy pipeline file on diff (`<file>.pre-v0.8.2.bak`),
+then `bootstrap --force` refreshes the two changed pure-copy files (`pipeline.md`,
+`espalier-fix`) with the re-review fixpoint loop + `Reviewed-Diff` certificate
+writes. Surgically appends a `## Re-review Rounds` section to the per-project
+`harness-reviewer.md` and inserts the certificate check into the per-project
+`pre-push-gate.sh` (graceful warn + manual snippet if the gate was customised past
+the anchor). Idempotent — re-running detects an already-v0.8.2 install and no-ops.
+
+**v0.8.2→v0.9.0 (`migrate-v0.8.2-to-v0.9.0.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Creates the three new per-project files (security-standards rule, harness-security
+agent, espalier-security skill) with project-name + tools-mode substitution, then
+`bootstrap --force` refreshes the pure-copy pipeline files + symlinks + runs the
+32-check validation. Surgically appends the security sections to the per-project
+`harness-coder.md` / `harness-reviewer.md` / `espalier-testing` SKILL and inserts
+the secret/dependency scan into `pre-push-gate.sh`. Idempotent — the already-v0.9.0
+check requires all five artifacts present, so a crash mid-run is completed on re-run.
 
 ## Anti-Patterns
 

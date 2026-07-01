@@ -195,6 +195,42 @@ Agent tool:
     Write your review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
+**Stage 4 (Security Audit — runs as a panel with the review above):**
+```
+Agent tool:
+  prompt: |
+    You are the harness-security auditor.
+    Read espalier/agents/harness-security.md for your full instructions.
+
+    WHAT TO AUDIT: Read espalier/changes/{type}/{slug}/coding-report.md to see
+    what changed, then trace the touched endpoints. Assume the client is hostile.
+
+    Write your audit to: espalier/changes/{type}/{slug}/security-record.md
+```
+
+Stage 4 is a **review panel**: `harness-reviewer` (correctness / conventions,
+→ review-record.md) and `harness-security` (trust boundary, → security-record.md)
+both run on the CURRENT diff. Run this procedure every round — it IS the gate, not
+a description. Do not advance to Stage 5 by any other path:
+
+1. **Baseline.** Note whether `espalier/changes/{type}/{slug}/security-record.md`
+   exists and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
+2. **Completion check.** After both return, confirm `security-record.md` was written
+   THIS round (it now exists and differs from the baseline). `harness-security`
+   OVERWRITES it each round, so it always reflects the current round only. If it is
+   missing or unchanged, the security agent did NOT complete — re-spawn it; never
+   treat a missing or stale file as a pass.
+3. **Collect P0s from BOTH files.** Read the current verdict + P0 rows from
+   `review-record.md` (harness-reviewer) AND `security-record.md` (harness-security).
+4. **If EITHER file has a P0 →** re-spawn `harness-coder` with the combined findings
+   (a Stage 3 action), increment the shared round counter, and return to step 1. At
+   counter = 2, escalate to a human WITHOUT another re-spawn (the coder gets at most
+   one re-spawn per counter limit).
+5. **Only when BOTH return zero P0 on the current code →** write the `Reviewed-Diff`
+   certificate, THEN run the "Stage 4 Post-Review" drift processing below. The exit
+   gate requires BOTH clean — never one agent's pass alone. A security P0 shares the
+   correctness "Max 2 P0 rounds → escalate" counter.
+
 **Stage 5 (Testing):**
 ```
 Agent tool:
@@ -204,6 +240,11 @@ Agent tool:
 
     WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what was implemented. Write tests for those changes.
+
+    ALSO read espalier/changes/{type}/{slug}/security-record.md (if present) — for
+    EVERY field in its `## Security-Sensitive Fields` contract, write the negative
+    abuse test it names (tamper the value → assert rejected → assert store unchanged). A
+    contracted field with no such test will be blocked at Stage 6.
 
     Append test report to: espalier/changes/{type}/{slug}/coding-report.md
 ```
@@ -220,14 +261,20 @@ Agent tool:
 
     Check: Are tests meaningful? Do they cover edge cases?
     Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
+    Security coverage: does EVERY field in espalier/changes/{type}/{slug}/security-record.md's
+    `## Security-Sensitive Fields` contract have a passing abuse test
+    (tamper → rejected → store unchanged)? A missing one is a P0 → back to Stage 5.
 
     Append review to: espalier/changes/{type}/{slug}/review-record.md
 ```
 
 ### Stage 4 Post-Review: Drift & Convention Index
 
-After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
-Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
+After Stage 4 PASSES (step 5 above — BOTH panel agents returned zero P0 and the
+certificate is written), parse `review-record.md` for Convention Drift blocks (see
+`harness-reviewer.md`) and flag the affected rule files. Do NOT run this on a P0
+round: a malformed-drift P0 written back mid-loop would contaminate the next
+round's P0 count.
 
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug.
 

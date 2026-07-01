@@ -501,6 +501,11 @@ ALWAYS prompt.
 
 ## Stage 3: Coding
 
+**Baseline (first entry only):** before spawning the coder, record
+`Base-Ref: $(git rev-parse HEAD)` as a line in this fix's pipeline-state.md. Never
+overwrite it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint and
+the push gate.
+
 Spawn sub-agent. Prompt:
 
 ```
@@ -517,17 +522,47 @@ espalier/changes/fix/{slug}/coding-report.md
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
-## Stage 4: Code Review
+## Stage 4: Code Review (fixpoint loop — a two-agent panel, re-review after EVERY fix)
 
-Spawn `harness-reviewer`. Output to `espalier/changes/fix/{slug}/review-record.md`.
+Run Stage 4 as a loop, not a single pass. Every round runs TWO fresh agents on the
+CURRENT diff, spawned concurrently — `harness-reviewer` (correctness / conventions,
+→ review-record.md) and `harness-security` (trust boundary — never trust frontend
+data, → security-record.md):
+
+1. Spawn the FRESH panel on the CURRENT diff. Output to
+   `espalier/changes/fix/{slug}/review-record.md` and `.../security-record.md`. On a
+   re-review round, also hand each agent the "changed since last review" set (the
+   fix's files from the latest coding-report.md) so they scrutinize the new code
+   while owning the whole-diff verdict. `harness-security` OVERWRITES
+   security-record.md each round (current round only); before spawning, note its
+   baseline state, and after BOTH return confirm it was written THIS round — a
+   missing or unchanged file means the security agent did not complete, so re-spawn
+   it; never treat a missing/stale file as a pass.
+2. **Read the current-round verdict + P0 rows from BOTH `review-record.md` and
+   `security-record.md`. A P0 in EITHER →** re-spawn `harness-coder` with the
+   combined findings, then **return to step 1 and re-review the new diff with the
+   whole panel.** Never advance to Stage 5 on the coder's fix report alone — a fix is
+   never the last action before the gate; a clean panel is. Each P0 round increments
+   the counter; at counter = 2, escalate to a human WITHOUT another re-spawn (a
+   security P0 shares this counter).
+3. **Zero P0 from BOTH agents on a fresh review of the current code →** PASS. Record
+   the certificate: `git add -A` (so new files count), then overwrite `Reviewed-Diff`
+   in pipeline-state.md with
+   `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+   (`<Base-Ref>` = the Stage 3 SHA). The Stage 7 push gate blocks unless this still matches.
 
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
+A bug fix is a prime place to REINTRODUCE a trust-boundary hole — `harness-security`
+treats the fix diff as hostile-input surface exactly as it would a feature, and
+emits the `## Security-Sensitive Fields` abuse-test contract for Stage 5/6.
 
 ### Stage 4 Post-Review: Drift & Convention Index
 
-After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
-Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
+After Stage 4 PASSES (step 3 above — BOTH agents zero P0, certificate written),
+parse `review-record.md` for Convention Drift blocks (see `harness-reviewer.md`)
+and flag the affected rule files. Do NOT run this on a P0 round — a malformed-drift
+P0 written back mid-loop would contaminate the next round's P0 count.
 
 > Variable in scope: `SLUG` is this fix's slug (no `fix/` prefix).
 
@@ -594,6 +629,9 @@ Write tests for the fix. Required:
    pre-fix code; PASS on the current code).
 2. A test from the original feature's spec (proves the causing feature
    still works — read its requirements.md acceptance criteria).
+3. For EVERY entry in espalier/changes/fix/{slug}/security-record.md's
+   `## Security-Sensitive Fields` contract (if present), the negative abuse
+   test it names: tamper the value → assert rejected → assert store unchanged.
 
 If a meaningful test requires touching files OUTSIDE the fix's scope (>2
 additional files or crossing a layer boundary), append the Test Scope
@@ -628,6 +666,9 @@ Check:
 - Regression test would have failed on pre-fix code (assertions are meaningful)
 - Original feature's acceptance criteria still pass
 - No tests are tautological (asserting the fix's masked behaviour instead of intended)
+- Security coverage: every field in security-record.md's `## Security-Sensitive
+  Fields` contract has a passing abuse test (tamper → rejected → store unchanged).
+  A missing one is a P0 → back to Stage 5.
 
 If the fix is correct given its current scope BUT the scope itself is wrong
 (symptom-mask, wrong layer, architectural concern), emit verdict
@@ -643,6 +684,12 @@ if grep -q '^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
   _fire_late_escalation_prompt 6
 fi
 ```
+
+**Fixpoint + certificate.** Stage 6 is a loop like Stage 4: a P0 in the test review
+sends the tests back to Stage 5 (re-spawn coder), then **re-review** — never exit on
+the fix report alone (max 2 rounds → escalate). On a clean PASS, refresh
+`Reviewed-Diff` in pipeline-state.md (same `git add -A` + fingerprint command as
+Stage 4) so it now covers the added tests; the push gate compares against this.
 
 ## Stage 7: Push (with back-link)
 
