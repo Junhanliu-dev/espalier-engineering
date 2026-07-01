@@ -54,7 +54,7 @@ run_audit() {
   printf '# Critical Paths\nEntry points: controllers / handlers / queue consumers in src/. No auth middleware unless shown in the change.\n' > "$proj/espalier/wiki/critical-paths.md"
   printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file)\n- Notes: the change under audit.\n' "$file" > "$cdir/coding-report.md"
 
-  claude -p --output-format text \
+  claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-security auditor for EvalApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
 Read $proj/espalier/agents/harness-security.md and follow it EXACTLY (including reading the rule $proj/espalier/rules/security-standards.md and skill $proj/espalier/skills/espalier-security/SKILL.md it references).

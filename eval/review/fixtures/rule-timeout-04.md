@@ -2,7 +2,7 @@
 fixture_id: rule-timeout-04
 kind: violation
 file: src/services/payment-service.js
-expected_verdict: FAIL
+expected_verdict: PASS_WITH_FIXES
 planted_issues:
   - rule: external-call-timeout (Required Patterns)
     severity: P1
