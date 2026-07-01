@@ -7,7 +7,9 @@ planted_issues:
   - rule: no-throw (Error Handling Pattern)
     severity: P0
     hint: throws AppError instead of returning Result<T, AppError>
-false_positive_watch: []
+false_positive_watch:
+  - "getOrder is a repository (internal) call — do NOT flag it for a missing timeout"
+  - "orderId/amount are already-parsed service params, not an HTTP boundary — do NOT flag missing validation"
 shadow: false
 ---
 const { getOrder } = require('../repositories/order-repo');

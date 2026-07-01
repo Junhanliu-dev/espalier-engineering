@@ -11,7 +11,8 @@ Every fallible function returns `Result<T, AppError>` (`{ ok: true, value }` /
 files kebab-case; functions camelCase verb-first; constants SCREAMING_SNAKE_CASE.
 
 ## Required
-- External / network calls use an explicit timeout (`TIMEOUT_MS`).
+- External HTTP calls (`fetch` / a third-party SDK) use an explicit timeout
+  (`TIMEOUT_MS` / `AbortController`). Repository / `db` calls do not.
 - Use the injected `logger`, never `console`.
 
 ## Layers (see engineering-structure.md)
