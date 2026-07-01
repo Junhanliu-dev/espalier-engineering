@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.8.0 — requirements approval gate.** Both pipelines now STOP after the requirement is written and reviewed, and wait for your explicit sign-off before any code is written (Approve / Edit / Abort). Previously Stage 1 → Stage 2 → Stage 3 chained automatically, so coding started the moment the requirement doc existed. Interactive-only — a no-TTY run auto-approves so unattended pipelines never hang. No new skill, no new stage; a refresh of the existing pipeline templates.
+> **v0.9.0 — security audit.** Stage 4 now runs a two-agent panel: alongside the correctness reviewer, a new `harness-security` auditor checks the change's trust boundary on one rule — *never trust data the frontend sent.* It hard-blocks any sensitive field (price, userId, role, orderId, status, …) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. `harness-coder` reads the same taxonomy while writing, so security shifts left. The push gate gains a secret scan (blocks) + dependency audit (warns).
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.6→v0.7→v0.8) in order. See [`docs/migrating-v0.7-to-v0.8.md`](./docs/migrating-v0.7-to-v0.8.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.7→v0.8→v0.8.1→v0.8.2→v0.9.0) in order. See [`docs/migrating-v0.8-to-v0.9.md`](./docs/migrating-v0.8-to-v0.9.md).
 
 ---
 
@@ -32,9 +32,9 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 
 ```
 espalier/
-├── rules/                  # always-loaded: engineering structure, coding standards, dev process
-├── skills/                 # phase-loaded: coding, review, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask
-├── agents/                 # delegated: harness-coder, harness-reviewer (separate tool sets)
+├── rules/                  # always-loaded: engineering structure, coding standards, dev process, security standards
+├── skills/                 # phase-loaded: coding, review, security, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask
+├── agents/                 # delegated: harness-coder, harness-reviewer, harness-security (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
 ├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
 ├── pipeline.md             # 10-stage workflow with explicit gates and rollback rules
@@ -258,6 +258,8 @@ Five guiding principles:
 MIT — see [LICENSE](./LICENSE).
 
 ## Status
+
+`v0.8.2` — **re-review fixpoint loop + push-gate certificate.** Code review is now a loop, not a single pass: when the reviewer files a P0 and the coder fixes it, the fix is re-reviewed — the only way out of Stage 4 (and Stage 6) is a fresh review of the *current* code returning zero P0, so the coder is never the last actor before the gate, a reviewer always is. A new push-gate certificate binds the verdict to a content fingerprint of the reviewed source (`git hash-object` of the source diff vs a Stage-3 `Base-Ref`, with `espalier/` bookkeeping excluded), so a fix that skips re-review fails closed at push time. Closes the gap where a NEW bug introduced by a fix could ship unreviewed. Non-breaking — in-flight changes without a certificate fall through the gate with a warning. New `migrate-v0.8.1-to-v0.8.2.sh`.
 
 `v0.8.1` — **change-impact / runtime-surface agent guidance.** The coder and reviewer sub-agents now reason about *every* surface a change touches — admin/CRUD UIs, API validation, client forms, persisted data, other callers — not just the programmatic happy path. Closes a class of avoidable fix-round: a value made system-derived (auto-generated/defaulted/computed) but left user-required on a UI, so server-side generation succeeds while the UI still blocks the user before the hook runs. The coder gains a `## Change Impact Analysis` section (map the blast radius before coding); the reviewer gains a `## Runtime-Surface Review` section (a leftover required-on-derived constraint is a P1 defect). Purely additive agent guidance — non-breaking. New `migrate-v0.8-to-v0.8.1.sh` (the two agent files are per-project, so a plugin update can't reach them).
 

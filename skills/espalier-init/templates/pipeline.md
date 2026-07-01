@@ -26,28 +26,72 @@
 - **Execute:** Sub-agent implements per task decomposition
 - **Gate:** All sub-tasks done + code builds + lint passes
 - **Constraint:** One sub-agent invocation per sub-task
+- **Baseline (first entry only):** before any code is written, record
+  `Base-Ref: $(git rev-parse HEAD)` as a line in pipeline-state.md. Never overwrite
+  it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint and the push gate.
 - **Output:** Code changes + espalier/changes/{slug}/coding-report.md
 
-### 4. Code Review
-- **Trigger:** Implementation complete
-- **Load:** Spawn `harness-reviewer` agent (see espalier/agents/harness-reviewer.md)
-- **Execute:** Reviewer reads diff, checks against review skill
-- **Gate:** No P0 findings remaining
-- **Limit:** Max 2 review rounds → escalate to human
-- **Rollback:** P0 found → back to Stage 3 (re-spawn coder with review findings)
-- **Output:** espalier/changes/{slug}/review-record.md (append)
+### 4. Code Review (fixpoint loop — a two-agent review panel, re-review after EVERY fix)
+- **Trigger:** Implementation complete (Stage 3 done)
+- **Review panel:** every review round runs TWO fresh agents on the CURRENT diff, spawned
+  concurrently — `harness-reviewer` (correctness / conventions, → review-record.md)
+  and `harness-security` (trust boundary — never trust frontend data, → security-record.md).
+- **Loop — repeat until exit:**
+  1. Spawn the FRESH panel on the CURRENT diff. On a re-review round, also hand each
+     agent the "changed since last review" set — the fix's files from the latest
+     coding-report.md — so they scrutinize the new code while still owning the
+     whole-diff verdict.
+  2. **P0 found by EITHER agent →** re-spawn `harness-coder` with the combined
+     findings (a Stage 3 action), then **return to step 1 and re-review the NEW
+     diff with the whole panel.** Never advance to Stage 5 on the coder's fix report
+     alone — a fix is never the last action before the gate; a clean panel is. Each
+     P0 round increments the counter.
+  3. **Zero P0 from BOTH agents on a fresh review of the current code →** PASS;
+     record the certificate (below) and exit.
+- **Gate (to leave Stage 4):** the MOST RECENT run of BOTH panel agents saw the
+  CURRENT code and returned zero P0 — NOT "the earlier P0s were addressed." A coder
+  fix always triggers another full panel round.
+- **Certificate (write on PASS):** `git add -A` (so new files count), then record in
+  pipeline-state.md, overwriting any prior value —
+  `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+  where `<Base-Ref>` is the Stage 3 SHA. The Stage 7 push gate blocks unless this
+  fingerprint still matches the code being pushed.
+- **Limit:** Max 2 P0 rounds → escalate to human (never silently ship); at counter =
+  2, escalate WITHOUT another coder re-spawn. A security P0 (from `harness-security`)
+  shares this counter with correctness P0s.
+- **Panel P0 collection (procedural — see the espalier skill):** each round, after
+  BOTH agents return, confirm security-record.md was written THIS round, then read
+  P0s from BOTH review-record.md AND security-record.md. Either P0 → re-spawn coder
+  + re-run panel. The certificate is written only when BOTH are clean; drift
+  processing runs only on that PASS, never on a P0 round.
+- **Security contract (on PASS):** `harness-security` writes a
+  `## Security-Sensitive Fields` block into security-record.md — one entry per
+  client-supplied sensitive field in scope. This is the Stage 5/6 abuse-test contract.
+- **Output:** espalier/changes/{slug}/review-record.md (append) + security-record.md
+  (OVERWRITTEN each round — reflects the current round only, so the orchestrator
+  never reads a stale prior-round verdict)
 
 ### 5. Test Writing
 - **Trigger:** Code review passed
 - **Load:** Spawn `harness-coder` agent with testing skill
-- **Execute:** Write tests for changed interfaces
-- **Gate:** Tests exist for every changed public interface + tests pass
+- **Execute:** Write tests for changed interfaces. ALSO write the negative abuse
+  test named by EVERY entry in security-record.md's `## Security-Sensitive Fields`
+  contract (tamper the value → assert rejected → assert persistent store unchanged).
+- **Gate:** Tests exist for every changed public interface + tests pass + every
+  contracted sensitive field has its abuse test
 
 ### 6. Test Review
 - **Trigger:** Tests written
 - **Load:** Spawn `harness-reviewer` agent
-- **Execute:** Review tests for meaningfulness
-- **Gate:** Tests are meaningful (not just "passes"), cover edge cases
+- **Execute:** Review tests for meaningfulness + security abuse-test coverage
+- **Gate:** Tests are meaningful (not just "passes"), cover edge cases, AND every
+  field in security-record.md's `## Security-Sensitive Fields` contract has a
+  passing abuse test (tamper → rejected → store unchanged). A missing one is a P0.
+- **Loop:** same fixpoint rule as Stage 4 — a P0 sends the tests back to Stage 5
+  (re-spawn coder), then **re-review**; never exit on the fix report alone.
+- **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
+  tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
+  against this value.
 - **Limit:** Max 2 rounds → escalate
 
 ### 7. Code Push

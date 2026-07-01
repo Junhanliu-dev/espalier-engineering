@@ -115,3 +115,40 @@ blast radius of the change:
 
 The goal is to surface a cross-surface impact at coding time, not discover it as
 a fix round after the change ships.
+
+## Security-Aware Coding (do this WHILE writing, not only at review)
+
+The Stage 4 security audit is a backstop, not permission to trust the client. Read
+`espalier/rules/security-standards.md` and apply it as you write ANY code that
+handles a request or writes to a persistent store: **the frontend is untrusted;
+the backend is the trust boundary.**
+
+For every client-supplied value your code reads (path param, query, body, header),
+classify it on the five risk axes (money / identity / permission / owner / state).
+For any that is sensitive:
+
+1. **owner / identity** — derive the actor from the session, never the request.
+   Before loading or mutating an object by a client-supplied id, assert the actor
+   owns it (or holds a permitting role). A client id is a lookup key, not an
+   authorization. *(User 1's request carrying id 2 must not touch object 2.)*
+2. **money** — never persist or charge a client-supplied `price`/`amount`/`total`.
+   Recompute from the source of truth (catalog / ledger).
+3. **permission** — never bind `role`/`isAdmin`/`scope` from the request body.
+   Decide server-side.
+4. **state** — change lifecycle fields only through a server-side transition that
+   checks both legality and actor.
+5. **stock / balance** — range-check and apply atomically (no read-then-write race).
+
+Never spread a raw request body into a persistence call — bind an explicit
+allow-list. Record each sensitive field you handled and the control you applied in
+coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
+
+### Writing Abuse Tests (Stage 5)
+
+When you run in testing mode (Stage 5), read the `## Security-Sensitive Fields`
+contract in `espalier/changes/{type}/{slug}/security-record.md` (emitted by the
+Stage 4 auditor). For EACH field listed, write the negative test named in its
+`abuse_test`: tamper the value, assert the request is rejected, and assert the
+persistent store is unchanged. A contracted field with no such test is a Stage 6
+blocker — do not skip one. See `espalier/skills/espalier-security/SKILL.md` for
+the recipe.
