@@ -49,7 +49,7 @@ run_review() {
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$REVIEW_SKILL_TPL" > "$proj/espalier/skills/espalier-review/SKILL.md"
   printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file path)\n- Notes: the change under review.\n' "$file" > "$cdir/coding-report.md"
 
-  claude -p --output-format text \
+  claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-reviewer for ReviewApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
 Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md and $proj/espalier/rules/engineering-structure.md and $proj/espalier/skills/espalier-review/SKILL.md. Judge ONLY against those project rules, not generic opinions.

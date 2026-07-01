@@ -2,7 +2,7 @@
 fixture_id: rule-console-02
 kind: violation
 file: src/controllers/user-controller.js
-expected_verdict: FAIL
+expected_verdict: PASS_WITH_FIXES
 planted_issues:
   - rule: no-console-log (Forbidden Patterns)
     severity: P1

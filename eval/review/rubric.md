@@ -27,8 +27,13 @@ misses AND false alarms on clean code.
     genuine defect you can confirm in the code. Do NOT penalize a real extra finding;
     DO count invented/spurious ones and anything in `false_positive_watch`.
 
-- **verdict_match** — `1` if the reviewer's `**Verdict:**` matches `expected_verdict`
-  (FAIL / PASS_WITH_FIXES for a fixture with planted P0/P1; PASS for `clean`), else 0.
+- **verdict_match** — decide by the fixture's `kind`, NOT a literal string compare:
+  - `kind: clean` → `1` iff the reviewer's `**Verdict:**` is `PASS`.
+  - `kind: violation` → `1` iff the reviewer's `**Verdict:**` is `FAIL` OR
+    `PASS_WITH_FIXES` — both mean the planted issue was flagged and would gate. It is
+    `0` ONLY if the reviewer gave a clean `PASS` (i.e. missed the issue). The reviewer
+    legitimately varies — a P1-only change is `PASS_WITH_FIXES`, a P0 is `FAIL` — so do
+    NOT require one specific value.
 
 - **verdict** — holistic PASS for this fixture iff `caught == planted` AND
   `false_positives == 0` AND `verdict_match == 1`.

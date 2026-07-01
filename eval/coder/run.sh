@@ -44,7 +44,7 @@ setup_and_run() {
 
   ( cd "$proj" && git init -q && git add -A && git -c user.email=e@e.co -c user.name=eval commit -qm baseline ) >/dev/null 2>&1
 
-  claude -p --output-format text \
+  claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-coder for CoderApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
 Read $proj/espalier/agents/harness-coder.md and follow it EXACTLY, plus $proj/espalier/skills/espalier-coding/SKILL.md and the rules under $proj/espalier/rules/. Mirror the reference pattern in $proj/src/services/user-service.js. Honor the coder's core rule: ONE task at a time — do NOT expand scope.
