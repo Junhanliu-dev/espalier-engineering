@@ -8,17 +8,20 @@ planted_issues:
     severity: P1
     hint: fetch() to an external gateway with no timeout — unbounded await on I/O
 false_positive_watch:
-  - "returns Result<T> via { ok, value } — do NOT flag error handling"
+  - "wrapped in try/catch returning an err Result — do NOT flag error handling or a possible throw"
 shadow: false
 ---
-// charge — calls the external payment gateway
+// charge — calls the external payment gateway. Returns Result<Charge, AppError>.
 async function charge(token, amount) {
-  const res = await fetch('https://gw.example.com/charge', {   // no TIMEOUT_MS
-    method: 'POST',
-    body: JSON.stringify({ token, amount }),
-  });
-  const data = await res.json();
-  return { ok: res.ok, value: data };
+  try {
+    const res = await fetch('https://gw.example.com/charge', {   // no timeout applied — the planted issue
+      method: 'POST',
+      body: JSON.stringify({ token, amount }),
+    });
+    return { ok: res.ok, value: await res.json() };
+  } catch (e) {
+    return { ok: false, err: new AppError('gateway error') };
+  }
 }
 
 module.exports = { charge };
