@@ -10,6 +10,11 @@ planted vulnerabilities on real code, classify them on the right axis, emit a
 usable abuse-test contract, and — just as important — **not cry wolf** on clean
 changes or wrongly wave through a sensitive one.
 
+It covers BOTH auditor modes: the change-scoped Stage-4 audit (default
+fixtures) and the `/espalier-audit` repo-wide mode (`mode: repo-audit`
+fixtures — multi-file body, findings returned as the agent's final message
+instead of security-record.md).
+
 ## Layout
 
 ```
@@ -23,8 +28,12 @@ eval/security/
 ## Run
 
 ```bash
-bash eval/security/run.sh
+bash eval/security/run.sh                  # full suite — the release gate
+bash eval/security/run.sh 'vuln-*.md'      # partial (debug / retry after a transient failure)
 ```
+
+A partial run's RESULT covers only the selected subset; only the no-argument
+full run counts as the release gate.
 
 Per fixture the runner: (1) builds a throwaway project containing the fixture's
 code change + a generated security install; (2) runs `harness-security` against it
@@ -56,6 +65,16 @@ shadow: false
 <the code file being reviewed>
 ```
 
+Repo-audit fixtures differ in three ways: `mode: repo-audit` in the
+frontmatter, `expected_verdict: FINDINGS | CLEAN` (batch verdict, not
+PASS/FAIL), and a multi-file body — one `=== FILE: <path> ===` block per repo
+file (no `file:` field). The runner materializes the blocks into a throwaway
+project, spawns the auditor with the `/espalier-audit` repo-audit prompt, and
+judges the returned findings document. A good repo-audit fixture mixes a
+planted vuln, a correctly-controlled surface (→ `### Controls Confirmed`), and
+a no-surface file (→ `### No Sensitive Fields`) so the mode's section routing
+is exercised, not just the catch.
+
 ## Why both `vuln` and `clean` fixtures
 
 - **`vuln`** — measures the catch-rate. A miss here is a shipped vulnerability.
@@ -66,8 +85,9 @@ shadow: false
 
 ## Discipline (same as eval/grill)
 
-- **Reach 20–30 fixtures.** This seed set has 7 (5 vuln across the five axes +
-  mass-assignment + queue-consumer; 2 clean). The gate is provisional until full.
+- **Reach 20–30 fixtures.** This seed set has 9 (5 change-scoped vuln across the
+  five axes + mass-assignment + queue-consumer; 2 change-scoped clean; 2
+  repo-audit — one mixed repo, one clean repo). The gate is provisional until full.
 - **Shadow subset.** Roughly one third should be `shadow: true` — authored from real
   CVEs / real PRs or by someone other than the security-skill author, so the auditor
   cannot be tuned to pass known fixtures. This seed is all `shadow: false`.

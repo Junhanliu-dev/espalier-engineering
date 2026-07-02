@@ -5,6 +5,13 @@
 # with an LLM judge, and gates on the aggregate catch-rate + a zero-false-positive
 # rule + verdict accuracy.
 #
+# Two fixture modes:
+#   (default)          change-scoped Stage-4 audit — single `file:` body, the
+#                      auditor writes security-record.md.
+#   mode: repo-audit   /espalier-audit repo-audit mode — multi-file body
+#                      (`=== FILE: <path> ===` blocks), the auditor RETURNS its
+#                      findings (captured stdout), no security-record.md.
+#
 # Dev/QA infra — NOT shipped to target projects. Mirrors eval/grill/run.sh.
 # Bash 3.2 compatible (macOS); no GNU-only tools; sed uses -E for BSD.
 set -euo pipefail
@@ -23,6 +30,12 @@ trap 'rm -rf "$WORK"' EXIT
 # strict and PROVISIONAL until the fixture set reaches 20-30 (see README).
 GATE_CATCH_RATE="0.90"
 
+# Optional $1: a fixture glob (e.g. 'vuln-*.md') for partial re-runs after a
+# transient failure, or while iterating on one fixture. The RESULT then covers
+# only that subset — the release gate is the no-argument FULL run.
+FIXTURE_GLOB="${1:-*.md}"
+[ "$FIXTURE_GLOB" = "*.md" ] || echo "NOTE: partial run (glob=$FIXTURE_GLOB) — the release gate requires the full suite."
+
 [ -f "$AGENT_TPL" ] || { echo "ERROR: harness-security template not found at $AGENT_TPL"; exit 2; }
 [ -f "$RUBRIC" ]    || { echo "ERROR: rubric not found at $RUBRIC"; exit 2; }
 [ -d "$FIXTURES" ]  || { echo "ERROR: fixtures dir not found at $FIXTURES"; exit 2; }
@@ -33,6 +46,18 @@ total_fp=0
 fail_count=0
 results=""   # "fixture_id\tkind\tcaught/planted\tfp\tverdict\tPASS|FAIL\n"
 
+# install_espalier PROJ — generate the security install the auditor reads
+# (project name substituted). Shared by both modes.
+install_espalier() {
+  local proj="$1"
+  mkdir -p "$proj/espalier/rules" "$proj/espalier/agents" \
+           "$proj/espalier/skills/espalier-security" "$proj/espalier/wiki"
+  sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-security.md"
+  sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$SKILL_TPL" > "$proj/espalier/skills/espalier-security/SKILL.md"
+  cp "$RULE_TPL" "$proj/espalier/rules/security-standards.md"
+  printf '# Critical Paths\nEntry points: controllers / handlers / queue consumers in src/. No auth middleware unless shown in the change.\n' > "$proj/espalier/wiki/critical-paths.md"
+}
+
 # Build a throwaway project for the fixture and run the auditor headless.
 # Produces $WORK/$fid/espalier/changes/feat/eval/security-record.md
 run_audit() {
@@ -41,17 +66,12 @@ run_audit() {
   [ -n "$file" ] || file="src/change.js"
   local proj="$WORK/$fid"
   local cdir="$proj/espalier/changes/feat/eval"
-  mkdir -p "$proj/$(dirname "$file")" "$proj/espalier/rules" "$proj/espalier/agents" \
-           "$proj/espalier/skills/espalier-security" "$proj/espalier/wiki" "$cdir"
+  mkdir -p "$proj/$(dirname "$file")" "$cdir"
+  install_espalier "$proj"
 
   # fixture body (everything after the 2nd `---`) → the changed file
   awk 'body{print} /^---[[:space:]]*$/{c++; if(c==2) body=1}' "$fixture" > "$proj/$file"
 
-  # generate the security install the auditor reads (project name substituted)
-  sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-security.md"
-  sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$SKILL_TPL" > "$proj/espalier/skills/espalier-security/SKILL.md"
-  cp "$RULE_TPL" "$proj/espalier/rules/security-standards.md"
-  printf '# Critical Paths\nEntry points: controllers / handlers / queue consumers in src/. No auth middleware unless shown in the change.\n' > "$proj/espalier/wiki/critical-paths.md"
   printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file)\n- Notes: the change under audit.\n' "$file" > "$cdir/coding-report.md"
 
   claude -p --dangerously-skip-permissions --output-format text \
@@ -62,6 +82,53 @@ Read $proj/espalier/agents/harness-security.md and follow it EXACTLY (including 
 WHAT TO AUDIT: read $cdir/coding-report.md, then the file it lists ($proj/$file). Assume the client is hostile.
 
 Write your audit (OVERWRITE) to $cdir/security-record.md using your instruction file's EXACT output format (findings table + Verdict + the '## Security-Sensitive Fields' contract when a sensitive surface is touched). You have no Write/Edit tool — write the record via a Bash heredoc/redirection." >/dev/null 2>&1 || return 1
+}
+
+# Repo-audit mode: materialize the fixture's '=== FILE: <path> ===' blocks into a
+# throwaway project, run the auditor with the /espalier-audit spawn prompt, and
+# capture its FINAL MESSAGE (stdout) as the findings record — repo-audit mode
+# writes no security-record.md by design.
+# Produces $WORK/$fid/repo-findings.md
+run_repo_audit() {
+  local fixture="$1" fid="$2"
+  local proj="$WORK/$fid"
+  mkdir -p "$proj"
+  install_espalier "$proj"
+
+  # fixture body (after the 2nd `---`) → one file per '=== FILE: ... ===' block
+  awk 'body{print} /^---[[:space:]]*$/{c++; if(c==2) body=1}' "$fixture" \
+  | (
+      cur=""
+      while IFS= read -r line; do
+        case "$line" in
+          "=== FILE: "*" ===")
+            cur="${line#=== FILE: }"; cur="${cur% ===}"
+            mkdir -p "$proj/$(dirname "$cur")"
+            : > "$proj/$cur"
+            ;;
+          *)
+            [ -n "$cur" ] && printf '%s\n' "$line" >> "$proj/$cur"
+            ;;
+        esac
+      done
+    )
+
+  local filelist
+  filelist="$(sed -n -E 's/^=== FILE: (.*) ===$/\1/p' "$fixture")"
+  [ -n "$filelist" ] || return 1
+
+  claude -p --dangerously-skip-permissions --output-format text \
+"You are the harness-security auditor in REPO-AUDIT MODE for EvalApp. The project root is $proj; EVERY espalier/ path is relative to that root.
+
+Read $proj/espalier/agents/harness-security.md and follow its '## Repo-Audit Mode' section EXACTLY (including reading the rule $proj/espalier/rules/security-standards.md and skill $proj/espalier/skills/espalier-security/SKILL.md it references). You are auditing EXISTING code, not a change — there is no coding-report.md and no changes/ dir.
+
+SURFACE FILES TO AUDIT (paths relative to $proj — the code as it stands NOW):
+$filelist
+
+Trace every client-supplied value in these files to its authorization decision or persistence call. Assume the client is hostile. Do NOT write security-record.md — your ENTIRE final message must be the Repo-Audit output format from your instruction file (findings table + '**Batch verdict:**' + the '### Security-Sensitive Fields' / '### Controls Confirmed' / '### No Sensitive Fields' sections)." \
+    > "$WORK/$fid.repo-findings.md" 2>/dev/null || return 1
+  # claude -p can exit 0 with empty output on an aborted run — treat as failure.
+  [ -s "$WORK/$fid.repo-findings.md" ] || return 1
 }
 
 judge() {
@@ -82,17 +149,25 @@ Output ONE line of compact JSON only, no prose:
     2>/dev/null
 }
 
-for fixture in "$FIXTURES"/*.md; do
+for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   [ -e "$fixture" ] || { echo "ERROR: no fixtures found"; exit 2; }
   fid="$(basename "$fixture" .md)"
   kind="$(sed -n -E 's/^kind:[[:space:]]*//p' "$fixture" | head -1)"
+  mode="$(sed -n -E 's/^mode:[[:space:]]*//p' "$fixture" | head -1)"
 
-  if ! run_audit "$fixture" "$fid"; then
-    echo "$fid: auditor run failed"; fail_count=$((fail_count + 1)); continue
-  fi
-  record="$WORK/$fid/espalier/changes/feat/eval/security-record.md"
-  if [ ! -f "$record" ]; then
-    echo "$fid: auditor wrote no security-record.md"; fail_count=$((fail_count + 1)); continue
+  if [ "$mode" = "repo-audit" ]; then
+    if ! run_repo_audit "$fixture" "$fid"; then
+      echo "$fid: repo-audit run failed"; fail_count=$((fail_count + 1)); continue
+    fi
+    record="$WORK/$fid.repo-findings.md"
+  else
+    if ! run_audit "$fixture" "$fid"; then
+      echo "$fid: auditor run failed"; fail_count=$((fail_count + 1)); continue
+    fi
+    record="$WORK/$fid/espalier/changes/feat/eval/security-record.md"
+    if [ ! -f "$record" ]; then
+      echo "$fid: auditor wrote no security-record.md"; fail_count=$((fail_count + 1)); continue
+    fi
   fi
   if ! line="$(judge "$fixture" "$record")"; then
     echo "$fid: judge failed"; fail_count=$((fail_count + 1)); continue

@@ -59,12 +59,20 @@ version. Up to TEN migrations may apply, always in this order:
    pipeline files (`pipeline.md`, `espalier-fix`), appends a `## Re-review Rounds`
    section to `harness-reviewer.md`, and inserts the certificate check into
    `pre-push-gate.sh`. Mechanical: `scripts/migrate-v0.8.1-to-v0.8.2.sh`.
-10. **v0.8.2 → v0.9.0** — security audit: a new `harness-security` agent joins
-   Stage 4 as a review panel; a `security-standards` rule + `espalier-security`
-   skill are added, and the coder/reviewer/testing/push-gate gain security
-   sections. Creates the three new files, `bootstrap --force` refreshes the
-   pure-copy pipeline + symlinks + runs the 32-check validation, and surgical
-   appends patch the per-project files. Mechanical:
+10. **v0.8.2 → v0.9.0** — security audit + production hardening (one release):
+   a new `harness-security` agent joins Stage 4 as a review panel; a
+   `security-standards` rule + `espalier-security` skill are added, and the
+   coder/reviewer/testing/push-gate gain security sections. Ships
+   `/espalier-audit`, the repo-wide audit lane (`espalier-audit` skill + a
+   Repo-Audit Mode section). Adds an always-loaded `production-standards` rule
+   (resilience / observability / data-safety, tiered severity) the coder writes
+   to and the reviewer enforces; per-round `VERDICT:` sentinels + dual-record
+   freshness; a fail-closed push gate (cwd guard) + programmatic build/lint gate;
+   a deploy-aware Stage 9; the TTY→explicit-signal gate fix; and a single shipped
+   `scout-prompts` file for prune/doctor. Creates the new per-project files,
+   `bootstrap --force` refreshes the pure-copy pipeline/grill/hooks + copies
+   scout-prompts + symlinks both new rules + runs the 37-check validation, and
+   surgical appends patch the per-project files. Mechanical:
    `scripts/migrate-v0.8.2-to-v0.9.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
@@ -156,11 +164,19 @@ elif [ -d "espalier" ]; then
   fi
   # v0.9.0: the security audit. A new harness-security agent joins Stage 4 as a
   # review panel; a security-standards rule + espalier-security skill are added and
-  # the coder/reviewer/gate gain security sections. The "review panel" text rides
-  # the pure-copy pipeline; harness-security.md is a new per-project file a plugin
-  # update cannot reach — either absent ⇒ pre-v0.9.0.
+  # the coder/reviewer/gate gain security sections. v0.9.0 also ships the
+  # /espalier-audit repo-wide lane (espalier-audit skill + a Repo-Audit Mode
+  # section in the security agent). The "review panel" text rides the pure-copy
+  # pipeline; harness-security.md is a new per-project file a plugin update
+  # cannot reach — any absent ⇒ pre-v0.9.0 (or a pre-fold v0.9.0 the script
+  # completes idempotently).
   if ! grep -qF "review panel" espalier/pipeline.md 2>/dev/null \
-     || [ ! -f espalier/agents/harness-security.md ]; then
+     || [ ! -f espalier/agents/harness-security.md ] \
+     || [ ! -f espalier/skills/espalier-audit/SKILL.md ] \
+     || ! grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md 2>/dev/null \
+     || [ ! -f espalier/rules/production-standards.md ] \
+     || ! grep -qF "## Production-Aware Coding" espalier/agents/harness-coder.md 2>/dev/null \
+     || ! grep -qF "cd defensively too" espalier/hooks/pre-push-gate.sh 2>/dev/null; then
     NEEDS_V09_MINOR=yes
   fi
 fi
@@ -287,6 +303,12 @@ completed.
 
 Each script's verification block prints `X passed, Y failed`. Surface every
 script's output to the user.
+
+Mid-chain, an intermediate script's `bootstrap --force` health check may WARN
+about missing artifacts from a NEWER version ("expected mid-chain") — that is
+normal, not a failure: a later migration in the chain installs them and the
+final step re-validates everything. Only treat a script as failed on a nonzero
+exit or a `✗` in its own verification block.
 
 ### Step 7: Report verification + next steps
 
@@ -434,13 +456,18 @@ the anchor). Idempotent — re-running detects an already-v0.8.2 install and no-
 | `--yes` | Skip the apply confirmation prompt |
 | `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
 
-Creates the three new per-project files (security-standards rule, harness-security
-agent, espalier-security skill) with project-name + tools-mode substitution, then
-`bootstrap --force` refreshes the pure-copy pipeline files + symlinks + runs the
-32-check validation. Surgically appends the security sections to the per-project
-`harness-coder.md` / `harness-reviewer.md` / `espalier-testing` SKILL and inserts
-the secret/dependency scan into `pre-push-gate.sh`. Idempotent — the already-v0.9.0
-check requires all five artifacts present, so a crash mid-run is completed on re-run.
+Creates the new per-project files (security-standards + production-standards
+rules, harness-security agent, espalier-security skill) with project-name +
+tools-mode substitution, then `bootstrap --force` refreshes the pure-copy
+pipeline/grill files + drift-helpers/wrapper/lookup hooks + copies scout-prompts
++ symlinks both new rules + the audit skill + runs the 37-check validation.
+Surgically appends the security AND production sections to the per-project
+`harness-coder.md` / `harness-reviewer.md` / `espalier-testing` SKILL (and the
+Repo-Audit Mode section to a pre-fold `harness-security.md`), inserts the
+secret/dependency scan + the cwd fail-closed guard into `pre-push-gate.sh`, and
+patches CLAUDE.md + `espalier/agent.md`. Idempotent — the already-v0.9.0 check
+requires all ten artifacts present (security + audit + production), so a crash
+mid-run is completed on re-run.
 
 ## Anti-Patterns
 

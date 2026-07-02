@@ -205,10 +205,15 @@ Return JSON ONLY:
 
 If no tests exist at all, status = "no_evidence".
 
-### Call 5 — scout (1.5 git + CI)
+### Call 5 — scout (1.5 git + CI + deploy)
 
 ```
 Read git log + CI configs (.github/workflows/, Jenkinsfile, Makefile, justfile).
+Also look for deploy configuration: deploy workflows/jobs, Procfile, Dockerfile +
+compose/k8s manifests, fly.toml, vercel.json, serverless.yml — and any health/
+readiness endpoint the app exposes (grep routes for /health, /healthz, /ready,
+/ping). Deploy discovery is OPTIONAL — when the repo has no deploy config, set
+"deploy": null (do NOT invent one; Stage 9 records a clean skip).
 
 Return JSON ONLY:
 {
@@ -221,11 +226,19 @@ Return JSON ONLY:
       "build": "<exact command, e.g. 'npm run build'>",
       "lint": "<exact command>",
       "test": "<exact command>"
+    },
+    "deploy": {
+      "mechanism": "<e.g. 'GitHub Actions deploy.yml on main' | 'fly deploy'>",
+      "command": "<exact command, or 'automatic on merge'>",
+      "health_check": "<URL path or command, e.g. 'GET /healthz'>",
+      "environment": "<staging|production|both — what a merged change reaches>"
     }
   },
   "evidence_files": [...]
 }
 ```
+
+`deploy` is `null` when no deploy config exists — never guessed.
 
 ### Call 6 — scout (1.6 unwritten rules)
 
@@ -402,6 +415,7 @@ DISCOVERY = {
   coding: { naming, error_handling, async_pattern, ... }, // from 1.3
   testing: { framework, assertion_style, ... },           // from 1.4
   ci_checks: { build, lint, test },                       // from 1.5
+  deploy: { mechanism, command, health_check, environment } | null,  // from 1.5 (null = no deploy config)
   invariants, anti_patterns,                              // from 1.6
   best_practices: { recommendations, divergences },       // from 1.7
   data_models: { entities, relationships },               // from 1.8

@@ -224,7 +224,22 @@ Options:
    ```
    Read each, look for `Current Stage:` < 7 (in-progress).
 3. If matching slug found, RESUME from current stage.
-4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`.
+4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`
+   from `espalier/changes/_template/`. On creation, write `- Current Stage: 0`
+   and `- Status: IN_PROGRESS` to the Status block — this is what the collision
+   check (step 11) and Session Resumption read.
+
+## Stage State Protocol (MANDATORY — every stage)
+
+The fix lane uses the SAME per-stage state discipline as `/espalier` (its Stage
+Execution Protocol). At the START of each stage below, before doing the stage's
+work: write `- Current Stage: {N}` to this fix's pipeline-state.md and append a
+Stage History row. This is not optional bookkeeping — the **Stage 7 push gate
+blocks unless `Current Stage:` ≥ 7**, so a lane that never updates the stage
+number cannot push its own clean work. `Status:` stays `IN_PROGRESS` from
+creation until a terminal state (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED /
+PARTIAL_FIX) is written at the end. Stage numbers in this lane: 0, 1, 3, 4, 5,
+6, 7 (2/8/9/10 are skipped — see the overview table; the gate only requires ≥ 7).
 
 ## Stage 0 Pre-Flight (drift + conventions + doctor)
 
@@ -264,7 +279,9 @@ per the `espalier` skill's Convention Promotion section — the same four option
 
 ## Stage 0: Auto-Link Discovery (NEW)
 
-> Fully specified in plan §6 (Phase 4). Summary follows; see plan for full code.
+Self-contained below — this skill ships into the target project and cannot read
+any external plan. Stage 0 turns the bug input into a set of blamed commit SHAs
+(`SHAS` array), then resolves each to the change that introduced it.
 
 ### 0.1 Parse user input for a bug anchor
 
@@ -276,8 +293,56 @@ Priority order (try each until one succeeds):
 | 2 | `file:line` pattern in bug text | `src/payment.ts:42` | file, line |
 | 3 | Stack trace block | `at handler (src/auth.ts:88:14)` | list of file:line frames |
 | 4 | Bare file path | `bug in src/payment.ts` | file only |
-| 5 | Symbol name | `bug in processPayment function` | symbol → grep first match → file:line |
+| 5 | Symbol name | `bug in processPayment function` | symbol → grep matches → file:line |
 | 6 | No anchor at all | "checkout is broken" | prompt user |
+
+### 0.1a Resolve anchors to blamed SHAs (`SHAS` array)
+
+The `SHAS` array (index 0 = primary, consumed by 0.2) is built as follows. If
+`--caused-by` was given, skip blame entirely: `SHAS=()` and use the flag slug.
+
+```bash
+SHAS=()   # blamed commit SHAs, primary first
+
+_blame_line() {   # file, line -> append the commit that last touched that line
+  local file="$1" line="$2"
+  [ -f "$file" ] || return 0
+  local sha
+  sha=$(git blame -L "${line},${line}" --porcelain -- "$file" 2>/dev/null | awk 'NR==1{print $1}')
+  # skip an uncommitted line (all-zero SHA) — nothing to link
+  case "$sha" in ""|0000000*) return 0 ;; esac
+  SHAS+=("$sha")
+}
+
+# Priority 2 — file:line
+_blame_line "$FILE" "$LINE"
+
+# Priority 3 — stack trace: blame each frame in order (primary = top frame)
+#   FRAMES is an array of "file:line" parsed from the trace block.
+for frame in "${FRAMES[@]}"; do
+  _blame_line "${frame%%:*}" "${frame##*:}"
+done
+
+# Priority 4 — bare file (no line): blame the file's most recent commit
+if [ -n "$FILE" ] && [ -z "$LINE" ]; then
+  sha=$(git log -1 --format=%H -- "$FILE" 2>/dev/null)
+  [ -n "$sha" ] && SHAS+=("$sha")
+fi
+
+# Priority 5 — symbol: grep the repo; blame EACH match (not just the first — a
+# first-match-only guess silently mislinks). Cap at the Stage-0 fan-out of 5.
+if [ -n "$SYMBOL" ]; then
+  while IFS=: read -r mfile mline _; do
+    [ -n "$mfile" ] && _blame_line "$mfile" "$mline"
+    [ "${#SHAS[@]}" -ge 5 ] && break
+  done < <(grep -rnI --exclude-dir=.git -e "$SYMBOL" . 2>/dev/null | head -5)
+fi
+```
+
+De-duplicate `SHAS` preserving order (primary wins) before 0.2 consumes it. If
+`SHAS` is empty after all anchors AND no `--caused-by`, this is the priority-6
+"no anchor" case — prompt the user (or proceed with an empty `caused_by` list on
+a headless run; a fix with no causal link is valid, just unlinked).
 
 ### 0.2 Tiered reverse-lookup chain
 
@@ -495,16 +560,20 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
 3. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.
 
-**Non-interactive exception:** on a no-TTY run (same condition that auto-skips
-the grill), auto-approve and record it in the Stage History. Interactive runs
-ALWAYS prompt.
+**Non-interactive exception:** auto-approve ONLY when EXPLICITLY unattended —
+`interactivity_mode` (in `drift-helpers.sh`) returns `unattended` (`CI` /
+`ESPALIER_UNATTENDED` / `ESPALIER_LOOP` / `ESPALIER_HEADLESS` set). Do NOT use a
+bash TTY test: stdin has no TTY inside Claude Code even with the user present, so
+a TTY check would auto-approve every interactive fix — defeating the gate. If you
+can call `AskUserQuestion`, you ARE interactive and MUST prompt. Only a genuinely
+headless run auto-approves (record it in the Stage History).
 
 ## Stage 3: Coding
 
 **Baseline (first entry only):** before spawning the coder, record
 `Base-Ref: $(git rev-parse HEAD)` as a line in this fix's pipeline-state.md. Never
-overwrite it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint and
-the push gate.
+overwrite it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint,
+the push gate, AND the Stage 5 regression-test verification against pre-fix code.
 
 Spawn sub-agent. Prompt:
 
@@ -520,34 +589,48 @@ When done, write your coding report to:
 espalier/changes/fix/{slug}/coding-report.md
 ```
 
+**Stage 3 exit gate (PROGRAMMATIC):** after the coder returns (first pass and
+every re-spawn), re-run the discovered build + lint yourself; both must exit 0
+before the panel spawns. The coder's self-reported status is a claim, not the
+gate. A failure returns to the coder without a panel round.
+
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
 ## Stage 4: Code Review (fixpoint loop — a two-agent panel, re-review after EVERY fix)
 
 Run Stage 4 as a loop, not a single pass. Every round runs TWO fresh agents on the
-CURRENT diff, spawned concurrently — `harness-reviewer` (correctness / conventions,
-→ review-record.md) and `harness-security` (trust boundary — never trust frontend
-data, → security-record.md):
+CURRENT diff, spawned concurrently — `harness-reviewer` (correctness / conventions /
+production readiness, → review-record.md) and `harness-security` (trust boundary —
+never trust frontend data, → security-record.md). BOTH records are OVERWRITTEN each
+round and end with a `VERDICT:` sentinel line. Before every panel spawn, run the
+Stage 3 programmatic gate: re-run the discovered build + lint commands yourself —
+the coder's self-report is a claim, not the gate; a failure goes back to the coder
+without spawning the panel and without counting a P0 round.
 
-1. Spawn the FRESH panel on the CURRENT diff. Output to
-   `espalier/changes/fix/{slug}/review-record.md` and `.../security-record.md`. On a
-   re-review round, also hand each agent the "changed since last review" set (the
-   fix's files from the latest coding-report.md) so they scrutinize the new code
-   while owning the whole-diff verdict. `harness-security` OVERWRITES
-   security-record.md each round (current round only); before spawning, note its
-   baseline state, and after BOTH return confirm it was written THIS round — a
-   missing or unchanged file means the security agent did not complete, so re-spawn
-   it; never treat a missing/stale file as a pass.
-2. **Read the current-round verdict + P0 rows from BOTH `review-record.md` and
-   `security-record.md`. A P0 in EITHER →** re-spawn `harness-coder` with the
-   combined findings, then **return to step 1 and re-review the new diff with the
-   whole panel.** Never advance to Stage 5 on the coder's fix report alone — a fix is
-   never the last action before the gate; a clean panel is. Each P0 round increments
-   the counter; at counter = 2, escalate to a human WITHOUT another re-spawn (a
-   security P0 shares this counter).
-3. **Zero P0 from BOTH agents on a fresh review of the current code →** PASS. Record
-   the certificate: `git add -A` (so new files count), then overwrite `Reviewed-Diff`
-   in pipeline-state.md with
+1. **Baseline BOTH records** (`espalier/changes/fix/{slug}/review-record.md` and
+   `.../security-record.md` — exists? size/mtime), then spawn the FRESH panel on
+   the CURRENT diff in ONE message. Pass each agent `ROUND: {n}` AND the
+   `CAUSAL CONTEXT` line (the `caused_by` slugs + "verify the fix does not
+   regress these features' acceptance criteria — read their requirements.md")
+   so the regression check reaches the reviewer at Stage 4, not only at Stage 6.
+   On a re-review round, also hand each agent the "changed since last review" set
+   (the fix's files from the latest coding-report.md) so they scrutinize the new
+   code while owning the whole-diff verdict.
+2. **Completion check — BOTH files.** Each record must exist, differ from its
+   baseline, and end with a `VERDICT:` sentinel carrying `round={n}`. A missing,
+   unchanged, or sentinel-less record means that agent did NOT complete —
+   re-spawn that agent (once; a second failure → escalate). Never treat a
+   missing/stale record as a pass.
+3. **Gate read: `grep '^VERDICT:' <record> | tail -1` from EACH file. `p0=` > 0
+   in EITHER →** snapshot both sentinels into pipeline-state.md Stage History,
+   re-spawn `harness-coder` with the combined findings, then **return to step 1
+   and re-review the new diff with the whole panel.** Never advance to Stage 5 on
+   the coder's fix report alone — a fix is never the last action before the gate;
+   a clean panel is. Each P0 round increments the counter; at counter = 2,
+   escalate to a human WITHOUT another re-spawn (a security P0 shares this counter).
+4. **Both sentinels p0=0 on a fresh review of the current code →** PASS. Snapshot
+   the sentinels into Stage History, then record the certificate: `git add -A`
+   (so new files count), then overwrite `Reviewed-Diff` in pipeline-state.md with
    `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
    (`<Base-Ref>` = the Stage 3 SHA). The Stage 7 push gate blocks unless this still matches.
 
@@ -559,10 +642,10 @@ emits the `## Security-Sensitive Fields` abuse-test contract for Stage 5/6.
 
 ### Stage 4 Post-Review: Drift & Convention Index
 
-After Stage 4 PASSES (step 3 above — BOTH agents zero P0, certificate written),
+After Stage 4 PASSES (step 4 above — BOTH sentinels p0=0, certificate written),
 parse `review-record.md` for Convention Drift blocks (see `harness-reviewer.md`)
-and flag the affected rule files. Do NOT run this on a P0 round — a malformed-drift
-P0 written back mid-loop would contaminate the next round's P0 count.
+and flag the affected rule files. Run this BEFORE Stage 6 (which overwrites
+review-record.md). Do NOT run it on a P0 round.
 
 > Variable in scope: `SLUG` is this fix's slug (no `fix/` prefix).
 
@@ -582,15 +665,17 @@ python3 espalier/hooks/parse-drift-blocks.py "$REV" \
       echo "$LINE" >> "espalier/changes/fix/${SLUG}/pipeline-state.md"
       ;;
     MALFORMED)
-      echo "P0: malformed Convention Drift block — $RULE_FILE" \
-        >> "espalier/changes/fix/${SLUG}/review-record.md"
+      echo "convention_drift_malformed: $RULE_FILE (reviewer bundled blocks — drift NOT indexed)" \
+        >> "espalier/changes/fix/${SLUG}/pipeline-state.md"
       ;;
   esac
 done
 ```
 
-A `MALFORMED` line means the reviewer bundled unrelated drifts into one block —
-it is written back as a P0 so the next review round splits them.
+A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
+Stage 4 has already PASSED when this parse runs — record it in pipeline-state.md
+and surface one line to the user; never write a fake P0 into review-record.md
+(it would contaminate the Stage 6 gate read).
 
 **Convention Observations → the convention index.** The reviewer also emits
 lower-bar Convention Observations (see `harness-reviewer.md`) — one per
@@ -626,12 +711,16 @@ ORIGINAL CAUSE (for regression test scope): {paste caused_by entries}
 
 Write tests for the fix. Required:
 1. A regression test that reproduces the original bug (must FAIL on the
-   pre-fix code; PASS on the current code).
+   pre-fix code; PASS on the current code — the orchestrator verifies the
+   FAIL half mechanically against Base-Ref after you return).
 2. A test from the original feature's spec (proves the causing feature
    still works — read its requirements.md acceptance criteria).
 3. For EVERY entry in espalier/changes/fix/{slug}/security-record.md's
    `## Security-Sensitive Fields` contract (if present), the negative abuse
    test it names: tamper the value → assert rejected → assert store unchanged.
+4. For every NEW external-call path the fix introduced, a failure-mode test
+   (dependency times out / errors → decided failure behaviour, no partial
+   write) per espalier/rules/production-standards.md.
 
 If a meaningful test requires touching files OUTSIDE the fix's scope (>2
 additional files or crossing a layer boundary), append the Test Scope
@@ -650,6 +739,45 @@ if grep -q "^- TEST_SCOPE_INFLATION: true" "$COD"; then
 fi
 ```
 
+### Stage 5 regression verification (PROGRAMMATIC — proves the test earns its keep)
+
+A regression test that passes on BOTH the fixed and the pre-fix code proves
+nothing. Verify mechanically that the new regression test FAILS at `Base-Ref`
+(pre-fix) and PASSES now — using a detached git worktree so the check never
+disturbs the working tree. Record the result in coding-report.md; the reviewer
+reads it at Stage 6.
+
+```bash
+BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | tail -1 | awk '{print $2}')
+COD="espalier/changes/fix/${SLUG}/coding-report.md"
+REG_TESTS="{the regression test file(s) the coder just wrote}"   # from coding-report.md
+
+if [ -n "$BASE_REF" ]; then
+  WT=$(mktemp -d)
+  # Detached worktree at the pre-fix commit; keep the tree free of the fix.
+  if git worktree add --detach "$WT" "$BASE_REF" >/dev/null 2>&1; then
+    # Copy ONLY the new regression test(s) onto pre-fix code, then run them.
+    for t in $REG_TESTS; do mkdir -p "$WT/$(dirname "$t")"; cp "$t" "$WT/$t"; done
+    ( cd "$WT" && {test_command} ) > "$WT/.reg.out" 2>&1
+    if [ $? -ne 0 ]; then
+      echo "- REGRESSION_VERIFIED: true (test fails on pre-fix $BASE_REF, passes on fix)" >> "$COD"
+    else
+      echo "- REGRESSION_VERIFIED: false — test PASSES on pre-fix code; it does not capture the bug (P0 at Stage 6)" >> "$COD"
+    fi
+    git worktree remove --force "$WT" >/dev/null 2>&1
+  else
+    echo "- REGRESSION_VERIFIED: skipped — could not create worktree at $BASE_REF" >> "$COD"
+    rm -rf "$WT"
+  fi
+else
+  echo "- REGRESSION_VERIFIED: skipped — no Base-Ref recorded" >> "$COD"
+fi
+```
+
+`{test_command}` is the project's discovered test command. A
+`REGRESSION_VERIFIED: false` is a P0 the Stage 6 reviewer must catch — the
+"regression test" does not reproduce the bug and would not catch a recurrence.
+
 ## Stage 6: Test Review
 
 Spawn `harness-reviewer`:
@@ -661,35 +789,46 @@ Read espalier/agents/harness-reviewer.md.
 REVIEW: tests added in coding-report.md at espalier/changes/fix/{slug}/.
 CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
+ROUND: {n} — put round={n} in your VERDICT sentinel line.
 
 Check:
-- Regression test would have failed on pre-fix code (assertions are meaningful)
+- Regression test would have failed on pre-fix code. The orchestrator recorded
+  `- REGRESSION_VERIFIED: {true|false|skipped}` in coding-report.md from a
+  Base-Ref worktree run. `false` → P0 (the test does not capture the bug).
+  `skipped` → verify the assertions capture the bug by reading them. Your job is
+  that the ASSERTIONS are meaningful, not tautological.
 - Original feature's acceptance criteria still pass
 - No tests are tautological (asserting the fix's masked behaviour instead of intended)
 - Security coverage: every field in security-record.md's `## Security-Sensitive
   Fields` contract has a passing abuse test (tamper → rejected → store unchanged).
   A missing one is a P0 → back to Stage 5.
+- Failure-mode coverage: every NEW external-call path has a dependency-failure
+  test (per espalier/rules/production-standards.md). A missing one is a P1.
 
 If the fix is correct given its current scope BUT the scope itself is wrong
 (symptom-mask, wrong layer, architectural concern), emit verdict
 ESCALATION_REQUIRED with the required Escalation Reason block.
 
-Write review to: espalier/changes/fix/{slug}/review-record.md
+Write (OVERWRITE) review to: espalier/changes/fix/{slug}/review-record.md
+End the file with your VERDICT sentinel line.
 ```
 
-After sub-agent returns:
+After sub-agent returns (sentinel first; legacy `**Verdict:**` kept as fallback):
 ```bash
 REV="espalier/changes/fix/${SLUG}/review-record.md"
-if grep -q '^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
+if grep -qE '^VERDICT: ESCALATION_REQUIRED|^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
   _fire_late_escalation_prompt 6
 fi
 ```
 
-**Fixpoint + certificate.** Stage 6 is a loop like Stage 4: a P0 in the test review
-sends the tests back to Stage 5 (re-spawn coder), then **re-review** — never exit on
-the fix report alone (max 2 rounds → escalate). On a clean PASS, refresh
-`Reviewed-Diff` in pipeline-state.md (same `git add -A` + fingerprint command as
-Stage 4) so it now covers the added tests; the push gate compares against this.
+**Fixpoint + certificate.** Stage 6 is a loop like Stage 4: freshness-check
+review-record.md against its baseline each round, gate on
+`grep '^VERDICT:' | tail -1`, snapshot each round's sentinel into Stage History.
+A P0 sends the tests back to Stage 5 (re-spawn coder), then **re-review** — never
+exit on the fix report alone (max 2 rounds → escalate). On a clean PASS
+(sentinel p0=0), refresh `Reviewed-Diff` in pipeline-state.md (same `git add -A`
++ fingerprint command as Stage 4) so it now covers the added tests; the push
+gate compares against this.
 
 ## Stage 7: Push (with back-link)
 

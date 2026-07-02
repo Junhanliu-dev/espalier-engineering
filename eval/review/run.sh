@@ -16,12 +16,20 @@ PROJECT="$HERE/project"
 TPL="$HERE/../../skills/espalier-init/templates"
 AGENT_TPL="$TPL/agents/harness-reviewer.md"
 REVIEW_SKILL_TPL="$TPL/skills/espalier-review.md"
+PROD_RULE_TPL="$TPL/rules/production-standards.md"
+SEC_RULE_TPL="$TPL/rules/security-standards.md"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 GATE_CATCH_RATE="0.80"
 
-for f in "$AGENT_TPL" "$REVIEW_SKILL_TPL" "$RUBRIC" "$PROJECT/coding-standards.md" "$PROJECT/engineering-structure.md"; do
+# Optional $1: a fixture glob (e.g. 'rule-*.md') for partial re-runs after a
+# transient (rate-limit) failure. The RESULT then covers only that subset — the
+# release gate is the no-argument FULL run.
+FIXTURE_GLOB="${1:-*.md}"
+[ "$FIXTURE_GLOB" = "*.md" ] || echo "NOTE: partial run (glob=$FIXTURE_GLOB) — the release gate requires the full suite."
+
+for f in "$AGENT_TPL" "$REVIEW_SKILL_TPL" "$PROD_RULE_TPL" "$SEC_RULE_TPL" "$RUBRIC" "$PROJECT/coding-standards.md" "$PROJECT/engineering-structure.md"; do
   [ -f "$f" ] || { echo "ERROR: required file not found: $f"; exit 2; }
 done
 [ -d "$FIXTURES" ] || { echo "ERROR: fixtures dir not found at $FIXTURES"; exit 2; }
@@ -45,6 +53,10 @@ run_review() {
 
   cp "$PROJECT/coding-standards.md"      "$proj/espalier/rules/coding-standards.md"
   cp "$PROJECT/engineering-structure.md" "$proj/espalier/rules/engineering-structure.md"
+  # v0.9.0: the reviewer's Before-Reviewing step reads these always-loaded rules.
+  # Universal seeds bind even with the {discovered} cells unfilled.
+  cp "$PROD_RULE_TPL" "$proj/espalier/rules/production-standards.md"
+  cp "$SEC_RULE_TPL"  "$proj/espalier/rules/security-standards.md"
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-reviewer.md"
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$REVIEW_SKILL_TPL" > "$proj/espalier/skills/espalier-review/SKILL.md"
   printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file path)\n- Notes: the change under review.\n' "$file" > "$cdir/coding-report.md"
@@ -52,7 +64,7 @@ run_review() {
   claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-reviewer for ReviewApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
-Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md and $proj/espalier/rules/engineering-structure.md and $proj/espalier/skills/espalier-review/SKILL.md. Judge ONLY against those project rules, not generic opinions.
+Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md, $proj/espalier/rules/engineering-structure.md, $proj/espalier/rules/production-standards.md, and $proj/espalier/skills/espalier-review/SKILL.md. Judge ONLY against those project rules, not generic opinions.
 
 WHAT TO REVIEW: read $cdir/coding-report.md, then the file it lists ($proj/$file).
 
@@ -76,7 +88,7 @@ Output ONE line of compact JSON only, no prose:
     2>/dev/null
 }
 
-for fixture in "$FIXTURES"/*.md; do
+for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   [ -e "$fixture" ] || { echo "ERROR: no fixtures found"; exit 2; }
   fid="$(basename "$fixture" .md)"
   kind="$(sed -n -E 's/^kind:[[:space:]]*//p' "$fixture" | head -1)"

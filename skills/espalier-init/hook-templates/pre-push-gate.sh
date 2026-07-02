@@ -1,6 +1,12 @@
 #!/bin/bash
 # Pre-push quality gate
-# Blocks git push unless all conditions are met
+# Blocks git push unless all conditions are met.
+#
+# Runs from the repo root: the wrapper cd's here, but cd defensively too so a
+# direct invocation from a subdir still resolves the relative espalier/ paths
+# below (a wrong cwd would make every `-f` test miss and fail OPEN).
+_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -n "$_ROOT" ] && cd "$_ROOT" || true
 
 # Doctor-cadence reminder — non-blocking, printed before any gate logic so it
 # fires on every push regardless of gate outcome (the gate has early-exit
@@ -31,8 +37,9 @@ if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
   exit 0  # Allow but warn
 fi
 
-# Check pipeline stage (must be ≥ 7)
-CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" | grep -oE '[0-9]+')
+# Check pipeline stage (must be ≥ 7). Take the FIRST match's first integer —
+# `grep -oE '[0-9]+'` across multiple matching lines would concatenate digits.
+CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" | head -1 | grep -oE '[0-9]+' | head -1)
 if [ -n "$CURRENT_STAGE" ] && [ "$CURRENT_STAGE" -lt 7 ]; then
   echo "BLOCKED: Pipeline is at Stage $CURRENT_STAGE (need ≥ 7 for push)"
   echo "Complete code review and tests before pushing."

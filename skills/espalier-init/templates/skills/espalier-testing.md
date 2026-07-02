@@ -41,6 +41,20 @@ A happy-path test does NOT satisfy the contract. See
 `espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at Stage 6 —
 a contracted field with no abuse test is a P0.
 
+## Failure-Mode Tests (every NEW external-call path)
+
+Production code is proven by how it fails. For each external-call path the
+change introduces (HTTP/RPC/DB/queue/third-party SDK), write at least one test
+where the dependency fails — timeout, error response, or garbage payload — and
+assert the DECIDED failure behaviour from `espalier/rules/production-standards.md`:
+
+- the fallback is used, OR the error propagates with context (never swallowed)
+- no partial write persisted (the store is unchanged or consistently rolled back)
+- the failure is visible (error-level log emitted, per the project's logger)
+
+Use the project's mock/fixture conventions above to simulate the failure.
+Enforced at Stage 6 — a new external call with no failure-mode test is a P1.
+
 ## What NOT to Test
 - Private internals (test via public interface)
 - Framework behavior (trust the framework)

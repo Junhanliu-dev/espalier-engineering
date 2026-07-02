@@ -21,21 +21,34 @@ Each finding MUST include:
 - [ ] New code placed in correct layer/module
 - [ ] No forbidden cross-layer dependencies
 - [ ] {detected convention} is followed
-- [ ] External calls have timeout/fallback (if applicable)
 - [ ] Tests cover the changed interface
 
 ## General Checks
 - [ ] Correctness: Does it do what the requirement says?
 - [ ] Consistency: Does it match existing patterns?
 - [ ] Completeness: Edge cases handled?
-- [ ] Performance: No obvious N+1, unbounded queries?
+
+## Production-Readiness Checks (espalier/rules/production-standards.md)
+Severity tiers are defined in the rule — P0 for the data-loss class, P1 for
+production-readiness gaps.
+- [ ] External calls carry a timeout + decided failure behaviour (P1 if not)
+- [ ] List queries on request paths are bounded/paginated (P1); no N+1 on hot paths
+- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome (P1)
+- [ ] No swallowed errors; persistence-path failures never continue as success (P0 on money/state paths)
+- [ ] Migrations follow expand → migrate → contract; destructive steps are requirement-authorized (P0 if not)
+- [ ] Mutating consumers/webhooks are idempotent under redelivery (P1)
 
 ## Output Template
 
-### Review: {what was reviewed}
-| # | Priority | Problem | Fix |
-|---|----------|---------|-----|
-| 1 | P0 | ... | ... |
-| 2 | P1 | ... | ... |
+The CANONICAL output format (columns, verdict vocabulary, sentinel line) is
+defined in `espalier/agents/harness-reviewer.md` — that file wins on any
+disagreement. Shape:
 
-**Verdict:** PASS / PASS WITH FIXES / FAIL
+### Review: {what was reviewed}
+| # | Priority | File | Problem | Fix |
+|---|----------|------|---------|-----|
+| 1 | P0 | path/file.ext | ... | ... |
+| 2 | P1 | path/file.ext | ... | ... |
+
+**Verdict:** PASS / PASS_WITH_FIXES / FAIL / ESCALATION_REQUIRED
+(ESCALATION_REQUIRED is fix-lane-only — see the agent file for when.)
