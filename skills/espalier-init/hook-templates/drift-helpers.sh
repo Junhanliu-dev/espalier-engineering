@@ -146,6 +146,14 @@ doctor_stamp() {
 }
 
 # detect_run_mode — attended | unattended | ambiguous.
+#
+# WARNING (do not gate human checkpoints on this): a bare `[ -t 0 ]` TTY test
+# reports "unattended" inside an interactive Claude Code session, because the
+# harness does not attach a TTY to the tool's stdin. Using this to auto-approve
+# the grill / requirements gates silently defeats them in normal interactive
+# use. For those gates use `interactivity_mode` below. This function is kept for
+# prune's report-only fallback, where a false "unattended" only means "write the
+# diff to a file instead of prompting" — safe either way.
 detect_run_mode() {
   [ -n "${CI:-}" ]                  && { echo unattended; return; }
   [ -n "${ESPALIER_UNATTENDED:-}" ] && { echo unattended; return; }
@@ -153,4 +161,29 @@ detect_run_mode() {
   [ ! -t 0 ]                        && { echo unattended; return; }
   [ -t 0 ] && [ -t 1 ]              && { echo attended;   return; }
   echo ambiguous
+}
+
+# interactivity_mode — the CORRECT signal for whether a human checkpoint
+# (grill question, requirements approval) can prompt. It answers "can the
+# orchestrator ask the user a question right now?" — which the bash TTY test
+# CANNOT, since the harness owns the real terminal, not this subshell.
+#
+# Contract: gates fire UNLESS a run is EXPLICITLY unattended. Only an explicit
+# env signal means "no human is here":
+#   CI, ESPALIER_UNATTENDED, ESPALIER_LOOP  → unattended (auto-approve + record)
+#   ESPALIER_HEADLESS                        → unattended (claude -p / SDK runs
+#                                              set this; prompting is impossible)
+# Everything else — including the TTY-less-but-interactive Claude Code session —
+# is "interactive": the orchestrator CAN and MUST use AskUserQuestion. Ambiguity
+# fails SAFE toward asking, never toward silently skipping the gate.
+#
+# The orchestrator is the authority: if it can call AskUserQuestion, it is
+# interactive regardless of what this returns. This helper only decides the
+# unattended AUTO-APPROVE path for genuinely headless runs.
+interactivity_mode() {
+  [ -n "${CI:-}" ]               && { echo unattended; return; }
+  [ -n "${ESPALIER_UNATTENDED:-}" ] && { echo unattended; return; }
+  [ -n "${ESPALIER_LOOP:-}" ]    && { echo unattended; return; }
+  [ -n "${ESPALIER_HEADLESS:-}" ] && { echo unattended; return; }
+  echo interactive
 }

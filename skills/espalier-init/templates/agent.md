@@ -15,15 +15,20 @@ following the Espalier structure below.
 |-----------|------|---------|-----------|
 | Structure | espalier/rules/engineering-structure.md | Module map | Always |
 | Standards | espalier/rules/coding-standards.md | Code conventions | Always |
-| Process | espalier/rules/development-process.md | Workflow rules | Always |
+| Process | espalier/rules/development-process.md | Workflow + deploy/verify | Always |
+| Security | espalier/rules/security-standards.md | Trust boundary + sensitive-field taxonomy | Always |
+| Production | espalier/rules/production-standards.md | Resilience / observability / data-safety NFR bar | Always |
 | Coding | espalier/skills/espalier-coding/ | Implementation specs | Coding phase |
 | Review | espalier/skills/espalier-review/ | Quality gates | Review phase |
+| Security audit | espalier/skills/espalier-security/ | Trust-boundary audit checklist | Review phase |
 | Testing | espalier/skills/espalier-testing/ | Test generation | Testing phase |
 | Requirements | espalier/skills/espalier-requirements/ | Requirement decomposition | Analysis phase |
+| Grill | espalier/skills/espalier-grill/ | Stage 1 requirement/diagnosis interrogation | Analysis phase |
 | Wiki | espalier/wiki/ | Business context | On demand |
 | Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
 | Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator (5-stage) | Via /espalier-fix |
 | Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
+| Audit    | espalier/skills/espalier-audit/ | Repo-wide security audit → wiki/security-audit.md | Via /espalier-audit |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting

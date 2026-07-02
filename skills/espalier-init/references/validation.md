@@ -1,6 +1,6 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 29 checks: 28 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override. The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 37 checks: 36 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override. The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
 
 After all generation and wiring is complete, validate end-to-end.
 
@@ -8,9 +8,9 @@ After all generation and wiring is complete, validate end-to-end.
 
 | # | Check | Command | Expected |
 |---|-------|---------|----------|
-| 1 | Rules auto-load | `ls -la .claude/rules/espalier-*` | 3 symlinks |
-| 2 | Skills discoverable | `ls -la .claude/skills/espalier*` | 6 symlinks (incl. bare `espalier`) |
-| 3 | Agents registered | `ls -la .claude/agents/harness-*` | 2 symlinks (names kept for stability) |
+| 1 | Rules auto-load | `ls -la .claude/rules/espalier-*` | 4 symlinks (structure, standards, process, security) |
+| 2 | Skills discoverable | `ls -la .claude/skills/espalier*` | symlinks incl. bare `espalier` + `espalier-security` |
+| 3 | Agents registered | `ls -la .claude/agents/harness-*` | 3 symlinks (harness-coder, harness-reviewer, harness-security) |
 | 4 | Hooks configured | `cat .claude/settings.json \| grep espalier` | Hook entries |
 | 5 | Symlinks valid | `readlink .claude/rules/espalier-structure.md` | Points to espalier/ |
 | 6 | Hooks executable | `test -x espalier/hooks/check-layer-boundaries.sh` | Exit 0 |
@@ -37,6 +37,14 @@ After all generation and wiring is complete, validate end-to-end.
 | 27 | Conventions TSV structural | `[ ! -s espalier/.conventions.tsv ] \|\| awk -F'\t' 'NF != 5 && NF != 6 { exit 1 }' espalier/.conventions.tsv` | Exit 0 (absent/empty allowed; every row has 5 or 6 tab-separated fields) |
 | 28 | Doctor cadence valid | `[ ! -f espalier/.doctor-cadence ] \|\| grep -qE '^cadence: (every-change\|weekly\|monthly\|manual)$' espalier/.doctor-cadence` | Exit 0 (absent allowed; if present, `cadence:` is a known value) |
 | 29 | espalier-ask skill present | `test -f .claude/skills/espalier-ask/SKILL.md` | Symlink resolves to the read-only Q&A skill |
+| 30 | Security rule wired | `[ -L .claude/rules/espalier-security.md ] && [ -e .claude/rules/espalier-security.md ]` | Symlink resolves to `espalier/rules/security-standards.md` |
+| 31 | Security agent present | `test -f .claude/agents/harness-security.md` | Symlink resolves to the trust-boundary auditor |
+| 32 | Security skill present | `test -f .claude/skills/espalier-security/SKILL.md` | Symlink resolves to the audit checklist |
+| 33 | Audit skill present | `test -f .claude/skills/espalier-audit/SKILL.md` | Symlink resolves to the repo-wide audit lane |
+| 34 | Repo-audit mode wired | `grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md` | The auditor agent carries the /espalier-audit mode section |
+| 35 | Production rule wired | `[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]` | Symlink resolves to `espalier/rules/production-standards.md` |
+| 36 | Production rule present | `test -f espalier/rules/production-standards.md` | The always-loaded NFR bar exists |
+| 37 | Scout prompts shipped | `test -f espalier/.scout-prompts.md` | Shared discovery prompts for prune + doctor |
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

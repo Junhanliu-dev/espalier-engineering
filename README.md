@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.8.0 — requirements approval gate.** Both pipelines now STOP after the requirement is written and reviewed, and wait for your explicit sign-off before any code is written (Approve / Edit / Abort). Previously Stage 1 → Stage 2 → Stage 3 chained automatically, so coding started the moment the requirement doc existed. Interactive-only — a no-TTY run auto-approves so unattended pipelines never hang. No new skill, no new stage; a refresh of the existing pipeline templates.
+> **v0.9.0 — security audit + production hardening.** Stage 4 now runs a two-agent panel: alongside the correctness reviewer, a new `harness-security` auditor checks the change's trust boundary on one rule — *never trust data the frontend sent.* It hard-blocks any sensitive field (price, userId, role, orderId, status, …) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. `harness-coder` reads the same taxonomy while writing, so security shifts left. The push gate gains a secret scan (blocks) + dependency audit (warns). And because Stage 4 only sees *new* changes, a new `/espalier-audit` lane runs the same auditor repo-wide over your **existing** code — findings land in `espalier/wiki/security-audit.md`, each dispatchable to `/espalier-fix`. This release also adds an always-loaded **production-standards** bar (resilience / observability / data-safety) the coder writes to and the reviewer enforces at tiered severity, plus a batch of gate-integrity fixes (fail-closed push gate, programmatic build/lint gate, per-round verdict sentinels, a deploy-aware Stage 9).
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.6→v0.7→v0.8) in order. See [`docs/migrating-v0.7-to-v0.8.md`](./docs/migrating-v0.7-to-v0.8.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.7→v0.8→v0.8.1→v0.8.2→v0.9.0) in order. See [`docs/migrating-v0.8-to-v0.9.md`](./docs/migrating-v0.8-to-v0.9.md).
 
 ---
 
@@ -32,9 +32,9 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 
 ```
 espalier/
-├── rules/                  # always-loaded: engineering structure, coding standards, dev process
-├── skills/                 # phase-loaded: coding, review, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask
-├── agents/                 # delegated: harness-coder, harness-reviewer (separate tool sets)
+├── rules/                  # always-loaded: engineering structure, coding standards, dev process, security standards, production standards
+├── skills/                 # phase-loaded: coding, review, security, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask, /espalier-audit
+├── agents/                 # delegated: harness-coder, harness-reviewer, harness-security (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
 ├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
 ├── pipeline.md             # 10-stage workflow with explicit gates and rollback rules
@@ -75,6 +75,10 @@ Includes scope-creep escalation gates (predictive + reactive + test-scope + revi
 For "how does X work", "where is Y handled", "why is Z built this way", "what changed recently in X". Instead of exploring the codebase from scratch, it reads your `espalier/` docs first — the wiki for *how/where*, the change history (`requirements.md`, `review-record.md`) for *why* — then **verifies every doc claim against the actual code** before answering, and falls back to a codebase search when the docs come up short. Every claim is sourced (doc path and/or `file:line`).
 
 It is strictly read-only and not a pipeline lane — no stages, no gates, no `changes/` folder. Its only writes are two notify-only sidecars: if a doc it read contradicts the code, it flags that doc stale (the same signal `/espalier-doctor` produces) and points you at `/espalier-prune`; if the docs couldn't answer at all, it logs the question to `espalier/.ask-gaps.tsv` (git-tracked) as evidence of what the wiki should cover next.
+
+### `/espalier-audit` — repo-wide security audit (v0.9.0)
+
+The Stage 4 security audit is change-scoped: it guards code the pipeline writes, not the code you already had. `/espalier-audit` closes that gap — it enumerates the project's security surface (from the discovered trust boundary + wiki critical paths), runs `harness-security` in repo-audit mode over the **existing** handlers/consumers, and writes a point-in-time findings inventory to `espalier/wiki/security-audit.md` (priority, defect, required control, abuse test — per finding). It never edits code and never blocks anything; for each P0/P1 you select, it dispatches a `/espalier-fix` run, so every fix still gets its own approval gate, review panel (with a fresh security re-audit), and contracted abuse test. Optional `scope-path` argument bounds the audit on large repos. Typical uses: baselining a codebase that predates v0.9.0, or a periodic sweep.
 
 ### Keeping the guardrails in sync
 
@@ -130,7 +134,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~10 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, CI, unwritten rules, layer specs), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 29 validation checks.
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 37 validation checks.
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -148,7 +152,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (29 checks, no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (37 checks, no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 
@@ -227,6 +231,7 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 | `/espalier-prune <path>` (refresh a stale artifact) | LIGHT — one scout per file + a gated diff |
 | `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
 | `/espalier-ask <question>` (read-only Q&A) | LIGHT — reads a few docs + verifies against code; no sub-agents |
+| `/espalier-audit [path]` (repo-wide security audit) | LIGHT-MEDIUM — 1-4 read-only auditors over the security surface + one wiki write |
 | `/espalier-migrate` | LIGHT — script-driven, low LLM usage |
 | Re-run `/espalier-init` (already bootstrapped) | TRIVIAL — validate-only, ~few K tokens |
 
@@ -258,6 +263,12 @@ Five guiding principles:
 MIT — see [LICENSE](./LICENSE).
 
 ## Status
+
+`v0.9.0` — **security audit + repo-wide audit lane + production hardening.** Stage 4 is a two-agent review panel: a new `harness-security` auditor joins the correctness reviewer in the same fixpoint loop, auditing the change's trust boundary on one axiom — *never trust data the frontend sent.* It classifies every client-supplied value on five risk axes (money / identity / permission / owner / state) and hard-blocks any sensitive field the backend fails to re-derive, re-authorize, or recompute (IDOR/BOLA, price tampering, mass assignment, illegal state transitions). Each flagged field becomes an abuse-test contract Stage 5 must satisfy and Stage 6 enforces; `harness-coder` reads the same always-loaded `security-standards.md` at write-time. The push gate gains a secret scan (blocks) + dependency audit (warns). A new `/espalier-audit` lane runs the same auditor repo-wide over existing code, writing a findings inventory to `espalier/wiki/security-audit.md` with per-finding handoff into `/espalier-fix`.
+
+The same release folds in a **production-readiness pass**: a new always-loaded `production-standards.md` rule (resilience — timeouts / bounded queries / atomic state; observability — structured logs, no swallowed errors; data-safety — expand-migrate-contract, idempotent consumers) enforced by the reviewer at tiered severity (P0 for the data-loss class), with failure-mode tests required for new external calls. Plus the gate-integrity fixes a full-system audit surfaced: a **fail-closed push gate** (was fail-open from a subdirectory), a **programmatic build/lint gate** at Stage 3 (no longer trusts the coder's self-report), per-round `VERDICT:` sentinels with dual-record freshness (closes stale-verdict certification), the human-gate interactivity fix (bash TTY checks always read "non-interactive" inside Claude Code), an inlined fix-lane blame procedure + `Base-Ref` regression verification, and a deploy-aware Stage 9. Validation grows to 37 checks; `eval/security/` gates the auditor in both modes. New `migrate-v0.8.2-to-v0.9.0.sh`.
+
+`v0.8.2` — **re-review fixpoint loop + push-gate certificate.** Code review is now a loop, not a single pass: when the reviewer files a P0 and the coder fixes it, the fix is re-reviewed — the only way out of Stage 4 (and Stage 6) is a fresh review of the *current* code returning zero P0, so the coder is never the last actor before the gate, a reviewer always is. A new push-gate certificate binds the verdict to a content fingerprint of the reviewed source (`git hash-object` of the source diff vs a Stage-3 `Base-Ref`, with `espalier/` bookkeeping excluded), so a fix that skips re-review fails closed at push time. Closes the gap where a NEW bug introduced by a fix could ship unreviewed. Non-breaking — in-flight changes without a certificate fall through the gate with a warning. New `migrate-v0.8.1-to-v0.8.2.sh`.
 
 `v0.8.1` — **change-impact / runtime-surface agent guidance.** The coder and reviewer sub-agents now reason about *every* surface a change touches — admin/CRUD UIs, API validation, client forms, persisted data, other callers — not just the programmatic happy path. Closes a class of avoidable fix-round: a value made system-derived (auto-generated/defaulted/computed) but left user-required on a UI, so server-side generation succeeds while the UI still blocks the user before the hook runs. The coder gains a `## Change Impact Analysis` section (map the blast radius before coding); the reviewer gains a `## Runtime-Surface Review` section (a leftover required-on-derived constraint is a P1 defect). Purely additive agent guidance — non-breaking. New `migrate-v0.8-to-v0.8.1.sh` (the two agent files are per-project, so a plugin update can't reach them).
 

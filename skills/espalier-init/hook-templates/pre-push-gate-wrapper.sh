@@ -13,7 +13,13 @@ COMMAND=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin
 # Don't match unrelated mentions like `echo 'git push'` or comments.
 case "$COMMAND" in
   "git push"|"git push "*|*" git push"|*" git push "*)
-    exec bash "$CLAUDE_PROJECT_DIR/espalier/hooks/pre-push-gate.sh"
+    # Run the gate from the repo root so its relative espalier/ paths resolve
+    # regardless of the cwd the push was invoked from. Prefer the git toplevel;
+    # fall back to CLAUDE_PROJECT_DIR. A push from a subdir must NEVER silently
+    # skip the gate (that would fail OPEN — the exact hole this closes).
+    ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$CLAUDE_PROJECT_DIR")
+    cd "$ROOT" || { echo "BLOCKED: cannot cd to repo root ($ROOT) to run the push gate." >&2; exit 1; }
+    exec bash "$ROOT/espalier/hooks/pre-push-gate.sh"
     ;;
 esac
 

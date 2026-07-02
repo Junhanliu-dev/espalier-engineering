@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.8.1</span>
+      <span class="nav-pill">v0.9.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1518,9 +1518,9 @@ footer {
     <div class="tree-layout">
       <div class="tree">
         <div class="tree-root">espalier/</div>
-<span class="tree-row" data-key="rules">├── rules/                  <span class="gloss"># engineering structure, coding standards</span></span>
-<span class="tree-row" data-key="skills">├── skills/                 <span class="gloss"># coding, review, testing, /espalier-fix, /espalier-prune, /espalier-ask…</span></span>
-<span class="tree-row" data-key="agents">├── agents/                 <span class="gloss"># harness-coder, harness-reviewer</span></span>
+<span class="tree-row" data-key="rules">├── rules/                  <span class="gloss"># structure, coding, security, production standards</span></span>
+<span class="tree-row" data-key="skills">├── skills/                 <span class="gloss"># coding, review, testing, /espalier-fix, /espalier-ask, /espalier-audit…</span></span>
+<span class="tree-row" data-key="agents">├── agents/                 <span class="gloss"># harness-coder, harness-reviewer, harness-security</span></span>
 <span class="tree-row" data-key="wiki">├── wiki/                   <span class="gloss"># architecture, data models, critical paths</span></span>
 <span class="tree-row" data-key="hooks">├── hooks/                  <span class="gloss"># layer boundary, pre-push, post-merge drift</span></span>
 <span class="tree-row" data-key="pipeline">├── pipeline.md             <span class="gloss"># 10-stage workflow with gates &amp; rollback</span></span>
@@ -1745,13 +1745,19 @@ footer {
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.9.0</span> — Stage 4 now runs a two-agent panel. Alongside the correctness reviewer, a new <code style="font-family:var(--f-mono);color:var(--vine)">harness-security</code> auditor checks the change's trust boundary on one rule — <em>never trust data the frontend sent.</em> It hard-blocks any sensitive field (price, userId, role, orderId, status) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. The coder reads the same taxonomy while writing, so security shifts left. <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-audit</code> runs the same auditor repo-wide over your <em>existing</em> code, dispatchable to <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-fix</code>. The release also adds an always-loaded <em>production-standards</em> bar — resilience, observability, data-safety — the coder writes to and the reviewer enforces at tiered severity, plus a fail-closed push gate and a programmatic build/lint gate.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.8.2</span> — code review is now a fixpoint loop. When the reviewer files a P0 and the coder fixes it, the fix is re-reviewed — the only way out is a fresh review of the <em>current</em> code returning zero P0, so a new bug introduced by the fix can't slip through unreviewed. A push-gate certificate binds the verdict to a fingerprint of the reviewed source, so a fix that skips re-review fails closed at push time.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.7 → v0.8 → v0.8.1) in order.
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.8.1 → v0.8.2 → v0.9.0) in order.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Purely additive — no pipeline change. <span style="color:var(--paper)">Non-breaking.</span>
+          New pipeline runs get the loop; in-flight changes are unaffected. <span style="color:var(--paper)">Non-breaking.</span>
         </p>
       </div>
     </div>
@@ -2506,13 +2512,13 @@ const treeData = {
   skills: {
     kind: 'Phase-loaded',
     name: 'espalier/skills/',
-    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
+    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask, /espalier-audit. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
     loaded: 'Loaded per pipeline phase'
   },
   agents: {
     kind: 'Delegated',
     name: 'espalier/agents/',
-    desc: 'harness-coder (Write/Edit/Bash) and harness-reviewer (Read/Grep/Glob/Bash only). Separate invocations, separate tool sets — execution and judgment must come from different agents.',
+    desc: 'harness-coder (Write/Edit/Bash), harness-reviewer (Read/Grep/Glob/Bash — correctness + production-readiness), and harness-security (Read/Grep/Glob/Bash — the trust-boundary auditor). Separate invocations, separate tool sets — execution, judgment, and security come from different agents.',
     loaded: 'Spawned by orchestrator'
   },
   wiki: {

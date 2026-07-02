@@ -115,3 +115,77 @@ blast radius of the change:
 
 The goal is to surface a cross-surface impact at coding time, not discover it as
 a fix round after the change ships.
+
+## Security-Aware Coding (do this WHILE writing, not only at review)
+
+The Stage 4 security audit is a backstop, not permission to trust the client. Read
+`espalier/rules/security-standards.md` and apply it as you write ANY code that
+handles a request or writes to a persistent store: **the frontend is untrusted;
+the backend is the trust boundary.**
+
+For every client-supplied value your code reads (path param, query, body, header),
+classify it on the five risk axes (money / identity / permission / owner / state).
+For any that is sensitive:
+
+1. **owner / identity** — derive the actor from the session, never the request.
+   Before loading or mutating an object by a client-supplied id, assert the actor
+   owns it (or holds a permitting role). A client id is a lookup key, not an
+   authorization. *(User 1's request carrying id 2 must not touch object 2.)*
+2. **money** — never persist or charge a client-supplied `price`/`amount`/`total`.
+   Recompute from the source of truth (catalog / ledger).
+3. **permission** — never bind `role`/`isAdmin`/`scope` from the request body.
+   Decide server-side.
+4. **state** — change lifecycle fields only through a server-side transition that
+   checks both legality and actor.
+5. **stock / balance** — range-check and apply atomically (no read-then-write race).
+
+Never spread a raw request body into a persistence call — bind an explicit
+allow-list. Record each sensitive field you handled and the control you applied in
+coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
+
+### Writing Abuse Tests (Stage 5)
+
+When you run in testing mode (Stage 5), read the `## Security-Sensitive Fields`
+contract in `espalier/changes/{type}/{slug}/security-record.md` (emitted by the
+Stage 4 auditor). For EACH field listed, write the negative test named in its
+`abuse_test`: tamper the value, assert the request is rejected, and assert the
+persistent store is unchanged. A contracted field with no such test is a Stage 6
+blocker — do not skip one. See `espalier/skills/espalier-security/SKILL.md` for
+the recipe.
+
+## Production-Aware Coding (do this WHILE writing, not only at review)
+
+Read `espalier/rules/production-standards.md` and apply its seeds to every code
+path you write that calls an external system, serves a request, moves data, or
+changes a schema. The reviewer enforces these at Stage 4 with tiered severity —
+write them in the first place:
+
+1. **External call** → explicit timeout + a DECIDED failure behaviour (retry
+   with backoff / fallback / propagate-with-context). Use the project's
+   discovered mechanism (client wrapper, helper) — never a raw un-timeboxed call
+   when a wrapper exists.
+2. **List/collection read on a request path** → bounded (pagination / limit /
+   hard cap). Never "return the whole table".
+3. **New endpoint / handler / consumer** → at least one structured log with
+   actor, entity id, and outcome, via the project's logger. Never swallow an
+   error — a caught failure logs at error level WITH its cause, then follows the
+   project's error pattern.
+4. **Schema migration** → expand → migrate → contract. Additive first; code
+   reads both shapes; destructive steps land in a LATER change. A destructive
+   operation the requirement never asked for is a P0 — do not write it.
+5. **Mutating consumer / webhook / retried job** → idempotent (dedupe key,
+   upsert, idempotency token). Assume redelivery.
+6. **Shared mutable state** → applied atomically at the store; no
+   read-modify-write across a request boundary.
+
+Record each NFR mechanism you applied (timeout value, pagination bound, dedupe
+key, migration phase) in coding-report.md "Notes" — the reviewer confirms it
+rather than re-derives it.
+
+### Writing Failure-Mode Tests (Stage 5)
+
+In testing mode, for each NEW external-call path this change introduced, write
+at least one failure-mode test: make the dependency fail (timeout / error /
+garbage response) and assert the decided failure behaviour occurs — fallback
+used or error propagated with context, and no partial write persisted. Missing
+failure-mode coverage on a new external call is a P1 at Stage 6.

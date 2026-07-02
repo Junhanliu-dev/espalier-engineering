@@ -30,12 +30,22 @@ Run Steps 0–3 in order.
 
 ### Step 0 — Environment check
 
+Decide whether a human can answer a grill question. Do NOT use a bare `[ -t 0 ]`
+TTY test — inside Claude Code stdin has no TTY even when a user is right there,
+so that test would skip the grill in normal interactive use (the bug this
+closes). Use the explicit-signal helper instead:
+
 ```bash
-[ -t 0 ] || echo "non-interactive"
+. espalier/hooks/drift-helpers.sh
+interactivity_mode        # -> "interactive" | "unattended"
 ```
 
-If the session is non-interactive (no TTY), do NOT grill — a grill question would
-hang an unattended pipeline. Return the verdict `SKIPPED: non-interactive`.
+Only an EXPLICIT unattended signal (`CI`, `ESPALIER_UNATTENDED`, `ESPALIER_LOOP`,
+`ESPALIER_HEADLESS`) returns `unattended` — then do NOT grill (a question would
+hang an unattended pipeline); return the verdict `SKIPPED: non-interactive`.
+Otherwise you are interactive: grill normally. The real authority is the
+orchestrator — if it can call `AskUserQuestion`, it is interactive regardless;
+this check only governs the auto-skip for genuinely headless runs.
 
 ### Step 1 — Score ambiguity, choose depth
 

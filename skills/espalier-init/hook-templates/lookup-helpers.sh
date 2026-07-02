@@ -89,9 +89,16 @@ _fuzzy_file_overlap_match() {
     case "$state" in *_template*) continue ;; esac
 
     COUNT=0
-    for f in $FILES; do
-      grep -qF "$f" "$state" 2>/dev/null && COUNT=$((COUNT + 1))
-    done
+    # while-read (not `for f in $FILES`) so paths with spaces stay whole.
+    # Match a whole-path token in a Commits-table cell, not a bare substring —
+    # else `a.ts` spuriously matches `a.tsx` / `dir/a.ts.map` and inflates overlap.
+    while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      grep -qE "(^|[^[:alnum:]_./-])$(printf '%s' "$f" | sed 's/[.[\*^$/]/\\&/g')([^[:alnum:]_./-]|$)" "$state" 2>/dev/null \
+        && COUNT=$((COUNT + 1))
+    done <<EOF
+$FILES
+EOF
     if [ "$COUNT" -gt "$BEST_COUNT" ]; then
       BEST_COUNT=$COUNT
       BEST_STATE=$state
