@@ -56,6 +56,29 @@ vulnerabilities and punish both misses AND false alarms.
   quality defect — treat a completely absent contract on a vuln fixture as one
   false_positive-equivalent penalty (it breaks the Stage 5/6 handoff).
 
+## Repo-audit fixtures (`mode: repo-audit`)
+
+These score the `/espalier-audit` repo-audit mode: the fixture body is a set of
+`=== FILE: <path> ===` blocks (a whole small repo, not one change), and the
+record under judgment is the auditor's returned findings document (there is no
+security-record.md in this mode). All field definitions above apply, with:
+
+- **verdict_match** — compare the `**Batch verdict:**` line instead of
+  `**Verdict:**`: `FINDINGS` matches a `vuln` fixture, `CLEAN` matches a `clean`
+  fixture. Missing/garbled batch-verdict line → `verdict_match: 0`.
+- **false_positives** — additionally: a well-controlled endpoint belongs under
+  `### Controls Confirmed` (NOT a false positive); a listed file with no
+  sensitive client input belongs under `### No Sensitive Fields` — a P0/P1
+  finding manufactured on such a file IS a false positive. Server-side batch
+  jobs with no client input are not client-tamperable state transitions.
+- **Contract validity** — repo-audit emits a `### Security-Sensitive Fields`
+  entry **per finding only** (not per in-scope field). A caught finding with no
+  contract entry: still caught, but a completely absent contract section on a
+  fixture with planted vulns is one false_positive-equivalent penalty (it
+  breaks the /espalier-fix handoff). Do NOT penalize the absence of contract
+  entries for confirmed-controlled fields — that is the mode's specified
+  behavior.
+
 ## Judge discipline
 
 - Do not reward verbosity. Four crisp correct P0s beat ten vague findings.

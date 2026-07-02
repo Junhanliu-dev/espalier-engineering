@@ -41,6 +41,20 @@ The auditor traces each client-supplied value to where it reaches an authorizati
 - **Stage 4 → a panel** in `pipeline.md` and the `espalier` / `espalier-fix` skills: any P0 from either agent loops the coder; the `Reviewed-Diff` push certificate is written only when both are clean.
 - **Abuse tests are enforced.** For every sensitive field the auditor flags, Stage 5 must write a negative test (tamper → rejected → store unchanged) and Stage 6 blocks if one is missing.
 - **Coder / reviewer / testing** gain security sections; the **push gate** gains a secret scan (blocks) + a dependency audit (warns), both degrading gracefully when tooling is absent.
+- **New lane** `/espalier-audit` (`espalier/skills/espalier-audit/`) — the Stage 4 audit only sees new changes; this runs the same auditor repo-wide over your **existing** code (a `## Repo-Audit Mode` section in the agent), writes the findings inventory to `espalier/wiki/security-audit.md`, and hands each selected P0/P1 to `/espalier-fix`. CLAUDE.md and `espalier/agent.md` are patched to mention it.
+
+### Production hardening (same release)
+
+v0.9.0 also raises the bar on the code the pipeline *generates* and fixes a set of gate defects:
+
+- **New always-loaded rule** `espalier/rules/production-standards.md` — resilience (timeouts, bounded queries, atomic state), observability (structured logs, no swallowed errors), data-safety (expand→migrate→contract, idempotent consumers). The reviewer enforces it at tiered severity: **P0** for the data-loss class (destructive migration, unbounded write, swallowed error on a money/state path — hard-blocks the loop), **P1** for readiness gaps (missing timeout/log/pagination/idempotency). The coder reads it at write-time; new external calls require a failure-mode test.
+- **Fail-closed push gate** — the gate now runs from the repo root (wrapper + gate both `cd`), closing a hole where a `git push` from a subdirectory skipped the stage / review-certificate / secret checks and allowed the push.
+- **Programmatic Stage 3 gate** — the orchestrator re-runs build + lint itself before the review panel; the coder's self-reported status is no longer the gate.
+- **Per-round `VERDICT:` sentinels** — the reviewer and security records end with a machine-greppable verdict line and are overwritten per round, closing a stale-verdict certification path.
+- **Human-gate fix** — the grill and requirements-approval gates now key off an explicit `interactivity_mode` signal, not a bash TTY test (which reads "non-interactive" inside Claude Code and silently auto-approved).
+- **Deploy-aware Stage 9** — verifies a real deploy when init discovers one, records a clean `SKIPPED: no-deploy-config` when it doesn't.
+
+To fill the `{discovered}` cells of `production-standards.md` (your project's own timeout wrapper, logger, migration tool), run `/espalier-doctor` or edit the file — the universal seeds bind immediately either way.
 
 ## What to verify after upgrading
 
@@ -53,11 +67,19 @@ ls -l .claude/rules/espalier-security.md .claude/agents/harness-security.md .cla
 # the Stage 4 panel is wired
 grep -c "review panel" espalier/pipeline.md
 grep -c "harness-security" espalier/skills/espalier/SKILL.md
+
+# the repo-wide audit lane is wired
+ls -l .claude/skills/espalier-audit
+grep -c "## Repo-Audit Mode" espalier/agents/harness-security.md
 ```
 
 ## One manual step
 
 The migration cannot fill the `{discovered}` sections of `security-standards.md` — the trust boundary (your entry points, how identity / ownership / validation are done) and your project-specific sensitive field names. The **universal taxonomy and controls are live immediately**; to fill the discovered parts, run `/espalier-doctor` (it re-scouts) or edit the file by hand.
+
+## Recommended after upgrading
+
+Run `/espalier-audit` once. The Stage 4 audit protects changes from here on — the baseline audit inventories the trust-boundary holes already in the codebase (to `espalier/wiki/security-audit.md`) so you can burn them down through `/espalier-fix`.
 
 ## Rollback
 

@@ -254,10 +254,27 @@ BOOT_FLAGS="--force --project-dir=. --plugin-dir=$PLUGIN_INIT --merge-decision=$
 if [ "$DRY_RUN" = "yes" ]; then
   bash "$BOOTSTRAP" $BOOT_FLAGS --dry-run
 else
-  if ! bash "$BOOTSTRAP" $BOOT_FLAGS; then
-    echo "ERROR: bootstrap-espalier.sh failed — see output above. Aborting." >&2
-    exit 1
+  _boot_log=$(mktemp)
+  bash "$BOOTSTRAP" $BOOT_FLAGS > "$_boot_log" 2>&1
+  _boot_exit=$?
+  cat "$_boot_log"
+  if [ "$_boot_exit" -ne 0 ]; then
+    # A failure AFTER wiring (the "Validation: N/M FAILED" line was printed)
+    # means stages 1-10 completed and only the final health check is red —
+    # expected MID-CHAIN when the plugin is newer than this migration's target
+    # version (later-version artifacts are not installed yet; the next
+    # migration in the chain installs them, and the chain's final step
+    # re-validates everything). Anything else is a real bootstrap failure.
+    if grep -qE 'Validation: [0-9]+/[0-9]+ FAILED' "$_boot_log"; then
+      echo "WARN: bootstrap health check reports missing artifacts — expected mid-chain" >&2
+      echo "      with a newer plugin; continuing (a later migration completes them)." >&2
+    else
+      echo "ERROR: bootstrap-espalier.sh failed — see output above. Aborting." >&2
+      rm -f "$_boot_log"
+      exit 1
+    fi
   fi
+  rm -f "$_boot_log"
 fi
 
 # --- Step 3: append the Re-review Rounds section to the reviewer agent -------

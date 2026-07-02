@@ -103,6 +103,29 @@ description: smoke
 tools: Read
 ---
 EOF
+  # v0.9.0 security substitution files (checks 30-32, 34)
+  cat > "$dir/espalier/agents/harness-security.md" << 'EOF'
+---
+name: harness-security
+description: smoke
+tools: Read
+---
+## Repo-Audit Mode
+EOF
+  cat > "$dir/espalier/rules/security-standards.md" << 'EOF'
+# Security Standards
+EOF
+  # production-standards.md is a Phase-2 substitution file (checks 35-36)
+  cat > "$dir/espalier/rules/production-standards.md" << 'EOF'
+# Production Standards
+EOF
+  mkdir -p "$dir/espalier/skills/espalier-security"
+  cat > "$dir/espalier/skills/espalier-security/SKILL.md" << 'EOF'
+---
+name: espalier-security
+description: smoke test
+---
+EOF
 
   # Wiki
   for f in architecture data-models critical-paths external-services; do
@@ -150,6 +173,11 @@ assert "espalier-doctor skill copied"       "[ -f '$TMP/espalier/skills/espalier
 assert ".claude/skills/espalier-doctor link" "[ -L '$TMP/.claude/skills/espalier-doctor' ]"
 assert "espalier-ask skill copied"          "[ -f '$TMP/espalier/skills/espalier-ask/SKILL.md' ]"
 assert ".claude/skills/espalier-ask link"   "[ -L '$TMP/.claude/skills/espalier-ask' ]"
+assert "espalier-audit skill copied"        "[ -f '$TMP/espalier/skills/espalier-audit/SKILL.md' ]"
+assert ".claude/skills/espalier-audit link" "[ -L '$TMP/.claude/skills/espalier-audit' ]"
+assert ".claude/agents/harness-security link" "[ -L '$TMP/.claude/agents/harness-security.md' ]"
+assert ".claude/rules/espalier-production link" "[ -L '$TMP/.claude/rules/espalier-production.md' ]"
+assert "scout-prompts shipped"              "[ -f '$TMP/espalier/.scout-prompts.md' ]"
 assert ".doctor-cadence written"            "grep -q '^cadence: ' '$TMP/espalier/.doctor-cadence'"
 assert ".claude/agents/harness-coder link"  "[ -L '$TMP/.claude/agents/harness-coder.md' ]"
 assert "pre-push-gate.sh executable (R10)"      "[ -x '$TMP/espalier/hooks/pre-push-gate.sh' ]"
@@ -266,7 +294,7 @@ simulate_llm_writes "$TMP" ts
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/29\]' | head -3 | sed 's/\[//;s/\/29\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/37\]' | head -3 | sed 's/\[//;s/\/37\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -294,7 +322,7 @@ HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --p
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/29] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/37] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -308,7 +336,7 @@ HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/29] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/37] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
