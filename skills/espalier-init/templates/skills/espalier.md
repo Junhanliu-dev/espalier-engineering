@@ -156,10 +156,15 @@ sign-off on `requirements.md` before Stage 3.
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
    **Abort**, write Status: ABORTED to pipeline-state.md and stop.
 
-**Non-interactive exception:** on a no-TTY run (same condition that auto-skips
-the Stage 1 grill), this gate cannot prompt — record `requirements auto-approved
-(non-interactive)` in the Stage History and proceed. Interactive runs ALWAYS
-prompt.
+**Non-interactive exception:** auto-approve ONLY when the run is EXPLICITLY
+unattended — `interactivity_mode` (in `drift-helpers.sh`) returns `unattended`,
+i.e. one of `CI` / `ESPALIER_UNATTENDED` / `ESPALIER_LOOP` / `ESPALIER_HEADLESS`
+is set. Do NOT key this off a bash TTY test: stdin has no TTY inside Claude Code
+even when the user is present, so a TTY check would silently auto-approve every
+interactive run — defeating the gate. If you (the orchestrator) can call
+`AskUserQuestion`, you ARE interactive and MUST prompt. Only on a genuinely
+headless run, record `requirements auto-approved (non-interactive)` in the Stage
+History and proceed.
 
 Record the outcome in pipeline-state.md Stage History (e.g.
 `| 2 | PASSED | … | Requirements approved by user |`).
@@ -182,6 +187,14 @@ Agent tool:
     espalier/changes/{type}/{slug}/coding-report.md
 ```
 
+**Stage 3 exit gate (PROGRAMMATIC — run before every panel spawn):** after the
+coder returns (first pass AND every P0-fix re-spawn), re-run the discovered
+build + lint commands yourself (they are in `espalier/rules/development-process.md`
+/ the pre-push gate's substituted commands). Both must exit 0. The coder's
+self-reported "Build status: pass" is a claim, not the gate. On failure,
+re-spawn the coder with the build/lint output — do NOT spawn the review panel
+on unbuildable code (a wasted panel round), and do NOT count it as a P0 round.
+
 **Stage 4 (Review):**
 ```
 Agent tool:
@@ -191,9 +204,58 @@ Agent tool:
 
     WHAT TO REVIEW: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what the coder did. Then read the actual files listed there.
+    ROUND: {n} — put round={n} in your VERDICT sentinel line.
 
-    Write your review to: espalier/changes/{type}/{slug}/review-record.md
+    Write (OVERWRITE) your review to:
+    espalier/changes/{type}/{slug}/review-record.md
+    End the file with your VERDICT sentinel line.
 ```
+
+**Stage 4 (Security Audit — runs as a panel with the review above):**
+```
+Agent tool:
+  prompt: |
+    You are the harness-security auditor.
+    Read espalier/agents/harness-security.md for your full instructions.
+
+    WHAT TO AUDIT: Read espalier/changes/{type}/{slug}/coding-report.md to see
+    what changed, then trace the touched endpoints. Assume the client is hostile.
+    ROUND: {n} — put round={n} in your VERDICT sentinel line.
+
+    Write (OVERWRITE) your audit to:
+    espalier/changes/{type}/{slug}/security-record.md
+    End the file with your VERDICT sentinel line.
+```
+
+Stage 4 is a **review panel**: `harness-reviewer` (correctness / conventions /
+production readiness, → review-record.md) and `harness-security` (trust boundary,
+→ security-record.md) both run on the CURRENT diff. BOTH records are OVERWRITTEN
+each round and end with a machine-greppable `VERDICT:` sentinel. Run this
+procedure every round — it IS the gate, not a description. Do not advance to
+Stage 5 by any other path:
+
+1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
+   exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
+2. **Completion check — BOTH files.** After both return, confirm EACH record was
+   written THIS round: it exists, differs from its baseline, and its last
+   `VERDICT:` line carries `round={n}` for the current round. A record that is
+   missing, unchanged, or lacks a current-round sentinel means THAT agent did not
+   complete — re-spawn that agent (once; a second failure → escalate to human).
+   Never treat a missing or stale record as a pass.
+3. **Gate read (deterministic).** From EACH file:
+   `grep '^VERDICT:' <record> | tail -1` → parse `p0=`. Also read the P0 rows
+   for the findings themselves.
+4. **If EITHER sentinel has p0 > 0 →** snapshot both sentinel lines into
+   pipeline-state.md Stage History
+   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2; security: PASS p0=0 |`),
+   re-spawn `harness-coder` with the combined findings (a Stage 3 action — its
+   programmatic build/lint gate applies), increment the shared round counter, and
+   return to step 1. At counter = 2, escalate to a human WITHOUT another re-spawn.
+5. **Only when BOTH sentinels read p0=0 on the current code →** snapshot the two
+   sentinel lines into Stage History (`| 4 | PASSED | … |`), write the
+   `Reviewed-Diff` certificate, THEN run the "Stage 4 Post-Review" drift
+   processing below. The exit gate requires BOTH clean — never one agent's pass
+   alone. A security P0 shares the correctness "Max 2 P0 rounds → escalate" counter.
 
 **Stage 5 (Testing):**
 ```
@@ -204,6 +266,11 @@ Agent tool:
 
     WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what was implemented. Write tests for those changes.
+
+    ALSO read espalier/changes/{type}/{slug}/security-record.md (if present) — for
+    EVERY field in its `## Security-Sensitive Fields` contract, write the negative
+    abuse test it names (tamper the value → assert rejected → assert store unchanged). A
+    contracted field with no such test will be blocked at Stage 6.
 
     Append test report to: espalier/changes/{type}/{slug}/coding-report.md
 ```
@@ -217,17 +284,33 @@ Agent tool:
 
     WHAT TO REVIEW: The test files created in Stage 5.
     Read espalier/changes/{type}/{slug}/coding-report.md for the list.
+    ROUND: {n} — put round={n} in your VERDICT sentinel line.
 
     Check: Are tests meaningful? Do they cover edge cases?
     Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
+    Security coverage: does EVERY field in espalier/changes/{type}/{slug}/security-record.md's
+    `## Security-Sensitive Fields` contract have a passing abuse test
+    (tamper → rejected → store unchanged)? A missing one is a P0 → back to Stage 5.
+    Failure-mode coverage: does every NEW external-call path have a
+    dependency-failure test (per espalier/rules/production-standards.md)?
+    A missing one is a P1.
 
-    Append review to: espalier/changes/{type}/{slug}/review-record.md
+    Write (OVERWRITE) your review to: espalier/changes/{type}/{slug}/review-record.md
+    End the file with your VERDICT sentinel line.
 ```
+
+Stage 6 uses the same record semantics as Stage 4: freshness-check
+review-record.md against its baseline, gate on `grep '^VERDICT:' | tail -1`,
+snapshot each round's sentinel into Stage History. (Stage 4's final record is
+overwritten here — its verdicts live in Stage History and the certificate.)
 
 ### Stage 4 Post-Review: Drift & Convention Index
 
-After the Stage 4 reviewer returns, parse its `review-record.md` for Convention
-Drift blocks (see `harness-reviewer.md`) and flag the affected rule files.
+After Stage 4 PASSES (step 5 above — BOTH panel agents returned zero P0 and the
+certificate is written), parse `review-record.md` for Convention Drift blocks (see
+`harness-reviewer.md`) and flag the affected rule files. Do NOT run this on a P0
+round: a malformed-drift P0 written back mid-loop would contaminate the next
+round's P0 count.
 
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug.
 
@@ -247,15 +330,20 @@ python3 espalier/hooks/parse-drift-blocks.py "$REV" \
       echo "$LINE" >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
       ;;
     MALFORMED)
-      echo "P0: malformed Convention Drift block — $RULE_FILE" \
-        >> "espalier/changes/${TYPE}/${SLUG}/review-record.md"
+      echo "convention_drift_malformed: $RULE_FILE (reviewer bundled blocks — drift NOT indexed)" \
+        >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
       ;;
   esac
 done
 ```
 
-A `MALFORMED` line means the reviewer bundled unrelated drifts into one block —
-it is written back as a P0 so the next review round splits them. `coupled_with`
+A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
+Stage 4 has already PASSED when this parse runs, so there is no later round to
+fix it in this change — do NOT write a fake P0 into review-record.md (it would
+contaminate the Stage 6 gate read). Instead the malformed block is recorded in
+pipeline-state.md and surfaced to the user in ONE line ("a Convention Drift
+block was malformed and not indexed — the underlying drift will resurface via
+the post-merge detector or the next review that sees it"). `coupled_with`
 blocks resurface together at the next Stage 0 pre-flight (promote-together /
 reject-together / split).
 

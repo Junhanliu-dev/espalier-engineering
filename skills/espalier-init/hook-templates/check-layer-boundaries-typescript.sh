@@ -19,8 +19,9 @@ esac
 # (Generated from Layer Boundaries table in engineering-structure.md)
 case "$LAYER" in
   route)
-    # Routes must not import directly from repository/adapter
-    if grep -qE "from ['\"].*/(repositories|adapters|db)/" "$FILE" 2>/dev/null; then
+    # Routes must not import directly from repository/adapter.
+    # Matches ESM `from '...'` AND CJS `require('...')`/dynamic `import('...')`.
+    if grep -qE "(from|require\(|import\()\s*['\"].*/(repositories|adapters|db)/" "$FILE" 2>/dev/null; then
       echo "LAYER VIOLATION: Route layer cannot import from repository/adapter layer"
       echo "File: $FILE"
       echo "Fix: Route should call service, service calls repository"
@@ -28,8 +29,8 @@ case "$LAYER" in
     fi
     ;;
   service)
-    # Services must not import from route layer
-    if grep -qE "from ['\"].*/(routes|pages|app)/" "$FILE" 2>/dev/null; then
+    # Services must not import from route layer (ESM + CJS + dynamic import).
+    if grep -qE "(from|require\(|import\()\s*['\"].*/(routes|pages|app)/" "$FILE" 2>/dev/null; then
       echo "LAYER VIOLATION: Service layer cannot import from route layer"
       echo "File: $FILE"
       exit 1

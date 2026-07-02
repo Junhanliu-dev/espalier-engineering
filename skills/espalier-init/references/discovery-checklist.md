@@ -2,7 +2,7 @@
 
 **Goal:** Understand what this project IS before prescribing anything.
 
-This phase runs as ONE parallel batch (10 calls in a single message). See "Parallel Execution Recipe" below for copy-paste scout prompts. Sections 1.1-1.10 describe what each call covers.
+This phase runs as ONE parallel batch (11 calls in a single message). See "Parallel Execution Recipe" below for copy-paste scout prompts. Sections 1.1-1.10 describe what each call covers.
 
 ## 1.1 Detect Language & Framework
 
@@ -112,11 +112,17 @@ Grep for SDK imports (`stripe`, `aws-sdk`, `redis`, `kafka`, `postgres`, `elasti
 
 Output: `{services: [{name, purpose, config_location}], env_vars, timeout_retry_patterns}`. Feeds `espalier/wiki/external-services.md`.
 
+## 1.11 Detect Security Surface
+
+Find the trust boundary and the sensitive fields. Identify the entry points where client data enters (HTTP handlers, GraphQL resolvers, RPC, server actions, queue consumers); how the backend establishes caller identity (session / JWT / auth middleware); how object ownership is enforced today before a load or mutate (pattern + `file:line`, or NONE); where request validation happens (library + layer). Then scan schemas and handlers for fields on the five risk axes — money (`price`, `amount`, `balance`, `stock`), identity (`userId`, `accountId`), permission (`role`, `isAdmin`, `scope`), owner (`orderId`, `tenantId`), state (`status`, `approved`) — plus project-specific names.
+
+Output: `{entry_points, identity_pattern, ownership_pattern, validation, sensitive_fields, project_conventions}`. Feeds three fill targets in `espalier/rules/security-standards.md`: the trust-boundary bullets (entry_points / identity_pattern / ownership_pattern / validation), the per-axis taxonomy cells (sensitive_fields), and the Project-Specific Security Conventions section (project_conventions).
+
 ---
 
 ## Parallel Execution Recipe
 
-In one message, issue these 10 tool calls concurrently:
+In one message, issue these 11 tool calls concurrently:
 
 ### Call 1 — Bash batch (1.1 + 1.5 fast detection)
 
@@ -199,10 +205,15 @@ Return JSON ONLY:
 
 If no tests exist at all, status = "no_evidence".
 
-### Call 5 — scout (1.5 git + CI)
+### Call 5 — scout (1.5 git + CI + deploy)
 
 ```
 Read git log + CI configs (.github/workflows/, Jenkinsfile, Makefile, justfile).
+Also look for deploy configuration: deploy workflows/jobs, Procfile, Dockerfile +
+compose/k8s manifests, fly.toml, vercel.json, serverless.yml — and any health/
+readiness endpoint the app exposes (grep routes for /health, /healthz, /ready,
+/ping). Deploy discovery is OPTIONAL — when the repo has no deploy config, set
+"deploy": null (do NOT invent one; Stage 9 records a clean skip).
 
 Return JSON ONLY:
 {
@@ -215,11 +226,19 @@ Return JSON ONLY:
       "build": "<exact command, e.g. 'npm run build'>",
       "lint": "<exact command>",
       "test": "<exact command>"
+    },
+    "deploy": {
+      "mechanism": "<e.g. 'GitHub Actions deploy.yml on main' | 'fly deploy'>",
+      "command": "<exact command, or 'automatic on merge'>",
+      "health_check": "<URL path or command, e.g. 'GET /healthz'>",
+      "environment": "<staging|production|both — what a merged change reaches>"
     }
   },
   "evidence_files": [...]
 }
 ```
+
+`deploy` is `null` when no deploy config exists — never guessed.
 
 ### Call 6 — scout (1.6 unwritten rules)
 
@@ -336,11 +355,41 @@ Return JSON ONLY:
 }
 ```
 
+### Call 11 — scout (1.11 security surface)
+
+```
+Find the trust boundary and sensitive fields for security-standards.md.
+Identify: (a) entry points where client data enters (controllers / routes /
+resolvers / RPC / server actions / queue consumers); (b) how caller identity is
+established (session / JWT / auth middleware — pattern + file:line); (c) how object
+ownership is enforced before a load or mutate (pattern + file:line, or "NONE
+FOUND"); (d) where request validation happens (library + layer); (e) existing
+security conventions the codebase already follows (e.g. "all controllers call
+requireOwner(ctx, id) before load", "prices come from PriceService.quote()"), each
+with a file:line. Then list fields on the money / identity / permission / owner /
+state axes, project-specific names included.
+
+Return JSON ONLY:
+{
+  "scout_id": "1.11",
+  "status": "ok" | "no_evidence",
+  "structured": {
+    "entry_points": [{"kind": "...", "example": "file:line"}],
+    "identity_pattern": "...",
+    "ownership_pattern": "... | NONE FOUND",
+    "validation": {"library": "...", "layer": "..."},
+    "sensitive_fields": [{"name": "...", "axis": "money|identity|permission|owner|state"}],
+    "project_conventions": [{"pattern": "...", "example": "file:line"}]
+  },
+  "evidence_files": [...]
+}
+```
+
 ---
 
 ## Failure handling: batched follow-up
 
-After all 10 calls return, collect scouts where `status: no_evidence`. Issue ONE follow-up `AskUserQuestion` listing each:
+After all 11 calls return, collect scouts where `status: no_evidence`. Issue ONE follow-up `AskUserQuestion` listing each:
 
 ```
 Scouts couldn't find evidence for: {list}
@@ -366,11 +415,13 @@ DISCOVERY = {
   coding: { naming, error_handling, async_pattern, ... }, // from 1.3
   testing: { framework, assertion_style, ... },           // from 1.4
   ci_checks: { build, lint, test },                       // from 1.5
+  deploy: { mechanism, command, health_check, environment } | null,  // from 1.5 (null = no deploy config)
   invariants, anti_patterns,                              // from 1.6
   best_practices: { recommendations, divergences },       // from 1.7
   data_models: { entities, relationships },               // from 1.8
   critical_paths: { entry_points, primary_flows },        // from 1.9
-  external_services: { services, env_vars }               // from 1.10
+  external_services: { services, env_vars },              // from 1.10
+  security: { entry_points, identity_pattern, ownership_pattern, validation, sensitive_fields, project_conventions }  // from 1.11
 }
 ```
 
