@@ -346,7 +346,7 @@ stage_state_template() {
 - Started: {timestamp}
 - Last Updated: {timestamp}
 - Total Rollbacks: 0
-- Review Rounds: req=0/3, code=0/2, test=0/2
+- Review Rounds: req=0/{max-req-rounds}, code=0/{max-code-rounds}, test=0/{max-test-rounds}
 
 ## Stage History
 | Stage | Status | Timestamp | Notes |
@@ -497,6 +497,7 @@ stage_merge_decision() {
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] write espalier/.merge-hook-decision = $MERGE_DECISION"
     echo "[dry-run] write espalier/.doctor-cadence = $DOCTOR_CADENCE (if absent)"
+    echo "[dry-run] write espalier/.espalier-config = review-round caps (if absent)"
     echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
     return
   fi
@@ -510,6 +511,35 @@ stage_merge_decision() {
   else
     echo "cadence: $DOCTOR_CADENCE" > espalier/.doctor-cadence
     log "  wrote espalier/.doctor-cadence = $DOCTOR_CADENCE"
+  fi
+
+  # espalier/.espalier-config — tracked, review-round escalation caps. Written
+  # ONCE; never auto-rewritten, so a user's later tuning survives re-bootstrap.
+  # Read at runtime by the orchestrator (grep + integer parse, like pre-push-gate).
+  if [ -f espalier/.espalier-config ]; then
+    log "  espalier/.espalier-config already exists — preserving"
+  else
+    cat > espalier/.espalier-config << 'ESPALIERCFG'
+# Espalier pipeline tuning. Key-value, one per line: `<key>: <integer>`.
+# Read at runtime by the orchestrator; `#` comment lines and blanks are ignored.
+# Edit a value to tune; it survives re-bootstrap (never auto-rewritten).
+# On any missing file/key the orchestrator falls back to 3.
+
+# Escalation caps: how many review rounds before the pipeline stops and asks a
+# human, per review type. A round = one reviewer pass + (on P0) one coder re-spawn.
+# Keep value lines digit-clean (the reader greps the first integer on the line).
+# Stage 2 requirements review:
+max-req-rounds: 3
+# Stage 4 coder<->reviewer/security panel (shared correctness+security P0 counter):
+max-code-rounds: 3
+# Stage 6 test review:
+max-test-rounds: 3
+
+# Whole-pipeline safety: total cross-stage rollbacks allowed before human takeover.
+# (Separate from the fixed "no more than 3 stages in a single rollback" span guard.)
+max-rollbacks: 3
+ESPALIERCFG
+    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3)"
   fi
 
   # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must

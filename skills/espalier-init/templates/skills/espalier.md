@@ -250,12 +250,15 @@ Stage 5 by any other path:
    (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2; security: PASS p0=0 |`),
    re-spawn `harness-coder` with the combined findings (a Stage 3 action — its
    programmatic build/lint gate applies), increment the shared round counter, and
-   return to step 1. At counter = 2, escalate to a human WITHOUT another re-spawn.
+   return to step 1. At counter = `max-code-rounds` (default 3, read from
+   `espalier/.espalier-config` via
+   `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
+   back to 3 if the file or key is unset), escalate to a human WITHOUT another re-spawn.
 5. **Only when BOTH sentinels read p0=0 on the current code →** snapshot the two
    sentinel lines into Stage History (`| 4 | PASSED | … |`), write the
    `Reviewed-Diff` certificate, THEN run the "Stage 4 Post-Review" drift
    processing below. The exit gate requires BOTH clean — never one agent's pass
-   alone. A security P0 shares the correctness "Max 2 P0 rounds → escalate" counter.
+   alone. A security P0 shares the correctness "`max-code-rounds` P0 rounds → escalate" counter.
 
 **Stage 5 (Testing):**
 ```
@@ -407,7 +410,7 @@ Create `espalier/changes/{type}/{slug}/pipeline-state.md`:
 - Started: {ISO timestamp}
 - Last Updated: {ISO timestamp}
 - Total Rollbacks: {count}
-- Review Rounds: req={n}/3, code={n}/2, test={n}/2
+- Review Rounds: req={n}/{max-req-rounds}, code={n}/{max-code-rounds}, test={n}/{max-test-rounds}
 
 ## Stage History
 | Stage | Status | Timestamp | Notes |
@@ -416,6 +419,13 @@ Create `espalier/changes/{type}/{slug}/pipeline-state.md`:
 | 2 | PASSED | 2025-01-15T10:05 | 1 round, no P0s |
 | 3 | IN_PROGRESS | 2025-01-15T10:10 | |
 ```
+
+When instantiating this from `_template`, substitute the Review-Rounds
+denominators (`{max-req-rounds}`, `{max-code-rounds}`, `{max-test-rounds}`) from
+`espalier/.espalier-config` — same read as the Stage 4 gate:
+`grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'` (fall
+back to 3 per key if the file or key is missing) — alongside the `{requirement}`
+/ `{timestamp}` substitution. The denominators are the escalation limits as displayed.
 
 ### Stage 7: Stage the Convention Index
 
@@ -550,7 +560,10 @@ When a gate fails:
 1. Identify failure type from gate output
 2. Look up rollback target in pipeline.md
 3. Update pipeline-state.md (increment rollback counter, record failure)
-4. If total rollbacks > 3: STOP and ask human
+4. If total rollbacks > `max-rollbacks` (default 3, read from
+   `espalier/.espalier-config` via
+   `grep '^max-rollbacks:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
+   back to 3 if unset): STOP and ask human
 5. Otherwise: announce rollback target and re-execute from that stage
 
 ### Human Checkpoints

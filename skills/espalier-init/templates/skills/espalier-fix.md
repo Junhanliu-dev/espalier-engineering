@@ -626,8 +626,11 @@ without spawning the panel and without counting a P0 round.
    re-spawn `harness-coder` with the combined findings, then **return to step 1
    and re-review the new diff with the whole panel.** Never advance to Stage 5 on
    the coder's fix report alone — a fix is never the last action before the gate;
-   a clean panel is. Each P0 round increments the counter; at counter = 2,
-   escalate to a human WITHOUT another re-spawn (a security P0 shares this counter).
+   a clean panel is. Each P0 round increments the counter; at counter =
+   `max-code-rounds` (default 3, read from `espalier/.espalier-config` via
+   `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
+   back to 3 if unset), escalate to a human WITHOUT another re-spawn (a security P0
+   shares this counter).
 4. **Both sentinels p0=0 on a fresh review of the current code →** PASS. Snapshot
    the sentinels into Stage History, then record the certificate: `git add -A`
    (so new files count), then overwrite `Reviewed-Diff` in pipeline-state.md with
@@ -825,7 +828,7 @@ fi
 review-record.md against its baseline each round, gate on
 `grep '^VERDICT:' | tail -1`, snapshot each round's sentinel into Stage History.
 A P0 sends the tests back to Stage 5 (re-spawn coder), then **re-review** — never
-exit on the fix report alone (max 2 rounds → escalate). On a clean PASS
+exit on the fix report alone (max `max-test-rounds` rounds, default 3 → escalate). On a clean PASS
 (sentinel p0=0), refresh `Reviewed-Diff` in pipeline-state.md (same `git add -A`
 + fingerprint command as Stage 4) so it now covers the added tests; the push
 gate compares against this.

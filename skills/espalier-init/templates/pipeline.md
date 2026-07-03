@@ -14,7 +14,7 @@
 - **Load:** Read espalier/skills/espalier-review/SKILL.md
 - **Execute:** Main agent reviews the requirements doc
 - **Gate:** No P0/P1 findings remaining
-- **Limit:** Max 3 review rounds → escalate to human
+- **Limit:** Max `max-req-rounds` review rounds (default 3, from `espalier/.espalier-config`) → escalate to human
 - **Human checkpoint (BLOCKING):** user approves `requirements.md` before ANY
   coding. Stage 3 does not start on a Stage 2 PASS alone — see the espalier
   skill → "Requirements Approval Gate". Auto-approved only on a no-TTY run.
@@ -60,9 +60,10 @@
   `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
   where `<Base-Ref>` is the Stage 3 SHA. The Stage 7 push gate blocks unless this
   fingerprint still matches the code being pushed.
-- **Limit:** Max 2 P0 rounds → escalate to human (never silently ship); at counter =
-  2, escalate WITHOUT another coder re-spawn. A security P0 (from `harness-security`)
-  shares this counter with correctness P0s.
+- **Limit:** Max `max-code-rounds` P0 rounds (default 3, from `espalier/.espalier-config`)
+  → escalate to human (never silently ship); at counter = `max-code-rounds`, escalate
+  WITHOUT another coder re-spawn. A security P0 (from `harness-security`) shares this
+  counter with correctness P0s.
 - **Panel P0 collection (procedural — see the espalier skill):** each round, after
   BOTH agents return, confirm BOTH records were written THIS round (baseline
   size/mtime + a `VERDICT:` sentinel whose `round=` matches), then read the gate
@@ -106,7 +107,7 @@
 - **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
   tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
   against this value.
-- **Limit:** Max 2 rounds → escalate
+- **Limit:** Max `max-test-rounds` rounds (default 3, from `espalier/.espalier-config`) → escalate
 
 ### 7. Code Push
 - **Trigger:** Tests reviewed
@@ -173,11 +174,15 @@
 ## Rollback Rules
 - Rollback targets the EARLIEST stage where the failure originated
 - Never rollback more than 3 stages at once — escalate instead
-- Each rollback increments a counter; >3 total rollbacks → human takeover
+- Each rollback increments a counter; > `max-rollbacks` total rollbacks (default 3,
+  from `espalier/.espalier-config`) → human takeover
 
 ## Review Cycle Limits
-| Review Type | Max Rounds | On Exceed |
-|-------------|-----------|-----------|
-| Requirements | 3 | Human decision |
-| Code | 2 | Human decision |
-| Test | 2 | Human decision |
+Round caps are read from `espalier/.espalier-config` (default 3 each); fall back
+to 3 if the file or key is missing.
+
+| Review Type | Max Rounds (config key) | Default | On Exceed |
+|-------------|-------------------------|---------|-----------|
+| Requirements | `max-req-rounds` | 3 | Human decision |
+| Code | `max-code-rounds` | 3 | Human decision |
+| Test | `max-test-rounds` | 3 | Human decision |
