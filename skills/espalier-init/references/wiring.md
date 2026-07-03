@@ -135,7 +135,7 @@ cat > espalier/changes/_template/pipeline-state.md << 'EOF'
 - Started: {timestamp}
 - Last Updated: {timestamp}
 - Total Rollbacks: 0
-- Review Rounds: req=0/3, code=0/2, test=0/2
+- Review Rounds: req=0/{max-req-rounds}, code=0/{max-code-rounds}, test=0/{max-test-rounds}
 
 ## Stage History
 | Stage | Status | Timestamp | Notes |
@@ -144,6 +144,8 @@ EOF
 ```
 
 State files live at `espalier/changes/{type}/{slug}/pipeline-state.md` (depth 3 from `espalier/changes/`). All scans (session resumption, pre-push gate) use `find -mindepth 3 -maxdepth 3 -name pipeline-state.md`.
+
+The `{max-req-rounds}` / `{max-code-rounds}` / `{max-test-rounds}` denominators are the review-round escalation caps, read from `espalier/.espalier-config` (a tracked key-value file written once by bootstrap, default `3` each). The orchestrator substitutes them when it instantiates a change's state file, and reads them at the Stage 2/4/6 gates via `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'` (falling back to 3 if absent). The same file also holds `max-rollbacks` (default 3) — the total cross-stage rollbacks allowed before human takeover, read the same way at the rollback gate. `#` comment lines and blanks in the file are ignored. Edit any value to tune; it survives re-bootstrap.
 
 ## 10.7 Make Hooks Executable
 
