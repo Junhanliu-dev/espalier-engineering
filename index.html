@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.9.0</span>
+      <span class="nav-pill">v0.9.1</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1745,6 +1745,9 @@ footer {
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.9.1</span> — the review-round and rollback hard stops are now configurable. How many coder↔reviewer rounds run before the pipeline stops and asks a human used to be hardcoded prose (<em>Max 2 P0 rounds</em>) in the pipeline templates. It now lives in a tracked <code style="font-family:var(--f-mono);color:var(--vine)">espalier/.espalier-config</code> — <code style="font-family:var(--f-mono);color:var(--vine)">max-req-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-code-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-test-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-rollbacks</code> — that the orchestrator reads at runtime, falling back to 3 when a key is absent so a missing file never blocks. Defaults unify to 3 (code and test caps rise 2→3). Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.9.0</span> — Stage 4 now runs a two-agent panel. Alongside the correctness reviewer, a new <code style="font-family:var(--f-mono);color:var(--vine)">harness-security</code> auditor checks the change's trust boundary on one rule — <em>never trust data the frontend sent.</em> It hard-blocks any sensitive field (price, userId, role, orderId, status) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. The coder reads the same taxonomy while writing, so security shifts left. <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-audit</code> runs the same auditor repo-wide over your <em>existing</em> code, dispatchable to <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-fix</code>. The release also adds an always-loaded <em>production-standards</em> bar — resilience, observability, data-safety — the coder writes to and the reviewer enforces at tiered severity, plus a fail-closed push gate and a programmatic build/lint gate.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
