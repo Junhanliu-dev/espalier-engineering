@@ -73,28 +73,52 @@ _dedupe_entries_preserve_primary() {
   ENTRIES_LOOKUP=("${OUT_LOOKUP[@]}")
 }
 
-# Fuzzy: given a (squash) SHA, find the Espalier change whose Commits table
-# has the largest overlap of file paths with this SHA's tree. Threshold 50%.
-# Stdout: slug ("feat/foo") or empty string. Used by Layer 3 fallback when no
-# squash hook recorded the mapping.
-_fuzzy_file_overlap_match() {
-  local SHA="$1"
-  local FILES BEST_STATE="" BEST_COUNT=0 TOTAL THRESHOLD COUNT f state SLUG
+# _fuzzy_scan SHA [MAX_AGE_DAYS] — core of the fuzzy overlap heuristic: find
+# the Espalier change whose Commits table has the largest overlap of file
+# paths with this SHA's tree. Threshold 50%. Sets globals (no stdout):
+#   FUZZY_SLUG        slug ("feat/foo") or "" when below threshold
+#   FUZZY_BEST_STATE  matched pipeline-state.md path or ""
+#   FUZZY_BEST_COUNT  matched-file count of the winner
+#   FUZZY_TOTAL       file count of the SHA's tree
+# MAX_AGE_DAYS (optional) skips candidates whose state file is older — the
+# post-merge backlink hook passes 30 so ancient changes never steal a match.
+_fuzzy_scan() {
+  local SHA="$1" MAX_AGE_DAYS="${2:-}"
+  local FILES BEST_STATE="" BEST_COUNT=0 TOTAL THRESHOLD COUNT f state
+  local NOW MTIME AGE_DAYS
+  FUZZY_SLUG=""
+  FUZZY_BEST_STATE=""
+  FUZZY_BEST_COUNT=0
+  FUZZY_TOTAL=0
 
   FILES=$(git diff-tree --no-commit-id --name-only -r "$SHA" 2>/dev/null)
   [ -z "$FILES" ] && return 0
+  NOW=$(date +%s)
 
   for state in espalier/changes/*/*/pipeline-state.md; do
     [ -f "$state" ] || continue
     case "$state" in *_template*) continue ;; esac
 
+    if [ -n "$MAX_AGE_DAYS" ]; then
+      if [ "$(uname)" = "Darwin" ]; then
+        MTIME=$(stat -f %m "$state" 2>/dev/null)
+      else
+        MTIME=$(stat -c %Y "$state" 2>/dev/null)
+      fi
+      [ -z "$MTIME" ] && continue
+      AGE_DAYS=$(( (NOW - MTIME) / 86400 ))
+      [ "$AGE_DAYS" -gt "$MAX_AGE_DAYS" ] && continue
+    fi
+
     COUNT=0
     # while-read (not `for f in $FILES`) so paths with spaces stay whole.
     # Match a whole-path token in a Commits-table cell, not a bare substring —
     # else `a.ts` spuriously matches `a.tsx` / `dir/a.ts.map` and inflates overlap.
+    # The sed class escapes EVERY ERE metachar — including ()+?{}| — so a path
+    # like app/(dashboard)/page.tsx matches itself, not a regex group.
     while IFS= read -r f; do
       [ -z "$f" ] && continue
-      grep -qE "(^|[^[:alnum:]_./-])$(printf '%s' "$f" | sed 's/[.[\*^$/]/\\&/g')([^[:alnum:]_./-]|$)" "$state" 2>/dev/null \
+      grep -qE "(^|[^[:alnum:]_./-])$(printf '%s' "$f" | sed 's/[.[\*^$()+?{}|/]/\\&/g')([^[:alnum:]_./-]|$)" "$state" 2>/dev/null \
         && COUNT=$((COUNT + 1))
     done <<EOF
 $FILES
@@ -107,10 +131,21 @@ EOF
 
   TOTAL=$(echo "$FILES" | wc -l | tr -d ' ')
   THRESHOLD=$(( (TOTAL + 1) / 2 ))
+  FUZZY_TOTAL=$TOTAL
   if [ "$BEST_COUNT" -ge "$THRESHOLD" ] && [ -n "$BEST_STATE" ]; then
-    SLUG=$(echo "$BEST_STATE" | sed 's|espalier/changes/||; s|/pipeline-state.md||')
-    echo "$SLUG"
+    FUZZY_BEST_STATE=$BEST_STATE
+    FUZZY_BEST_COUNT=$BEST_COUNT
+    FUZZY_SLUG=$(echo "$BEST_STATE" | sed 's|espalier/changes/||; s|/pipeline-state.md||')
   fi
+}
+
+# Fuzzy: stdout wrapper around _fuzzy_scan — slug ("feat/foo") or empty string.
+# Used by the /espalier-fix Stage 0 Layer 3 fallback when no squash hook
+# recorded the mapping. Optional second arg = MAX_AGE_DAYS (see _fuzzy_scan).
+_fuzzy_file_overlap_match() {
+  _fuzzy_scan "$1" "${2:-}"
+  [ -n "$FUZZY_SLUG" ] && echo "$FUZZY_SLUG"
+  return 0
 }
 
 # Append one row to reverse-lookup cache, idempotent (skip if SHA+kind already present).

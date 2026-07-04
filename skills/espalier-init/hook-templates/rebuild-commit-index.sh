@@ -33,7 +33,12 @@ find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/nul
   awk -v slug="$SLUG" -v now="$NOW" '
     /^## Commits/ {in_commits=1; in_squash=0; next}
     /^## Squash Merges/ {in_squash=1; in_commits=0; next}
-    /^## [^CS]/ {in_commits=0; in_squash=0}
+    # ANY other heading closes both sections. (The old /^## [^CS]/ shortcut
+    # leaked: a heading like "## Checks" or "## Stage History" starts with
+    # C/S, kept the previous flag alive, and indexed rows that are not
+    # commits. This rule sits after the two `next` rules, so it only ever
+    # fires for OTHER headings.)
+    /^## / {in_commits=0; in_squash=0}
 
     in_commits && /^\| *[0-9]+ *\|/ {
       n = split($0, cols, "|")
