@@ -62,7 +62,7 @@ Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so
 | `feat:` (or no prefix) | `feat` | `espalier/changes/feat/<slug>/` |
 | `refactor:` | `refactor` | `espalier/changes/refactor/<slug>/` |
 | `docs:` | `docs` | `espalier/changes/docs/<slug>/` |
-| `fix:` | use `/espalier-fix` instead | — |
+| `fix:` | `fix` — full pipeline, for LARGE fixes only (>5 files / multi-layer / schema); a typical single bug belongs in `/espalier-fix`, which adds causal linking | `espalier/changes/fix/<slug>/` |
 
 ### `/espalier-fix <bug>` — 5-stage bug-fix lane
 
@@ -132,7 +132,7 @@ ln -sfn /path/to/espalier-engineering/skills/espalier-init .claude/skills/espali
 On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's a one-time tax — every future `/espalier` and `/espalier-fix` reuses the generated structure. You earn the time back inside the first few requirements via dropped rework rounds.
 
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
-- **Phase 1 (parallel discovery)** — single message fires ~10 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, CI, unwritten rules, layer specs), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
+- **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
 - **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 37 validation checks.
 
