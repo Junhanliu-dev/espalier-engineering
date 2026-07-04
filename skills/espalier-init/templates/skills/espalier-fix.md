@@ -887,8 +887,11 @@ for entry in parsed_yaml["caused_by"]:
 ```
 
 ```bash
+# This block runs ONCE PER ENTRY as its own bash invocation (the loop lives in
+# the orchestrator, above) — so early-outs are `exit 0`, never `continue`
+# (bare `continue` outside a loop is a no-op warning and execution falls through).
 CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
-[ ! -f "$CAUSING_STATE" ] && continue
+[ ! -f "$CAUSING_STATE" ] && exit 0
 
 # Ensure section exists (schema: Role + Lookup columns)
 if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
@@ -903,10 +906,12 @@ fi
 # Idempotency: own slug + role together (same slug can legitimately appear as primary and call_path in different fixes)
 OWN_SLUG="fix/${SLUG}"
 if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
-  continue
+  exit 0
 fi
 
-REASON=$(head -1 espalier/changes/fix/${SLUG}/requirements.md | sed 's/^# Bug: //')
+# The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
+REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
+[ -z "$REASON" ] && REASON="fix/${SLUG}"
 DATE=$(date -u +%Y-%m-%d)
 echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $DATE |" >> "$CAUSING_STATE"
 ```
