@@ -141,9 +141,7 @@ if [ -z "$PLUGIN_DIR" ]; then
     "$HOME/.claude/plugins/espalier" \
     "$HOME/.claude/plugins/harness-engineering" \
     "$HOME/repos/espalier-engineering" \
-    "$HOME/repos/harness-engineering" \
-    "$HOME/SBM_Projects/espalier-engineering" \
-    "$HOME/SBM_Projects/harness-engineering"; do
+    "$HOME/repos/harness-engineering"; do
     if [ -d "$candidate/skills/espalier-init/hook-templates" ]; then
       PLUGIN_DIR="$candidate/skills/espalier-init"
       break
