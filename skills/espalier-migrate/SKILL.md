@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, and the v0.9.1 configurable escalation caps you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, and the v0.9.2 correctness patch you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to ELEVEN migrations may apply, always in this order:
+version. Up to TWELVE migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -83,15 +83,26 @@ version. Up to ELEVEN migrations may apply, always in this order:
    `espalier/skills/espalier/SKILL.md`, `espalier-fix`) so their prose reads the
    config; a customised file is backed up to `<file>.pre-v0.9.1.bak`. Mechanical:
    `scripts/migrate-v0.9.0-to-v0.9.1.sh`.
+12. **v0.9.1 → v0.9.2** — correctness patch: the fix lane's late-escalation
+   gates detect via a marker line (the old text called a shell helper that was
+   never shipped), its back-link reads the real `# Bug:` title, and its
+   regression verification is scoped + dep-linked (no more false `true` from a
+   suite that couldn't run); `/espalier-audit`'s fix handoff and
+   `/espalier-prune`'s unattended path key off `interactivity_mode`; the push
+   gate gates the ACTIVE change (completed changes stop blocking later manual
+   pushes) and parses mocha/rspec/go test counts, preserving the substituted
+   test command; scout 1.11 ships in `.scout-prompts.md` and prune/doctor map
+   the security/production rules. Backs up customised pure-copy files to
+   `<file>.pre-v0.9.2.bak`. Mechanical: `scripts/migrate-v0.9.1-to-v0.9.2.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL ELEVEN; a v0.3.x
-install needs the last ten; a v0.4.x install needs the last nine; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.1; a v0.5.3–v0.5.x
-install needs v0.6 … v0.9.1; a v0.6.x install needs v0.7 … v0.9.1; a v0.7.x
-install needs v0.8 … v0.9.1; a v0.8.0 install needs v0.8.1 … v0.9.1; a v0.8.1
-install needs v0.8.2 … v0.9.1; a v0.8.2 install needs v0.9.0 then v0.9.1; a
-v0.9.0 install needs only v0.9.1.
+confirmation, apply in order. A v0.1.x install needs ALL TWELVE; a v0.3.x
+install needs the last eleven; a v0.4.x install needs the last ten; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.2; a v0.5.3–v0.5.x
+install needs v0.6 … v0.9.2; a v0.6.x install needs v0.7 … v0.9.2; a v0.7.x
+install needs v0.8 … v0.9.2; a v0.8.0 install needs v0.8.1 … v0.9.2; a v0.8.1
+install needs v0.8.2 … v0.9.2; a v0.8.2 install needs v0.9.0 … v0.9.2; a
+v0.9.0 install needs v0.9.1 then v0.9.2; a v0.9.1 install needs only v0.9.2.
 
 ### Step 1: Preflight + detect install version
 
@@ -109,6 +120,7 @@ NEEDS_V08_PATCH=no
 NEEDS_V082_PATCH=no
 NEEDS_V09_MINOR=no
 NEEDS_V091_PATCH=no
+NEEDS_V092_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -131,6 +143,7 @@ if [ -d "harness" ]; then
   NEEDS_V082_PATCH=yes       # ...then the v0.8.2 re-review fixpoint loop
   NEEDS_V09_MINOR=yes        # ...then the v0.9.0 security audit
   NEEDS_V091_PATCH=yes       # ...then the v0.9.1 configurable escalation caps
+  NEEDS_V092_PATCH=yes       # ...then the v0.9.2 correctness patch
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -199,6 +212,15 @@ elif [ -d "espalier" ]; then
      || ! grep -qF "max-code-rounds" espalier/pipeline.md 2>/dev/null; then
     NEEDS_V091_PATCH=yes
   fi
+  # v0.9.2: correctness patch. Pre-v0.9.2 signals: the fix lane still calls
+  # the never-shipped _fire_late_escalation_prompt helper (pure-copy file), OR
+  # the per-project push gate still selects by mtime alone (no active-change
+  # text), OR the shipped scout-prompts lacks scout 1.11. Any ⇒ needed.
+  if grep -qF "_fire_late_escalation_prompt" espalier/skills/espalier-fix/SKILL.md 2>/dev/null \
+     || ! grep -qF "Find the ACTIVE change" espalier/hooks/pre-push-gate.sh 2>/dev/null \
+     || ! grep -qF "Scout 1.11" espalier/.scout-prompts.md 2>/dev/null; then
+    NEEDS_V092_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -206,7 +228,7 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ] \
    && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ] \
    && [ "$NEEDS_V082_PATCH" = no ] && [ "$NEEDS_V09_MINOR" = no ] \
-   && [ "$NEEDS_V091_PATCH" = no ]; then
+   && [ "$NEEDS_V091_PATCH" = no ] && [ "$NEEDS_V092_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -272,6 +294,7 @@ verbatim:
 [ "$NEEDS_V082_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.1-to-v0.8.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
@@ -322,6 +345,7 @@ completed.
 [ "$NEEDS_V082_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.1-to-v0.8.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -506,6 +530,22 @@ then refreshes the three pure-copy pipeline files (`pipeline.md`,
 `espalier/skills/espalier/SKILL.md`, `espalier-fix`) so their prose reads the
 config keys. A customised file is backed up to `<file>.pre-v0.9.1.bak`.
 Idempotent — config present + prose referencing it ⇒ no-op.
+
+**v0.9.1→v0.9.2 (`migrate-v0.9.1-to-v0.9.2.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up any customised pure-copy file on diff (`<file>.pre-v0.9.2.bak`), then
+`bootstrap --force` refreshes the pure-copy skills + pipeline + scout-prompts +
+hook templates, and two anchored surgical patches update the per-project
+`pre-push-gate.sh` (active-change selection; portable test-count parse — the
+substituted test command is read out of the old gate and carried forward).
+Warn + manual snippet if the gate was customised past the anchors. Idempotent —
+re-running detects an already-v0.9.2 install and no-ops.
 
 ## Anti-Patterns
 
