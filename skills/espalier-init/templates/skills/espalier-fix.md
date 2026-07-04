@@ -733,14 +733,18 @@ do NOT silently expand scope.
 Append test results to: espalier/changes/fix/{slug}/coding-report.md
 ```
 
-After sub-agent returns:
+After sub-agent returns, run the detector:
 ```bash
 COD="espalier/changes/fix/${SLUG}/coding-report.md"
 if grep -q "^- TEST_SCOPE_INFLATION: true" "$COD"; then
-  # Fire late-escalation prompt — see "Stage 5/6 Late-Escalation Prompt"
-  _fire_late_escalation_prompt 5
+  echo "LATE_ESCALATION_GATE: stage=5 (test scope inflation)"
 fi
 ```
+
+A `LATE_ESCALATION_GATE:` line on stdout means STOP and run the
+"Stage 5/6 Late-Escalation Prompt" (below) with that stage's context. The
+prompt is an `AskUserQuestion` the orchestrator issues — a human gate, not a
+shell helper; the bash above only detects, it never prompts.
 
 ### Stage 5 regression verification (PROGRAMMATIC — proves the test earns its keep)
 
@@ -820,9 +824,13 @@ After sub-agent returns (sentinel first; legacy `**Verdict:**` kept as fallback)
 ```bash
 REV="espalier/changes/fix/${SLUG}/review-record.md"
 if grep -qE '^VERDICT: ESCALATION_REQUIRED|^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
-  _fire_late_escalation_prompt 6
+  echo "LATE_ESCALATION_GATE: stage=6 (reviewer flagged ESCALATION_REQUIRED)"
 fi
 ```
+
+Same contract as Stage 5: a `LATE_ESCALATION_GATE:` line means STOP and run the
+"Stage 5/6 Late-Escalation Prompt" (below) via `AskUserQuestion`, handing it the
+reviewer's Escalation Reason block. Detection is bash; the prompt is yours.
 
 **Fixpoint + certificate.** Stage 6 is a loop like Stage 4: freshness-check
 review-record.md against its baseline each round, gate on
