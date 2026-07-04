@@ -733,53 +733,99 @@ do NOT silently expand scope.
 Append test results to: espalier/changes/fix/{slug}/coding-report.md
 ```
 
-After sub-agent returns:
+After sub-agent returns, run the detector:
 ```bash
 COD="espalier/changes/fix/${SLUG}/coding-report.md"
 if grep -q "^- TEST_SCOPE_INFLATION: true" "$COD"; then
-  # Fire late-escalation prompt — see "Stage 5/6 Late-Escalation Prompt"
-  _fire_late_escalation_prompt 5
+  echo "LATE_ESCALATION_GATE: stage=5 (test scope inflation)"
 fi
 ```
+
+A `LATE_ESCALATION_GATE:` line on stdout means STOP and run the
+"Stage 5/6 Late-Escalation Prompt" (below) with that stage's context. The
+prompt is an `AskUserQuestion` the orchestrator issues — a human gate, not a
+shell helper; the bash above only detects, it never prompts.
 
 ### Stage 5 regression verification (PROGRAMMATIC — proves the test earns its keep)
 
 A regression test that passes on BOTH the fixed and the pre-fix code proves
-nothing. Verify mechanically that the new regression test FAILS at `Base-Ref`
-(pre-fix) and PASSES now — using a detached git worktree so the check never
-disturbs the working tree. Record the result in coding-report.md; the reviewer
+nothing — and a test that merely ERRORS at `Base-Ref` (missing deps in a fresh
+worktree, unresolvable import, bad invocation) proves nothing either: "could
+not run" is not "captured the bug". Verify in two steps, both SCOPED to only
+the new regression test file(s):
+
+1. Run the scoped invocation on the FIXED tree. It must pass — this validates
+   the command itself (runner found, deps resolve, file loads) before any
+   pre-fix conclusion is drawn.
+2. Run the same scoped invocation at `Base-Ref` in a detached worktree. A
+   genuine assertion failure there → `true`. A harness error there → `skipped`
+   (the reviewer verifies the assertions by reading), NEVER `true`.
+
+Set `REG_RUN` to the project's test runner limited to exactly `$REG_TESTS` —
+most runners accept file paths directly; npm-style runners need `--`
+(e.g. `npx jest <files>`, `pytest <files>`, `npm test -- <files>`,
+`go test ./path/to/pkg/`). Record the result in coding-report.md; the reviewer
 reads it at Stage 6.
 
 ```bash
 BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | tail -1 | awk '{print $2}')
 COD="espalier/changes/fix/${SLUG}/coding-report.md"
 REG_TESTS="{the regression test file(s) the coder just wrote}"   # from coding-report.md
+REG_RUN="{the project's test runner scoped to ONLY $REG_TESTS — see above}"
 
-if [ -n "$BASE_REF" ]; then
-  WT=$(mktemp -d)
-  # Detached worktree at the pre-fix commit; keep the tree free of the fix.
-  if git worktree add --detach "$WT" "$BASE_REF" >/dev/null 2>&1; then
-    # Copy ONLY the new regression test(s) onto pre-fix code, then run them.
-    for t in $REG_TESTS; do mkdir -p "$WT/$(dirname "$t")"; cp "$t" "$WT/$t"; done
-    ( cd "$WT" && {test_command} ) > "$WT/.reg.out" 2>&1
-    if [ $? -ne 0 ]; then
-      echo "- REGRESSION_VERIFIED: true (test fails on pre-fix $BASE_REF, passes on fix)" >> "$COD"
-    else
-      echo "- REGRESSION_VERIFIED: false — test PASSES on pre-fix code; it does not capture the bug (P0 at Stage 6)" >> "$COD"
-    fi
-    git worktree remove --force "$WT" >/dev/null 2>&1
-  else
-    echo "- REGRESSION_VERIFIED: skipped — could not create worktree at $BASE_REF" >> "$COD"
-    rm -rf "$WT"
-  fi
-else
+# Harness failure (couldn't run) vs assertion failure (ran and failed) —
+# conflating them is how a test that never executed gets certified.
+_reg_harness_error() {   # <output-file> → exit 0 if the run failed to RUN at all
+  grep -qiE 'cannot find module|module ?not ?found|no such file or directory|command not found|ENOENT|ImportError|ModuleNotFoundError|SyntaxError|failed to (resolve|load|collect)|no tests? (found|ran)' "$1"
+}
+
+if [ -z "$BASE_REF" ]; then
   echo "- REGRESSION_VERIFIED: skipped — no Base-Ref recorded" >> "$COD"
+else
+  # Step 1 — scoped run on the FIXED tree validates the invocation itself.
+  OUT_NOW=$(mktemp)
+  $REG_RUN > "$OUT_NOW" 2>&1
+  RC_NOW=$?
+  if [ $RC_NOW -ne 0 ] && _reg_harness_error "$OUT_NOW"; then
+    echo "- REGRESSION_VERIFIED: skipped — scoped invocation could not run on the fixed tree: $(grep -m1 . "$OUT_NOW")" >> "$COD"
+  elif [ $RC_NOW -ne 0 ]; then
+    echo "- REGRESSION_VERIFIED: false — regression test FAILS on the FIXED code (broken test or unfixed bug) (P0 at Stage 6)" >> "$COD"
+  else
+    # Step 2 — same scoped run at the pre-fix commit, in a detached worktree.
+    WT=$(mktemp -d)
+    if git worktree add --detach "$WT" "$BASE_REF" >/dev/null 2>&1; then
+      for t in $REG_TESTS; do mkdir -p "$WT/$(dirname "$t")"; cp "$t" "$WT/$t"; done
+      # Link installed dep dirs — a fresh worktree has none, and a bare run
+      # would fail for that reason alone and fake a 'true'.
+      for dep in node_modules .venv venv vendor; do
+        [ -e "$dep" ] && [ ! -e "$WT/$dep" ] && ln -s "$(pwd)/$dep" "$WT/$dep"
+      done
+      ( cd "$WT" && $REG_RUN ) > "$WT/.reg.out" 2>&1
+      RC_PRE=$?
+      if [ $RC_PRE -eq 0 ]; then
+        echo "- REGRESSION_VERIFIED: false — test PASSES on pre-fix code; it does not capture the bug (P0 at Stage 6)" >> "$COD"
+      elif _reg_harness_error "$WT/.reg.out"; then
+        echo "- REGRESSION_VERIFIED: skipped — could not RUN at Base-Ref (harness error, not an assertion failure): $(grep -m1 . "$WT/.reg.out")" >> "$COD"
+      else
+        echo "- REGRESSION_VERIFIED: true (test fails on pre-fix $BASE_REF, passes on fix)" >> "$COD"
+      fi
+      git worktree remove --force "$WT" >/dev/null 2>&1
+    else
+      echo "- REGRESSION_VERIFIED: skipped — could not create worktree at $BASE_REF" >> "$COD"
+      rm -rf "$WT"
+    fi
+  fi
+  rm -f "$OUT_NOW"
 fi
 ```
 
-`{test_command}` is the project's discovered test command. A
-`REGRESSION_VERIFIED: false` is a P0 the Stage 6 reviewer must catch — the
-"regression test" does not reproduce the bug and would not catch a recurrence.
+A `REGRESSION_VERIFIED: false` is a P0 the Stage 6 reviewer must catch — the
+"regression test" does not reproduce the bug (or fails on the fixed code) and
+would not catch a recurrence. `skipped` keeps its existing Stage 6 meaning:
+the reviewer verifies the assertions capture the bug by reading them. (One
+deliberate bias: a bug whose pre-fix symptom IS a load-time error — e.g. the
+fix repairs a syntax error — classifies as `skipped`, not `true`; the check
+errs toward human eyes, never toward false certification.)
 
 ## Stage 6: Test Review
 
@@ -820,9 +866,13 @@ After sub-agent returns (sentinel first; legacy `**Verdict:**` kept as fallback)
 ```bash
 REV="espalier/changes/fix/${SLUG}/review-record.md"
 if grep -qE '^VERDICT: ESCALATION_REQUIRED|^\*\*Verdict:\*\* ESCALATION_REQUIRED' "$REV"; then
-  _fire_late_escalation_prompt 6
+  echo "LATE_ESCALATION_GATE: stage=6 (reviewer flagged ESCALATION_REQUIRED)"
 fi
 ```
+
+Same contract as Stage 5: a `LATE_ESCALATION_GATE:` line means STOP and run the
+"Stage 5/6 Late-Escalation Prompt" (below) via `AskUserQuestion`, handing it the
+reviewer's Escalation Reason block. Detection is bash; the prompt is yours.
 
 **Fixpoint + certificate.** Stage 6 is a loop like Stage 4: freshness-check
 review-record.md against its baseline each round, gate on
@@ -879,8 +929,11 @@ for entry in parsed_yaml["caused_by"]:
 ```
 
 ```bash
+# This block runs ONCE PER ENTRY as its own bash invocation (the loop lives in
+# the orchestrator, above) — so early-outs are `exit 0`, never `continue`
+# (bare `continue` outside a loop is a no-op warning and execution falls through).
 CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
-[ ! -f "$CAUSING_STATE" ] && continue
+[ ! -f "$CAUSING_STATE" ] && exit 0
 
 # Ensure section exists (schema: Role + Lookup columns)
 if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
@@ -895,10 +948,12 @@ fi
 # Idempotency: own slug + role together (same slug can legitimately appear as primary and call_path in different fixes)
 OWN_SLUG="fix/${SLUG}"
 if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
-  continue
+  exit 0
 fi
 
-REASON=$(head -1 espalier/changes/fix/${SLUG}/requirements.md | sed 's/^# Bug: //')
+# The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
+REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
+[ -z "$REASON" ] && REASON="fix/${SLUG}"
 DATE=$(date -u +%Y-%m-%d)
 echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $DATE |" >> "$CAUSING_STATE"
 ```

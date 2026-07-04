@@ -38,7 +38,7 @@ doc. Refresh is always `/espalier-prune`.
 
 For each artifact in scope (see Scout Mapping):
 
-1. Spawn the matching scout (prompts embedded below) against the CURRENT codebase.
+1. Spawn the matching scout (prompts in `espalier/.scout-prompts.md`) against the CURRENT codebase.
 2. Two-way diff the scout's proposed content vs the current artifact file.
 3. If MATERIALLY different, flag it:
    ```bash
@@ -91,6 +91,8 @@ directly — bootstrap writes it once and never auto-rewrites it.
 | `wiki/critical-paths.md` | 1.9 | yes |
 | `wiki/external-services.md` | 1.10 | yes |
 | `rules/coding-standards.md` | 1.3 + 1.6 (merge before diff) | `--full` only |
+| `rules/security-standards.md` | 1.11 — discovered sections only (see espalier-prune's fixed-vs-discovered note) | `--full` only |
+| `rules/production-standards.md` | 1.3 + 1.10 + 1.8 — `{discovered}` cells only (merge before diff) | `--full` only |
 | `skills/espalier-coding/specs/{layer}.md` | per-layer spec scout | `--full` only |
 
 ## Embedded Scout Prompts

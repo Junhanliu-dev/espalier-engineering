@@ -252,7 +252,7 @@ Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 - `espalier/wiki/external-services.md`        ← DISCOVERY.external_services (scout 1.10)
 
 **Hooks with placeholders** (2 files):
-- `espalier/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks
+- `espalier/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks. A `null` ci_checks key is substituted, never guessed: build/lint → `true  # no <kind> command discovered at init` (the gate skips that check cleanly); test → `echo 'no test command discovered at init — refresh espalier/hooks/pre-push-gate.sh via /espalier-prune once tests exist' && false` (the tests-required gate fails closed with an actionable message instead of an invented command's confusing error)
 - `espalier/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-${LANG}.sh`, rewrite `case` block from DISCOVERY.layers. If LANG ∉ {ts,py,go}, emit a no-op script (`#!/bin/bash\nexit 0`).
 
 **Then per-layer specs (parallel scout batch + Write batch):**

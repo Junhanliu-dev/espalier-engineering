@@ -167,8 +167,7 @@ if [ -z "$PLUGIN_DIR" ] || [ ! -f "$PLUGIN_DIR/scripts/bootstrap-espalier.sh" ];
   for candidate in \
     "$HOME/.claude/plugins/espalier-engineering" \
     "$HOME/.claude/plugins/espalier" \
-    "$HOME/repos/espalier-engineering" \
-    "$HOME/SBM_Projects/espalier-engineering"; do
+    "$HOME/repos/espalier-engineering"; do
     if [ -f "$candidate/scripts/bootstrap-espalier.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
@@ -255,82 +254,32 @@ elif [ "$SKIP_PROMPT" != "yes" ]; then
   esac
 fi
 
-# --- Text to append / insert (quoted heredocs — emitted verbatim) ------------
+# --- Text to append / insert ---------------------------------------------
+# Like the production emitters below, the security sections are EXTRACTED from
+# the plugin templates at run time (heading → next fixed heading) rather than
+# duplicated here — the migration text can never drift from what a fresh
+# install ships. The preflight already verified the plugin carries v0.9.0+
+# templates, which is when these sections (and their anchors) appeared.
 
 emit_coder_section() {
-cat << 'EOF'
-
-## Security-Aware Coding (do this WHILE writing, not only at review)
-
-The Stage 4 security audit is a backstop, not permission to trust the client. Read
-`espalier/rules/security-standards.md` and apply it as you write ANY code that
-handles a request or writes to a persistent store: **the frontend is untrusted;
-the backend is the trust boundary.**
-
-For every client-supplied value your code reads (path param, query, body, header),
-classify it on the five risk axes (money / identity / permission / owner / state).
-For any that is sensitive:
-
-1. **owner / identity** — derive the actor from the session, never the request.
-   Before loading or mutating an object by a client-supplied id, assert the actor
-   owns it (or holds a permitting role). A client id is a lookup key, not an
-   authorization. *(User 1's request carrying id 2 must not touch object 2.)*
-2. **money** — never persist or charge a client-supplied `price`/`amount`/`total`.
-   Recompute from the source of truth (catalog / ledger).
-3. **permission** — never bind `role`/`isAdmin`/`scope` from the request body.
-   Decide server-side.
-4. **state** — change lifecycle fields only through a server-side transition that
-   checks both legality and actor.
-5. **stock / balance** — range-check and apply atomically (no read-then-write race).
-
-Never spread a raw request body into a persistence call — bind an explicit
-allow-list. Record each sensitive field you handled and the control you applied in
-coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
-
-### Writing Abuse Tests (Stage 5)
-
-When you run in testing mode (Stage 5), read the `## Security-Sensitive Fields`
-contract in `espalier/changes/{type}/{slug}/security-record.md` (emitted by the
-Stage 4 auditor). For EACH field listed, write the negative test named in its
-`abuse_test`: tamper the value, assert the request is rejected, and assert the
-persistent store is unchanged. A contracted field with no such test is a Stage 6
-blocker — do not skip one. See `espalier/skills/espalier-security/SKILL.md` for
-the recipe.
-EOF
+  printf '\n'
+  _extract_section "$PLUGIN_INIT/templates/agents/harness-coder.md" \
+    "## Security-Aware Coding (do this WHILE writing, not only at review)" \
+    "## Production-Aware Coding (do this WHILE writing, not only at review)"
 }
 
 emit_reviewer_section() {
-cat << 'EOF'
-
-## Security Abuse-Test Coverage (Stage 6 — test review)
-
-When reviewing tests, if the change has an
-`espalier/changes/{type}/{slug}/security-record.md` carrying a
-`## Security-Sensitive Fields` contract (emitted by the Stage 4 `harness-security`
-audit), verify EVERY listed field has a passing negative test that (a) tampers the
-value, (b) asserts the request is rejected, and (c) asserts the persistent store is
-unchanged. A missing or happy-path-only test for any contracted field is a **P0** —
-the tests do not prove the control holds. Send it back to Stage 5. This is enforced
-coverage, not a suggestion.
-EOF
+  printf '\n'
+  _extract_section "$PLUGIN_INIT/templates/agents/harness-reviewer.md" \
+    "## Security Abuse-Test Coverage (Stage 6 — test review)" \
+    "## You Must NOT"
 }
 
 emit_testing_section() {
-cat << 'EOF'
-
-## Security Abuse Tests (when a security contract is present)
-When the change has an `espalier/changes/{type}/{slug}/security-record.md` with a
-`## Security-Sensitive Fields` contract (from the Stage 4 `harness-security` audit),
-write a negative test for EACH field. The shape is always **tamper → assert
-rejected → assert persistent store unchanged**:
-- tamper the value (foreign id, `$0.01` price, `isAdmin=true`, illegal status)
-- assert the request is rejected (403 / 404 / 422 per project convention)
-- assert the persisted store did NOT change
-
-A happy-path test does NOT satisfy the contract. See
-`espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at Stage 6 —
-a contracted field with no abuse test is a P0.
-EOF
+  printf '\n'
+  _extract_section "$PLUGIN_INIT/templates/skills/espalier-testing.md" \
+    "## Security Abuse Tests (when a security contract is present)" \
+    "## Failure-Mode Tests (every NEW external-call path)"
 }
 
 # The Repo-Audit Mode section is EXTRACTED from the plugin's harness-security
@@ -407,65 +356,14 @@ A NO SENSITIVE SURFACE self-noop still ends with `VERDICT: PASS p0=0 p1=0 round=
 EOF
 }
 
+# Extracted from the plugin's pre-push-gate.sh template at run time (from the
+# security-scan marker up to — not including — the build-check section), same
+# no-drift rationale. The extracted block is placeholder-free; the {command}
+# placeholders live in the sections the extraction stops before.
 emit_gate_block() {
-cat << 'EOF'
-# --- Security scan: secrets BLOCK, dependency audit WARNS -------------------
-# Deterministic backstop to the harness-security audit. A leaked credential must
-# fail closed; a pre-existing dependency CVE should not block THIS change. Both
-# degrade gracefully — absent tooling never fails the push.
-#
-# Determine the range to scan. Prefer the reviewed range (Base-Ref..HEAD). With no
-# Base-Ref (legacy / first push), fall back to the upstream tracking branch, then
-# the previous commit — so the scan always sees the pushed code and never silently
-# scans nothing.
-SEC_RANGE=""
-if [ -n "$BASE_REF" ]; then
-  SEC_RANGE="$BASE_REF..HEAD"
-else
-  _up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
-  if [ -n "$_up" ]; then
-    SEC_RANGE="$_up..HEAD"
-  elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-    SEC_RANGE="HEAD~1..HEAD"
-  fi
-fi
-if [ -z "$SEC_RANGE" ]; then
-  echo "WARNING: cannot determine a push range (no Base-Ref, upstream, or prior commit) — secret scan skipped."
-fi
-
-if [ -n "$SEC_RANGE" ]; then
-  if command -v gitleaks >/dev/null 2>&1; then
-    if ! gitleaks detect --no-banner --redact --log-opts="$SEC_RANGE" >/dev/null 2>&1; then
-      echo "BLOCKED: gitleaks found a potential secret in the pushed diff."
-      echo "  Inspect with: gitleaks detect --log-opts=\"$SEC_RANGE\" -v"
-      exit 1
-    fi
-  else
-    # Fallback: high-signal pattern grep over the ADDED lines of the pushed diff.
-    ADDED=$(git diff "$SEC_RANGE" -- . ':(exclude)espalier/' 2>/dev/null | grep '^+' | grep -v '^+++')
-    if printf '%s\n' "$ADDED" | grep -qiE '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Za-z ]*PRIVATE KEY-----|(secret|api[_-]?key|apikey|access[_-]?token|password|passwd|private[_-]?key)[[:space:]]*[:=][[:space:]]*.{0,3}[A-Za-z0-9/+_-]{16,})'; then
-      echo "BLOCKED: a possible hard-coded secret was added in this push."
-      echo "  Matched an AWS key / private key / long api_key=… assignment."
-      echo "  Move it to config/env and re-push (install 'gitleaks' for higher fidelity)."
-      exit 1
-    fi
-  fi
-fi
-
-# Dependency audit — WARN only, per available tool for the detected stack. Wrapped
-# in a timeout when available so a slow / offline advisory fetch can't hang the
-# push; a nonzero exit may mean vulnerabilities OR a tool/network error (never blocks).
-command -v timeout >/dev/null 2>&1 && _to="timeout 45" || _to=""
-if   [ -f package.json ] && command -v npm >/dev/null 2>&1; then
-  $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || echo "WARNING: 'npm audit' flagged high-severity advisories or errored (non-blocking)."
-elif { [ -f pyproject.toml ] || [ -f requirements.txt ]; } && command -v pip-audit >/dev/null 2>&1; then
-  $_to pip-audit >/dev/null 2>&1 || echo "WARNING: 'pip-audit' flagged vulnerable dependencies or errored (non-blocking)."
-elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
-  $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: 'govulncheck' flagged vulnerabilities or errored (non-blocking)."
-elif [ -f Cargo.toml ] && command -v cargo-audit >/dev/null 2>&1; then
-  $_to cargo audit >/dev/null 2>&1 || echo "WARNING: 'cargo audit' flagged vulnerable crates or errored (non-blocking)."
-fi
-EOF
+  awk '/^# --- Security scan: secrets BLOCK/{f=1}
+       f && (/^# Run build check/ || /^# The three \{command\} placeholders/){exit}
+       f{print}' "$PLUGIN_INIT/hook-templates/pre-push-gate.sh"
 }
 
 # append_section FILE MARKER EMIT_FN — append EMIT_FN's output to FILE unless
