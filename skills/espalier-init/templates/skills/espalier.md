@@ -18,9 +18,11 @@ all 10 stages defined in `espalier/pipeline.md`.
 ### Before Starting
 
 1. Read `espalier/pipeline.md` for stage definitions
-2. Check for existing state: look in `espalier/changes/` for a matching requirement
+2. Check for existing state: look in `espalier/changes/` for a matching
+   requirement (matching = the kebab-tail rule in Session Resumption below)
    - If found, read `pipeline-state.md` and RESUME from the current stage
-   - If not found, create a new directory and start from Stage 1
+   - If not found, create a new directory and start from Stage 1 — an
+     unrelated in-flight change is surfaced, never silently resumed
 
 ### Flag Parsing
 
@@ -108,10 +110,24 @@ On every invocation, check:
 find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md
 ```
 
-If any state file is found with an in-progress stage marker (Current Stage < 10):
-- Read it to find current stage and history
-- Announce: "Resuming {requirement} from Stage {N}"
-- Continue from that stage (do NOT restart from 1)
+Resumption is scoped to THIS invocation's requirement — never hijack an
+unrelated in-flight change into the new request:
+
+1. Derive the invocation's `{kebab}` (State File Format below) and compare it
+   against each state file's folder tail — the part after the `YYYY-MM-DD-`
+   prefix — the same tail match the fix lane's collision check uses.
+2. A tail-matching state file that is in progress (`Current Stage` < 10 and no
+   terminal `- Status:` value) → resume it: read stage + history, announce
+   "Resuming {requirement} from Stage {N}", continue from that stage (do NOT
+   restart from 1).
+3. Non-matching in-flight state files do NOT block a new requirement. Start
+   the new change normally and surface ONE line: "Note: {N} other in-flight
+   change(s): {slugs} — resume each with /espalier <its requirement>." (The
+   push gate independently warns when several changes are in flight;
+   finishing one before starting the next is the safe default.)
+4. Invoked with no requirement text at all (bare `/espalier`, or `--resume`
+   alone) → resume the single in-flight change; if several are in flight,
+   list them and ask which one via `AskUserQuestion`.
 
 ### Stage Execution Protocol
 
@@ -383,6 +399,12 @@ Parse `{type}` from the requirement prefix:
 - `refactor: <text>` → type = `refactor`
 - `docs: <text>` → type = `docs`
 - Anything else → type = `feat` (default)
+
+`fix:` on the FULL pipeline is for large fixes — >5 files, multiple layers, or
+schema changes (the espalier-fix skill's own "Do NOT use for" list routes those
+here). A typical single-bug fix belongs in `/espalier-fix`, which adds Stage 0
+causal linking; when a `fix:` requirement looks that small, say so in one line
+and suggest the fix lane before proceeding.
 
 Then derive `{kebab}` from the remainder of the requirement (kebab-case, max 60 chars, strip slashes).
 
