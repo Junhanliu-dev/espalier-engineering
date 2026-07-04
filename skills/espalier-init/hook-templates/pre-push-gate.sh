@@ -16,8 +16,16 @@ if [ -f espalier/hooks/drift-helpers.sh ]; then
   doctor_due && echo "Reminder: an /espalier-doctor drift scan is due."
 fi
 
-# Find the most-recently-modified pipeline-state.md across typed subdirs
-# (espalier/changes/{type}/{slug}/pipeline-state.md — depth 3 from CHANGES_DIR).
+# Find the ACTIVE change: the most recently modified pipeline-state.md whose
+# Status is not terminal (espalier/changes/{type}/{slug}/pipeline-state.md —
+# depth 3 from CHANGES_DIR). A COMPLETE/ABORTED change describes FINISHED work;
+# letting it gate later pushes would (a) block every manual push after a
+# completed pipeline (its stale Reviewed-Diff never matches again) and (b) let
+# a newer finished change shadow an in-flight one. A state file with no
+# `- Status:` line (pre-v0.9.2 full-pipeline runs) counts as in-flight.
+# PARTIAL_FIX is deliberately NOT terminal — it is written BEFORE that fix's
+# own Stage 7 push, which must still be gated; the follow-up root-cause feat
+# then supersedes it as the active change.
 CHANGES_DIR="espalier/changes"
 
 # stat format differs between BSD (macOS) and GNU (Linux)
@@ -27,14 +35,37 @@ else
   STAT_ARGS=(-c '%Y %n')
 fi
 
-STATE_FILE=$(find "$CHANGES_DIR" -mindepth 3 -maxdepth 3 -name pipeline-state.md \
-             -not -path "*/_template/*" \
-             -exec stat "${STAT_ARGS[@]}" {} + 2>/dev/null \
-             | sort -rn | head -1 | cut -d' ' -f2-)
+STATE_FILE=""
+ACTIVE_COUNT=0
+OTHER_ACTIVE=""
+while IFS= read -r _cand; do
+  [ -n "$_cand" ] || continue
+  _f="${_cand#* }"   # strip the leading epoch; path may contain spaces
+  [ -f "$_f" ] || continue
+  if grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE)\b' "$_f" 2>/dev/null; then
+    continue   # terminal — finished work never gates a later push
+  fi
+  ACTIVE_COUNT=$((ACTIVE_COUNT + 1))
+  if [ -z "$STATE_FILE" ]; then
+    STATE_FILE="$_f"
+  else
+    OTHER_ACTIVE="$OTHER_ACTIVE $_f"
+  fi
+done << EOF_STATES
+$(find "$CHANGES_DIR" -mindepth 3 -maxdepth 3 -name pipeline-state.md \
+    -not -path "*/_template/*" \
+    -exec stat "${STAT_ARGS[@]}" {} + 2>/dev/null | sort -rn)
+EOF_STATES
 
 if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
-  echo "WARNING: No Espalier change record found. Pushing without pipeline tracking."
+  echo "WARNING: No in-flight Espalier change found. Pushing without pipeline tracking."
   exit 0  # Allow but warn
+fi
+
+if [ "$ACTIVE_COUNT" -gt 1 ]; then
+  echo "WARNING: $ACTIVE_COUNT in-flight changes found; gating the most recent: $STATE_FILE"
+  echo "         Not checked:$OTHER_ACTIVE"
+  echo "         If this push belongs to one of those, complete or abort the newer change first."
 fi
 
 # Check pipeline stage (must be ≥ 7). Take the FIRST match's first integer —
@@ -139,17 +170,30 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Run tests and check count
+# Run tests and check count. Runners word their counts differently —
+# jest/pytest/cargo "N passed", mocha "N passing", rspec "N examples",
+# go prints per-package "ok" lines with no aggregate count at all.
 TEST_OUTPUT=$({test_command} 2>&1)
 TEST_EXIT=$?
-TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|tests)' | grep -oE '[0-9]+' | head -1)
 
 if [ $TEST_EXIT -ne 0 ]; then
   echo "BLOCKED: Tests fail"
   exit 1
 fi
 
-if [ -z "$TEST_COUNT" ] || [ "$TEST_COUNT" -eq 0 ]; then
+TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+if [ -z "$TEST_COUNT" ]; then
+  _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
+  [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok
+fi
+
+if [ -z "$TEST_COUNT" ]; then
+  # A passing suite whose output format we cannot parse must not hard-block
+  # the push — that is a false BLOCKED on mocha/rspec/go-shaped output, and a
+  # blocking gate that cries wolf gets disabled. Exit code stays the gate.
+  echo "WARNING: could not parse a test count from the runner output (unrecognized format)."
+  echo "         Exit code 0 accepted; the total_tests>0 check was skipped this push."
+elif [ "$TEST_COUNT" -eq 0 ]; then
   echo "BLOCKED: No tests found (total_tests must be > 0)"
   exit 1
 fi
