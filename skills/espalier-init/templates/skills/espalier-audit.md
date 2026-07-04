@@ -144,7 +144,16 @@ dispatched to the fix lane (step 4), rewrite its cell to the fix's change slug
 
 ### 4. Offer the fix handoff (interactive only)
 
-If there are P0/P1 findings AND the session has a TTY, ask ONE
+Decide interactivity with the explicit-signal helper — NEVER a bash TTY test
+(stdin has no TTY inside Claude Code even with the user right there; a TTY
+test would silently skip this handoff on every interactive run):
+
+```bash
+. espalier/hooks/drift-helpers.sh
+interactivity_mode        # -> "interactive" | "unattended"
+```
+
+If there are P0/P1 findings AND the run is interactive, ask ONE
 `AskUserQuestion` (multiSelect) listing each P0/P1 as an option — label
 `{priority} {file}: {short defect}` — plus the implied "none for now" via
 selecting nothing. For EACH selected finding, run the fix lane **sequentially**
@@ -161,8 +170,12 @@ Then update that finding's `Status` cell as above. The fix lane's Stage 0
 causal-link discovery may find no causing change for a pre-existing hole —
 that is expected; the lane proceeds without a link.
 
-On a no-TTY run, skip the prompt entirely (same convention as the grill and
-the approval gate): write the page, print its path and the P0/P1 counts, done.
+Only an EXPLICITLY unattended run (`CI` / `ESPALIER_UNATTENDED` /
+`ESPALIER_LOOP` / `ESPALIER_HEADLESS` set → `interactivity_mode` returns
+`unattended`) skips the prompt — the same convention as the grill and the
+approval gates: write the page, print its path and the P0/P1 counts, done.
+If you (the orchestrator) can call `AskUserQuestion`, you ARE interactive
+and MUST offer the handoff.
 
 ### 5. Byproduct: flag a stale trust-boundary doc (notify-only)
 
