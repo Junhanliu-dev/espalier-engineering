@@ -64,6 +64,11 @@ readiness endpoint the app exposes (grep routes for /health, /healthz, /ready,
 /ping). Deploy discovery is OPTIONAL — when the repo has no deploy config, set
 "deploy": null (do NOT invent one).
 
+ci_checks values must be commands that exist TODAY (a manifest script, Makefile
+target, or CI step). A kind with no command — no lint configured, no build
+step, no test runner — is null, never guessed: an invented command lands in
+the pre-push gate and blocks every push.
+
 Return JSON ONLY:
 {
   "scout_id": "1.5",
@@ -72,9 +77,9 @@ Return JSON ONLY:
     "branch_strategy": "...",
     "commit_conventions": "<conventional-commits | imperative | other>",
     "ci_checks": {
-      "build": "<exact command, e.g. 'npm run build'>",
-      "lint": "<exact command>",
-      "test": "<exact command>"
+      "build": "<exact command, e.g. 'npm run build'> | null",
+      "lint": "<exact command> | null",
+      "test": "<exact command> | null"
     },
     "deploy": {
       "mechanism": "<e.g. 'GitHub Actions deploy.yml on main' | 'fly deploy'>",
@@ -162,6 +167,42 @@ Return JSON ONLY:
     "services": [{"name": "...", "purpose": "...", "config_location": "..."}],
     "env_vars": [...],
     "timeout_retry_patterns": [{"service": "...", "pattern": "..."}]
+  },
+  "evidence_files": [...]
+}
+```
+
+## Scout 1.11 — Security Surface
+
+Used to refresh the three DISCOVERED sections of `rules/security-standards.md`
+(trust-boundary bullets, per-axis `{discovered}` taxonomy cells,
+Project-Specific Security Conventions). The universal taxonomy, required
+controls, mass-assignment ban, and abuse-test requirement are fixed text — a
+refresh never rewrites them.
+
+```
+Find the trust boundary and sensitive fields for security-standards.md.
+Identify: (a) entry points where client data enters (controllers / routes /
+resolvers / RPC / server actions / queue consumers); (b) how caller identity is
+established (session / JWT / auth middleware — pattern + file:line); (c) how object
+ownership is enforced before a load or mutate (pattern + file:line, or "NONE
+FOUND"); (d) where request validation happens (library + layer); (e) existing
+security conventions the codebase already follows (e.g. "all controllers call
+requireOwner(ctx, id) before load", "prices come from PriceService.quote()"), each
+with a file:line. Then list fields on the money / identity / permission / owner /
+state axes, project-specific names included.
+
+Return JSON ONLY:
+{
+  "scout_id": "1.11",
+  "status": "ok" | "no_evidence",
+  "structured": {
+    "entry_points": [{"kind": "...", "example": "file:line"}],
+    "identity_pattern": "...",
+    "ownership_pattern": "... | NONE FOUND",
+    "validation": {"library": "...", "layer": "..."},
+    "sensitive_fields": [{"name": "...", "axis": "money|identity|permission|owner|state"}],
+    "project_conventions": [{"pattern": "...", "example": "file:line"}]
   },
   "evidence_files": [...]
 }
