@@ -86,8 +86,11 @@ printf '%s\n' "$ALL_PATHS" | grep -qE '(^|/)(main|index|app)\.(ts|js|py|go)$|(^|
   && mark_stale espalier/wiki/critical-paths.md "$MERGED_SHA" "entry/route touched"
 
 # external-services keys off env files + dependency manifests, NOT src/services/
-# (which is usually internal).
-printf '%s\n' "$TOUCHED" | grep -qE '(^|/)\.env(\.example|\.sample)?$|(^|/)(package\.json|requirements\.txt|go\.mod|Cargo\.toml|Gemfile)$' \
+# (which is usually internal). pyproject.toml is BOTH the modern Python dep
+# manifest (flag external-services, here) AND a lint-config carrier
+# ([tool.ruff] etc. — flagged toward coding-standards below); it belongs in
+# both regexes.
+printf '%s\n' "$TOUCHED" | grep -qE '(^|/)\.env(\.example|\.sample)?$|(^|/)(package\.json|requirements\.txt|pyproject\.toml|go\.mod|Cargo\.toml|Gemfile)$' \
   && mark_stale espalier/wiki/external-services.md "$MERGED_SHA" "deps/env touched"
 
 # --- CI / process drift (rules) ---
