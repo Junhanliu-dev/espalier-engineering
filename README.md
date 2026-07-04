@@ -10,7 +10,7 @@
 
 > **v0.9.0 — security audit + production hardening.** Stage 4 now runs a two-agent panel: alongside the correctness reviewer, a new `harness-security` auditor checks the change's trust boundary on one rule — *never trust data the frontend sent.* It hard-blocks any sensitive field (price, userId, role, orderId, status, …) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. `harness-coder` reads the same taxonomy while writing, so security shifts left. The push gate gains a secret scan (blocks) + dependency audit (warns). And because Stage 4 only sees *new* changes, a new `/espalier-audit` lane runs the same auditor repo-wide over your **existing** code — findings land in `espalier/wiki/security-audit.md`, each dispatchable to `/espalier-fix`. This release also adds an always-loaded **production-standards** bar (resilience / observability / data-safety) the coder writes to and the reviewer enforces at tiered severity, plus a batch of gate-integrity fixes (fail-closed push gate, programmatic build/lint gate, per-round verdict sentinels, a deploy-aware Stage 9).
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.7→v0.8→v0.8.1→v0.8.2→v0.9.0) in order. See [`docs/migrating-v0.8-to-v0.9.md`](./docs/migrating-v0.8-to-v0.9.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.8.1→v0.8.2→v0.9.0→v0.9.1→v0.9.2) in order. See [`docs/migrating-v0.8-to-v0.9.md`](./docs/migrating-v0.8-to-v0.9.md).
 
 ---
 
@@ -62,7 +62,7 @@ Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so
 | `feat:` (or no prefix) | `feat` | `espalier/changes/feat/<slug>/` |
 | `refactor:` | `refactor` | `espalier/changes/refactor/<slug>/` |
 | `docs:` | `docs` | `espalier/changes/docs/<slug>/` |
-| `fix:` | use `/espalier-fix` instead | — |
+| `fix:` | `fix` — full pipeline, for LARGE fixes only (>5 files / multi-layer / schema); a typical single bug belongs in `/espalier-fix`, which adds causal linking | `espalier/changes/fix/<slug>/` |
 
 ### `/espalier-fix <bug>` — 5-stage bug-fix lane
 
@@ -132,7 +132,7 @@ ln -sfn /path/to/espalier-engineering/skills/espalier-init .claude/skills/espali
 On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's a one-time tax — every future `/espalier` and `/espalier-fix` reuses the generated structure. You earn the time back inside the first few requirements via dropped rework rounds.
 
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
-- **Phase 1 (parallel discovery)** — single message fires ~10 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, CI, unwritten rules, layer specs), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
+- **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
 - **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 37 validation checks.
 
@@ -263,6 +263,8 @@ Five guiding principles:
 MIT — see [LICENSE](./LICENSE).
 
 ## Status
+
+`v0.9.2` — **correctness patch.** A full-repo audit surfaced a cluster of defects concentrated in bash embedded in skill markdown — code no interpreter had ever run end-to-end — plus gate and doc inconsistencies. Fixed and regression-tested: the fix lane's late-escalation gates no longer call a helper that was never shipped, its back-link records the real bug title, and its regression verification is scoped + dependency-linked so a test that *couldn't run* at `Base-Ref` can never be certified as *catching the bug*. The push gate now gates the **active** change — a completed pipeline change no longer blocks every later manual push with its stale certificate — and understands mocha/rspec/go test-count output. `/espalier-audit`'s fix handoff and `/espalier-prune`'s unattended path key off `interactivity_mode` (the TTY test is always false inside Claude Code). Scout 1.11 ships in `.scout-prompts.md`, so prune/doctor can finally refresh `security-standards.md` / `production-standards.md` — the files three other lanes point users at. `ci_checks` discovery gains a null convention (no more invented lint commands blocking pushes). New `scripts/test-hooks.sh` regression suite (28 assertions, written red-first against these bugs) plus a phantom-helper lint. Existing installs: `/espalier-migrate` (new `migrate-v0.9.1-to-v0.9.2.sh` — surgical, preserves your substituted commands and customisations via `.pre-v0.9.2.bak` backups).
 
 `v0.9.1` — **configurable escalation caps.** The review-round and rollback hard stops — how many coder↔reviewer rounds run before the pipeline stops and asks a human — were hardcoded prose scattered across the pipeline templates. They now live in a single tracked config file, `espalier/.espalier-config` (`max-req-rounds`, `max-code-rounds`, `max-test-rounds`, `max-rollbacks`), that the orchestrator reads at runtime — greppable with an integer parse, comment-annotated, and preserved across re-bootstrap (the `.doctor-cadence` precedent). Every gate falls back to 3 when a key is absent, so a missing file never blocks. Defaults unify to **3** across the board (code and test caps rise 2→3; requirements and rollback stay 3). Non-breaking; existing installs run `/espalier-migrate` (v0.9.0 → v0.9.1 writes the config and refreshes the pure-copy pipeline prose). New `migrate-v0.9.0-to-v0.9.1.sh`.
 

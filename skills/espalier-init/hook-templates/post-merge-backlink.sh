@@ -20,43 +20,21 @@ MSG=$(git log -1 --pretty=%s)
 [ "$PARENT_COUNT" = "1" ] || exit 0
 echo "$MSG" | grep -qE '(Merge pull request #[0-9]+|\(#[0-9]+\)$)' || exit 0
 
-# Files touched by the squash commit
-FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-[ -z "$FILES" ] && exit 0
+# Find the best-match source change via the SHARED hardened matcher in
+# lookup-helpers.sh (whole-path anchored so a.ts never substring-matches
+# a.tsx, space-safe, every ERE metachar escaped) — one heuristic, one
+# implementation, instead of a second hand-rolled loop that drifts.
+# 30 = the candidate age window in days (unchanged behavior).
+HELPERS="espalier/hooks/lookup-helpers.sh"
+[ -f "$HELPERS" ] || exit 0
+. "$HELPERS"
 
-# Find best-match source change by file-name overlap, ignoring stale (>30d) candidates
-BEST_STATE=""
-BEST_COUNT=0
-NOW=$(date +%s)
-for state in espalier/changes/*/*/pipeline-state.md; do
-  [ -f "$state" ] || continue
+_fuzzy_scan "$MERGED_SHA" 30
+[ -n "$FUZZY_SLUG" ] || exit 0
 
-  # Skip _template
-  case "$state" in *_template*) continue ;; esac
-
-  # Age guard
-  if [ "$(uname)" = "Darwin" ]; then
-    MTIME=$(stat -f %m "$state" 2>/dev/null)
-  else
-    MTIME=$(stat -c %Y "$state" 2>/dev/null)
-  fi
-  AGE_DAYS=$(( (NOW - MTIME) / 86400 ))
-  [ "$AGE_DAYS" -gt 30 ] && continue
-
-  COUNT=0
-  for f in $FILES; do
-    grep -qF "$f" "$state" 2>/dev/null && COUNT=$((COUNT + 1))
-  done
-  if [ "$COUNT" -gt "$BEST_COUNT" ]; then
-    BEST_COUNT=$COUNT
-    BEST_STATE=$state
-  fi
-done
-
-# Threshold: best match must overlap >=50% of squash's files
-TOTAL_FILES=$(echo "$FILES" | wc -l | tr -d ' ')
-THRESHOLD=$(( (TOTAL_FILES + 1) / 2 ))   # ceil(TOTAL/2)
-{ [ "$BEST_COUNT" -ge "$THRESHOLD" ] && [ -n "$BEST_STATE" ]; } || exit 0
+BEST_STATE="$FUZZY_BEST_STATE"
+BEST_COUNT="$FUZZY_BEST_COUNT"
+TOTAL_FILES="$FUZZY_TOTAL"
 
 # Idempotent append
 if ! grep -qF "squashed_to: $MERGED_SHA" "$BEST_STATE"; then

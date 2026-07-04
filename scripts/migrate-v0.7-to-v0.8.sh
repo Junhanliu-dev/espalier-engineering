@@ -90,8 +90,7 @@ if [ -z "$PLUGIN_DIR" ] || [ ! -f "$PLUGIN_DIR/scripts/bootstrap-espalier.sh" ];
   for candidate in \
     "$HOME/.claude/plugins/espalier-engineering" \
     "$HOME/.claude/plugins/espalier" \
-    "$HOME/repos/espalier-engineering" \
-    "$HOME/SBM_Projects/espalier-engineering"; do
+    "$HOME/repos/espalier-engineering"; do
     if [ -f "$candidate/scripts/bootstrap-espalier.sh" ]; then
       PLUGIN_DIR="$candidate"
       break

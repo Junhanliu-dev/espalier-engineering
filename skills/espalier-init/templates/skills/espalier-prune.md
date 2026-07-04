@@ -72,12 +72,18 @@ never bundled into a feature commit.
 
 ```bash
 . espalier/hooks/drift-helpers.sh
-[ "$(detect_run_mode)" = "unattended" ] && echo unattended
+[ "$(interactivity_mode)" = "unattended" ] && echo unattended
 ```
 
-If invoked unattended (CI, loop, non-tty) with `--all-stale`: do NOT prompt.
-Write the proposed diffs to `espalier/.drift-report.md` and exit, leaving every
-sidecar row in place. Refresh is never silent.
+Only an EXPLICIT unattended signal counts (`CI`, `ESPALIER_UNATTENDED`,
+`ESPALIER_LOOP`, `ESPALIER_HEADLESS`) — never a bash TTY test, which reads
+"no TTY" inside every interactive Claude Code session and would demote every
+attended `--all-stale` run to report-only. If you (the orchestrator) can call
+`AskUserQuestion`, you are interactive: gate each file normally.
+
+If genuinely unattended with `--all-stale`: do NOT prompt. Write the proposed
+diffs to `espalier/.drift-report.md` and exit, leaving every sidecar row in
+place. Refresh is never silent.
 
 ## Scout Mapping
 
@@ -86,6 +92,8 @@ sidecar row in place. Refresh is never silent.
 | `rules/engineering-structure.md` | 1.2 |
 | `rules/coding-standards.md` | 1.3 + 1.6 (merge before diff) |
 | `rules/development-process.md` | 1.5 |
+| `rules/security-standards.md` | 1.11 → discovered sections ONLY (see below) |
+| `rules/production-standards.md` | 1.3 + 1.10 + 1.8 → `{discovered}` cells ONLY (merge before diff) |
 | `wiki/architecture.md` | 1.2 |
 | `wiki/data-models.md` | 1.8 |
 | `wiki/critical-paths.md` | 1.9 |
@@ -93,6 +101,17 @@ sidecar row in place. Refresh is never silent.
 | `skills/espalier-coding/specs/{layer}.md` | per-layer spec scout |
 | `hooks/check-layer-boundaries.sh` | 1.2 → regenerate the `case` block |
 | `hooks/pre-push-gate.sh` | 1.5 → re-substitute build/lint/test commands |
+
+The two always-loaded standards rules are MIXED files — universal seed text
+plus discovered cells. A refresh regenerates ONLY the discovered parts:
+`security-standards.md` = the Trust Boundary bullets, the per-axis
+`{discovered}` taxonomy column, and Project-Specific Security Conventions
+(from scout 1.11); `production-standards.md` = the `{discovered}` mechanism
+cells and Project-Specific Production Conventions (from 1.3's
+logging/error-handling/validation, 1.10's timeout_retry_patterns, 1.8's
+migration_pattern). The universal taxonomy, required controls, seeds, and
+severity tiers are fixed text — never rewritten by a scout; the two-way diff
+must show them unchanged.
 
 A hook is not a prose doc. For `check-layer-boundaries.sh` regenerate the layer
 `case` block from scout 1.2's `layers`; for `pre-push-gate.sh` re-substitute the

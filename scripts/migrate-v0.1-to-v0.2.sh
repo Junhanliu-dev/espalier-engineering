@@ -71,9 +71,7 @@ if [ -z "$PLUGIN_DIR" ]; then
     "$HOME/repos/espalier-engineering/skills/espalier-init" \
     "$HOME/repos/espalier-engineering/skills/harness-engineering" \
     "$HOME/repos/harness-engineering/skills/espalier-init" \
-    "$HOME/repos/harness-engineering/skills/harness-engineering" \
-    "$HOME/SBM_Projects/espalier-engineering/skills/espalier-init" \
-    "$HOME/SBM_Projects/harness-engineering/skills/harness-engineering"; do
+    "$HOME/repos/harness-engineering/skills/harness-engineering"; do
     if [ -d "$candidate/hook-templates" ]; then
       PLUGIN_DIR="$candidate"
       break

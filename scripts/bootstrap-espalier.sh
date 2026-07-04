@@ -141,9 +141,7 @@ if [ -z "$PLUGIN_DIR" ]; then
     "$HOME/.claude/plugins/espalier" \
     "$HOME/.claude/plugins/harness-engineering" \
     "$HOME/repos/espalier-engineering" \
-    "$HOME/repos/harness-engineering" \
-    "$HOME/SBM_Projects/espalier-engineering" \
-    "$HOME/SBM_Projects/harness-engineering"; do
+    "$HOME/repos/harness-engineering"; do
     if [ -d "$candidate/skills/espalier-init/hook-templates" ]; then
       PLUGIN_DIR="$candidate/skills/espalier-init"
       break
@@ -756,7 +754,7 @@ stage_validate() {
   }
 
   run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-ask .claude/skills/espalier-audit' &
+  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit' &
   run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
   run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
   run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &

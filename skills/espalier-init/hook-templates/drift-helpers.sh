@@ -147,13 +147,11 @@ doctor_stamp() {
 
 # detect_run_mode — attended | unattended | ambiguous.
 #
-# WARNING (do not gate human checkpoints on this): a bare `[ -t 0 ]` TTY test
-# reports "unattended" inside an interactive Claude Code session, because the
-# harness does not attach a TTY to the tool's stdin. Using this to auto-approve
-# the grill / requirements gates silently defeats them in normal interactive
-# use. For those gates use `interactivity_mode` below. This function is kept for
-# prune's report-only fallback, where a false "unattended" only means "write the
-# diff to a file instead of prompting" — safe either way.
+# DEPRECATED — kept only so pre-v0.9.2 installed skills that source this file
+# keep working. A bare `[ -t 0 ]` TTY test reports "unattended" inside an
+# interactive Claude Code session (the harness attaches no TTY to tool stdin),
+# so gating ANY behavior on this silently degrades interactive runs — that is
+# why prune moved to `interactivity_mode` in v0.9.2. Do not add new callers.
 detect_run_mode() {
   [ -n "${CI:-}" ]                  && { echo unattended; return; }
   [ -n "${ESPALIER_UNATTENDED:-}" ] && { echo unattended; return; }

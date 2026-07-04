@@ -215,6 +215,11 @@ readiness endpoint the app exposes (grep routes for /health, /healthz, /ready,
 /ping). Deploy discovery is OPTIONAL — when the repo has no deploy config, set
 "deploy": null (do NOT invent one; Stage 9 records a clean skip).
 
+ci_checks values must be commands that exist TODAY (verified in a manifest
+script, Makefile target, or CI step). A kind with no command — no lint
+configured, no build step, no test runner — is null, never guessed: an
+invented command lands in the pre-push gate and blocks every push.
+
 Return JSON ONLY:
 {
   "scout_id": "1.5",
@@ -223,9 +228,9 @@ Return JSON ONLY:
     "branch_strategy": "...",
     "commit_conventions": "<conventional-commits | imperative | other>",
     "ci_checks": {
-      "build": "<exact command, e.g. 'npm run build'>",
-      "lint": "<exact command>",
-      "test": "<exact command>"
+      "build": "<exact command, e.g. 'npm run build'> | null",
+      "lint": "<exact command> | null",
+      "test": "<exact command> | null"
     },
     "deploy": {
       "mechanism": "<e.g. 'GitHub Actions deploy.yml on main' | 'fly deploy'>",
@@ -238,7 +243,10 @@ Return JSON ONLY:
 }
 ```
 
-`deploy` is `null` when no deploy config exists — never guessed.
+`deploy` is `null` when no deploy config exists — never guessed. Same rule per
+`ci_checks` key: a repo with no lint (or no build step, or no test runner) gets
+`null` for that key, never an invented command — Phase 2 substitutes a clean
+no-op (build/lint) or an actionable fail-closed stub (test) into the push gate.
 
 ### Call 6 — scout (1.6 unwritten rules)
 
