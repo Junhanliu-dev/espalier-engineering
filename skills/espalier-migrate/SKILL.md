@@ -234,7 +234,7 @@ fi
 # Fallback (rare — e.g. CLAUDE_SKILL_DIR unset): explicit override, then a
 # known dev-checkout location.
 if [ -z "$PLUGIN_DIR" ]; then
-  for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/SBM_Projects/espalier-engineering"; do
+  for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
     if [ -f "$candidate/scripts/migrate-v0.7-to-v0.8.sh" ]; then
       PLUGIN_DIR="$candidate"
