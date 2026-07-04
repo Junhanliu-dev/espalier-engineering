@@ -72,12 +72,18 @@ never bundled into a feature commit.
 
 ```bash
 . espalier/hooks/drift-helpers.sh
-[ "$(detect_run_mode)" = "unattended" ] && echo unattended
+[ "$(interactivity_mode)" = "unattended" ] && echo unattended
 ```
 
-If invoked unattended (CI, loop, non-tty) with `--all-stale`: do NOT prompt.
-Write the proposed diffs to `espalier/.drift-report.md` and exit, leaving every
-sidecar row in place. Refresh is never silent.
+Only an EXPLICIT unattended signal counts (`CI`, `ESPALIER_UNATTENDED`,
+`ESPALIER_LOOP`, `ESPALIER_HEADLESS`) — never a bash TTY test, which reads
+"no TTY" inside every interactive Claude Code session and would demote every
+attended `--all-stale` run to report-only. If you (the orchestrator) can call
+`AskUserQuestion`, you are interactive: gate each file normally.
+
+If genuinely unattended with `--all-stale`: do NOT prompt. Write the proposed
+diffs to `espalier/.drift-report.md` and exit, leaving every sidecar row in
+place. Refresh is never silent.
 
 ## Scout Mapping
 
