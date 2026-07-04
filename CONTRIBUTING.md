@@ -6,7 +6,7 @@ Thanks for the interest. This doc tells you how the project is laid out, what ki
 
 ```
 .claude-plugin/          # plugin manifests (plugin.json, marketplace.json)
-scripts/                 # bootstrap-espalier.sh, migrate-v0.1-to-v0.2.sh, migrate-v0.3-to-v0.4.sh, migrate-v0.4-to-v0.5.sh, test-bootstrap.sh
+scripts/                 # bootstrap-espalier.sh, migrate-v0.*.sh (one per version step), test-bootstrap.sh, test-hooks.sh
 skills/
 ├── espalier-init/       # the main /espalier-init skill (Phase 0-3 orchestrator)
 │   ├── SKILL.md         # phase index — entrypoint
@@ -14,6 +14,7 @@ skills/
 │   ├── hook-templates/  # shell hooks emitted into target projects
 │   └── references/      # deep-dive content (discovery checklist, wiring, validation)
 └── espalier-migrate/    # /espalier-migrate skill (auto-detect + dispatch migrations)
+eval/                    # dev/QA eval harnesses (grill, ask, security, review, coder) — runner + rubric + golden fixtures each
 docs/                    # migration guides + design plans
 CHANGELOG.md             # release notes
 README.md                # value prop + install + usage cost
@@ -36,11 +37,22 @@ export ESPALIER_PLUGIN_DIR=~/repos/espalier-engineering/skills/espalier-init
 ## Running tests
 
 ```bash
-# Bootstrap smoke suite — 43 assertions covering all phases of bootstrap-espalier.sh
+# Bootstrap smoke suite — 60 assertions covering all phases of bootstrap-espalier.sh
 bash scripts/test-bootstrap.sh --verbose
+
+# Hook regression suite — 28 assertions covering runtime behavior of the
+# shipped hooks (fuzzy matcher, backlink, commit-index rebuild, pre-push gate,
+# drift helpers) + the phantom-helper lint over the skill templates
+bash scripts/test-hooks.sh --verbose
 ```
 
 For the migration scripts, the test harness is described in `docs/migrating-v0.3-to-v0.4.md` (synthetic v0.3 fixture + dry-run + apply).
+
+The `eval/` harnesses (`bash eval/<name>/run.sh`) gate the judgment-heavy
+prompts (grill, security auditor, reviewer, coder, ask). They call the
+`claude` CLI headless and cost real tokens — run the relevant one whenever you
+edit the prompt it gates (each README lists its trigger files); they are not
+part of the default local loop.
 
 Before opening a PR, scripts must parse clean under macOS system bash 3.2.57:
 
@@ -58,7 +70,7 @@ done
 | New child skill template | `skills/espalier-init/templates/skills/` | Add to bootstrap's Stage 3 cp list; SKILL.md `name:` must equal folder name |
 | New hook template | `skills/espalier-init/hook-templates/` | Add to bootstrap's Stage 4 cp list; chmod-glob picks it up |
 | Discovery scout addition (Phase 1) | `skills/espalier-init/references/discovery-checklist.md` | Add to "Parallel Execution Recipe" + update SKILL.md Phase 1 |
-| Validation check | `scripts/bootstrap-espalier.sh` Stage 11 | Bump the `/28` total in `run_check`; add the check; add a row to `references/validation.md` |
+| Validation check | `scripts/bootstrap-espalier.sh` Stage 11 | Bump the `/37` total in `run_check`; add the check; add a row to `references/validation.md` |
 | Docs / typos / examples | `README.md`, `docs/`, in-file comments | No tests needed |
 | New migration (e.g. v0.5 → v0.6) | `scripts/migrate-v0.5-to-v0.6.sh` + update `/espalier-migrate` detection | Follow an existing `migrate-v*.sh` as template |
 
@@ -74,7 +86,8 @@ The migration script's `_rewrite_file()` is the reference pattern for portable s
 ## Pull request checklist
 
 - [ ] Branch named `feat/<short-desc>` or `fix/<short-desc>` or `docs/<short-desc>`
-- [ ] `scripts/test-bootstrap.sh --verbose` passes 43/43
+- [ ] `scripts/test-bootstrap.sh --verbose` passes 60/60
+- [ ] `scripts/test-hooks.sh --verbose` passes 28/28
 - [ ] All shell scripts pass `bash -n` under `/bin/bash` (macOS 3.2.57)
 - [ ] If changing migration scripts, dry-run + apply tested against synthetic v0.3 fixture under both `/bin/bash` and homebrew bash
 - [ ] CHANGELOG.md updated under the next version heading

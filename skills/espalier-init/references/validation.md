@@ -8,8 +8,8 @@ After all generation and wiring is complete, validate end-to-end.
 
 | # | Check | Command | Expected |
 |---|-------|---------|----------|
-| 1 | Rules auto-load | `ls -la .claude/rules/espalier-*` | 4 symlinks (structure, standards, process, security) |
-| 2 | Skills discoverable | `ls -la .claude/skills/espalier*` | symlinks incl. bare `espalier` + `espalier-security` |
+| 1 | Rules auto-load | `ls -la .claude/rules/espalier-*` | 5 symlinks (structure, standards, process, security, production) |
+| 2 | Skills discoverable | `ls -la .claude/skills/espalier*` | all 12 skill symlinks, incl. bare `espalier`, `espalier-security`, `espalier-prune`, `espalier-doctor` |
 | 3 | Agents registered | `ls -la .claude/agents/harness-*` | 3 symlinks (harness-coder, harness-reviewer, harness-security) |
 | 4 | Hooks configured | `cat .claude/settings.json \| grep espalier` | Hook entries |
 | 5 | Symlinks valid | `readlink .claude/rules/espalier-structure.md` | Points to espalier/ |

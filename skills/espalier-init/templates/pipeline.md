@@ -7,7 +7,7 @@
 - **Load:** Read espalier/skills/espalier-requirements/SKILL.md (which invokes espalier-grill)
 - **Execute:** Main agent produces the requirements doc; `espalier-grill` interrogates it (adaptive depth) unless `--no-grill` was passed
 - **Gate:** Requirements doc exists with acceptance criteria (≥ 2 criteria)
-- **Output:** espalier/changes/{slug}/requirements.md
+- **Output:** espalier/changes/{type}/{slug}/requirements.md
 
 ### 2. Requirements Review
 - **Trigger:** Requirements doc complete
@@ -18,7 +18,7 @@
 - **Human checkpoint (BLOCKING):** user approves `requirements.md` before ANY
   coding. Stage 3 does not start on a Stage 2 PASS alone — see the espalier
   skill → "Requirements Approval Gate". Auto-approved only on a no-TTY run.
-- **Output:** espalier/changes/{slug}/review-record.md (append)
+- **Output:** espalier/changes/{type}/{slug}/review-record.md (append)
 
 ### 3. Coding Implementation
 - **Trigger:** Requirements approved
@@ -33,7 +33,7 @@
 - **Baseline (first entry only):** before any code is written, record
   `Base-Ref: $(git rev-parse HEAD)` as a line in pipeline-state.md. Never overwrite
   it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint and the push gate.
-- **Output:** Code changes + espalier/changes/{slug}/coding-report.md
+- **Output:** Code changes + espalier/changes/{type}/{slug}/coding-report.md
 
 ### 4. Code Review (fixpoint loop — a two-agent review panel, re-review after EVERY fix)
 - **Trigger:** Implementation complete (Stage 3 done)
@@ -75,7 +75,7 @@
 - **Security contract (on PASS):** `harness-security` writes a
   `## Security-Sensitive Fields` block into security-record.md — one entry per
   client-supplied sensitive field in scope. This is the Stage 5/6 abuse-test contract.
-- **Output:** espalier/changes/{slug}/review-record.md + security-record.md — BOTH
+- **Output:** espalier/changes/{type}/{slug}/review-record.md + security-record.md — BOTH
   OVERWRITTEN each round (each reflects the current round only, so the orchestrator
   never reads a stale prior-round verdict). Before overwriting begins, the
   orchestrator snapshots each round's two sentinel lines into pipeline-state.md
@@ -129,7 +129,7 @@
   - `total_tests == 0` → Stage 5
   - Compile/build failure → Stage 3
   - Lint failure → Stage 3
-- **Output:** espalier/changes/{slug}/ci-result.md
+- **Output:** espalier/changes/{type}/{slug}/ci-result.md
 
 ### 8.5 Doc Drift Check (notify-only)
 - **Trigger:** Stage 8 (CI) passed

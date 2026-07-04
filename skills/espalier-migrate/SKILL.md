@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to TEN migrations may apply, always in this order:
+version. Up to ELEVEN migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -354,7 +354,7 @@ Migration applied. Recommended next steps:
 
   2. Commit:
        git add -A
-       git commit -m "chore: migrate to Espalier v0.5.0"
+       git commit -m "chore: migrate to Espalier vX.Y.Z"   # the version the chain just reached
 
   3. If you upgraded to v0.5.0, scan for drift that accrued before the upgrade:
        /espalier-doctor
@@ -491,6 +491,21 @@ secret/dependency scan + the cwd fail-closed guard into `pre-push-gate.sh`, and
 patches CLAUDE.md + `espalier/agent.md`. Idempotent — the already-v0.9.0 check
 requires all ten artifacts present (security + audit + production), so a crash
 mid-run is completed on re-run.
+
+**v0.9.0→v0.9.1 (`migrate-v0.9.0-to-v0.9.1.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Creates `espalier/.espalier-config` if absent (extracted from the plugin's
+bootstrap heredoc — single source of truth; an existing file is preserved),
+then refreshes the three pure-copy pipeline files (`pipeline.md`,
+`espalier/skills/espalier/SKILL.md`, `espalier-fix`) so their prose reads the
+config keys. A customised file is backed up to `<file>.pre-v0.9.1.bak`.
+Idempotent — config present + prose referencing it ⇒ no-op.
 
 ## Anti-Patterns
 
