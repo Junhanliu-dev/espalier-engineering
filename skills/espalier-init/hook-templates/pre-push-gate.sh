@@ -156,6 +156,12 @@ elif [ -f Cargo.toml ] && command -v cargo-audit >/dev/null 2>&1; then
   $_to cargo audit >/dev/null 2>&1 || echo "WARNING: 'cargo audit' flagged vulnerable crates or errored (non-blocking)."
 fi
 
+# The three {command} placeholders below were substituted from
+# DISCOVERY.ci_checks at init. A kind the repo did not have (null) was
+# substituted as a clean no-op for build/lint (`true  # none discovered`) or a
+# fail-closed, actionable stub for test — never an invented command. Refresh
+# via /espalier-prune when the project gains one.
+
 # Run build check
 {build_command} 2>/dev/null
 if [ $? -ne 0 ]; then
