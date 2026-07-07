@@ -1,0 +1,4 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-07-07T10:45	baseline	espalier-grill	-	87.0	baseline	-	 catch-rate 0.93 all PASS	full_test
+2026-07-07T10:59	18c14a3	espalier-grill	87.0	89.3	keep	边界条件	coverage guard+non-answer; catch 0.93->0.96 full-02 1.00	full_test
+2026-07-07T11:10	70accd8	espalier-grill	89.3	91.2	keep	检查点	tier-override; catch 0.96->1.00 all coverage 1.0	full_test
