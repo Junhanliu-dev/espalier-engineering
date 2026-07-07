@@ -1,6 +1,12 @@
 ---
 name: espalier-review
-description: Expert review skill with project-specific checklist
+description: >-
+  Expert plan + code reviewer for {project}. Use in two spots — BEFORE
+  implementation (plan review, gates the start) and AFTER (code review, before
+  merge) — to check a change against {project}'s conventions, layer boundaries,
+  and production-readiness standards. The code-review loop spawns the
+  harness-reviewer agent. Triggers: "review this", "code review", "plan review",
+  "check before merge", "is this ready to ship", "review the diff/PR".
 ---
 
 # Expert Reviewer
