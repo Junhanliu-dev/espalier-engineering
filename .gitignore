@@ -6,3 +6,4 @@
 SKILL.original.md
 __pycache__/
 .in_use/
+eval/grill/*-run.log
