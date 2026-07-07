@@ -75,7 +75,11 @@ Tier anchors (calibrate against these):
 - `full` — "make the dashboard faster and handle errors better"
 
 State the chosen tier to the user in one line ("Well-specified — confirming, not
-grilling") so a misjudgment is visible and they can correct it.
+grilling") so a misjudgment is visible and they can correct it. If the user pushes
+back on the tier ("this is more involved than that" / "don't bother grilling"), adopt
+their tier and proceed — their read of the requirement's stakes overrides the signal
+count. A `skip`→`light`/`full` bump runs Step 2; a bump down to `skip` returns
+`SKIPPED: crisp`.
 
 ### Step 2 — Grill loop (tiers `light` and `full`)
 
