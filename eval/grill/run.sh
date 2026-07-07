@@ -22,6 +22,10 @@ GATE_CATCH_RATE="0.80"
 
 total_planted=0
 total_surfaced=0
+shadow_planted=0
+shadow_surfaced=0
+nonshadow_planted=0
+nonshadow_surfaced=0
 fail_count=0
 results=""   # accumulated: "fixture_id\ttier\tcoverage\tverdict\n"
 
@@ -67,6 +71,7 @@ for fixture in "$FIXTURES"/*.md; do
   [ -e "$fixture" ] || { echo "ERROR: no fixtures found"; exit 2; }
   fid="$(basename "$fixture" .md)"
   tier="$(sed -n -E 's/^expected_tier:[[:space:]]*//p' "$fixture" | head -1)"
+  shadow="$(sed -n -E 's/^shadow:[[:space:]]*//p' "$fixture" | head -1)"
 
   if ! run_grill "$fixture" > "$WORK/$fid.transcript"; then
     echo "$fid: grill run failed"; fail_count=$((fail_count + 1)); continue
@@ -83,6 +88,11 @@ for fixture in "$FIXTURES"/*.md; do
 
   total_planted=$((total_planted + planted))
   total_surfaced=$((total_surfaced + surfaced))
+  if [ "$shadow" = "true" ]; then
+    shadow_planted=$((shadow_planted + planted));       shadow_surfaced=$((shadow_surfaced + surfaced))
+  else
+    nonshadow_planted=$((nonshadow_planted + planted)); nonshadow_surfaced=$((nonshadow_surfaced + surfaced))
+  fi
   [ "$verdict" = "PASS" ] || fail_count=$((fail_count + 1))
 
   cov="n/a"
@@ -97,11 +107,29 @@ echo
 
 catch_rate="0.00"
 [ "$total_planted" -gt 0 ] && catch_rate="$(awk "BEGIN{printf \"%.2f\", $total_surfaced/$total_planted}")"
-echo "catch-rate: $catch_rate  (gate >= $GATE_CATCH_RATE)"
+shadow_rate="n/a"
+[ "$shadow_planted" -gt 0 ] && shadow_rate="$(awk "BEGIN{printf \"%.2f\", $shadow_surfaced/$shadow_planted}")"
+nonshadow_rate="n/a"
+[ "$nonshadow_planted" -gt 0 ] && nonshadow_rate="$(awk "BEGIN{printf \"%.2f\", $nonshadow_surfaced/$nonshadow_planted}")"
+echo "catch-rate (all):        $catch_rate  (gate >= $GATE_CATCH_RATE)"
+echo "catch-rate (shadow):     $shadow_rate  (the trustworthy number — see README 'shadow subset')"
+echo "catch-rate (non-shadow): $nonshadow_rate"
 echo "fixture failures: $fail_count"
 
 pass="$(awk "BEGIN{print ($catch_rate >= $GATE_CATCH_RATE) ? 1 : 0}")"
-if [ "$pass" -eq 1 ] && [ "$fail_count" -eq 0 ]; then
+
+# Shadow-subset gate. A high all-fixtures rate driven only by non-shadow (author-written)
+# fixtures is not trustworthy: the skill can be tuned to pass fixtures written alongside
+# it. If any shadow fixtures exist, they must ALSO clear the gate. If none exist, the gate
+# is provisional — warn loudly (this is the seed-set state, README "Discipline").
+shadow_pass=1
+if [ "$shadow_planted" -gt 0 ]; then
+  shadow_pass="$(awk "BEGIN{print ($shadow_rate >= $GATE_CATCH_RATE) ? 1 : 0}")"
+else
+  echo "WARNING: no shadow fixtures present — gate is PROVISIONAL (README 'shadow subset')."
+fi
+
+if [ "$pass" -eq 1 ] && [ "$shadow_pass" -eq 1 ] && [ "$fail_count" -eq 0 ]; then
   echo "RESULT: PASS"
 else
   echo "RESULT: FAIL"

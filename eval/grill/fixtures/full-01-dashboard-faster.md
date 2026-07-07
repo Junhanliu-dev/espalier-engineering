@@ -19,6 +19,8 @@ answer_script:
     reply: failed data-fetch calls to the metrics API
   - asks_about: better error handling
     reply: show a retry button instead of a blank panel
+  - asks_about: whose experience / actor
+    reply: end users viewing the dashboard (SBM staff), on initial page load
   - asks_about: scope boundary
     reply: load time and fetch errors only — no redesign
 shadow: false
