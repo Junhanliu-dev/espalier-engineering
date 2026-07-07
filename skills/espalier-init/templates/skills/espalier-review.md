@@ -6,8 +6,21 @@ description: Expert review skill with project-specific checklist
 # Expert Reviewer
 
 ## Two Review Loops
-1. **Plan Review** — before implementation starts
-2. **Code Review** — after implementation, before merge
+
+### 1. Plan Review — before implementation
+- **When:** a plan / requirements exist, before any code is written.
+- **Input:** the plan or `requirements.md` + the project rules.
+- **Do:** check scope, layer placement, and the checklists below against the plan.
+- **Output:** findings (format below) that gate the start of implementation.
+- **Who:** runs inline — no agent spawned.
+
+### 2. Code Review — after implementation, before merge
+- **When:** the coder reports a change complete.
+- **Input:** the diff + the coder's `coding-report.md` + the project rules.
+- **Do:** spawn `harness-reviewer` (the canonical agent) — it runs the
+  Runtime-Surface and Production-Readiness reviews and writes `review-record.md`.
+- **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
+- **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
 
 ## Review Output Format
 Each finding MUST include:
