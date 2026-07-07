@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.9.3 — 2026-07-07
+
+Patch: **skill-clarity + eval calibration** — no new lane, no new stage, no gate or
+verdict behaviour change. Two shipped skills get sharper instructions; the eval
+harnesses that guard them get a recalibrated judge and a fixture-integrity fix.
+
+**Shipped skills:**
+
+- **`espalier-grill` (pure-copy) — three loop guarantees made explicit.** (1) *User
+  tier-override:* if the user pushes back on the chosen tier ("this is more involved" /
+  "don't bother grilling"), grill now adopts their read — their sense of the
+  requirement's stakes overrides the raw signal count. (2) *Coverage guard:* every
+  ambiguity signal counted in Step 1 must end resolved, scoped-out, or recorded under
+  `## Open Questions`; stop-early now applies only to questions *beyond* the counted
+  signals, so the exact ambiguity grill exists to catch can no longer be skipped. (3)
+  *Non-answer handling:* an "I don't know" is recorded with a named safe default
+  instead of being silently dropped.
+- **`espalier-review` (substituted) — same checks, clearer instructions.** The two
+  review loops become an explicit when / input / do / output / who workflow. The
+  production-readiness checklist stops restating severities (P0/P1) — `production-
+  standards.md` is named the single source, removing a second copy that could drift.
+  The frontmatter gains when-to-use + trigger phrases. Effect is unchanged: the review
+  eval harness scores identically before and after (catch-rate 1.00, zero false
+  positives).
+
+**Eval harness (dev/QA infra — not shipped):**
+
+- **Grill judge recalibrated.** The `non_obvious` rubric anchors were sharpened
+  (a standard scoping ask = 1; a question that overturns a likely-wrong default = 2;
+  filler = 0) after the judge was found to inflate the dimension by ~0.3. The
+  judge-validation agreement tolerance tightened ±0.5 → ±0.3 so that drift surfaces
+  instead of hiding inside the band. Hand-scores were cross-checked against a second
+  model and reconciled; judge-validation now agrees 24/24.
+- **Review eval fixture-integrity fix.** The `clean-01` fixture used `new AppError()`
+  with no import, so a literal read was a `ReferenceError` — the reviewer correctly
+  flagged the undefined symbol and it was miscounted as a false positive. Added the
+  import (it is the project-standard error type); the reviewer was not changed. Also
+  adds the review eval's shadow discipline notes and a darwin optimization ledger.
+
+**Existing installs:** run `bash scripts/migrate-v0.9.2-to-v0.9.3.sh` from the target
+repo root (`--dry-run` to preview). It refreshes the pure-copy `espalier-grill` and
+surgically re-splices the three changed sections of the substituted `espalier-review`
+in place — preserving your project's substituted name and discovered conventions.
+Idempotent; backs up both skills to `*.pre-v0.9.3.bak`.
+
 ## 0.9.2 — 2026-07-04
 
 Patch: **correctness sweep** — a full-repo audit surfaced a cluster of defects concentrated in bash embedded in skill markdown (code no interpreter had ever run end-to-end) plus gate/doc inconsistencies. All fixed, each proven by a red-first regression test or a sandbox reproduction. No new lane, no new stage; non-breaking.
