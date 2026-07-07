@@ -1,0 +1,63 @@
+**Mode:** diagnosis · **Input:** "fix: invoice creation shows a success toast even when it failed"
+
+## Step 1 — Signals
+
+Count concrete ambiguity signals:
+
+1. **Unconfirmed cause** — why failure renders success is asserted symptom, not evidenced root cause.
+2. **Missing failure behaviour** — batch undefined: one card fails vs whole batch?
+3. **Unscoped edge case** — partial-failure handling + which error message unspecified.
+
+**3 signals → tier `light`** (≤3 questions). Matches expected.
+
+Tier line to user: *"Diagnosis under-specified on cause + failure semantics — light grill, 3 questions."*
+
+## Step 2 — Grill loop (sequential)
+
+**Q1** (root cause — symptom vs cause). Divergent explanations: {toast unconditional in `finally`, mutation error swallowed by catch, optimistic UI never rolled back, backend returns 200 on failure}. Discriminating question:
+
+> Why does a failed invoice mutation still fire the success toast — is the error swallowed, or is the toast unconditional?
+
+**A1** (`asks_about: why it falsely succeeds`): success toast lives in a `finally` block, so it fires even when the invoice mutation throws.
+→ Root cause pinned: unconditional toast in `finally`. Not a swallowed error.
+
+**Q2** (batch semantics). Divergent: {single invoice only, batch all-or-nothing, batch per-card independent, mixed}. Discriminating:
+
+> Is invoice creation single or batched — and does one card's failure fail the batch or just that card?
+
+**A2** (`asks_about: batch semantics`): shared builder-contact error fails every card in that batch together; per-card errors come back as individual results.
+→ Two failure classes: shared error (whole batch), per-card error (individual).
+
+**Q3** (partial-failure behaviour + message). Divergent: {rollback all, commit successes + summary, silent partial, show first error only}. Discriminating:
+
+> On partial failure, commit the successes and show a count, or roll everything back — and which message on total failure?
+
+**A3** (`asks_about: partial failures`): show "N of M invoice(s) failed" and still commit the cards that succeeded; on a total failure show the first failure's message.
+
+Every counted signal covered. Next question would not change implementation → stop.
+
+## Step 3 — Writeback (`requirements.md`)
+
+**## Root Cause**
+- Success toast rendered from a `finally` block in the invoice-creation handler → fires unconditionally, including when the invoice mutation throws. Toast is decoupled from mutation outcome.
+
+**## Reproduction**
+1. Trigger invoice creation where the mutation throws (e.g. shared builder-contact error).
+2. Mutation rejects; `finally` block runs; success toast displays.
+3. Expected: failure state; actual: success toast.
+
+**## Acceptance Criteria**
+- Success toast fires only on mutation success — move it out of `finally` into the success path.
+- Batch: shared builder-contact error fails all cards in that batch together; per-card errors surface as individual results.
+- Partial failure: commit succeeded cards; show `"N of M invoice(s) failed"`.
+- Total failure: show first failure's message.
+
+**## Scope Definition**
+- In: toast placement fix, batch/partial/total failure messaging.
+- Out: retry logic, builder-contact validation upstream.
+
+Coverage guard: 3/3 signals landed as written lines. No open questions.
+
+## Verdict
+
+**`GRILLED`** — tier `light`, 3 questions, `requirements.md` updated.

@@ -1,0 +1,90 @@
+**Tier: full.** 6 ambiguity signals counted:
+
+1. "faster" — no target metric or baseline (hidden quantifier)
+2. "the dashboard" — which one? (unstated system)
+3. "errors" — which errors? (unscoped)
+4. "better" error handling — undefined (vague term)
+5. no actor — whose experience?
+6. no failure behaviour defined
+
+5+ signals = full tier, ≤7 questions. Sequential grill below. Input is one requirement string; no reqs_path passed, so resolutions shown inline as they'd land in `requirements.md`.
+
+---
+
+**Q1** — Divergences: {main analytics dashboard · admin dashboard · per-project dashboard · billing dashboard}. Discriminate the target first.
+
+> Which dashboard? Multiple exist — the main analytics one, admin, per-project?
+
+*answer_script[which dashboard]:* "the main analytics dashboard"
+
+→ Scope: main analytics dashboard.
+
+---
+
+**Q2** — "faster" is unmeasured. Divergences: {perceived render · TTI · initial load seconds · API latency}. Pin the metric + baseline.
+
+> "Faster" against what target and current baseline?
+
+*answer_script[faster target]:* "initial load under 2 seconds, currently about 6"
+
+→ AC: initial load < 2s (baseline ~6s).
+
+---
+
+**Q3** — "errors" unscoped. Divergences: {data-fetch failures · JS render crashes · auth/permission errors · validation errors}. Which class?
+
+> Which errors — failed data fetches, render crashes, auth failures?
+
+*answer_script[which errors]:* "failed data-fetch calls to the metrics API"
+
+→ Scope: failed data-fetch calls to metrics API.
+
+---
+
+**Q4** — "handle better" still open. Divergences: {retry button · auto-retry w/ backoff · toast + log · cached-stale fallback}. What does user see?
+
+> "Better handling" concretely — what shows when a fetch fails?
+
+*answer_script[better error handling]:* "show a retry button instead of a blank panel"
+
+→ AC: on fetch failure, render retry button (not blank panel).
+
+---
+
+**Q5** — actor + trigger undefined. Divergences: {end users on load · admins on demand · background job · mobile}. Whose experience, when?
+
+> Whose experience improves, and on what trigger — initial load, refresh?
+
+*answer_script[whose experience / actor]:* "end users viewing the dashboard (SBM staff), on initial page load"
+
+→ Actor: SBM staff end users, on initial page load.
+
+---
+
+**Q6** — scope boundary. Divergences: {load+errors only · +redesign · +new metrics · +caching layer}. Confirm out-of-scope.
+
+> Boundary — load time and fetch errors only, or does redesign/new features count?
+
+*answer_script[scope boundary]:* "load time and fetch errors only — no redesign"
+
+→ Scope out: redesign, new metrics, layout changes.
+
+---
+
+**All 6 signals resolved.** Stop early — next question would not change implementation.
+
+**Resolved requirements:**
+
+```
+## Scope Definition
+IN:  main analytics dashboard — initial page load performance + metrics-API fetch-error handling
+OUT: redesign, new metrics, layout/UX changes, non-fetch error classes
+
+## Acceptance Criteria
+- Initial load of main analytics dashboard < 2s (baseline ~6s), for SBM staff end users on first page load
+- On failed data-fetch to metrics API, panel shows a retry button instead of a blank panel
+```
+
+**Coverage guard:** all 6 counted signals → written as AC or scope line. No open questions (every point answered).
+
+**Verdict: `GRILLED`** — full tier, requirements resolved.

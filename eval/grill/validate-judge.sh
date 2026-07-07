@@ -30,8 +30,8 @@ SUBSET="full-01-dashboard-faster shadow-full-02-decimal-points light-01-csv-expo
 # Agreement tolerances per dimension (judge vs human counts as agreeing within these):
 #   surfaced        exact count +/- 1
 #   depth_cal       exact (0/1/2)
-#   non_obvious     +/- 0.5
-#   discrimination  +/- 0.5
+#   non_obvious     +/- 0.3   (tightened from 0.5 — 0.5 let a systematic +0.3 judge bias pass unflagged)
+#   discrimination  +/- 0.3
 
 run_grill() {
   local fixture="$1"
@@ -107,8 +107,8 @@ case "$cmd" in
         d = h - j; if (d < 0) d = -d
         if (dim == "surfaced")       return (d <= 1) ? 1 : 0
         if (dim == "depth_cal")      return (h == j) ? 1 : 0
-        if (dim == "non_obvious")    return (d <= 0.5) ? 1 : 0
-        if (dim == "discrimination") return (d <= 0.5) ? 1 : 0
+        if (dim == "non_obvious")    return (d <= 0.3 + 1e-9) ? 1 : 0
+        if (dim == "discrimination") return (d <= 0.3 + 1e-9) ? 1 : 0
         return -1
       }
       FNR==NR {

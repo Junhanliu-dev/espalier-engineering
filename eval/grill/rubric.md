@@ -18,9 +18,22 @@ Did grill choose the fixture's `expected_tier`?
 - 0 — off by two (skip vs full), or grilled a `skip` fixture / skipped a `full` one
 
 ### 3. Non-obviousness (per question, averaged)
-- 2 — a competent engineer would not already know to ask this
-- 1 — reasonable but obvious
-- 0 — generic filler ("any edge cases?") or answerable from the input text itself
+- 2 — a competent engineer would NOT already know to ask this; the ambiguity is
+  hidden and the answer is not the default assumption. Examples: input-entry-vs-
+  display bug, sync-vs-async + pagination scope, `finally`-block cause, blur-timing.
+- 1 — a standard domain question any engineer building this feature would ask
+  by reflex; real but not insight. Examples: "which report / which entity?",
+  "which columns?", "which of the several dashboards?". Score these 1, NOT 2 —
+  asking is correct, but it is obvious, not non-obvious.
+- 0 — generic filler ("any edge cases?") or answerable from the input text itself.
+
+Calibration note: score non-obviousness on its own, independent of whether the
+answer forks the impl (that is dimension 4). A pure "which X of the obvious set of
+X" is a 1. But a question is a 2 when a competent engineer would plausibly have
+picked a DEFAULT and been wrong — even if the topic itself is mundane (e.g.
+"normalise while typing vs on blur", "sync visible-page export vs async full
+dataset"). Do not floor everything to 1; reserve 0 for filler, 1 for reflexive
+standard asks, 2 for questions that overturn a likely-wrong default assumption.
 
 ### 4. Discrimination (per question, averaged)
 - 2 — the answer materially changes the implementation

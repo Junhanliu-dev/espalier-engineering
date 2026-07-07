@@ -1,0 +1,66 @@
+**Tier: full** — 5 ambiguity signals counted.
+
+Signals in `fix: add decimal points` (diagnosis mode):
+1. Undefined term — "decimal points" on which fields/screen?
+2. Missing symptom — no statement of what breaks today
+3. Unconfirmed cause — display/rounding vs input-entry, asserted not evidenced
+4. No reproduction steps
+5. Unscoped — when formatting should apply, component scope
+
+5 signals → `full` (≤7 questions).
+
+---
+
+## Grill transcript (sequential)
+
+**Q1** — divergences: {any numeric field app-wide · money inputs only · a read-only display column · a totals/summary cell}. Discriminator:
+> Which fields show the problem — every numeric input, or specific money fields, and on which screen?
+
+*answer_script[which fields]:* "the money inputs — gross amount, super, and GST — on the working-project row"
+
+→ Write `requirements.md` ## Reproduction: fields = gross amount, super, GST on working-project row.
+
+---
+
+**Q2** — divergences: {value rounds wrong · trailing zeros vanish on save · can't type a decimal at all · totals miscompute}. Discriminator:
+> What actually goes wrong when you use those fields today?
+
+*answer_script[what actually breaks]:* "typing \"100.\" or a trailing zero gets clobbered back to \"100\" mid-edit; you can't enter a decimal"
+
+→ Write ## Reproduction symptom: mid-edit reparse clobbers `100.` / trailing zero back to `100`.
+
+---
+
+**Q3** — divergences: {display formatter rounds · store coerces number · field bound to numeric value so reparse overwrites keystrokes · currency-parse helper strips}. Discriminator:
+> Is the value wrong when displayed/saved (display bug), or does the field fight you while typing (input-entry bug)?
+
+*answer_script[display bug or input bug]:* "input-entry bug — the field is bound straight to the numeric value, so reparsing overwrites what you're typing"
+
+→ Write ## Root Cause: input bound directly to numeric value; every keystroke reparses `Number(x)`, dropping in-progress decimal chars. Not a display/rounding bug.
+
+---
+
+**Q4** — divergences: {normalise every keystroke · normalise on blur · never normalise, store raw string · normalise on submit}. Discriminator:
+> When should the field snap to 2 decimals — live while typing, or only on blur?
+
+*answer_script[when to normalise]:* "on blur only, never while typing"
+
+→ Write ## Acceptance-adjacent (Reproduction/expected): hold raw string during edit; normalise to 2 decimals on blur only, never mid-type.
+
+---
+
+**Q5** — divergences: {fix row component only · also patch store · also patch currency-parse helper · global input wrapper}. Discriminator:
+> Scope — just the working-project row component, or does the store / currency-parse helper need touching too?
+
+*answer_script[scope]:* "just the working-project row component; don't touch the store or the currency-parse helper"
+
+→ Write ## Scope: working-project row component only. Out: store, currency-parse helper.
+
+---
+
+Stop — every counted signal resolved, next question wouldn't change implementation.
+
+**Coverage guard:** all 5 signals now traced in `requirements.md` (fields, symptom, root cause, formatting-timing, scope). No open questions — no non-answers.
+
+## Verdict
+`GRILLED`
