@@ -1,0 +1,7 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-07-07T15:30	baseline	harness-reviewer	-	88.2	baseline	-	effect 10/10 catch-rate 1.00 FP 0 gate PASS; strong structure	full_test
+2026-07-07T15:30	baseline	espalier-review	-	70.7	baseline	-	effect shared 10/10; structural weak on workflow(6)+arch(6)+frontmatter(5)	full_test
+2026-07-07T15:30	cfa8451	eval/review	-	-	keep	eval-integrity	clean-01 elided AppError import -> reviewer FP'd undefined-symbol P0; added import, FP cleared (NOT a skill win)	full_test
+2026-07-07T15:45	8cc3c2f	espalier-review	70.7	75.2	keep	architecture	dedup production-check severities -> point to production-standards.md as single source; no effect regression (catch 1.00 FP 0)	full_test
+2026-07-07T15:52	cc68ed1	espalier-review	75.2	79.7	keep	workflow	two review loops -> explicit when/input/do/output/who; no effect regression (catch 1.00 FP 0)	full_test
+2026-07-07T15:58	e75e461	espalier-review	79.7	82.9	keep	frontmatter	description gains when-to-use + triggers; frontmatter-only, cumulative harness PASS	full_test
