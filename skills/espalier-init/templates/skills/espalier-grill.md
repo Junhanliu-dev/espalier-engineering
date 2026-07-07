@@ -101,8 +101,15 @@ Rules for the loop:
 - **By mode** — `spec`: probe scope (in / out), false premises, edge cases, vague
   terms. `diagnosis`: probe the root cause (symptom vs. cause?), the reproduction,
   and whether the stated "expected behaviour" is actually correct.
+- **Cover every counted signal.** Each ambiguity signal you counted in Step 1 must end
+  either resolved by an answer or consciously ruled out of scope. Stop-early (below)
+  applies only to questions *beyond* the counted signals — never leave a signal you
+  counted unaddressed, because that is exactly the ambiguity grill exists to catch.
+- **Handle a non-answer.** If the user replies "I don't know" / defers, do not silently
+  drop the point: record it under `## Open Questions` in `requirements.md`, pick the
+  safest default, and name that default. An invisible unresolved signal defeats the audit.
 - **Stop early.** Stop the moment the next question's answer would not change the
-  implementation — even before the tier cap.
+  implementation — even before the tier cap (but after every counted signal is covered).
 
 ### Step 3 — Write the resolved input back
 
@@ -116,6 +123,11 @@ batched at the end:
 
 Every grilled decision must land as a verifiable line. Never leave a resolution only
 in the conversation.
+
+**Coverage guard (before returning `GRILLED`).** Re-read the Step 1 signal list. Every
+signal you counted must now appear in `requirements.md` as a resolved criterion, a
+scope-out line, or an `## Open Questions` entry. A counted signal with no written trace
+is a coverage miss — ask it now (within the tier cap) or record it, then return.
 
 ## Verdict
 
