@@ -1,0 +1,42 @@
+**Tier: light.** 3 ambiguity signals counted:
+1. Undefined term — "reports page" holds >1 report type; which one exports?
+2. Hidden quantifier — current visible page vs full dataset?
+3. Unscoped columns — which columns land in CSV?
+
+3 signals → light (2–4). Cap ≤3 questions.
+
+Reports page has multiple reports + pagination + column set. Codebase can't pick product intent, so ask.
+
+---
+
+**Q1** (discriminates: which report is the button bound to — summary / detail / all reports combined / active tab only):
+> "Reports page shows multiple report types. Which one does the CSV export button export — summary, detail, or all of them?"
+
+answer_script reply used → *"the summary report only"*
+
+**Q2** (discriminates: sync export of visible page rows vs async export of full dataset — biggest impl fork: pagination scope + sync/async):
+> "Summary report is paginated. Export only the rows on the current visible page, or the full dataset across all pages?"
+
+answer_script reply used → *"the full dataset"*
+
+**Q3** (discriminates: visible table columns only / all underlying fields / user-configurable):
+> "Which columns go in the CSV — the columns currently visible in the table, or all underlying fields?"
+
+answer_script reply used → *"the columns currently visible in the table"*
+
+---
+
+Stop. 3 signals covered, next question wouldn't change impl. Every counted signal resolved.
+
+**Written to `requirements.md`:**
+
+`## Acceptance Criteria`
+- CSV export button on reports page exports **summary report only** (not detail, not all-reports).
+- Export includes **full dataset across all pages**, not just current visible page.
+- CSV columns = **columns currently visible in the table**.
+
+`## Scope Definition`
+- **In:** summary report, full dataset, visible columns.
+- **Out:** detail/other report types, hidden/underlying fields, per-user column config.
+
+**Verdict: `GRILLED`** — light ran, requirements.md updated.

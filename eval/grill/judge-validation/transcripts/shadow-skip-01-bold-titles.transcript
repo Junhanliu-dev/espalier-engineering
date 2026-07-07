@@ -1,0 +1,33 @@
+**Grill transcript — fixture `shadow-skip-01-bold-titles`** (mode: diagnosis)
+
+**Step 0 — Environment**
+EVAL mode. Answer channel = fixture answer_script. No TTY skip. Proceed.
+
+**Step 1 — Signal count + tier**
+
+Scan input for diagnosis-mode ambiguity signals:
+
+| Signal check | Present? |
+|---|---|
+| Undefined/overloaded term ("Fire Cause sub-section") | domain term, resolvable in code — not counted |
+| Unconfirmed cause | mild — "sentence alone" is asserted current state | **1** |
+| Weak reproduction | no — deterministic PDF render, exact before/after given |
+| Missing failure behavior | n/a — pure formatting change |
+| Hidden quantifier | none |
+| Unscoped edge case | desired output fully specified (bold title, e.g. given, sentence line below) |
+
+Count = **1** signal → tier **`skip`**.
+
+Matches expected_tier=skip, expected_signals=1.
+
+**Tier line to user:** "Well-specified fix — clear before (sentence alone) and after (bold title + sentence below) with a concrete example. Confirming, not grilling."
+
+**Step 2 — Grill loop**
+Skipped (tier skip). No questions asked. answer_script empty — consistent, zero replies consumed.
+
+**Step 3 — Write-back**
+Skipped (tier skip).
+
+**Verdict:** `SKIPPED: crisp`
+
+No signal left untraced — the one soft signal (asserted current state) is a verifiable code fact the implementer confirms during the fix, not a spec ambiguity. Grill correctly declined.

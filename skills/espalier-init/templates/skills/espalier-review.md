@@ -1,13 +1,32 @@
 ---
 name: espalier-review
-description: Expert review skill with project-specific checklist
+description: >-
+  Expert plan + code reviewer for {project}. Use in two spots — BEFORE
+  implementation (plan review, gates the start) and AFTER (code review, before
+  merge) — to check a change against {project}'s conventions, layer boundaries,
+  and production-readiness standards. The code-review loop spawns the
+  harness-reviewer agent. Triggers: "review this", "code review", "plan review",
+  "check before merge", "is this ready to ship", "review the diff/PR".
 ---
 
 # Expert Reviewer
 
 ## Two Review Loops
-1. **Plan Review** — before implementation starts
-2. **Code Review** — after implementation, before merge
+
+### 1. Plan Review — before implementation
+- **When:** a plan / requirements exist, before any code is written.
+- **Input:** the plan or `requirements.md` + the project rules.
+- **Do:** check scope, layer placement, and the checklists below against the plan.
+- **Output:** findings (format below) that gate the start of implementation.
+- **Who:** runs inline — no agent spawned.
+
+### 2. Code Review — after implementation, before merge
+- **When:** the coder reports a change complete.
+- **Input:** the diff + the coder's `coding-report.md` + the project rules.
+- **Do:** spawn `harness-reviewer` (the canonical agent) — it runs the
+  Runtime-Surface and Production-Readiness reviews and writes `review-record.md`.
+- **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
+- **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
 
 ## Review Output Format
 Each finding MUST include:
@@ -28,15 +47,19 @@ Each finding MUST include:
 - [ ] Consistency: Does it match existing patterns?
 - [ ] Completeness: Edge cases handled?
 
-## Production-Readiness Checks (espalier/rules/production-standards.md)
-Severity tiers are defined in the rule — P0 for the data-loss class, P1 for
-production-readiness gaps.
-- [ ] External calls carry a timeout + decided failure behaviour (P1 if not)
-- [ ] List queries on request paths are bounded/paginated (P1); no N+1 on hot paths
-- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome (P1)
-- [ ] No swallowed errors; persistence-path failures never continue as success (P0 on money/state paths)
-- [ ] Migrations follow expand → migrate → contract; destructive steps are requirement-authorized (P0 if not)
-- [ ] Mutating consumers/webhooks are idempotent under redelivery (P1)
+## Production-Readiness Checks
+`espalier/rules/production-standards.md` is the SINGLE SOURCE for these checks and
+their severity tiers — do not restate severities here (they drift). Confirm each
+that applies to the change:
+- [ ] External calls carry a timeout + decided failure behaviour
+- [ ] List queries on request paths are bounded/paginated; no N+1 on hot paths
+- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome
+- [ ] No swallowed errors; persistence-path failures never continue as success
+- [ ] Migrations follow expand → migrate → contract; destructive steps requirement-authorized
+- [ ] Mutating consumers/webhooks are idempotent under redelivery
+
+Severity tier for any gap: read it from the rule, not this list. The code-review
+loop delegates enforcement to `harness-reviewer` (Production-Readiness Review).
 
 ## Output Template
 

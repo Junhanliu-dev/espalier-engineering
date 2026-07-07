@@ -1,0 +1,25 @@
+**Grill transcript — fixture `skip-01-copyright-year`**
+
+Step 0 — eval mode, TTY check skipped. Interactive.
+
+Step 1 — signal count on input:
+`feat: bump the copyright year in the site footer from 2025 to 2026`
+
+| Signal type | Present? |
+|---|---|
+| Undefined/overloaded term | no — "copyright year" concrete |
+| Unstated actor/system | no — site footer named |
+| Missing failure behavior | no — static text swap, no failure path |
+| Hidden quantifier | no — exact values 2025 2026 |
+| Unscoped edge case | no — full change is happy path |
+
+**Signals = 0 → tier `skip`.**
+
+Tier line: "Well-specified — confirming, not grilling. Footer copyright string 2025 to 2026, exact swap."
+
+Step 2 — not run (skip tier).
+Step 3 — not run (skip tier).
+
+Questions asked: none. answer_script empty (`[]`) — no replies consumed. Match: 0 questions, 0 scripted answers. ✓
+
+**Verdict: `SKIPPED: crisp`**

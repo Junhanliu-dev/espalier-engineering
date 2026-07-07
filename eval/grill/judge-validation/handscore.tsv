@@ -1,0 +1,25 @@
+fixture	dimension	human_score	note
+full-01-dashboard-faster	surfaced	6	all 6 planted surfaced by Q1-Q6
+full-01-dashboard-faster	depth_cal	2	full == expected full
+full-01-dashboard-faster	non_obvious	1.17	Q4 retry-vs-blank overturns default (=2); Q1-3/5-6 standard scoping (=1); 7/6 (codex-reconciled)
+full-01-dashboard-faster	discrimination	1.9	metric/error/retry fork impl; Q6 scope-boundary answer only excludes (codex-reconciled)
+shadow-full-02-decimal-points	surfaced	5	all 5 planted surfaced (fields/symptom/cause/timing/scope)
+shadow-full-02-decimal-points	depth_cal	2	full == expected full
+shadow-full-02-decimal-points	non_obvious	1.8	strong diagnosis disambiguation (display-vs-input, blur timing)
+shadow-full-02-decimal-points	discrimination	2.0	each answer materially changes fix
+light-01-csv-export	surfaced	3	all 3 planted surfaced
+light-01-csv-export	depth_cal	2	light == expected light
+light-01-csv-export	non_obvious	1.5	page-vs-dataset non-obvious; which-report/columns standard (codex-reconciled)
+light-01-csv-export	discrimination	2.0	all three change impl
+shadow-light-02-invoice-failures	surfaced	3	all 3 planted surfaced (cause/batch/partial)
+shadow-light-02-invoice-failures	depth_cal	2	light == expected light
+shadow-light-02-invoice-failures	non_obvious	1.9	finally-block cause + batch semantics non-obvious
+shadow-light-02-invoice-failures	discrimination	2.0	all change impl
+skip-01-copyright-year	surfaced	0	0 planted, 0 asked
+skip-01-copyright-year	depth_cal	2	skip == expected skip
+skip-01-copyright-year	non_obvious	0.0	no questions
+skip-01-copyright-year	discrimination	0.0	no questions
+shadow-skip-01-bold-titles	surfaced	0	0 planted, 0 asked; soft signal correctly declined
+shadow-skip-01-bold-titles	depth_cal	2	skip == expected skip
+shadow-skip-01-bold-titles	non_obvious	0.0	no questions
+shadow-skip-01-bold-titles	discrimination	0.0	no questions

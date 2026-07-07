@@ -10,9 +10,11 @@ false_positive_watch:
   - "a service importing a repository is allowed — do NOT flag layers"
   - "findCart is a repository (internal) call — do NOT flag it for a missing timeout"
   - "naming is camelCase verb-first — do NOT flag naming"
+  - "AppError is imported and is the project-standard error type (named in coding-standards.md) — do NOT flag it as undefined/missing-import"
 shadow: false
 ---
 const { findCart } = require('../repositories/cart-repo');
+const { AppError } = require('../errors');
 const logger = require('../logger');
 
 // getCart — returns Result<Cart, AppError>
