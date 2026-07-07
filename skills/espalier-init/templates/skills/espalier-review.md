@@ -28,15 +28,19 @@ Each finding MUST include:
 - [ ] Consistency: Does it match existing patterns?
 - [ ] Completeness: Edge cases handled?
 
-## Production-Readiness Checks (espalier/rules/production-standards.md)
-Severity tiers are defined in the rule — P0 for the data-loss class, P1 for
-production-readiness gaps.
-- [ ] External calls carry a timeout + decided failure behaviour (P1 if not)
-- [ ] List queries on request paths are bounded/paginated (P1); no N+1 on hot paths
-- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome (P1)
-- [ ] No swallowed errors; persistence-path failures never continue as success (P0 on money/state paths)
-- [ ] Migrations follow expand → migrate → contract; destructive steps are requirement-authorized (P0 if not)
-- [ ] Mutating consumers/webhooks are idempotent under redelivery (P1)
+## Production-Readiness Checks
+`espalier/rules/production-standards.md` is the SINGLE SOURCE for these checks and
+their severity tiers — do not restate severities here (they drift). Confirm each
+that applies to the change:
+- [ ] External calls carry a timeout + decided failure behaviour
+- [ ] List queries on request paths are bounded/paginated; no N+1 on hot paths
+- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome
+- [ ] No swallowed errors; persistence-path failures never continue as success
+- [ ] Migrations follow expand → migrate → contract; destructive steps requirement-authorized
+- [ ] Mutating consumers/webhooks are idempotent under redelivery
+
+Severity tier for any gap: read it from the rule, not this list. The code-review
+loop delegates enforcement to `harness-reviewer` (Production-Readiness Review).
 
 ## Output Template
 
