@@ -85,12 +85,19 @@ is exercised, not just the catch.
 
 ## Discipline (same as eval/grill)
 
-- **Reach 20–30 fixtures.** This seed set has 9 (5 change-scoped vuln across the
-  five axes + mass-assignment + queue-consumer; 2 change-scoped clean; 2
-  repo-audit — one mixed repo, one clean repo). The gate is provisional until full.
+- **Reach 20–30 fixtures.** This set has 20: 11 change-scoped vuln (all five axes —
+  owner/IDOR, money price-tamper + unbounded-refund, permission mass-assign +
+  header-role, state illegal-transition + cross-axis IDOR, identity actor-spoof — plus
+  stock/balance P1 race and a queue-consumer surface); 5 change-scoped clean (no-surface
+  self-noop, fully-controlled, control-one-hop-away in a helper, pure-calc refactor, and
+  a check-moved-but-kept refactor); 4 repo-audit (two mixed FINDINGS repos incl. a P1,
+  two CLEAN repos exercising Controls-Confirmed / No-Sensitive-Fields routing). Still
+  provisional toward the 20–30 target's upper end and the shadow ratio below.
 - **Shadow subset.** Roughly one third should be `shadow: true` — authored from real
   CVEs / real PRs or by someone other than the security-skill author, so the auditor
-  cannot be tuned to pass known fixtures. This seed is all `shadow: false`.
+  cannot be tuned to pass known fixtures. Currently 4 are `shadow: true`
+  (`shadow-01-massassign-verified`, `shadow-02-header-role`,
+  `shadow-03-controlled-refactor`, `clean-04-refactor-noop`) — ~20%; grow toward ⅓.
 - **Validate the judge** before trusting it — hand-score a handful and confirm the
   judge agrees (≥ 75%), especially on the axis-correctness and false-positive calls.
 - **Regression gate.** Run `run.sh` on every edit to `harness-security.md`,

@@ -1,0 +1,7 @@
+fixture	planted	caught	false_positives	verdict_match
+vuln-07-stock-race	1	1	0	1
+clean-03-guarded-helper	0	0	0	1
+shadow-01-massassign-verified	2	2	0	1
+shadow-03-controlled-refactor	0	0	0	1
+repo-03-mixed-p1	2	2	0	1
+vuln-08-idor-crossaxis	1	1	0	1
