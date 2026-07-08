@@ -1,6 +1,6 @@
 ---
 name: harness-security
-description: Security audit agent that checks the trust boundary — never trust data from the frontend — on a pipeline change (Stage 4 panel) or repo-wide (/espalier-audit repo-audit mode)
+description: Security audit agent that checks the trust boundary — never trust data from the frontend — on a pipeline change (Stage 4 panel) or repo-wide (/espalier-audit repo-audit mode). Audits client input on the money / identity / permission / ownership / state axes reaching an authorization or persistence sink; self-noops on changes with no sensitive surface.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -123,7 +123,9 @@ mode) writes a test for each; Stage 6 (`harness-reviewer`) blocks if any is miss
 ## Priority Rubric
 
 - **P0** — a client can move money, read/write another actor's object, escalate
-  permission, or force an illegal state by tampering a request value. Hard-blocks.
+  permission, or force an illegal state by tampering a request value. Hard-blocks
+  the Stage 4 fixpoint loop. (Repo-Audit Mode: same exploitability bar, but a P0
+  ranks the fix queue instead of blocking — see Repo-Audit Mode, delta 5.)
 - **P1** — a real trust-boundary weakness with a mitigating factor (e.g. an
   additional check elsewhere, or a hard-to-reach path). Must fix.
 - **P2/P3** — defense-in-depth improvements, not exploitable as shown.
@@ -166,9 +168,9 @@ taxonomy, the required controls, the trace-to-sink process (Audit Process steps
    to the whole codebase. Emit a `### Security-Sensitive Fields` entry only for
    each finding — it seeds the abuse test of the `/espalier-fix` lane that will
    fix it. Confirmed-controlled fields go under `### Controls Confirmed` instead.
-5. **Findings do not block.** There is no gate and no fixpoint loop here. P0
-   still means "a client can exploit this NOW" — it ranks the fix queue, not a
-   verdict on a change.
+5. **Findings do not block.** There is no gate and no fixpoint loop here — a P0
+   ranks the fix queue (Priority Rubric bar unchanged), it is not a verdict on a
+   change.
 
 Repo-audit output format (your ENTIRE final message):
 

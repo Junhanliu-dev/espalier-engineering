@@ -24,7 +24,11 @@ AGENT_TPL="$TPL/agents/harness-security.md"
 RULE_TPL="$TPL/rules/security-standards.md"
 SKILL_TPL="$TPL/skills/espalier-security.md"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# KEEP_WORK=1 preserves the throwaway projects, records, and per-fixture judge
+# lines for judge-validation / debugging (default: clean up on exit).
+KEEP_WORK="${KEEP_WORK:-0}"
+[ "$KEEP_WORK" = "1" ] || trap 'rm -rf "$WORK"' EXIT
+if [ "$KEEP_WORK" = "1" ]; then : > "$WORK/judge-lines.tsv"; fi
 
 # Security is higher-stakes than grill: a missed vuln is a shipped hole. Gate is
 # strict and PROVISIONAL until the fixture set reaches 20-30 (see README).
@@ -180,6 +184,11 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
 
   case "$planted$caught$fp$vmatch" in *[!0-9]*|"") echo "$fid: unparseable judge output: $line"; fail_count=$((fail_count + 1)); continue ;; esac
 
+  if [ "$KEEP_WORK" = "1" ]; then
+    cp "$record" "$WORK/$fid.record.md" 2>/dev/null || true
+    printf '%s\t%s\n' "$fid" "$line" >> "$WORK/judge-lines.tsv"
+  fi
+
   total_planted=$((total_planted + planted))
   total_caught=$((total_caught + caught))
   total_fp=$((total_fp + fp))
@@ -205,6 +214,7 @@ catch_rate="1.00"
 echo "catch-rate:       $catch_rate  (gate >= $GATE_CATCH_RATE)"
 echo "false positives:  $total_fp    (gate == 0)"
 echo "fixture failures: $fail_count"
+if [ "$KEEP_WORK" = "1" ]; then echo "KEEP_WORK dir:    $WORK"; fi
 
 rate_ok="$(awk "BEGIN{print ($catch_rate >= $GATE_CATCH_RATE) ? 1 : 0}")"
 if [ "$rate_ok" -eq 1 ] && [ "$total_fp" -eq 0 ] && [ "$fail_count" -eq 0 ]; then

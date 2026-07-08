@@ -1,0 +1,7 @@
+fixture	planted	caught	false_positives	verdict_match	note
+vuln-07-stock-race	1	1	0	1	auditor emitted 2 findings (P0 negative-qty inflation + P1 non-atomic race) for the 1 planted qty defect; both same field/root, judge correctly collapsed to caught=1, no FP. P1 gradient exercised.
+clean-03-guarded-helper	0	0	0	1	FP-trap held: control lives one hop away in loadOwned(); auditor read the helper and confirmed ownership, did NOT flag IDOR.
+shadow-01-massassign-verified	2	2	0	1	both planted (verified, plan) caught as P0. Minor axis note: auditor labeled verified as state (keyed permission) — same required control, still caught per rubric.
+shadow-03-controlled-refactor	0	0	0	1	FP-trap held: check was MOVED into requireOwner() not removed; auditor traced the helper and confirmed intact, did NOT flag "ownership removed".
+repo-03-mixed-p1	2	2	0	1	P0 commentId IDOR + P1 wallet balance race both caught; notify consumer → Controls Confirmed, slug.util → No Sensitive Fields. Section routing correct, no manufactured findings.
+vuln-08-idor-crossaxis	1	1	0	1	auditor split into 2 P0s (orderId owner + status state) but both are the single missing-owner-check root; judge collapsed to caught=1, no FP.

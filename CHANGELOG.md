@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.9.4 — 2026-07-08
+
+Patch: **security eval expansion + skill clarity** — dev/QA infra plus sharper skill
+instructions. No new lane, stage, gate, or verdict behaviour; the security auditor's
+catch / false-positive behaviour is unchanged (eval gate 1.00 catch-rate / 0 false
+positives both before and after).
+
+**Security eval harness (dev/QA, not shipped to target projects):**
+
+- **Seed suite expanded 9 → 20 fixtures.** New coverage: an identity-spoof (actor from
+  the request body), a stock/balance **P1** race (the first non-P0 gradient case),
+  owner×state cross-axis IDOR (a *legal* transition on another actor's object),
+  unbounded-refund money tampering, two shadow (author-blind) vulns (a partial
+  allow-list that mass-assigns `verified`/`plan`, and a header-derived role), three
+  clean false-positive traps (control one hop away in a helper, a pure-calc refactor,
+  and an ownership check *moved but kept*), and two more repo-audit fixtures (mixed
+  P0+P1 with section routing, and all-controlled queue consumers). All five risk axes
+  are now covered; 4 fixtures are `shadow: true` (~20%).
+- **Added `judge-validation/`.** A 6-fixture hand-score vs the LLM judge agrees on
+  24/24 cells (100%), above the 75% bar — including the drift-prone case where a record
+  emits more findings than planted (the judge correctly collapses to caught==planted
+  with zero false positives). Records for the validated subset are checked in as an
+  audit trail.
+- **`run.sh` gains an env-gated `KEEP_WORK` mode** that preserves auditor records for
+  judge-validation and debugging. Default behaviour is unchanged.
+
+**Shipped skills (clarity only, effect-neutral):**
+
+- **`harness-security` (agent) + `espalier-security` (skill) — frontmatter gains
+  when-to-use + trigger context.** Each description now names *when* it runs (Stage 4
+  panel / `/espalier-audit`) and the five sensitive axes (money / identity / permission
+  / ownership / state) reaching an auth or persistence sink, so skill/agent matching
+  keys off the surface it guards, not just the name.
+- **`harness-security` — mode redundancy deduped.** The P0 / no-manufacture semantics
+  that were restated across pipeline and repo-audit modes collapse to one source plus a
+  cross-reference. The output-format tables, the abuse-test contract block, every
+  section heading, and the `VERDICT:` sentinel are untouched; the security eval scores
+  identically before and after (catch-rate 1.00, zero false positives, all 20 verdicts
+  match).
+
+**Ask eval:** three adversarial `sourced` fixtures (multi-file flow, multi-value
+enumerate, mixed doc/code provenance) that stress per-claim citation; the ask skill
+holds at 2/2 on all Gate-2 dimensions.
+
+**Existing users:** no migration. This release changes dev-only eval harnesses and
+skill-template wording — target-project installs pick up the sharper `harness-security`
+/ `espalier-security` descriptions on the next `/espalier-init` or `/espalier-prune`;
+no behaviour change requires action.
+
 ## 0.9.3 — 2026-07-07
 
 Patch: **skill-clarity + eval calibration** — no new lane, no new stage, no gate or

@@ -1,6 +1,6 @@
 ---
 name: espalier-security
-description: Security audit checklist for {project} — trust-boundary review of client-supplied sensitive fields
+description: Security audit checklist and abuse-test recipe for {project} — trust-boundary review of client-supplied sensitive fields. Use during Stage 4 pipeline review or /espalier-audit repo-audit whenever a change touches a request handler, queue/event consumer, auth check, or client-reachable persistence — i.e. any client input on the money / identity / permission / ownership / state axes reaching an authorization or persistence sink.
 ---
 
 # Security Audit — {project}
