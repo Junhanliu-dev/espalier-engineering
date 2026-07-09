@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, and the v0.9.2 correctness patch you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, and the v0.9.4 security-skill patch you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to TWELVE migrations may apply, always in this order:
+version. Up to FOURTEEN migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -104,16 +104,29 @@ version. Up to TWELVE migrations may apply, always in this order:
    production-readiness checklist (`production-standards.md` is the single source),
    and gains when-to-use + trigger phrases in its frontmatter. Backs both skills up
    to `<file>.pre-v0.9.3.bak`. Mechanical: `scripts/migrate-v0.9.2-to-v0.9.3.sh`.
+14. **v0.9.3 → v0.9.4** — security-skill patch; no new lane, no new stage, no
+   behaviour change to any gate or verdict (the security auditor's catch /
+   false-positive rates are unchanged). The per-project `harness-security` AGENT
+   and `espalier-security` SKILL gain when-to-use + the five sensitive axes as
+   frontmatter trigger context, and the agent's P0 rubric and repo-audit
+   "findings do not block" delta stop restating each other's semantics,
+   cross-referencing one source instead. Both are per-project files that
+   `bootstrap --force` never re-copies, so v0.9.4 shipped these template
+   improvements with no way to reach an existing install. Frontmatter is edited
+   LINE-WISE (an `inherit` tools-mode install has had its `tools:` line stripped;
+   re-copying the template's frontmatter would reintroduce it). A body span the
+   project has customised is left alone and reported warn-only. Backs both up to
+   `<file>.pre-v0.9.4.bak`. Mechanical: `scripts/migrate-v0.9.3-to-v0.9.4.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL THIRTEEN; a v0.3.x
-install needs the last twelve; a v0.4.x install needs the last eleven; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.3; a v0.5.3–v0.5.x
-install needs v0.6 … v0.9.3; a v0.6.x install needs v0.7 … v0.9.3; a v0.7.x
-install needs v0.8 … v0.9.3; a v0.8.0 install needs v0.8.1 … v0.9.3; a v0.8.1
-install needs v0.8.2 … v0.9.3; a v0.8.2 install needs v0.9.0 … v0.9.3; a
-v0.9.0 install needs v0.9.1 … v0.9.3; a v0.9.1 install needs v0.9.2 then v0.9.3;
-a v0.9.2 install needs only v0.9.3.
+confirmation, apply in order. A v0.1.x install needs ALL FOURTEEN; a v0.3.x
+install needs the last thirteen; a v0.4.x install needs the last twelve; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.4; a v0.5.3–v0.5.x
+install needs v0.6 … v0.9.4; a v0.6.x install needs v0.7 … v0.9.4; a v0.7.x
+install needs v0.8 … v0.9.4; a v0.8.0 install needs v0.8.1 … v0.9.4; a v0.8.1
+install needs v0.8.2 … v0.9.4; a v0.8.2 install needs v0.9.0 … v0.9.4; a
+v0.9.0 install needs v0.9.1 … v0.9.4; a v0.9.1 install needs v0.9.2 … v0.9.4;
+a v0.9.2 install needs v0.9.3 then v0.9.4; a v0.9.3 install needs only v0.9.4.
 
 Note: `migrate-v0.9.2-to-v0.9.3.sh` requires the installed `espalier-review`
 SKILL to carry a `## Production-Readiness Checks` section. Fresh v0.9.0+ inits
@@ -140,6 +153,7 @@ NEEDS_V09_MINOR=no
 NEEDS_V091_PATCH=no
 NEEDS_V092_PATCH=no
 NEEDS_V093_PATCH=no
+NEEDS_V094_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -164,6 +178,7 @@ if [ -d "harness" ]; then
   NEEDS_V091_PATCH=yes       # ...then the v0.9.1 configurable escalation caps
   NEEDS_V092_PATCH=yes       # ...then the v0.9.2 correctness patch
   NEEDS_V093_PATCH=yes       # ...then the v0.9.3 skill-clarity patch
+  NEEDS_V094_PATCH=yes       # ...then the v0.9.4 security-skill patch
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -257,6 +272,21 @@ elif [ -d "espalier" ]; then
      || ! grep -qF "SINGLE SOURCE for these checks" espalier/skills/espalier-review/SKILL.md 2>/dev/null; then
     NEEDS_V093_PATCH=yes
   fi
+  # v0.9.4: security-skill patch. Same two markers migrate-v0.9.3-to-v0.9.4.sh uses
+  # for its own idempotency check — keep them in sync with that script:
+  #   harness-security AGENT   → "self-noops on changes with no sensitive surface"
+  #   espalier-security SKILL  → "abuse-test recipe for"
+  # Both are per-project files a plugin update cannot reach. Either missing ⇒
+  # pre-v0.9.4. Guarded on the files existing: a pre-v0.9.0 install has neither,
+  # and the v0.9.0 step creates them before this step runs.
+  if [ -f espalier/agents/harness-security.md ] && [ -f espalier/skills/espalier-security/SKILL.md ]; then
+    if ! grep -qF "self-noops on changes with no sensitive surface" espalier/agents/harness-security.md 2>/dev/null \
+       || ! grep -qF "abuse-test recipe for" espalier/skills/espalier-security/SKILL.md 2>/dev/null; then
+      NEEDS_V094_PATCH=yes
+    fi
+  else
+    NEEDS_V094_PATCH=yes   # v0.9.0 will create them; v0.9.4 then sharpens them
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -265,7 +295,7 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ] \
    && [ "$NEEDS_V082_PATCH" = no ] && [ "$NEEDS_V09_MINOR" = no ] \
    && [ "$NEEDS_V091_PATCH" = no ] && [ "$NEEDS_V092_PATCH" = no ] \
-   && [ "$NEEDS_V093_PATCH" = no ]; then
+   && [ "$NEEDS_V093_PATCH" = no ] && [ "$NEEDS_V094_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -286,7 +316,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.9.2-to-v0.9.3.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.9.3-to-v0.9.4.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -295,7 +325,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.9.2-to-v0.9.3.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.9.3-to-v0.9.4.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -313,7 +343,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.9.2-to-v0.9.3.sh`) — tell the user to
+is likely stale (no `migrate-v0.9.3-to-v0.9.4.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -336,6 +366,7 @@ verbatim:
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V094_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.3-to-v0.9.4.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -394,6 +425,7 @@ completed.
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V094_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.3-to-v0.9.4.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -630,6 +662,30 @@ Fails closed with `ERROR: install missing section` if the installed
 `espalier-review` lacks `## Production-Readiness Checks`. That means the v0.9.0
 step never ran (or ran from a build predating its review-skill patch) — re-run the
 v0.9.0 step, which is idempotent and adds the section.
+
+**v0.9.3→v0.9.4 (`migrate-v0.9.3-to-v0.9.4.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up `harness-security.md` + `espalier-security` SKILL (`<file>.pre-v0.9.4.bak`),
+then replaces the `description:` frontmatter line of each from the v0.9.4 template
+(substituting this project's name into the skill's), and re-splices the two changed
+body spans of the agent (P0 rubric, repo-audit delta 5). Requires `python3`.
+Idempotent — re-running detects both v0.9.4 markers and no-ops.
+
+Frontmatter is edited **line-wise, never rewritten**: an install created in
+`inherit` tools-mode has had its `tools:` line stripped, and copying the template's
+frontmatter would silently reintroduce it. The verification asserts the install's
+original tools-mode is preserved.
+
+A body span whose anchor the project has customised away is left untouched and
+reported **warn-only** (not `✗`), because the v0.9.4 wording is a clarity
+improvement, not a behaviour change. The script still exits 0 and still applies
+every span it could match.
 
 ## Anti-Patterns
 

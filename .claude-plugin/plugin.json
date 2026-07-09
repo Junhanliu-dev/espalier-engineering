@@ -1,7 +1,7 @@
 {
   "name": "espalier-engineering",
   "description": "Train your AI coders the way you'd train a vine — discover your codebase's actual patterns, then encode them as rules, skills, agents, hooks, and a guided pipeline so generated code lands inside your conventions on the first try, not the fifth",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "author": {
     "name": "Zayhan"
   },
