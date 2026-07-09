@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.9.6 — 2026-07-09
+
+Patch: **the v0.9.4 migration that was never written**, plus a stale skill description
+shipped in 0.9.5. Same bug class as 0.9.5: an improvement lands in the init templates,
+and nothing carries it to installs that already exist.
+
+**New: `scripts/migrate-v0.9.3-to-v0.9.4.sh`.**
+
+v0.9.4 sharpened two **per-project** files — the `harness-security` agent and the
+`espalier-security` skill — but shipped no migration script. Both are created at init
+(or by `migrate-v0.8.2-to-v0.9.0.sh`) with `{project}` substituted, so `bootstrap --force`
+never re-copies them and a plugin update cannot reach them. No existing install ever
+received those improvements.
+
+The new script surgically re-splices exactly the changed regions:
+
+- the `description:` frontmatter line of each file, taken from the v0.9.4 template, with
+  this project's name substituted into the skill's;
+- the agent's `## Priority Rubric` P0 bullet and its Repo-Audit Mode "findings do not
+  block" delta, which now cross-reference one source instead of restating each other.
+
+Two things it deliberately does **not** do:
+
+- **It never rewrites frontmatter wholesale.** An install created in `inherit` tools-mode
+  has had its `tools:` line stripped; copying the template's frontmatter would silently
+  reintroduce it. Only the `description:` line is replaced, and verification asserts the
+  install's original tools-mode survived.
+- **A customised body span is left alone and reported warn-only**, not `✗`. The v0.9.4
+  wording is a clarity improvement, not a behaviour change, so a project that rewrote a
+  span keeps its version and the script still exits 0 after applying every span it could
+  match. (A hard failure there would tell the user to restore from backup after a skip the
+  script chose on purpose.)
+
+Verified against a real migrated install: the patched agent is **byte-identical to what a
+fresh v0.9.4 init produces**, once `{project_name}` is substituted and `tools:` stripped
+for inherit mode. Idempotent; re-running detects both v0.9.4 markers and no-ops.
+
+**Fixed: `espalier-migrate`'s frontmatter description was stale.**
+
+0.9.5 wired the v0.9.3 step into the skill's *body* — detection, dry-run, apply, prose,
+flags — but left the `description:` line enumerating migrations only through "the v0.9.2
+correctness patch". That line is what Claude reads to decide whether to invoke the skill.
+It now lists v0.9.3 and v0.9.4, and "Up to TWELVE migrations" reads FOURTEEN.
+
+**Also:**
+
+- `NEEDS_V094_PATCH` joins the chain, detecting on the same two markers the new script uses
+  for its own idempotency check (agent `self-noops on changes with no sensitive surface`,
+  skill `abuse-test recipe for`). An install with neither security file yet is flagged too —
+  the v0.9.0 step creates them, then v0.9.4 sharpens them.
+- The plugin-locate probe moves to the newest migration script (`migrate-v0.9.3-to-v0.9.4.sh`),
+  so a plugin predating the current chain fails to resolve with "update the plugin" rather
+  than dying mid-apply.
+
+`scripts/test-bootstrap.sh` 60/60. All four bash blocks in `SKILL.md` pass `bash -n`.
+
 ## 0.9.5 — 2026-07-09
 
 Patch: **migration-chain repair** — two bugs made the documented upgrade path fail for
