@@ -294,8 +294,9 @@ log "Step 4: verification"
 if [ "$DRY_RUN" = "yes" ]; then
   echo "(dry run — skipping verification)"
 else
-  pass=0; fail=0
+  pass=0; fail=0; warn=0
   check() { if eval "$2" >/dev/null 2>&1; then pass=$((pass+1)); echo "  ✓ $1"; else fail=$((fail+1)); echo "  ✗ $1"; fi; }
+  warn_check() { if eval "$2" >/dev/null 2>&1; then pass=$((pass+1)); echo "  ✓ $1"; else warn=$((warn+1)); echo "  ! $1 (warn-only)"; fi; }
   check "fix lane has no phantom helper"          "! grep -qF '_fire_late_escalation_prompt' $FIX"
   check "fix lane detects via marker line"        "grep -qF 'LATE_ESCALATION_GATE' $FIX"
   check "fix lane scoped regression verification" "grep -qF 'REG_RUN' $FIX"
@@ -309,11 +310,22 @@ else
   check "pipeline paths are typed"                "! grep -qF 'changes/{slug}' $PIPELINE"
   check "gate selects the active change"          "grep -qF 'Find the ACTIVE change' $GATE"
   check "gate count parse is portable"            "grep -qF 'could not parse a test count' $GATE"
-  check "gate kept its substituted test command"  "grep -qE '^TEST_OUTPUT=' $GATE && ! grep -qF '{test_command}' $GATE"
+  # The REAL invariant: no placeholder was left unsubstituted. Hard-check that.
+  check "gate left no {test_command} placeholder"  "! grep -qF '{test_command}' $GATE"
+  # The canonical `TEST_OUTPUT=$(...)` shape is what the template generates, but a
+  # project whose gate was customised at init to run tests another way (per-container
+  # `docker compose exec`, a bespoke runner loop) will never have it. That is a
+  # template-shape mismatch, not a failed migration — a blocking gate that cries
+  # wolf gets disabled. Warn instead.
+  warn_check "gate uses the template's TEST_OUTPUT shape" "grep -qE '^TEST_OUTPUT=' $GATE"
   check "gate parses clean (bash -n)"             "/bin/bash -n $GATE"
   check "backlink hook uses shared matcher"       "grep -qF '_fuzzy_scan' espalier/hooks/post-merge-backlink.sh"
   echo ""
-  echo "  Verification: $pass passed, $fail failed"
+  echo "  Verification: $pass passed, $fail failed, $warn warn-only"
+  if [ "$warn" -gt 0 ]; then
+    echo "  ($warn warn-only: the gate is customised past the template shape — it still"
+    echo "   gates; re-check by hand that its test step blocks on failure and on 0 tests.)"
+  fi
   [ "$fail" -eq 0 ] || exit 1
 fi
 
