@@ -94,15 +94,33 @@ version. Up to TWELVE migrations may apply, always in this order:
    test command; scout 1.11 ships in `.scout-prompts.md` and prune/doctor map
    the security/production rules. Backs up customised pure-copy files to
    `<file>.pre-v0.9.2.bak`. Mechanical: `scripts/migrate-v0.9.1-to-v0.9.2.sh`.
+13. **v0.9.2 → v0.9.3** — skill-clarity patch; no new lane, no new stage, no
+   behaviour change to any gate or verdict. `espalier-grill` (pure-copy) gains an
+   explicit user tier-override, a coverage guard so every counted ambiguity signal
+   ends resolved / scoped-out / recorded in `## Open Questions`, and records a
+   non-answer with a named safe default instead of dropping it. `espalier-review`
+   (substituted) gets its two review loops rewritten as an explicit
+   when / input / do / output / who workflow, stops restating severities in the
+   production-readiness checklist (`production-standards.md` is the single source),
+   and gains when-to-use + trigger phrases in its frontmatter. Backs both skills up
+   to `<file>.pre-v0.9.3.bak`. Mechanical: `scripts/migrate-v0.9.2-to-v0.9.3.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL TWELVE; a v0.3.x
-install needs the last eleven; a v0.4.x install needs the last ten; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.2; a v0.5.3–v0.5.x
-install needs v0.6 … v0.9.2; a v0.6.x install needs v0.7 … v0.9.2; a v0.7.x
-install needs v0.8 … v0.9.2; a v0.8.0 install needs v0.8.1 … v0.9.2; a v0.8.1
-install needs v0.8.2 … v0.9.2; a v0.8.2 install needs v0.9.0 … v0.9.2; a
-v0.9.0 install needs v0.9.1 then v0.9.2; a v0.9.1 install needs only v0.9.2.
+confirmation, apply in order. A v0.1.x install needs ALL THIRTEEN; a v0.3.x
+install needs the last twelve; a v0.4.x install needs the last eleven; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.9.3; a v0.5.3–v0.5.x
+install needs v0.6 … v0.9.3; a v0.6.x install needs v0.7 … v0.9.3; a v0.7.x
+install needs v0.8 … v0.9.3; a v0.8.0 install needs v0.8.1 … v0.9.3; a v0.8.1
+install needs v0.8.2 … v0.9.3; a v0.8.2 install needs v0.9.0 … v0.9.3; a
+v0.9.0 install needs v0.9.1 … v0.9.3; a v0.9.1 install needs v0.9.2 then v0.9.3;
+a v0.9.2 install needs only v0.9.3.
+
+Note: `migrate-v0.9.2-to-v0.9.3.sh` requires the installed `espalier-review`
+SKILL to carry a `## Production-Readiness Checks` section. Fresh v0.9.0+ inits
+have it from the template, and `migrate-v0.8.2-to-v0.9.0.sh` now appends it to
+migrated installs. An install migrated by an older build of that script lacks the
+section — re-running the v0.9.0 step (idempotent) adds it, which is why the chain
+below never skips ahead.
 
 ### Step 1: Preflight + detect install version
 
@@ -121,6 +139,7 @@ NEEDS_V082_PATCH=no
 NEEDS_V09_MINOR=no
 NEEDS_V091_PATCH=no
 NEEDS_V092_PATCH=no
+NEEDS_V093_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -144,6 +163,7 @@ if [ -d "harness" ]; then
   NEEDS_V09_MINOR=yes        # ...then the v0.9.0 security audit
   NEEDS_V091_PATCH=yes       # ...then the v0.9.1 configurable escalation caps
   NEEDS_V092_PATCH=yes       # ...then the v0.9.2 correctness patch
+  NEEDS_V093_PATCH=yes       # ...then the v0.9.3 skill-clarity patch
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -195,12 +215,19 @@ elif [ -d "espalier" ]; then
   # pipeline; harness-security.md is a new per-project file a plugin update
   # cannot reach — any absent ⇒ pre-v0.9.0 (or a pre-fold v0.9.0 the script
   # completes idempotently).
+  #
+  # The espalier-review SKILL's "## Production-Readiness Checks" is in this set on
+  # purpose. An install migrated by an older build of migrate-v0.8.2-to-v0.9.0.sh
+  # never received it (that script declared the path but never wrote to it), and
+  # migrate-v0.9.2-to-v0.9.3.sh dies without it. Flagging it here re-runs the
+  # (idempotent) v0.9.0 step, which appends the section before v0.9.3 needs it.
   if ! grep -qF "review panel" espalier/pipeline.md 2>/dev/null \
      || [ ! -f espalier/agents/harness-security.md ] \
      || [ ! -f espalier/skills/espalier-audit/SKILL.md ] \
      || ! grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md 2>/dev/null \
      || [ ! -f espalier/rules/production-standards.md ] \
      || ! grep -qF "## Production-Aware Coding" espalier/agents/harness-coder.md 2>/dev/null \
+     || ! grep -qF "## Production-Readiness Checks" espalier/skills/espalier-review/SKILL.md 2>/dev/null \
      || ! grep -qF "cd defensively too" espalier/hooks/pre-push-gate.sh 2>/dev/null; then
     NEEDS_V09_MINOR=yes
   fi
@@ -221,6 +248,15 @@ elif [ -d "espalier" ]; then
      || ! grep -qF "Scout 1.11" espalier/.scout-prompts.md 2>/dev/null; then
     NEEDS_V092_PATCH=yes
   fi
+  # v0.9.3: skill-clarity patch. Same two markers migrate-v0.9.2-to-v0.9.3.sh uses
+  # for its own idempotency check — keep them in sync with that script:
+  #   grill  → "Coverage guard (before returning"
+  #   review → "SINGLE SOURCE for these checks"
+  # Either missing ⇒ pre-v0.9.3 (or a half-applied run the script finishes).
+  if ! grep -qF "Coverage guard (before returning" espalier/skills/espalier-grill/SKILL.md 2>/dev/null \
+     || ! grep -qF "SINGLE SOURCE for these checks" espalier/skills/espalier-review/SKILL.md 2>/dev/null; then
+    NEEDS_V093_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -228,7 +264,8 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ] \
    && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ] \
    && [ "$NEEDS_V082_PATCH" = no ] && [ "$NEEDS_V09_MINOR" = no ] \
-   && [ "$NEEDS_V091_PATCH" = no ] && [ "$NEEDS_V092_PATCH" = no ]; then
+   && [ "$NEEDS_V091_PATCH" = no ] && [ "$NEEDS_V092_PATCH" = no ] \
+   && [ "$NEEDS_V093_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -249,7 +286,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.7-to-v0.8.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.9.2-to-v0.9.3.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -258,7 +295,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.7-to-v0.8.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.9.2-to-v0.9.3.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -273,9 +310,12 @@ if [ -z "$PLUGIN_DIR" ]; then
 fi
 ```
 
-If the primary path misses and the fallback fires, the plugin install is
-likely stale (no `migrate-v0.7-to-v0.8.sh`) — tell the user to
-`/plugin update espalier-engineering` first.
+The probe is the NEWEST migration script, so a plugin that predates the current
+chain fails to resolve rather than resolving and then dying on a missing script
+mid-apply. If the primary path misses and the fallback fires, the plugin install
+is likely stale (no `migrate-v0.9.2-to-v0.9.3.sh`) — tell the user to
+`/plugin update espalier-engineering` first. Bump this probe whenever a new
+migration script is added.
 
 ### Step 3: Show dry-run preview for each applicable migration
 
@@ -295,7 +335,14 @@ verbatim:
 [ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
+
+A dry-run for a step whose prerequisite has not been applied yet may refuse with
+an error (e.g. the v0.9.2 preview needs a `pipeline.md` that the v0.9.1 step
+rewrites). That is expected in a multi-step chain — the refusal is the script
+guarding its own precondition, not a failure. Surface it and continue; Step 6
+applies the steps in order, so the prerequisite is satisfied by then.
 
 ### Step 4: If v0.4→v0.5 applies, pick the doctor cadence
 
@@ -346,6 +393,7 @@ completed.
 [ "$NEEDS_V09_MINOR" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.8.2-to-v0.9.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V091_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.0-to-v0.9.1.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -509,12 +557,19 @@ tools-mode substitution, then `bootstrap --force` refreshes the pure-copy
 pipeline/grill files + drift-helpers/wrapper/lookup hooks + copies scout-prompts
 + symlinks both new rules + the audit skill + runs the 37-check validation.
 Surgically appends the security AND production sections to the per-project
-`harness-coder.md` / `harness-reviewer.md` / `espalier-testing` SKILL (and the
-Repo-Audit Mode section to a pre-fold `harness-security.md`), inserts the
-secret/dependency scan + the cwd fail-closed guard into `pre-push-gate.sh`, and
-patches CLAUDE.md + `espalier/agent.md`. Idempotent — the already-v0.9.0 check
-requires all ten artifacts present (security + audit + production), so a crash
-mid-run is completed on re-run.
+`harness-coder.md` / `harness-reviewer.md` / `espalier-testing` SKILL /
+`espalier-review` SKILL (and the Repo-Audit Mode section to a pre-fold
+`harness-security.md`), inserts the secret/dependency scan + the cwd fail-closed
+guard into `pre-push-gate.sh`, and patches CLAUDE.md + `espalier/agent.md`.
+Idempotent — the already-v0.9.0 check requires all eleven artifacts present
+(security + audit + production), so a crash mid-run is completed on re-run.
+
+The `espalier-review` SKILL's `## Production-Readiness Checks` section is part of
+that set. Fresh v0.9.0+ inits get it from the template; earlier builds of this
+script declared the path but never wrote to it, so installs migrated by them lack
+the section and `migrate-v0.9.2-to-v0.9.3.sh` refuses to patch them. Because the
+section is in the already-v0.9.0 check, re-running this step on such an install
+adds it rather than reporting "Nothing to do".
 
 **v0.9.0→v0.9.1 (`migrate-v0.9.0-to-v0.9.1.sh`):**
 
@@ -546,6 +601,35 @@ hook templates, and two anchored surgical patches update the per-project
 substituted test command is read out of the old gate and carried forward).
 Warn + manual snippet if the gate was customised past the anchors. Idempotent —
 re-running detects an already-v0.9.2 install and no-ops.
+
+The `^TEST_OUTPUT=` check assumes the gate runs ONE test command on the host, the
+shape `hook-templates/pre-push-gate.sh` generates. A project whose gate was
+customised at init to run tests another way (e.g. per-container `docker compose
+exec`) cannot satisfy it: the surgical patch warns and prints a manual snippet,
+and that one check reports `✗`. That is a template-shape mismatch, not a failed
+migration — the guard it really enforces is that no `{test_command}` placeholder
+was left unsubstituted.
+
+**v0.9.2→v0.9.3 (`migrate-v0.9.2-to-v0.9.3.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up `espalier-grill` + `espalier-review` (`<file>.pre-v0.9.3.bak`), refreshes
+the pure-copy `espalier-grill` SKILL from the template, then re-splices the three
+changed sections of the substituted `espalier-review` SKILL (frontmatter
+description, `## Two Review Loops`, `## Production-Readiness Checks`), preserving
+every init-substituted section — notably the `{detected convention}` checklist
+line. Requires `python3`. Idempotent — re-running detects both v0.9.3 markers and
+no-ops.
+
+Fails closed with `ERROR: install missing section` if the installed
+`espalier-review` lacks `## Production-Readiness Checks`. That means the v0.9.0
+step never ran (or ran from a build predating its review-skill patch) — re-run the
+v0.9.0 step, which is idempotent and adds the section.
 
 ## Anti-Patterns
 

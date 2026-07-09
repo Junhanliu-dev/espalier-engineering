@@ -129,7 +129,7 @@ if ! grep -qF "fixpoint loop" espalier/pipeline.md 2>/dev/null; then
   exit 1
 fi
 
-# Already-v0.9.0 detector — ALL TEN artifacts must be present (security + audit + production), not just the two
+# Already-v0.9.0 detector — ALL ELEVEN artifacts must be present (security + audit + production), not just the two
 # that Step 3 (bootstrap) produces. Checking only panel+agent would report "done"
 # after a crash between Step 3 and Step 4, leaving the coder/reviewer/testing
 # appends and the gate scan missing — a silently incomplete install that a re-run
@@ -152,10 +152,17 @@ PROD_DONE=no; PRODCODER_DONE=no; GATECD_DONE=no
 [ -f "$PRODRULE" ] && PROD_DONE=yes
 grep -qF "## Production-Aware Coding" "$CODER" 2>/dev/null && PRODCODER_DONE=yes
 grep -qF "cd defensively too" "$GATE" 2>/dev/null && GATECD_DONE=yes
+# The review SKILL's production checklist. Included so an install migrated by an
+# earlier build of THIS script — which declared $REVIEWSKILL but never wrote to it
+# — is completed on re-run, instead of short-circuiting here and then failing
+# migrate-v0.9.2-to-v0.9.3.sh with "install missing section".
+REVIEWCHECKS_DONE=no
+grep -qF "## Production-Readiness Checks" "$REVIEWSKILL" 2>/dev/null && REVIEWCHECKS_DONE=yes
 if [ "$PANEL_DONE" = yes ] && [ "$AGENT_DONE" = yes ] && [ "$CODER_DONE" = yes ] \
    && [ "$REVIEWER_DONE" = yes ] && [ "$GATE_DONE" = yes ] \
    && [ "$AUDIT_DONE" = yes ] && [ "$MODE_DONE" = yes ] \
-   && [ "$PROD_DONE" = yes ] && [ "$PRODCODER_DONE" = yes ] && [ "$GATECD_DONE" = yes ]; then
+   && [ "$PROD_DONE" = yes ] && [ "$PRODCODER_DONE" = yes ] && [ "$GATECD_DONE" = yes ] \
+   && [ "$REVIEWCHECKS_DONE" = yes ]; then
   echo "Already on v0.9.0 (all security + production artifacts present)."
   echo "Nothing to do."
   exit 0
@@ -315,6 +322,32 @@ emit_prod_testing_section() {
     "## Failure-Mode Tests (every NEW external-call path)" "## What NOT to Test"
 }
 
+# The espalier-review SKILL gains the production checklist too. Fresh v0.9.0+
+# inits get it from templates/skills/espalier-review.md; a MIGRATED install never
+# did, which later makes migrate-v0.9.2-to-v0.9.3.sh die with
+# "install missing section '## Production-Readiness Checks'".
+#
+# Deliberately inlined rather than _extract_section'd from the template: on a
+# v0.9.3+ plugin the template section carries the phrase "SINGLE SOURCE for these
+# checks", which is exactly the marker migrate-v0.9.2-to-v0.9.3.sh greps to decide
+# the review skill is ALREADY patched. Extracting it here would make v0.9.3 skip
+# its own Two-Review-Loops + frontmatter splice. Emit the v0.9.0-era text instead
+# and let v0.9.3 replace it, as it does for a fresh v0.9.0 install.
+emit_prod_review_checks_section() {
+cat << 'EOF'
+
+## Production-Readiness Checks (espalier/rules/production-standards.md)
+Severity tiers are defined in the rule — P0 for the data-loss class, P1 for
+production-readiness gaps.
+- [ ] External calls carry a timeout + decided failure behaviour (P1 if not)
+- [ ] List queries on request paths are bounded/paginated (P1); no N+1 on hot paths
+- [ ] New endpoints/consumers emit a structured log — actor, entity id, outcome (P1)
+- [ ] No swallowed errors; persistence-path failures never continue as success (P0 on money/state paths)
+- [ ] Migrations follow expand → migrate → contract; destructive steps are requirement-authorized (P0 if not)
+- [ ] Mutating consumers/webhooks are idempotent under redelivery (P1)
+EOF
+}
+
 # The VERDICT sentinel + overwrite-per-round contract lives inline in the fresh
 # template's Output Format, which bootstrap --force does NOT re-copy to a
 # per-project agent. Append it to a migrated agent so the refreshed orchestrator
@@ -468,6 +501,11 @@ append_section "$TESTING"  "## Security Abuse Tests"           emit_testing_sect
 append_section "$CODER"    "## Production-Aware Coding"        emit_prod_coder_section
 append_section "$REVIEWER" "## Production-Readiness Review"    emit_prod_reviewer_section
 append_section "$TESTING"  "## Failure-Mode Tests"            emit_prod_testing_section
+# The review SKILL (not the reviewer AGENT). Fresh inits carry this from the
+# template; migrated installs did not, and v0.9.3's surgical patch requires it.
+# The marker is the bare heading, so both the v0.9.0 form (with the
+# "(espalier/rules/...)" suffix) and the v0.9.3 form count as already-present.
+append_section "$REVIEWSKILL" "## Production-Readiness Checks" emit_prod_review_checks_section
 # VERDICT sentinel contract — per-project agents predate it; the refreshed
 # orchestrator greps `^VERDICT:`. Guard on the sentinel token so a fresh install
 # (carries it inline in Output Format) is a no-op.
@@ -611,6 +649,7 @@ else
   check "scout-prompts shipped"                         "test -f espalier/.scout-prompts.md"
   check "coder has Production-Aware Coding"             "grep -qF '## Production-Aware Coding' $CODER"
   check "reviewer has Production-Readiness Review"      "grep -qF '## Production-Readiness Review' $REVIEWER"
+  check "review skill has Production-Readiness Checks"  "grep -qF '## Production-Readiness Checks' $REVIEWSKILL"
   check "testing skill has failure-mode tests"         "grep -qF '## Failure-Mode Tests' $TESTING"
   check "push gate has cwd fail-closed guard"          "grep -qF 'cd defensively too' $GATE"
   check "pipeline Stage 9 is deploy-aware"             "grep -qF 'no-deploy-config' espalier/pipeline.md"
