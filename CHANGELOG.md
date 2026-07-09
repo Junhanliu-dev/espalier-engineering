@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.9.5 — 2026-07-09
+
+Patch: **migration-chain repair** — two bugs made the documented upgrade path fail for
+installs that reached v0.9.x by migrating rather than by a fresh `/espalier-init`. No
+new lane, stage, gate, or verdict behaviour; no change to what a fresh init produces.
+
+**`/espalier-migrate` could not reach v0.9.3.**
+
+- `scripts/migrate-v0.9.2-to-v0.9.3.sh` shipped in 0.9.3, but `skills/espalier-migrate/SKILL.md`
+  never referenced it — no `NEEDS_` flag, no detection, no dry-run line, no apply line.
+  Followed literally, the skill stopped at v0.9.2 and reported "Already fully up to date",
+  leaving the v0.9.3 grill + review changes unreachable for every install.
+- Adds `NEEDS_V093_PATCH`, detecting on the same two markers the script uses for its own
+  idempotency check (grill `Coverage guard (before returning`, review
+  `SINGLE SOURCE for these checks`), plus the dry-run, apply, chain prose, and flags entry.
+
+**`migrate-v0.8.2-to-v0.9.0.sh` never wrote to the review skill.**
+
+- It declared `REVIEWSKILL="espalier/skills/espalier-review/SKILL.md"` and never referenced
+  the variable again, so the `espalier-review` SKILL never received its
+  `## Production-Readiness Checks` section. Fresh v0.9.0+ inits get the section from
+  `templates/skills/espalier-review.md`; migrated installs did not — and
+  `migrate-v0.9.2-to-v0.9.3.sh` requires it, dying with
+  `ERROR: install missing section '## Production-Readiness Checks'`.
+- The section is now appended via the existing `append_section` helper, guarded on the bare
+  heading so both the v0.9.0 form (with the rules-path suffix) and the v0.9.3 form count as
+  already-present.
+- The section text is **inlined rather than extracted from the template**. On a v0.9.3+
+  plugin the template section carries the phrase `SINGLE SOURCE for these checks`, which is
+  exactly the marker `migrate-v0.9.2-to-v0.9.3.sh` greps to decide the review skill is
+  already patched. Extracting it would have made v0.9.3 report "already at v0.9.3 — nothing
+  to do" and silently skip its own frontmatter + Two-Review-Loops splice — a passing no-op.
+- The section joins the already-v0.9.0 detector (ten artifacts → eleven) and the verification
+  block, so an install migrated by an earlier build is completed on re-run rather than
+  short-circuiting. The `/espalier-migrate` v0.9.0 detection flags a missing section too, so
+  the chain self-repairs before v0.9.3 needs it.
+
+**Also:**
+
+- The plugin-locate probe in `espalier-migrate` now looks for the newest migration script
+  (`migrate-v0.9.2-to-v0.9.3.sh`) instead of `migrate-v0.7-to-v0.8.sh`. A plugin predating the
+  current chain now fails to resolve with a clear "update the plugin" message rather than
+  resolving and dying mid-apply on a missing script.
+- Documents that a dry-run preview of a later step may legitimately refuse until its
+  prerequisite step has been applied (e.g. the v0.9.2 preview needs the `pipeline.md` that
+  v0.9.1 rewrites) — the refusal is a precondition guard, not a failure.
+- Notes that the v0.9.2 gate check `^TEST_OUTPUT=` assumes the single-host-command shape
+  `hook-templates/pre-push-gate.sh` generates; a gate customised at init to run tests another
+  way (e.g. per-container `docker compose exec`) cannot satisfy it, warns, and reports that one
+  check as `✗`. Template-shape mismatch, not a failed migration.
+- **Version fields corrected.** `plugin.json` and `marketplace.json` still declared `0.9.3`
+  after the v0.9.4 release, which bumped only `CHANGELOG.md`. All three fields now read `0.9.5`.
+
+Validated against a synthetic v0.9.2 install: the original `install missing section` error
+reproduced, then cleared, with the project-substituted checklist lines preserved and no literal
+`{project}` leaked; re-run is a clean no-op. `scripts/test-bootstrap.sh` 60/60.
+
 ## 0.9.4 — 2026-07-08
 
 Patch: **security eval expansion + skill clarity** — dev/QA infra plus sharper skill
