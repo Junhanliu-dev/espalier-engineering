@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, and the v0.9.4 security-skill patch you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, and the v0.9.4 security-skill patch, and the v0.9.6→v0.10.0 push-gate reshape you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to FOURTEEN migrations may apply, always in this order:
+version. Up to FIFTEEN migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -117,6 +117,21 @@ version. Up to FOURTEEN migrations may apply, always in this order:
    re-copying the template's frontmatter would reintroduce it). A body span the
    project has customised is left alone and reported warn-only. Backs both up to
    `<file>.pre-v0.9.4.bak`. Mechanical: `scripts/migrate-v0.9.3-to-v0.9.4.sh`.
+15. **v0.9.6 → v0.10.0** — push-gate reshape. `{build_command}` / `{lint_command}` /
+   `{test_command}` are now substituted into FUNCTION BODIES (`run_build` /
+   `run_lint` / `run_tests`), so a value may be a single command OR a multi-line
+   block — a repo that must run several suites (one per container in a Docker-first
+   stack, one per workspace in a monorepo) can finally be expressed. Before,
+   `{test_command}` landed inside a command substitution and had to be one
+   expression. Build and lint also stop discarding stderr: the old template ran
+   `<cmd> 2>/dev/null` and, on failure, printed `BLOCKED: Build fails` and nothing
+   else; output is now captured and its tail printed. The migration rewrites those
+   three spans in the installed gate, PRESERVING the commands substituted at init,
+   and handles each span independently (a gate half-migrated by running the v0.9.2
+   step against a v0.10.0 plugin has `run_tests` but old build/lint). A gate
+   customised at init past the template shape is left completely untouched and
+   reported, never mangled. Backs up to `<file>.pre-v0.10.0.bak`. Mechanical:
+   `scripts/migrate-v0.9.6-to-v0.10.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
 confirmation, apply in order. A v0.1.x install needs ALL FOURTEEN; a v0.3.x
@@ -126,7 +141,8 @@ install needs v0.6 … v0.9.4; a v0.6.x install needs v0.7 … v0.9.4; a v0.7.x
 install needs v0.8 … v0.9.4; a v0.8.0 install needs v0.8.1 … v0.9.4; a v0.8.1
 install needs v0.8.2 … v0.9.4; a v0.8.2 install needs v0.9.0 … v0.9.4; a
 v0.9.0 install needs v0.9.1 … v0.9.4; a v0.9.1 install needs v0.9.2 … v0.9.4;
-a v0.9.2 install needs v0.9.3 then v0.9.4; a v0.9.3 install needs only v0.9.4.
+a v0.9.2 install needs v0.9.3 … v0.10.0; a v0.9.3 install needs v0.9.4 then
+v0.10.0; a v0.9.6 install needs only v0.10.0.
 
 Note: `migrate-v0.9.2-to-v0.9.3.sh` requires the installed `espalier-review`
 SKILL to carry a `## Production-Readiness Checks` section. Fresh v0.9.0+ inits
@@ -154,6 +170,7 @@ NEEDS_V091_PATCH=no
 NEEDS_V092_PATCH=no
 NEEDS_V093_PATCH=no
 NEEDS_V094_PATCH=no
+NEEDS_V0100_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -179,6 +196,7 @@ if [ -d "harness" ]; then
   NEEDS_V092_PATCH=yes       # ...then the v0.9.2 correctness patch
   NEEDS_V093_PATCH=yes       # ...then the v0.9.3 skill-clarity patch
   NEEDS_V094_PATCH=yes       # ...then the v0.9.4 security-skill patch
+  NEEDS_V0100_PATCH=yes      # ...then the v0.10.0 push-gate reshape
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -287,6 +305,18 @@ elif [ -d "espalier" ]; then
   else
     NEEDS_V094_PATCH=yes   # v0.9.0 will create them; v0.9.4 then sharpens them
   fi
+  # v0.10.0: the gate's three check steps become run_build/run_lint/run_tests, so a
+  # {..._command} may be a multi-line block, and build/lint stop discarding stderr.
+  # ALL THREE functions must be present — running the v0.9.2 step against a v0.10.0
+  # plugin re-splices only the test span, leaving run_tests with old build/lint.
+  # A gate customised past the template shape is detected here too; the script
+  # recognises it and exits 0 without touching it.
+  if [ -f espalier/hooks/pre-push-gate.sh ] && { \
+       ! grep -qF 'run_build() {' espalier/hooks/pre-push-gate.sh 2>/dev/null \
+       || ! grep -qF 'run_lint() {' espalier/hooks/pre-push-gate.sh 2>/dev/null \
+       || ! grep -qF 'run_tests() {' espalier/hooks/pre-push-gate.sh 2>/dev/null; }; then
+    NEEDS_V0100_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -295,7 +325,8 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V07_V08" = no ] && [ "$NEEDS_V08_PATCH" = no ] \
    && [ "$NEEDS_V082_PATCH" = no ] && [ "$NEEDS_V09_MINOR" = no ] \
    && [ "$NEEDS_V091_PATCH" = no ] && [ "$NEEDS_V092_PATCH" = no ] \
-   && [ "$NEEDS_V093_PATCH" = no ] && [ "$NEEDS_V094_PATCH" = no ]; then
+   && [ "$NEEDS_V093_PATCH" = no ] && [ "$NEEDS_V094_PATCH" = no ] \
+   && [ "$NEEDS_V0100_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -316,7 +347,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.9.3-to-v0.9.4.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.9.6-to-v0.10.0.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -325,7 +356,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.9.3-to-v0.9.4.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.9.6-to-v0.10.0.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -343,7 +374,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.9.3-to-v0.9.4.sh`) — tell the user to
+is likely stale (no `migrate-v0.9.6-to-v0.10.0.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -367,6 +398,7 @@ verbatim:
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V094_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.3-to-v0.9.4.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0100_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.6-to-v0.10.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -426,6 +458,7 @@ completed.
 [ "$NEEDS_V092_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.1-to-v0.9.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V093_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.2-to-v0.9.3.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V094_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.3-to-v0.9.4.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0100_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.9.6-to-v0.10.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
@@ -686,6 +719,28 @@ A body span whose anchor the project has customised away is left untouched and
 reported **warn-only** (not `✗`), because the v0.9.4 wording is a clarity
 improvement, not a behaviour change. The script still exits 0 and still applies
 every span it could match.
+
+**v0.9.6→v0.10.0 (`migrate-v0.9.6-to-v0.10.0.sh`):**
+
+| Flag | Effect |
+|------|--------|
+| `--dry-run` | Show actions only |
+| `--yes` | Skip the apply confirmation prompt |
+| `--plugin-dir=<path>` | Path to the espalier-engineering plugin checkout |
+
+Backs up `espalier/hooks/pre-push-gate.sh` (`<file>.pre-v0.10.0.bak`), then rewrites
+its build / lint / test spans from the v0.10.0 template, **preserving the commands
+this project substituted at init**. Requires `python3`.
+
+Each span is handled independently. A gate can be half-migrated — running the v0.9.2
+step against a v0.10.0 plugin re-splices only the test span, leaving `run_tests` with
+old build/lint — so the idempotency guard requires all three functions, and a span
+already function-shaped is skipped rather than re-read. The test command is never
+read back from `TEST_OUTPUT=$(run_tests 2>&1)`; that yields the function name.
+
+A gate customised at init past the template shape (e.g. a Docker-first gate running
+each suite in its own container) is **left completely untouched**, reported with the
+manual change list, and the script exits 0. It is never mangled.
 
 ## Anti-Patterns
 

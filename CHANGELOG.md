@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.10.0 — 2026-07-09
+
+Minor: **the push gate can run more than one command per check, and says why it blocked.**
+MINOR rather than PATCH because the generated `espalier/hooks/pre-push-gate.sh` changes
+shape. No pipeline stage, lane, gate semantic, or verdict changes.
+
+**`{build_command}` / `{lint_command}` / `{test_command}` are now function bodies.**
+
+The old template substituted the test command into a command substitution:
+
+```sh
+TEST_OUTPUT=$({test_command} 2>&1)
+```
+
+so the value had to be a single expression. A repo that must run several suites — one
+per container in a Docker-first stack, one per workspace in a monorepo — could not be
+expressed at all; init had to hand-write a bespoke gate, which then fell out of the
+migration chain (every later script's anchors missed it). Now:
+
+```sh
+run_tests() {
+  {test_command}
+}
+TEST_OUTPUT=$(run_tests 2>&1)
+```
+
+The substituted value may be a single command OR a multi-line block. A block MUST
+return non-zero if ANY step fails: join steps with `&&`, or end each with `|| return 1`.
+`run_build` and `run_lint` work the same way.
+
+`run_tests` is defined **inside** the `# Run tests and check count` … `echo "All gates
+passed` span on purpose: `migrate-v0.9.1-to-v0.9.2.sh` re-splices exactly that span, so
+the definition must travel with its caller or a patched gate would call an undefined
+function.
+
+**Build and lint stop discarding stderr.**
+
+The old template ran `{build_command} 2>/dev/null` and, on failure, printed
+`BLOCKED: Build fails` and nothing else — a gate that blocks without saying why gets
+disabled. Output is now captured and its tail printed on failure.
+
+**New: `scripts/migrate-v0.9.6-to-v0.10.0.sh`.**
+
+Rewrites the three spans of an installed gate, preserving the commands substituted at
+init. Three behaviours worth naming:
+
+- **Each span is independent.** A gate can be half-migrated: running the v0.9.2 step
+  against a v0.10.0 plugin re-splices only the test span, leaving `run_tests` with old
+  build/lint. The idempotency guard therefore requires all three functions, and a span
+  already function-shaped is skipped rather than re-read.
+- **The test command is never read back from `TEST_OUTPUT=$(run_tests 2>&1)`** — that
+  yields the function name, not the command.
+- **A customised gate is left completely untouched**, reported with the manual change
+  list, exit 0. Never mangled.
+
+Verified: a migrated gate is byte-identical to a fresh v0.10.0 init with the same
+commands. Idempotent.
+
+**Fixed: `migrate-v0.9.1-to-v0.9.2.sh` mislabelled a customised gate as a failure.**
+
+Its `gate kept its substituted test command` check asserted `^TEST_OUTPUT=`, which a
+gate customised at init can never satisfy — so a correct migration reported `✗`. The
+hard check is now the real invariant (no `{test_command}` placeholder survived); the
+template-shape assertion is warn-only.
+
+**Also:**
+
+- `NEEDS_V0100_PATCH` joins the chain; the plugin-locate probe moves to the newest
+  script; `espalier-init`'s SKILL documents the multi-line block form.
+
+`scripts/test-hooks.sh` 28/28, `scripts/test-bootstrap.sh` 60/60. Gate behaviour
+re-tested end to end in a real repo: build failure prints its output and blocks;
+a multi-suite block whose *second* suite fails blocks; zero tests blocks; unparseable
+runner output warns and allows; the no-test-command stub still fails closed.
+
 ## 0.9.6 — 2026-07-09
 
 Patch: **the v0.9.4 migration that was never written**, plus a stale skill description

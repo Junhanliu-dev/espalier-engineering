@@ -163,27 +163,49 @@ fi
 # via /espalier-prune when the project gains one.
 
 # Run build check
-{build_command} 2>/dev/null
+# Each {..._command} is substituted into a FUNCTION BODY, so the value may be a
+# single command OR a multi-line block. A repo that must run several suites — one
+# per container in a Docker-first stack, one per workspace in a monorepo —
+# expresses that here instead of being forced into one expression. A block MUST
+# return non-zero if ANY step fails: join steps with `&&`, or end each with
+# `|| return 1`.
+run_build() {
+  {build_command}
+}
+BUILD_OUTPUT=$(run_build 2>&1)
 if [ $? -ne 0 ]; then
   echo "BLOCKED: Build fails"
+  # Show why. A gate that blocks without printing the failure gets disabled.
+  printf '%s\n' "$BUILD_OUTPUT" | tail -20
   exit 1
 fi
 
 # Run lint check
-{lint_command} 2>/dev/null
+run_lint() {
+  {lint_command}
+}
+LINT_OUTPUT=$(run_lint 2>&1)
 if [ $? -ne 0 ]; then
   echo "BLOCKED: Lint fails"
+  printf '%s\n' "$LINT_OUTPUT" | tail -20
   exit 1
 fi
 
 # Run tests and check count. Runners word their counts differently —
 # jest/pytest/cargo "N passed", mocha "N passing", rspec "N examples",
 # go prints per-package "ok" lines with no aggregate count at all.
-TEST_OUTPUT=$({test_command} 2>&1)
+# run_tests is defined INSIDE this block on purpose: migrate-v0.9.1-to-v0.9.2.sh
+# re-splices the span from `# Run tests and check count` to `echo "All gates
+# passed`, so the definition must travel with its caller.
+run_tests() {
+  {test_command}
+}
+TEST_OUTPUT=$(run_tests 2>&1)
 TEST_EXIT=$?
 
 if [ $TEST_EXIT -ne 0 ]; then
   echo "BLOCKED: Tests fail"
+  printf '%s\n' "$TEST_OUTPUT" | tail -20
   exit 1
 fi
 
