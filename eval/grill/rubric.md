@@ -62,7 +62,9 @@ vacuously 1.0; progression N/A).
 ## Judge validation
 
 The LLM judge must be trusted before its scores are. Before first use:
-1. Hand-score a 6-fixture subset.
+1. Hand-score a 6-fixture subset. Dimensions 1–2 are one number per fixture;
+   dimensions 3–4 are scored 0/1/2 **per question** and averaged by
+   `validate-judge.sh rollup` — never by hand.
 2. Run the judge on the same 6.
 3. Require ≥ 75% agreement (dimension-level) with the hand scores.
 4. If below 75%, sharpen the level anchors above and repeat.

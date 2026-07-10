@@ -1,0 +1,18 @@
+fixture	q	question	non_obvious	discrimination	note
+full-01-dashboard-faster	1	Which dashboard? Multiple exist — the main analytics one, admin, per-project?	1	2	which-of-several-dashboards: reflexive standard ask (rubric anchor); answer picks the target
+full-01-dashboard-faster	2	"Faster" against what target and current baseline?	1	2	pinning target+baseline is the reflex ask on any perf ticket; answer sets the metric
+full-01-dashboard-faster	3	Which errors — failed data fetches, render crashes, auth failures?	1	2	which-error-class: standard scoping ask; answer bounds the work
+full-01-dashboard-faster	4	"Better handling" concretely — what shows when a fetch fails?	2	2	retry-button vs blank panel overturns a likely-wrong default; forks the impl
+full-01-dashboard-faster	5	Whose experience improves, and on what trigger — initial load, refresh?	1	1	actor+trigger: standard ask; answer changes a detail, not the impl
+full-01-dashboard-faster	6	Boundary — load time and fetch errors only, or does redesign/new features count?	1	2	scope-boundary: standard closing ask; answer fences redesign out
+shadow-full-02-decimal-points	1	Which fields show the problem — every numeric input, or specific money fields, and on which screen?	1	2	which-fields/screen: standard scoping ask
+shadow-full-02-decimal-points	2	What actually goes wrong when you use those fields today?	2	2	refuses the asserted cause and demands the symptom first
+shadow-full-02-decimal-points	3	Is the value wrong when displayed/saved (display bug), or does the field fight you while typing (input-entry bug)?	2	2	display-bug vs input-entry-bug (rubric anchor); wholly different fix
+shadow-full-02-decimal-points	4	When should the field snap to 2 decimals — live while typing, or only on blur?	2	2	normalise-while-typing vs on-blur (rubric anchor); overturns a default
+shadow-full-02-decimal-points	5	Scope — just the working-project row component, or does the store / currency-parse helper need touching too?	2	2	row-component vs store/currency-parse helper; forks the blast radius
+light-01-csv-export	1	"Reports page shows multiple report types. Which one does the CSV export button export — summary, detail, or all of them?"	1	2	which-report: reflexive standard ask (rubric anchor)
+light-01-csv-export	2	"Summary report is paginated. Export only the rows on the current visible page, or the full dataset across all pages?"	2	2	visible-page sync vs full-dataset async (rubric anchor); overturns a default
+light-01-csv-export	3	"Which columns go in the CSV — the columns currently visible in the table, or all underlying fields?"	1	2	which-columns: reflexive standard ask (rubric anchor)
+shadow-light-02-invoice-failures	1	Why does a failed invoice mutation still fire the success toast — is the error swallowed, or is the toast unconditional?	2	2	error-swallowed vs unconditional toast; the finally-block cause (rubric anchor)
+shadow-light-02-invoice-failures	2	Is invoice creation single or batched — and does one card's failure fail the batch or just that card?	2	2	batch semantics: one card failing vs failing the batch; not the default assumption
+shadow-light-02-invoice-failures	3	On partial failure, commit the successes and show a count, or roll everything back — and which message on total failure?	2	2	partial-failure commit-vs-rollback; materially changes the transaction shape

@@ -5,9 +5,23 @@
 #
 #   bash eval/grill/validate-judge.sh generate
 #       Runs grill + judge on the subset. Writes transcripts, the judge's own scores,
-#       and a BLANK hand-score sheet you fill in by eye.
+#       and two BLANK hand-score sheets you fill in by eye.
 #
-#   # ...open judge-validation/handscore.tsv, read each transcript, fill human_score...
+#   # ...read each transcript. Two sheets, because the four rubric dimensions have two
+#   # different granularities:
+#   #
+#   #   handscore.tsv            surfaced + depth_cal — ONE number per fixture.
+#   #                            surfaced  = how many planted_ambiguities the questions
+#   #                                        forced the user to resolve (a count).
+#   #                            depth_cal = 2 exact tier / 1 off-by-one / 0 off-by-two.
+#   #
+#   #   handscore-questions.tsv  non_obvious + discrimination — ONE 0/1/2 per QUESTION.
+#   #                            Score each row, then let `rollup` average them into the
+#   #                            matching handscore.tsv rows. Do not average by hand.
+#
+#   bash eval/grill/validate-judge.sh rollup
+#       Averages the per-question grid into handscore.tsv's non_obvious /
+#       discrimination rows. Fixtures with zero questions are left untouched.
 #
 #   bash eval/grill/validate-judge.sh compare
 #       Reads your filled sheet + the judge scores, computes per-dimension agreement,
@@ -52,6 +66,16 @@ Run the grill. Output the full transcript: the tier you chose, every question as
 and which answer_script reply you used for each." 2>/dev/null
 }
 
+extract_questions() {
+  # $1 = transcript. Prints one question per line, tabs stripped (TSV field).
+  # Grill writes each question as a `> ...` blockquote; some runs only emit the
+  # `**Qn** — <rationale>` header. Prefer the blockquote, fall back to the header.
+  local t="$1" qs
+  qs="$(sed -n -E 's/^> +//p' "$t" || true)"
+  [ -n "$qs" ] || qs="$(sed -n -E 's/^\*\*Q[0-9]+\*\* +[—-] +//p' "$t" || true)"
+  printf '%s\n' "$qs" | tr '\t' ' ' | sed '/^$/d'
+}
+
 judge() {
   local fixture="$1" transcript="$2"
   claude -p --output-format text \
@@ -76,6 +100,7 @@ case "$cmd" in
     mkdir -p "$OUT/transcripts"
     printf 'fixture\tdimension\thuman_score\tnote\n' > "$OUT/handscore.tsv"
     printf 'fixture\tsurfaced\tdepth_cal\tnon_obvious\tdiscrimination\n' > "$OUT/judge-scores.tsv"
+    printf 'fixture\tq\tquestion\tnon_obvious\tdiscrimination\tnote\n' > "$OUT/handscore-questions.tsv"
     for fid in $SUBSET; do
       fx="$FIXTURES/$fid.md"
       [ -f "$fx" ] || { echo "ERROR: missing fixture $fid"; exit 2; }
@@ -90,12 +115,53 @@ case "$cmd" in
       for dim in surfaced depth_cal non_obvious discrimination; do
         printf '%s\t%s\t\t\n' "$fid" "$dim" >> "$OUT/handscore.tsv"
       done
+      # Per-question grid. Grill renders each question as a `> ...` blockquote line;
+      # fall back to the `**Qn** —` header if a transcript deviates. `skip` fixtures
+      # ask nothing and correctly contribute zero rows.
+      extract_questions "$OUT/transcripts/$fid.transcript" | awk -F'\t' -v fid="$fid" '
+        { printf "%s\t%d\t%s\t\t\t\n", fid, NR, $0 }' >> "$OUT/handscore-questions.tsv"
     done
     echo
     echo "Wrote to $OUT :"
     echo "  transcripts/<fixture>.transcript  — read these to score"
     echo "  judge-scores.tsv                  — the judge's scores (do not edit)"
-    echo "  handscore.tsv                     — fill the human_score column, then run 'compare'"
+    echo "  handscore.tsv                     — fill surfaced + depth_cal (one per fixture)"
+    echo "  handscore-questions.tsv           — score each question 0/1/2, then run 'rollup'"
+    ;;
+  rollup)
+    GRID="$OUT/handscore-questions.tsv"
+    [ -f "$GRID" ]             || { echo "ERROR: no handscore-questions.tsv — run 'generate' first"; exit 2; }
+    [ -f "$OUT/handscore.tsv" ] || { echo "ERROR: no handscore.tsv — run 'generate' first"; exit 2; }
+    tmp="$OUT/.handscore.tsv.tmp"
+    awk -F'\t' -v OFS='\t' '
+      FNR==NR {                                      # pass 1: the per-question grid
+        if (FNR==1) next
+        if ($4 == "" || $5 == "") { blank[$1]++; next }
+        n[$1]++
+        sn[$1] += $4; sd[$1] += $5
+        ln[$1] = (ln[$1]=="" ? $4 : ln[$1] "," $4)
+        ld[$1] = (ld[$1]=="" ? $5 : ld[$1] "," $5)
+        next
+      }
+      FNR==1 { print; next }                         # pass 2: rewrite handscore.tsv
+      {
+        fx=$1; dim=$2
+        if ((dim=="non_obvious" || dim=="discrimination") && n[fx] > 0) {
+          if (blank[fx] > 0) {
+            printf "WARN: %s has %d unscored question row(s) — rollup used only the %d scored\n",
+                   fx, blank[fx], n[fx] > "/dev/stderr"
+          }
+          if (dim=="non_obvious") { v = sn[fx]/n[fx]; l = ln[fx] }
+          else                    { v = sd[fx]/n[fx]; l = ld[fx] }
+          $3 = sprintf("%.2f", v)
+          $4 = sprintf("rolled up from %d questions: %s", n[fx], l)
+        }
+        print
+      }
+    ' "$GRID" "$OUT/handscore.tsv" > "$tmp"
+    mv "$tmp" "$OUT/handscore.tsv"
+    echo "rolled up per-question scores into handscore.tsv"
+    echo "(fixtures with zero questions left untouched — fill those rows by hand)"
     ;;
   compare)
     [ -f "$OUT/handscore.tsv" ]    || { echo "ERROR: no handscore.tsv — run 'generate' first"; exit 2; }
@@ -137,5 +203,5 @@ case "$cmd" in
     ' gate="$AGREE_GATE" "$OUT/judge-scores.tsv" "$OUT/handscore.tsv"
     ;;
   *)
-    echo "usage: validate-judge.sh generate|compare"; exit 2 ;;
+    echo "usage: validate-judge.sh generate|rollup|compare"; exit 2 ;;
 esac
