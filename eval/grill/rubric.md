@@ -35,6 +35,17 @@ picked a DEFAULT and been wrong — even if the topic itself is mundane (e.g.
 dataset"). Do not floor everything to 1; reserve 0 for filler, 1 for reflexive
 standard asks, 2 for questions that overturn a likely-wrong default assumption.
 
+Announced-gap test (decides the 1-vs-2 boundary). A 2 requires the ambiguity to be
+HIDDEN: nothing in the requirement text signals it, so an engineer would proceed on a
+silent default and be wrong. If a vague term in the requirement itself announces the
+gap — "faster", "better", "improve", "handle X better", "cleaner" — then asking is
+reflexive (the word forces the question), so the question is a 1 EVEN IF the answer
+forks the impl. That the answer materially changes the build is dimension 4's job, not
+this one. Worked example: "handle errors better — what shows on failure?" is a 1: the
+word "better" flags the gap. "Normalise while typing or on blur?" is a 2: nothing in
+"add decimal points" hints the timing question exists; the engineer would silently pick
+one and ship the wrong one.
+
 ### 4. Discrimination (per question, averaged)
 - 2 — the answer materially changes the implementation
 - 1 — the answer changes a detail
@@ -52,6 +63,25 @@ non-obviousness ≥ 1.3 AND mean discrimination ≥ 1.3.
 
 `skip` fixtures pass when grill asked zero questions and chose `skip` (coverage is
 vacuously 1.0; progression N/A).
+
+### Coverage-only fixtures (`coverage_only: true`)
+
+Some requirements are genuinely ambiguous — many gaps, so grill correctly goes full or
+light tier — yet every gap is *announced* by a vague term in the text ("faster", "better",
+"which report"). By the announced-gap test above, every question is a reflexive 1, so the
+requirement affords no insight to find. Forcing the non-obviousness bar on it would demand
+insight the text cannot supply, and no honest scoring clears the bar: 6 announced 1s
+average 1.0, and clearing 1.3 would need ≥ 3 hidden forks the requirement does not contain.
+
+Such a fixture is a *coverage* test — does grill surface all the obvious gaps — not an
+insight test. Mark it `coverage_only: true` in the frontmatter. It then passes on
+**coverage ≥ 0.8 AND depth-calibration = 2 alone**; the non-obviousness and discrimination
+bars are recorded but not gated.
+
+This is not an escape hatch for weak fixtures: a `coverage_only` fixture still must surface
+its gaps (coverage) and pick the right tier (depth). Use it only when the ambiguities are
+genuinely all announced — never to excuse a fixture that *should* contain hidden forks. The
+trustworthy signal remains the shadow subset, which should include real insight fixtures.
 
 ## Aggregate gate
 

@@ -2,7 +2,7 @@ fixture	q	question	non_obvious	discrimination	note
 full-01-dashboard-faster	1	Which dashboard? Multiple exist — the main analytics one, admin, per-project?	1	2	which-of-several-dashboards: reflexive standard ask (rubric anchor); answer picks the target
 full-01-dashboard-faster	2	"Faster" against what target and current baseline?	1	2	pinning target+baseline is the reflex ask on any perf ticket; answer sets the metric
 full-01-dashboard-faster	3	Which errors — failed data fetches, render crashes, auth failures?	1	2	which-error-class: standard scoping ask; answer bounds the work
-full-01-dashboard-faster	4	"Better handling" concretely — what shows when a fetch fails?	2	2	retry-button vs blank panel overturns a likely-wrong default; forks the impl
+full-01-dashboard-faster	4	"Better handling" concretely — what shows when a fetch fails?	1	2	announced-gap: the word "better" flags the gap so the ask is reflexive (non_obvious=1); the answer still forks the impl (discrimination=2)
 full-01-dashboard-faster	5	Whose experience improves, and on what trigger — initial load, refresh?	1	1	actor+trigger: standard ask; answer changes a detail, not the impl
 full-01-dashboard-faster	6	Boundary — load time and fetch errors only, or does redesign/new features count?	1	2	scope-boundary: standard closing ask; answer fences redesign out
 shadow-full-02-decimal-points	1	Which fields show the problem — every numeric input, or specific money fields, and on which screen?	1	2	which-fields/screen: standard scoping ask
