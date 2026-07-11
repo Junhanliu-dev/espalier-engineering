@@ -56,7 +56,7 @@ This project uses Espalier for AI code quality — auto-discovered, project-spec
 
 **For any implementation work**, use `/espalier <requirement>` to execute the full pipeline.
 
-**For bug fixes**, use `/espalier-fix <bug>` for the slim 5-stage lane.
+**For bug fixes**, use `/espalier-fix <bug>` for the slim lane — 7 stages (0–7, no Stage 2).
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 

@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.9.1</span>
+      <span class="nav-pill">v0.11.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1745,6 +1745,9 @@ footer {
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.11.0</span> — the push gate actually blocks now. Claude Code hooks block only on <em>exit code 2 with the message on stderr</em> — the old gates&rsquo; exit 1 was a silent no-op. Every gate script and wrapper speaks the real contract (the wrapper fails <em>closed</em> without python and matches <code style="font-family:var(--f-mono);color:var(--vine)">git -C &hellip; push</code> and multi-line commands), the Stage 4/6 gates read the verdict <em>word</em> — closing the FAIL-with-P1-only and ESCALATION_REQUIRED-as-PASS holes — the reviewer/security agents get a record-file-scoped Write tool, and <code style="font-family:var(--f-mono);color:var(--vine)">.claude/</code> symlinks go relative so a moved repo keeps working. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.9.1</span> — the review-round and rollback hard stops are now configurable. How many coder↔reviewer rounds run before the pipeline stops and asks a human used to be hardcoded prose (<em>Max 2 P0 rounds</em>) in the pipeline templates. It now lives in a tracked <code style="font-family:var(--f-mono);color:var(--vine)">espalier/.espalier-config</code> — <code style="font-family:var(--f-mono);color:var(--vine)">max-req-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-code-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-test-rounds</code>, <code style="font-family:var(--f-mono);color:var(--vine)">max-rollbacks</code> — that the orchestrator reads at runtime, falling back to 3 when a key is absent so a missing file never blocks. Defaults unify to 3 (code and test caps rise 2→3). Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
@@ -1757,7 +1760,7 @@ footer {
           <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.8.1 → v0.8.2 → v0.9.0) in order.
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.9.4 → v0.10.0 → v0.11.0) in order.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           New pipeline runs get the loop; in-flight changes are unaffected. <span style="color:var(--paper)">Non-breaking.</span>

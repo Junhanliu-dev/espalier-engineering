@@ -1,6 +1,6 @@
 ---
 name: espalier-fix
-description: Bug-fix orchestrator — 5-stage pipeline with auto-link to the change that introduced the bug
+description: Bug-fix orchestrator — 7 stages (0–7, no Stage 2) with auto-link to the change that introduced the bug
 ---
 
 # Espalier Fix Runner
@@ -15,7 +15,7 @@ Do NOT use for:
 - Refactors with no behaviour change → use `/espalier refactor: …`
 - Fixes that obviously cross >5 files, multiple layers, or require schema changes → use `/espalier fix: …` directly (full pipeline)
 
-## Pipeline Overview (5 stages, vs 10 for /espalier)
+## Pipeline Overview (7 stages (0–7, no Stage 2), vs 10 for /espalier)
 
 | Stage | Name | Skipped from /espalier? |
 |-------|------|-------------------------|
@@ -189,6 +189,7 @@ For each match read its `pipeline-state.md` Status (and tombstones at
 | Match exists, Status: IN_PROGRESS | Resume that fix. Announce "Resuming fix/{matched-slug} from Stage {N}". |
 | Match exists, terminal Status (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED / ESCALATED_LATE) | **Prompt user** (below) — a same-name fix on a new day is usually a *new* dated folder, but confirm intent. |
 | Match exists, Status: PARTIAL_FIX | **Prompt user** (below) |
+| Match exists, Status: FILED | Offer to adopt/start it — the skeleton was filed by a partial fix; adopting = set `- Status: IN_PROGRESS` and begin at Stage 1 with its inherited frontmatter. |
 | Only `TOMBSTONE.md` exists (legacy migration) | Follow tombstone pointer; ask user "fix/{matched-slug} was migrated to feat/{target}. New fix at fix/{slug}, or work on feat/{target} instead?" |
 
 Collision prompt (use `AskUserQuestion`):
@@ -222,8 +223,14 @@ Options:
    ```bash
    find espalier/changes/fix -mindepth 2 -maxdepth 2 -name pipeline-state.md
    ```
-   Read each, look for `Current Stage:` < 7 (in-progress).
-3. If matching slug found, RESUME from current stage.
+   Resume is status-driven, not stage-driven: Resume any change whose
+   `- Status:` is `IN_PROGRESS`, at whatever stage its `Current Stage:`
+   records — including a crash mid-Stage-7. Statuses `COMPLETE`, `ABORTED`,
+   `ABORTED_LATE`, `ESCALATED`, `ESCALATED_LATE` are terminal — never resumed.
+   `PARTIAL_FIX` keeps its existing prompt ('Resume / extend' offer — see the
+   collision table, step 11). `FILED` skeletons are not resumed here; they are
+   adopted by the full lane's FILED-skeleton scan.
+3. If a matching `IN_PROGRESS` slug found, RESUME from its recorded stage.
 4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`
    from `espalier/changes/_template/`. On creation, write `- Current Stage: 0`
    and `- Status: IN_PROGRESS` to the Status block — this is what the collision
@@ -352,15 +359,29 @@ Per-SHA lookup runs through Layers 0-3. `espalier/.merge-hook-decision`
 > Prerequisite: source helpers once before this block runs (also done by Flag Handling section):
 > `. espalier/hooks/lookup-helpers.sh`
 
+Resolve `ask-later` UPFRONT so the inner loop never hits a prompt. The bash
+below only DETECTS the decision (same pattern as the Stage 5/6 detectors —
+bash detects, the orchestrator prompts). If it reads `ask-later` (or the file
+is absent) AND `interactivity_mode` (from `drift-helpers.sh`) is NOT
+`unattended`, YOU (the orchestrator) ask via `AskUserQuestion` — the same
+choices the init-time question offers (options: `installed` /
+`fuzzy-allowed` / `skip-only` / `not-needed`; keeping `ask-later` stays
+available via Other) — then write the answer to
+`espalier/.merge-hook-decision` yourself and re-run this resolution block. On
+an unattended run, keep the `ask-later` behavior (dispatch as `skip-only`, so
+entries link as `unknown_squash`) and log one line that the decision was
+deferred. (The legacy stderr prompt helper stays in `lookup-helpers.sh` for
+unattended/non-Claude use — it is no longer called from this flow.)
+
 ```bash
 DECISION=$(cat espalier/.merge-hook-decision 2>/dev/null || echo "ask-later")
 
-# Resolve ask-later UPFRONT so the inner loop never hits a prompt.
-# (Prompt is the only path that needs user input mid-loop; hoisting avoids
-# the "skip-current-SHA after prompt" trap that `continue` inside `case` causes.)
+# ask-later on an unattended run: dispatch conservatively as skip-only.
+# Interactive runs never reach here with ask-later — the orchestrator resolved
+# it via AskUserQuestion and rewrote the file before re-running this block.
 if [ "$DECISION" = "ask-later" ] || [ -z "$DECISION" ]; then
-  _prompt_user_for_merge_decision
-  DECISION=$(cat espalier/.merge-hook-decision 2>/dev/null || echo "skip-only")
+  echo "merge decision still ask-later (unattended) — linking conservatively; entries mark unknown_squash" >&2
+  DECISION="skip-only"
 fi
 
 # Build entries in stack-trace order. Index 0 = primary, rest = call_path. Cap=5.
@@ -439,9 +460,8 @@ _dedupe_entries_preserve_primary
 ```
 
 Helpers (`_push_entry`, `_push_note_entry`, `_dedupe_entries_preserve_primary`,
-`_fuzzy_file_overlap_match`, `_prompt_user_for_merge_decision`,
-`_cache_append`, `_maybe_warn_slow_scan`) live in `espalier/hooks/lookup-helpers.sh`
-and are sourced at Stage 0 entry.
+`_fuzzy_file_overlap_match`, `_cache_append`, `_maybe_warn_slow_scan`) live in
+`espalier/hooks/lookup-helpers.sh` and are sourced at Stage 0 entry.
 
 ### 0.3 Per-entry frontmatter shape
 
@@ -512,6 +532,12 @@ caused_by:           # populated by Stage 0
 (diagnosis mode); use "unconfirmed — <hypothesis>" only if grilling could not
 verify it against the code}
 
+## Files likely touched
+- {bulleted paths — best pre-code estimate}
+
+## Layers involved
+- {list of layers the fix will touch}
+
 ## Expected behaviour
 {what should happen instead}
 
@@ -523,6 +549,10 @@ verify it against the code}
 ## Out of scope
 {anything reporter asked for that isn't this specific bug}
 ```
+
+Fill `## Files likely touched` and `## Layers involved` from the diagnosis —
+they are the Stage 1 predictive escalation gate's inputs (Files predicted /
+Layers predicted), so a best pre-code estimate is mandatory, not optional.
 
 **Grill the diagnosis.** Unless the invocation passed `--no-grill`
 (`GRILL_DISABLED=yes`), invoke the `espalier-grill` skill in `diagnosis` mode once
@@ -621,17 +651,33 @@ without spawning the panel and without counting a P0 round.
    unchanged, or sentinel-less record means that agent did NOT complete —
    re-spawn that agent (once; a second failure → escalate). Never treat a
    missing/stale record as a pass.
-3. **Gate read: `grep '^VERDICT:' <record> | tail -1` from EACH file. `p0=` > 0
-   in EITHER →** snapshot both sentinels into pipeline-state.md Stage History,
-   re-spawn `harness-coder` with the combined findings, then **return to step 1
-   and re-review the new diff with the whole panel.** Never advance to Stage 5 on
-   the coder's fix report alone — a fix is never the last action before the gate;
-   a clean panel is. Each P0 round increments the counter; at counter =
-   `max-code-rounds` (default 3, read from `espalier/.espalier-config` via
-   `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
-   back to 3 if unset), escalate to a human WITHOUT another re-spawn (a security P0
-   shares this counter).
-4. **Both sentinels p0=0 on a fresh review of the current code →** PASS. Snapshot
+3. **Gate read (deterministic).** From EACH record:
+   `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+   - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT
+     advance and do NOT re-spawn: snapshot the sentinel, then run the escalation
+     protocol (fix lane: the late-escalation prompt; full lane: escalate to the
+     human with the agent's Escalation Reason block). An `ESCALATION_REQUIRED`
+     with `p0=0` is still an escalation.
+   - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
+     with the combined findings and loop (counter + `max-code-rounds` cap
+     unchanged): snapshot both sentinels into pipeline-state.md Stage History,
+     re-spawn with the combined findings, then **return to step 1 and re-review
+     the new diff with the whole panel.** Never advance to Stage 5 on the
+     coder's fix report alone — a fix is never the last action before the gate;
+     a clean panel is. Each non-PASS round increments the counter. Check the cap
+     BEFORE re-spawning: if the counter already equals `max-code-rounds`
+     (default 3, read from `espalier/.espalier-config` via
+     `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`;
+     fall back to 3 if unset), escalate to the human immediately — the coder is
+     NOT re-spawned and no further panel round runs. Before stopping, set
+     `- Status: ESCALATED` and add a Stage History row
+     `| 4 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
+     Otherwise re-spawn, increment the counter, and loop. (A security P0/P1
+     shares this counter.)
+   - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+     `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+4. **Both last sentinels PASS/PASS_WITH_FIXES with p0=0 p1=0 on a fresh review
+   of the current code →** PASS. Snapshot
    the sentinels into Stage History, then record the certificate: `git add -A`
    (so new files count), then overwrite `Reviewed-Diff` in pipeline-state.md with
    `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
@@ -875,13 +921,33 @@ Same contract as Stage 5: a `LATE_ESCALATION_GATE:` line means STOP and run the
 reviewer's Escalation Reason block. Detection is bash; the prompt is yours.
 
 **Fixpoint + certificate.** Stage 6 is a loop like Stage 4: freshness-check
-review-record.md against its baseline each round, gate on
-`grep '^VERDICT:' | tail -1`, snapshot each round's sentinel into Stage History.
-A P0 sends the tests back to Stage 5 (re-spawn coder), then **re-review** — never
-exit on the fix report alone (max `max-test-rounds` rounds, default 3 → escalate). On a clean PASS
-(sentinel p0=0), refresh `Reviewed-Diff` in pipeline-state.md (same `git add -A`
-+ fingerprint command as Stage 4) so it now covers the added tests; the push
-gate compares against this.
+review-record.md against its baseline each round, snapshot each round's
+sentinel into Stage History.
+
+**Gate read (deterministic).** From EACH record:
+`V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+- `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+  and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
+  (fix lane: the late-escalation prompt; full lane: escalate to the human with
+  the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
+  still an escalation.
+- Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → send the tests back to
+  Stage 5 (re-spawn `harness-coder`) with the combined findings and loop
+  (counter + `max-test-rounds` cap unchanged), then **re-review** — never exit
+  on the fix report alone.
+- Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+  `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+
+Check the cap BEFORE re-spawning: if the counter already equals
+`max-test-rounds` (default 3), escalate to the human immediately — the coder is
+NOT re-spawned and no further panel round runs. Before stopping, set
+`- Status: ESCALATED_LATE` (the fix's code is already committed at Stage 3, so
+a Stage 6 escalation is the late-escalation path) and add a Stage History row
+`| 6 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
+Otherwise re-spawn, increment the counter, and loop. On a clean PASS
+(per the gate read above), refresh `Reviewed-Diff` in pipeline-state.md (same
+`git add -A` + fingerprint command as Stage 4) so it now covers the added
+tests; the push gate compares against this.
 
 ## Stage 7: Push (with back-link)
 
@@ -966,8 +1032,8 @@ Four gates: predictive (Stage 1), reactive (Stage 3), test-scope (Stage 5), revi
 After reqs written, parse for:
 | Signal | Threshold | Source |
 |--------|-----------|--------|
-| Files predicted | > 5 | requirements.md "Files likely touched" if present |
-| Layers predicted | > 2 | requirements.md "Layers involved" |
+| Files predicted | > 5 | requirements.md "## Files likely touched" (mandatory Stage 1 section) |
+| Layers predicted | > 2 | requirements.md "## Layers involved" (mandatory Stage 1 section) |
 | Data model change | any | grep for "schema", "migration", "model change" |
 | New external dep | any | grep "depends on", "requires new" |
 | Reporter says "needs redesign" | exact phrase | grep |
@@ -1028,10 +1094,18 @@ Options:
          resume via /espalier --resume
   3. Ship as partial fix + file root-cause feat
        → Continue to Stage 7; Status: PARTIAL_FIX
-       → Auto-create espalier/changes/feat/{slug}-root-cause/ skeleton with
-         filed_from_partial_fix + inherited caused_by_chain
-       → User invokes /espalier feat: ... later
+       → AFTER Stage 7's push completes, auto-create the
+         espalier/changes/feat/{slug}-root-cause/ skeleton with
+         filed_from_partial_fix + inherited caused_by, `- Status: FILED`
+       → User invokes /espalier feat: ... later (or the full lane's
+         FILED-skeleton scan adopts it)
 ```
+
+If the run is unattended (the prompt cannot fire) or the user declines all
+three options and hands the problem to a human, stop the lane: before
+stopping, set `- Status: ESCALATED_LATE` and add a Stage History row
+`| {stage} | ESCALATED | {ts} | late-escalation unresolved — human takeover |`
+in pipeline-state.md.
 
 #### Tombstone in old fix slot (option 2 migration only)
 
@@ -1074,11 +1148,22 @@ pipeline-state.md Status block:
 - Root Cause Status: PENDING (last checked: {date})
 ```
 
-Auto-skeleton at `espalier/changes/feat/{slug}-root-cause/` inherits `caused_by` and adds `filed_from_partial_fix: fix/{slug}`. When that feat completes its own Stage 7, it writes back to the partial fix's pipeline-state.md `## Root Cause Addressed By` table (mechanism in `/espalier` Stage 7).
+Auto-skeleton at `espalier/changes/feat/{slug}-root-cause/` inherits `caused_by`
+and adds `filed_from_partial_fix: fix/{slug}`. Create the skeleton only after
+the partial fix's push has gone through — an in-flight skeleton would become
+the gate's most-recent active change and block the push. The skeleton's
+pipeline-state.md gets `- Status: FILED` (a non-active status: the push gate
+ignores it and neither lane resumes it; the full lane's FILED-skeleton scan or
+an explicit `/espalier feat: …` adopts it). When that feat completes its own
+Stage 7, it writes back to the partial fix's pipeline-state.md
+`## Root Cause Addressed By` table (mechanism in `/espalier` Stage 7).
 
 ## Completion
 
 When Stage 7 passes:
 - Update own `pipeline-state.md` Status: COMPLETE (or PARTIAL_FIX if option 3).
+- Commit the espalier bookkeeping (`git add espalier/changes/fix/{slug}
+  && git commit -m 'chore(espalier): close {slug}'`) so the next change starts
+  from a clean tree.
 - Summarize: original cause, fix files, regression tests added.
 - Report total rounds and any escalation gates tripped (even if user chose to override).

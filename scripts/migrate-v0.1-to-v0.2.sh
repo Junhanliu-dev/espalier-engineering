@@ -60,6 +60,16 @@ if [ ! -d "harness" ] || [ ! -d ".claude" ]; then
 fi
 
 if [ -z "$PLUGIN_DIR" ]; then
+  # Self-relative first: this script lives at <plugin-root>/scripts/, so the
+  # init skill dir is a sibling — works in every layout (marketplace cache,
+  # dev checkout, symlink) without guessing $HOME paths.
+  _self_root="$(cd "$(dirname "$0")/.." && pwd)"
+  if [ -d "$_self_root/skills/espalier-init/hook-templates" ]; then
+    PLUGIN_DIR="$_self_root/skills/espalier-init"
+  fi
+fi
+
+if [ -z "$PLUGIN_DIR" ]; then
   # Try common locations.
   # New (v0.4+ rename): plugin name `espalier`, repo `espalier-engineering`, skill dir `espalier-init`.
   # Legacy: plugin name `harness-engineering`, repo `harness-engineering`, skill dir `harness-engineering`.
@@ -324,6 +334,7 @@ else
   check "typed layout (no legacy flat)"    "! find harness/changes -mindepth 1 -maxdepth 1 -type d ! -name _template ! -name feat ! -name fix ! -name refactor ! -name docs | grep -q ."
   echo ""
   echo "  Verification: $pass passed, $fail failed"
+  [ "$fail" -gt 0 ] && exit 1
 fi
 
 echo ""

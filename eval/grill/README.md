@@ -96,16 +96,21 @@ shadow: false
 
 ## Discipline
 
-- **Reach 20–30 fixtures.** Currently 19 (9 seed + 10 shadow). Add a handful more to
-  clear the 20 floor — plan §6 Phase A2.
+- **Reach 20–30 fixtures.** Currently 20 (9 seed + 11 shadow) — the plan §6 Phase A2
+  floor of 20 is met. Keep adding toward 30.
+- **Cover the tier × mode matrix.** Choose the next fixture by which `expected_tier` ×
+  `mode` cell is thinnest, not by which ticket is convenient. `shadow-full-04` exists
+  because every other shadow `full` fixture was `diagnosis`, leaving `full` × `spec`
+  uncovered — a whole class of under-specified *feature* requests in which the harness
+  could not have detected a regression.
 - **Shadow subset.** Roughly one third of fixtures should be `shadow: true` — authored
   from real tickets or by someone other than the grill-skill author, so the skill
-  cannot be tuned to pass known fixtures. The 10 shadow fixtures were built from real
+  cannot be tuned to pass known fixtures. The 11 shadow fixtures were built from real
   internal-project commit history (two production apps): the raw
   commit subject is the ambiguous input, and the answer key is derived from what the
   commit's diff *actually* decided — so the key reflects real resolution, not the
   skill author's intuition. The 9 seed fixtures remain `shadow: false` (written
-  alongside the skill). Shadow fraction is currently 53%.
+  alongside the skill). Shadow fraction is currently 55%.
 - **Validate the judge** before trusting it — see `rubric.md` "Judge validation"
   (≥ 75% agreement with hand scores).
 - **Regression gate.** Run `run.sh` on every `espalier-grill.md` edit; prompt edits

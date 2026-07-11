@@ -102,9 +102,15 @@ _rewrite_file() {
     return 0
   fi
 
+  # Protect the AGENT name `harness-reviewer` before the skill renames run —
+  # `s|harness-review|espalier-review|g` would otherwise eat its prefix and
+  # corrupt it to `espalier-reviewer`. Sentinel swap works on BSD+GNU sed
+  # (no word-boundary syntax needed).
+  "${SED_INPLACE[@]}" -E 's|harness-reviewer|@@ESP_KEEP_REVIEWER@@|g' "$f"
   for expr in "${SKILL_RENAMES[@]}"; do
     "${SED_INPLACE[@]}" -E "$expr" "$f"
   done
+  "${SED_INPLACE[@]}" -E 's|@@ESP_KEEP_REVIEWER@@|harness-reviewer|g' "$f"
   # Now rewrite dir prefix. Only `harness/` (word-boundary before, slash after).
   # Don't touch `harness-coder`, `harness-reviewer`, `harness-engineering` etc.
   "${SED_INPLACE[@]}" -E -e 's|^harness/|espalier/|' -e 's|([^a-zA-Z0-9_-])harness/|\1espalier/|g' "$f"
@@ -379,6 +385,7 @@ else
   check ".claude/skills/espalier-fix link"       "test -L .claude/skills/espalier-fix"
   check ".claude/rules/espalier-structure.md"    "test -L .claude/rules/espalier-structure.md"
   check ".claude/agents/harness-coder.md"        "test -L .claude/agents/harness-coder.md"
+  check "harness-reviewer name uncorrupted"      "grep -q '^name: harness-reviewer' espalier/agents/harness-reviewer.md"
   if [ -f .claude/settings.json ]; then
     check "settings.json hooks point to espalier/" "grep -q 'espalier/hooks' .claude/settings.json"
     check "no leftover harness/ in settings.json"  "! grep -q 'harness/hooks' .claude/settings.json"
@@ -391,6 +398,7 @@ else
   fi
   echo ""
   echo "  Verification: $pass passed, $fail failed"
+  [ "$fail" -gt 0 ] && exit 1
 fi
 
 echo ""

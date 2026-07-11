@@ -4,7 +4,7 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 
 ## Items deferred (acceptable as-is for v0.2.0)
 
-- **`harness-fix.md` "Before Starting" step 1** references `harness/pipeline.md` even though fix lane has its own 5-stage overview. Slightly redundant but not wrong — pipeline.md is the canonical Stage 3-7 contract.
+- **`harness-fix.md` "Before Starting" step 1** references `harness/pipeline.md` even though fix lane has its own stage overview (7 stages: 0–7, no Stage 2). Slightly redundant but not wrong — pipeline.md is the canonical Stage 3-7 contract.
   - **Trigger to revisit**: if users report confusion between fix-lane stages and full pipeline stages.
 
 - **`_prompt_user_for_merge_decision`** in `lookup-helpers.sh` is a stub. The real prompt fires via the orchestrator's `AskUserQuestion` tool. The stub prints help text + does nothing in non-interactive mode. Comment in the helper clarifies.
@@ -12,6 +12,16 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 
 - **`docs/plan.md` is committed at repo root** (~93KB / ~2270 lines). Currently linked from README. Could move under `docs/internal/` later if external readers find it noisy.
   - **Trigger to revisit**: if README signal/noise becomes a complaint.
+
+## Items deferred from v0.11.0
+
+- **Commit-index `_cache_append` non-atomicity + rebuild/append race** (`lookup-helpers.sh`, `rebuild-commit-index.sh`) — concurrent append vs rebuild can lose a row; needs a lock or temp-file swap.
+- **Empty `OUT_SLUG[@]` expansion under bash 3.2 + `set -u`** (`lookup-helpers.sh` ~70-73) — an all-filtered dedupe would trip `unbound variable` on old bash.
+- **`parse-drift-blocks.py` argv/IO error handling** — a missing/unreadable record path currently tracebacks instead of degrading.
+- **Apostrophes in repo paths break bootstrap's `run "cp '…'"` quoting** — a path containing `'` splits the eval'd command.
+- **Multi-line gate function bodies joined by newlines instead of `&&` fail open by convention** — needs an init-time validator that rejects a body whose steps don't propagate failure.
+- **`eval/`-suite fixture for wrapper matching** — the deterministic test-hooks.sh wrapper matrix shipped in v0.11.0 (A6); only the LLM-judged eval variant is deferred.
+- **test-bootstrap gaps** — spaces-in-path, `--force` re-run settings.json dedup assertion, invalid-JSON settings path, husky branch.
 
 ## Algorithm complexity upgrades (`_dedupe_entries_preserve_primary`)
 

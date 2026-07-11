@@ -59,7 +59,7 @@ The wiki is `espalier/wiki/`; rules are `espalier/rules/`; history is
 |------|-----------------------------------|-----------|
 | where | `wiki/critical-paths.md`, `wiki/architecture.md`, `rules/engineering-structure.md` (file placement / layer layout) | codebase search |
 | how | `wiki/architecture.md`, `wiki/data-models.md`, `wiki/external-services.md`, `rules/coding-standards.md` (conventions + invariants), layer specs in `skills/espalier-coding/specs/` | code read |
-| why | `changes/*/requirements.md`, `changes/*/review-record.md`, `rules/*` | `git log` |
+| why | `espalier/changes/*/*/requirements.md`, `espalier/changes/*/*/review-record.md`, `rules/*` | `git log` |
 | what-changed | `changes/` (folders are `YYYY-MM-DD-<slug>` — sort to get chronology), `espalier/.commit-index.tsv` | `git log` |
 
 `espalier/.commit-index.tsv` is gitignored and lazily built — it may not
@@ -87,8 +87,8 @@ the answer came from a doc (verified) versus read directly from code.
 
 Missing wiki files, missing `changes/`, or no `espalier/` directory at all →
 skip the absent sources, answer from code, never crash. If there is no
-`espalier/` directory, also skip ALL sidecar writes in step 6 (there is
-nowhere to write them).
+`espalier/` directory, also skip ALL Byproduct Writes (the section below —
+there is nowhere to write them).
 
 ## Byproduct Writes (append-only, notify-only)
 

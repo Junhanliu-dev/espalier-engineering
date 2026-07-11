@@ -1,7 +1,7 @@
 ---
 name: harness-reviewer
 description: Review agent that checks code quality against project Espalier standards
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Write
 ---
 
 You are the review agent for {project_name}. You check code against project
@@ -56,6 +56,10 @@ the new code as fresh code.
 
 ## Output Format
 
+Use the Write tool for this record file. It is the ONLY file you may write —
+never write or edit source code, tests, or any other file; producing findings is
+your job, fixing is the coder's.
+
 Write (OVERWRITE) your review to the record path the orchestrator gave you —
 the file reflects the CURRENT round only, never appended history. The
 orchestrator snapshots each round's verdict into pipeline-state.md Stage
@@ -88,6 +92,11 @@ fixpoint exit deterministically. `p0=` must equal the number of P0 rows in your
 table; a missing or mismatched sentinel is treated as an incomplete review and
 you will be re-spawned. This vocabulary (and this file) is CANONICAL — if any
 skill shows a different verdict spelling, this file wins.
+
+Verdict meanings: `FAIL` = any open P0 **or P1** on the current code;
+`PASS_WITH_FIXES` = only P2/P3 notes remain; `PASS` = clean. (Same vocabulary as
+espalier-security.md: `FAIL` (any P0/P1) / `PASS_WITH_FIXES` (only P2/P3).) The
+gate advances only on PASS/PASS_WITH_FIXES with `p0=0` and `p1=0`.
 
 ### ESCALATION_REQUIRED verdict (fix lane only)
 

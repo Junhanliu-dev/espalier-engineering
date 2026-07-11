@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.11.0 — 2026-07-10
+
+Minor: **the push gate now actually blocks** — Claude Code hooks block on exit 2,
+not exit 1; every gate script and wrapper is updated, and the verdict gate reads
+the verdict word, closing the FAIL-with-p1-only and ESCALATION_REQUIRED-as-PASS
+holes. MINOR rather than PATCH because generated files change shape (gate exit
+codes, wrapper, agent frontmatter).
+
+**Hook exit-code contract (Workstream A).** For PreToolUse/PostToolUse hooks,
+ONLY exit code 2 blocks, and the message must be on **stderr** — exit 1 + stdout
+is a silent no-op. All 10 blocking paths in `pre-push-gate.sh` now exit 2 with
+the reason on stderr (warnings too, exit 0 unchanged); the three
+`check-layer-boundaries-*.sh` templates follow the same PostToolUse contract.
+The gate no longer early-exits when no pipeline change is in flight — the secret
+scan and dependency audit run on EVERY push (pipeline-only gates are wrapped in
+`gate_*_section` functions behind a `PIPELINE_TRACKED` guard, preserving the
+migration span markers). A corrupt state file (no parsable `Current Stage:`, or
+a Stage-4 PASSED row with a missing review certificate) fails closed.
+`pre-push-gate-wrapper.sh` fails CLOSED when python is absent, matches
+`git -C … push` / multi-line / after-`&&` pushes, ignores quoted mentions, and
+documents `ESPALIER_SKIP_GATE=1`. `test-hooks.sh` asserts exit codes exactly
+(2 for blocked, 0 for allowed, BLOCKED on stderr) plus a 6-case wrapper matrix,
+secret-scan, corrupt-state, and multi-line-build cases.
+
+**Verdict-word gates (Workstreams B/C).** One canonical gate paragraph at every
+Stage 4/6 gate site in both lanes: `ESCALATION_REQUIRED` (either agent, either
+lane, any stage) runs the escalation protocol; verdict `FAIL` or `p0>0` or
+`p1>0` re-spawns the coder; advance ONLY on PASS/PASS_WITH_FIXES with p0=0 AND
+p1=0. The cap check runs BEFORE re-spawning. Escalations now write
+`- Status: ESCALATED` / `ESCALATED_LATE`; PARTIAL_FIX root-cause skeletons are
+created AFTER the Stage 7 push with `- Status: FILED` (adopted later, never
+gating pushes). Resume is status-driven, not stage-numbered. The reviewer and
+security agents get a Write tool restricted to their own record file; the
+security no-op example ends with the mandatory sentinel; P1 severity text,
+kebab truncation (80 in both lanes), stage-count prose ("7 stages (0–7, no
+Stage 2)"), and the merge-decision prompt (now an orchestrator
+`AskUserQuestion`) are aligned.
+
+**Init/bootstrap (Workstream D).** `.claude/` symlinks are RELATIVE
+(`../../espalier/…`) so a moved repo keeps resolving; Stage 5 prints
+`WIRED: skills=<n> rules=<n> agents=<n>`. The language vocabulary is
+`typescript|python|go|unsupported` end-to-end, and `--lang=unsupported` writes a
+no-op boundary hook (write-if-absent). Stage 11 grows to **46 checks** (Phase-2
+skills, wiki pages, development-process rule, boundary hook); `validation.md`
+mirrors it 1:1. Phase 0/3 instructions substitute literal values — no dead
+shell-variable state between Bash calls.
+
+**Migration chain repair (Workstream E).** New
+`scripts/migrate-v0.10.0-to-v0.11.0.sh` rebuilds the gate from the v0.11
+template preserving the substituted command bodies, refreshes wrappers +
+pipeline + pure-copy skills (`.pre-v0.11.bak` backups), patches the boundary
+hook and agent tools lines, and re-substitutes `{project}` in
+espalier-review/security. Customised gates get an `espalier/.migrations-skipped`
+marker (reported once, never re-proposed). The v0.3→v0.4 sed no longer corrupts
+`harness-reviewer`; the five older scripts exit 1 on failed verification; the
+v0.1→v0.2 apply line carries `--plugin-dir` and the script probes its own
+checkout first. Chain regression verified: a pre-v0.9.2 install reaches exact
+v0.11.0 template parity.
+
+**Docs.** README/index.html refreshed; new `docs/migrating-v0.10-to-v0.11.md`.
+
 ## 0.10.0 — 2026-07-09
 
 Minor: **the push gate can run more than one command per check, and says why it blocked.**

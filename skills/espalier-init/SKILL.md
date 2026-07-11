@@ -67,7 +67,7 @@ project-root/
 │   │   ├── espalier-requirements/SKILL.md
 │   │   ├── espalier-grill/SKILL.md             # Stage 1 interrogation (invoked by espalier + espalier-fix)
 │   │   ├── espalier/SKILL.md                   # main pipeline orchestrator (slash: /espalier)
-│   │   ├── espalier-fix/SKILL.md               # bug-fix lane (5-stage; slash: /espalier-fix)
+│   │   ├── espalier-fix/SKILL.md               # bug-fix lane, 7 stages (0–7, no Stage 2); slash: /espalier-fix
 │   │   ├── espalier-prune/SKILL.md             # stale-artifact refresh (slash: /espalier-prune)
 │   │   ├── espalier-doctor/SKILL.md            # periodic drift scan (slash: /espalier-doctor)
 │   │   ├── espalier-ask/SKILL.md               # read-only Q&A lane (slash: /espalier-ask)
@@ -126,23 +126,27 @@ Issue ONE `AskUserQuestion` with THREE questions in the multi-question form:
 
 ### Q1 — Squash-merge strategy
 
+ONE question, EXACTLY these 4 options (AskUserQuestion caps options at 4; the
+two overflow values are reachable by typing them into Other):
+
 ```
 How does this repo merge PRs? Choice affects how /espalier-fix links bug
-fixes to causing commits.
+fixes to causing commits. (Two more accepted values — type skip-only or
+never-ask via Other if you want those: skip-only = no hook, no fuzzy, fix
+proceeds without causal link when the SHA misses; never-ask = same but
+suppresses future prompts.)
 
-  1. Rebase-merge / true merge-commit                   → MERGE_DECISION = not-needed
+  1. Rebase-merge / true merge-commit                   → not-needed
        SHAs preserved; no special handling needed.
-  2. Squash + install post-merge hook (recommended)     → MERGE_DECISION = installed
+  2. Squash + install post-merge hook (recommended)     → installed
        Hook records original→squashed SHA so fix lane finds origin via O(1) lookup.
-  3. Squash + allow fuzzy match at fix-time             → MERGE_DECISION = fuzzy-allowed
+  3. Squash + allow fuzzy match at fix-time             → fuzzy-allowed
        No hook. Fix lane falls back to file-overlap heuristic. Less safe.
-  4. Squash + skip linking when SHA misses (safest)     → MERGE_DECISION = skip-only
-       No hook, no fuzzy. Fix proceeds without causal link if SHA unresolvable.
-  5. Squash + never ask again, always skip              → MERGE_DECISION = never-ask
-       Same as skip-only but suppresses future "what should I do" prompts.
-  6. Decide later                                       → MERGE_DECISION = ask-later
+  4. Decide later                                       → ask-later
        Defer. Fix lane will prompt the first time SHA resolution fails.
 ```
+
+(Bootstrap accepts all six values per its `--merge-decision` validation.)
 
 ### Q2 — Sub-agent tool access
 
@@ -154,8 +158,8 @@ scope for this install:
   1. Restricted (recommended, default)                  → AGENT_TOOLS = restricted
        Templates' minimal tool list:
          harness-coder    → Read, Write, Edit, Bash, Glob, Grep
-         harness-reviewer → Read, Grep, Glob, Bash
-         harness-security → Read, Grep, Glob, Bash
+         harness-reviewer → Read, Grep, Glob, Bash, Write (record file only)
+         harness-security → Read, Grep, Glob, Bash, Write (record file only)
        Safest. Sub-agents can't reach MCPs, plugins, web search, Task spawning.
   2. Inherit from parent session                        → AGENT_TOOLS = inherit
        Drop the `tools:` frontmatter field entirely. Sub-agents inherit
@@ -184,12 +188,14 @@ A doctor scan is activity-gated — an idle repo never triggers one.
 
 > Why agent identifiers stay `harness-coder` / `harness-reviewer`: these are internal sub-agent names baked into pipeline orchestration. Renaming them mid-pipeline would break any in-flight changes. The plugin name and slash commands rebranded to Espalier in v0.4.0; agent identifiers remain frozen.
 
-Cache the answers in `$MERGE_DECISION`, `$AGENT_TOOLS`, and `$DOCTOR_CADENCE`. Phase 2's Write batch reads `$AGENT_TOOLS` when emitting `espalier/agents/harness-coder.md`, `espalier/agents/harness-reviewer.md`, and `espalier/agents/harness-security.md`:
+Note the answers; you will substitute them literally in Phase 3 — shell
+variables do NOT persist between Bash calls, so never stash an answer in one.
+Phase 2's Write batch reads the Q2 answer (AGENT_TOOLS) when emitting `espalier/agents/harness-coder.md`, `espalier/agents/harness-reviewer.md`, and `espalier/agents/harness-security.md`:
 
 - `restricted` → keep the `tools:` frontmatter line from the template verbatim
 - `inherit` → omit the `tools:` line entirely (Claude Code interprets missing `tools:` as "inherit from parent")
 
-Pass `$MERGE_DECISION` and `$DOCTOR_CADENCE` to `bootstrap-espalier.sh` in Phase 3 (`--merge-decision=$MERGE_DECISION --doctor-cadence=$DOCTOR_CADENCE`). `$AGENT_TOOLS` only affects Phase 2 LLM writes, no bootstrap flag needed.
+Pass the Q1 and Q3 answers to `bootstrap-espalier.sh` in Phase 3 as literal flag values (`--merge-decision=<answer from Q1> --doctor-cadence=<answer from Q3>`). The Q2 answer only affects Phase 2 LLM writes, no bootstrap flag needed.
 
 ---
 
@@ -234,7 +240,7 @@ Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 - `espalier/rules/production-standards.md`   ← `templates/rules/production-standards.md` + the NFR-relevant discoveries. Fill the `{discovered}` mechanism cells from DISCOVERY.{logging,error_handling,validation} (scout 1.3), `timeout_retry_patterns` (scout 1.10), `migration_pattern` (scout 1.8), and the Project-Specific Production Conventions section from whatever resilience/observability patterns scouts 1.3/1.6/1.10 evidenced (each with `file:line`). Leave the universal seeds + severity tiers verbatim. A cell with no discovered mechanism reads "none found — seed binds as written".
 
 **Orchestrator + per-stack skills** (5 files):
-- `espalier/agent.md`                          ← `templates/agent.md` + project_name + DISCOVERY.{lang,framework,layers}
+- `espalier/agent.md`                          ← `templates/agent.md` + project_name + DISCOVERY.{lang,framework,layers}. Fill EVERY placeholder in the template: `{project_name}`, `{lang}`, `{framework}`, `{discovered pattern}` (the architecture pattern from DISCOVERY.architecture, e.g. "layered MVC"), and `{2-3 sentences about what this project does}` (from DISCOVERY.critical_paths / the repo README).
 - `espalier/skills/espalier-coding/SKILL.md`   ← `templates/skills/espalier-coding.md` + DISCOVERY
 - `espalier/skills/espalier-testing/SKILL.md`  ← `templates/skills/espalier-testing.md` + DISCOVERY.testing
 - `espalier/skills/espalier-review/SKILL.md`   ← `templates/skills/espalier-review.md` (swap `{project}` → project_name)
@@ -242,8 +248,8 @@ Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 
 **Sub-agents** (3 files — `tools:` field branches on `$AGENT_TOOLS` from Phase 0 Q2):
 - `espalier/agents/harness-coder.md`          ← `templates/agents/harness-coder.md` + project_name. If `$AGENT_TOOLS == restricted` (default): keep `tools: Read, Write, Edit, Bash, Glob, Grep` line. If `$AGENT_TOOLS == inherit`: omit the `tools:` line entirely so the agent inherits from parent session.
-- `espalier/agents/harness-reviewer.md`       ← `templates/agents/harness-reviewer.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash` for restricted; omit for inherit.
-- `espalier/agents/harness-security.md`       ← `templates/agents/harness-security.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash` for restricted; omit for inherit.
+- `espalier/agents/harness-reviewer.md`       ← `templates/agents/harness-reviewer.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash, Write` for restricted (Write is for its record file only — the agent body states the restriction); omit for inherit.
+- `espalier/agents/harness-security.md`       ← `templates/agents/harness-security.md` + project_name. Same branching: keep `tools: Read, Grep, Glob, Bash, Write` for restricted (Write is for security-record.md only); omit for inherit.
 
 **Wiki** (4 files — all populated from DISCOVERY scouts 1.2/1.8/1.9/1.10, never stubs):
 - `espalier/wiki/architecture.md`             ← DISCOVERY.architecture (scout 1.2)
@@ -253,7 +259,7 @@ Issue ONE message with parallel Write calls, all sourcing from `DISCOVERY`:
 
 **Hooks with placeholders** (2 files):
 - `espalier/hooks/pre-push-gate.sh`           ← `hook-templates/pre-push-gate.sh`, swap `{build_command}`/`{lint_command}`/`{test_command}` from DISCOVERY.ci_checks. Each is substituted into a FUNCTION BODY (`run_build`/`run_lint`/`run_tests`), so a value may be a single command OR a multi-line block — a repo needing several suites (one per container in a Docker-first stack, one per workspace in a monorepo) writes them all here. A block MUST return non-zero if ANY step fails: join with `&&`, or end each step with `|| return 1`. A `null` ci_checks key is substituted, never guessed: build/lint → `true  # no <kind> command discovered at init` (the gate skips that check cleanly); test → `echo 'no test command discovered at init — refresh espalier/hooks/pre-push-gate.sh via /espalier-prune once tests exist' && false` (the tests-required gate fails closed with an actionable message instead of an invented command's confusing error)
-- `espalier/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-${LANG}.sh`, rewrite `case` block from DISCOVERY.layers. If LANG ∉ {ts,py,go}, emit a no-op script (`#!/bin/bash\nexit 0`).
+- `espalier/hooks/check-layer-boundaries.sh`  ← `hook-templates/check-layer-boundaries-<LANG_CHOICE>.sh` (LANG_CHOICE is the Phase 1 language token — one of `typescript|python|go|unsupported`; recorded once at discovery, substituted literally, never a live shell variable). Rewrite the `case` block from DISCOVERY.layers. The adapted script MUST keep the PostToolUse exit-code contract from the template: violations exit 2 with the message on stderr; exit 0 otherwise (exit 1 would be invisible to Claude Code). If LANG_CHOICE = `unsupported`, skip this Write — bootstrap emits a no-op hook itself.
 
 **Then per-layer specs (parallel scout batch + Write batch):**
 
@@ -283,23 +289,28 @@ Run:
 bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
   --project-dir=. \
   --plugin-dir="${CLAUDE_SKILL_DIR}" \
-  --lang=$LANG \
-  --merge-decision=$MERGE_DECISION \
-  --doctor-cadence=$DOCTOR_CADENCE
+  --lang=<LANG_CHOICE from Phase 1 discovery: typescript|python|go|unsupported> \
+  --merge-decision=<answer from Q1> \
+  --doctor-cadence=<answer from Q3>
 ```
+
+Shell variables do NOT persist between Bash calls — substitute literal values
+into this command before running (the `<...>` tokens are placeholders YOU fill
+verbatim, never live shell variables; `${CLAUDE_SKILL_DIR}` is the one
+exception — the harness sets it for the invocation itself).
 
 Bootstrap runs all 11 internal stages in one shell process:
 
 - **Stages 1-2:** preflight + `mkdir -p` (idempotent — Phase 2 Writes already created some dirs).
 - **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements,espalier-grill,espalier-prune,espalier-doctor,espalier-ask,espalier-audit}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
-- **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index, drift-detect, drift-helpers, parse-drift-blocks.py) + `chmod +x espalier/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
+- **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, pre-push-gate-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index, drift-detect, drift-helpers, parse-drift-blocks.py) + `chmod +x espalier/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
 - **Stage 5:** safe symlinks `.claude/{rules,skills,agents}/*` → `espalier/...` (refuses if target is regular file; uses portable `abspath`).
 - **Stage 6:** heredoc `espalier/changes/_template/pipeline-state.md`.
 - **Stage 7:** append `## Espalier` to `CLAUDE.md` (grep-guarded).
 - **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup).
-- **Stage 9:** persist `$MERGE_DECISION` to `espalier/.merge-hook-decision` and the Phase 0 Q3 cadence to `espalier/.doctor-cadence` (written once, never auto-rewritten). Install the post-merge dispatcher (`.husky/post-merge` or `.git/hooks/post-merge`) unconditionally — it runs `drift-detect.sh` on every merge and `post-merge-backlink.sh` only when the decision is `installed`.
+- **Stage 9:** persist the merge decision (the literal Q1 answer passed via `--merge-decision`) to `espalier/.merge-hook-decision` and the Phase 0 Q3 cadence to `espalier/.doctor-cadence` (written once, never auto-rewritten). Install the post-merge dispatcher (`.husky/post-merge` or `.git/hooks/post-merge`) unconditionally — it runs `drift-detect.sh` on every merge and `post-merge-backlink.sh` only when the decision is `installed`.
 - **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) to `.gitignore` (newline-guarded).
-- **Stage 11:** run 37 validation checks (36 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
+- **Stage 11:** run 46 validation checks (45 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
 
 **Re-run safety:** if `espalier/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
 
@@ -325,7 +336,7 @@ Hit a snag or have a suggestion? An issue is the most useful thing you can send:
 Either way — thanks for trying it.
 ```
 
-Fill `N`, `M`, `K` from the counts bootstrap printed (skills wired in Stage 5, rules + agents likewise). If a count is unavailable, drop that clause rather than guess.
+Fill `N`, `M`, `K` from the `WIRED: skills=<n> rules=<n> agents=<n>` line bootstrap Stage 5 printed. If the line is absent, drop that clause rather than guess.
 
 **Rule:** this is the ONLY end-of-install ask. No telemetry, no follow-up nag, no second prompt on re-runs — bootstrap's idempotent re-run path (`espalier/.merge-hook-decision` already present → validate-only) skips Phase 4 entirely.
 
@@ -344,7 +355,7 @@ GOOD: "ci_status == 'success' AND total_tests > 0 AND tests_passed == total_test
 If a constraint can't be machine-verified, the agent WILL drift from it.
 
 ### 3. Separate Execution from Judgment
-The agent that writes code NEVER reviews its own code. Different `.claude/agents/` with different tool sets (coder has Write/Edit; reviewer has only Read).
+The agent that writes code NEVER reviews its own code. Different `.claude/agents/` with different tool sets (coder has Write/Edit on source; reviewer and security have Read, Grep, Glob, Bash plus a Write that is contractually restricted to their own record file — they never write source, tests, or any other file).
 
 ### 4. Context Layering
 | Layer | Content | Mechanism | When |

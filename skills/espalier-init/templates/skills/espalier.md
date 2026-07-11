@@ -116,8 +116,14 @@ unrelated in-flight change into the new request:
 1. Derive the invocation's `{kebab}` (State File Format below) and compare it
    against each state file's folder tail — the part after the `YYYY-MM-DD-`
    prefix — the same tail match the fix lane's collision check uses.
-2. A tail-matching state file that is in progress (`Current Stage` < 10 and no
-   terminal `- Status:` value) → resume it: read stage + history, announce
+2. Resume is status-driven, not stage-driven: Resume any change whose
+   `- Status:` is `IN_PROGRESS`, at whatever stage its `Current Stage:`
+   records — including a crash mid-Stage-7/8/9/10. Statuses `COMPLETE`,
+   `ABORTED`, `ABORTED_LATE`, `ESCALATED`, `ESCALATED_LATE` are terminal —
+   never resumed. `PARTIAL_FIX` keeps its existing prompt ('Resume / extend'
+   offer — see the fix lane's collision table). `FILED` skeletons are not
+   resumed here; they are adopted by the FILED-skeleton scan (step 5 below).
+   On a tail-matching `IN_PROGRESS` state file: read stage + history, announce
    "Resuming {requirement} from Stage {N}", continue from that stage (do NOT
    restart from 1).
 3. Non-matching in-flight state files do NOT block a new requirement. Start
@@ -128,6 +134,13 @@ unrelated in-flight change into the new request:
 4. Invoked with no requirement text at all (bare `/espalier`, or `--resume`
    alone) → resume the single in-flight change; if several are in flight,
    list them and ask which one via `AskUserQuestion`.
+5. Before creating a new folder, also scan
+   `espalier/changes/feat/*/pipeline-state.md` for `Status: FILED` skeletons
+   (root-cause feats filed by a fix lane's PARTIAL_FIX exit); if the new
+   requirement's kebab tail OR its text mentions the skeleton's slug stem,
+   ADOPT the skeleton folder instead of creating a new one (set its
+   `- Status: IN_PROGRESS` and start from Stage 1 with its inherited
+   `caused_by` / `filed_from_partial_fix` frontmatter).
 
 ### Stage Execution Protocol
 
@@ -258,23 +271,40 @@ Stage 5 by any other path:
    missing, unchanged, or lacks a current-round sentinel means THAT agent did not
    complete — re-spawn that agent (once; a second failure → escalate to human).
    Never treat a missing or stale record as a pass.
-3. **Gate read (deterministic).** From EACH file:
-   `grep '^VERDICT:' <record> | tail -1` → parse `p0=`. Also read the P0 rows
-   for the findings themselves.
-4. **If EITHER sentinel has p0 > 0 →** snapshot both sentinel lines into
-   pipeline-state.md Stage History
-   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2; security: PASS p0=0 |`),
-   re-spawn `harness-coder` with the combined findings (a Stage 3 action — its
-   programmatic build/lint gate applies), increment the shared round counter, and
-   return to step 1. At counter = `max-code-rounds` (default 3, read from
-   `espalier/.espalier-config` via
+3. **Gate read (deterministic).** From EACH record:
+   `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+   - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT
+     advance and do NOT re-spawn: snapshot the sentinel, then run the escalation
+     protocol (fix lane: the late-escalation prompt; full lane: escalate to the
+     human with the agent's Escalation Reason block). An `ESCALATION_REQUIRED`
+     with `p0=0` is still an escalation.
+   - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
+     with the combined findings and loop (counter + `max-code-rounds` cap
+     unchanged).
+   - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+     `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+4. **On a non-PASS round (verdict `FAIL`, or p0/p1 > 0) →** snapshot both
+   sentinel lines into pipeline-state.md Stage History
+   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2 p1=0; security: PASS p0=0 p1=0 |`).
+   Check the cap BEFORE re-spawning: if the counter already equals
+   `max-code-rounds` (default 3, read from `espalier/.espalier-config` via
    `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
-   back to 3 if the file or key is unset), escalate to a human WITHOUT another re-spawn.
-5. **Only when BOTH sentinels read p0=0 on the current code →** snapshot the two
-   sentinel lines into Stage History (`| 4 | PASSED | … |`), write the
-   `Reviewed-Diff` certificate, THEN run the "Stage 4 Post-Review" drift
-   processing below. The exit gate requires BOTH clean — never one agent's pass
-   alone. A security P0 shares the correctness "`max-code-rounds` P0 rounds → escalate" counter.
+   back to 3 if the file or key is unset), escalate to the human immediately —
+   the coder is NOT re-spawned and no further panel round runs. Before stopping,
+   set `- Status: ESCALATED` and add a Stage History row
+   `| 4 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
+   Otherwise re-spawn `harness-coder` with the combined findings (a Stage 3
+   action — its programmatic build/lint gate applies), increment the shared
+   round counter, and return to step 1. After snapshotting a ROUND row, also
+   update the `Review Rounds:` numerators in pipeline-state.md — a resumed
+   session recounts rounds from this line plus the ROUND rows, never from
+   memory.
+5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
+   the current code →** snapshot the two sentinel lines into Stage History
+   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate, THEN run the
+   "Stage 4 Post-Review" drift processing below. The exit gate requires BOTH
+   clean — never one agent's pass alone. A security P0/P1 shares the correctness
+   `max-code-rounds` round counter.
 
 **Stage 5 (Testing):**
 ```
@@ -319,9 +349,32 @@ Agent tool:
 ```
 
 Stage 6 uses the same record semantics as Stage 4: freshness-check
-review-record.md against its baseline, gate on `grep '^VERDICT:' | tail -1`,
-snapshot each round's sentinel into Stage History. (Stage 4's final record is
-overwritten here — its verdicts live in Stage History and the certificate.)
+review-record.md against its baseline, snapshot each round's sentinel into
+Stage History. (Stage 4's final record is overwritten here — its verdicts live
+in Stage History and the certificate.)
+
+**Gate read (deterministic).** From EACH record:
+`V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+- `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+  and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
+  (fix lane: the late-escalation prompt; full lane: escalate to the human with
+  the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
+  still an escalation.
+- Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
+  with the combined findings and loop (counter + `max-test-rounds` cap
+  unchanged).
+- Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+  `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+
+Stage 6's loop cap is `max-test-rounds`. Check the cap BEFORE re-spawning: if
+the counter already equals `max-test-rounds`, escalate to the human
+immediately — the coder is NOT re-spawned and no further panel round runs.
+Before stopping, set `- Status: ESCALATED` and add a Stage History row
+`| 6 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
+Otherwise re-spawn, increment the counter, and loop. After snapshotting a
+ROUND row, also update the `Review Rounds:` numerators in pipeline-state.md —
+a resumed session recounts rounds from this line plus the ROUND rows, never
+from memory.
 
 ### Stage 4 Post-Review: Drift & Convention Index
 
@@ -406,7 +459,9 @@ here). A typical single-bug fix belongs in `/espalier-fix`, which adds Stage 0
 causal linking; when a `fix:` requirement looks that small, say so in one line
 and suggest the fix lane before proceeding.
 
-Then derive `{kebab}` from the remainder of the requirement (kebab-case, max 60 chars, strip slashes).
+Then derive `{kebab}` from the remainder of the requirement (kebab-case, max 80
+chars — same truncation rule as the fix lane, so collision tail-matching agrees
+across lanes; strip slashes).
 
 **Date-prefix the slug** so change folders sort chronologically in a directory
 listing:
@@ -600,5 +655,8 @@ At stages marked with human checkpoint in pipeline.md:
 
 When Stage 10 passes:
 - Update pipeline-state.md with final status: COMPLETE
+- Commit the espalier bookkeeping (`git add espalier/changes/{type}/{slug}
+  && git commit -m 'chore(espalier): close {slug}'`) so the next change starts
+  from a clean tree.
 - Summarize: files changed, tests added, review findings addressed
 - Report total rounds and rollbacks
