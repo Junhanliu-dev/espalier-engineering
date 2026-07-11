@@ -1,7 +1,7 @@
-fixture	surfaced	depth_cal	non_obvious	discrimination
-full-01-dashboard-faster	6	2	1.0	1.7
-shadow-full-02-decimal-points	5	2	1.8	2.0
-light-01-csv-export	3	2	1.3	2.0
-shadow-light-02-invoice-failures	3	2	2.0	2.0
-skip-01-copyright-year	0	2	0.0	0.0
-shadow-skip-01-bold-titles	0	2	0.0	0.0
+fixture	surfaced	depth_cal	non_obvious	discrimination	verdict
+full-01-dashboard-faster	6	2	1.0	1.7	PASS
+shadow-full-02-decimal-points	5	2	1.6	2.0	PASS
+light-01-csv-export	3	2	1.33	1.67	PASS
+shadow-light-02-invoice-failures	3	2	1.67	2.0	PASS
+skip-01-copyright-year	0	2	0.0	0.0	PASS
+shadow-skip-01-bold-titles	0	2	0.0	0.0	PASS
