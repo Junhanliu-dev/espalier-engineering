@@ -8,9 +8,9 @@
 /espalier-init
 ```
 
-> **v0.9.0 — security audit + production hardening.** Stage 4 now runs a two-agent panel: alongside the correctness reviewer, a new `harness-security` auditor checks the change's trust boundary on one rule — *never trust data the frontend sent.* It hard-blocks any sensitive field (price, userId, role, orderId, status, …) the backend fails to re-derive, re-authorize, or recompute, and requires an abuse test proving the tampered value is rejected and never persisted. `harness-coder` reads the same taxonomy while writing, so security shifts left. The push gate gains a secret scan (blocks) + dependency audit (warns). And because Stage 4 only sees *new* changes, a new `/espalier-audit` lane runs the same auditor repo-wide over your **existing** code — findings land in `espalier/wiki/security-audit.md`, each dispatchable to `/espalier-fix`. This release also adds an always-loaded **production-standards** bar (resilience / observability / data-safety) the coder writes to and the reviewer enforces at tiered severity, plus a batch of gate-integrity fixes (fail-closed push gate, programmatic build/lint gate, per-round verdict sentinels, a deploy-aware Stage 9).
+> **v0.11.0 — the push gate actually blocks now.** A correctness audit found the single most load-bearing assumption was wrong: Claude Code PreToolUse/PostToolUse hooks block **only on exit code 2 with the message on stderr** — the old gates' `exit 1` + stdout was a silent no-op, so nothing ever blocked. Every gate script and wrapper now speaks the real contract (and the wrapper fails **closed** when python is missing, matching `git -C … push` and multi-line commands too). The Stage 4/6 verdict gates now read the verdict **word**, closing the `FAIL`-with-P1-only and `ESCALATION_REQUIRED`-read-as-PASS holes; P1s block before Stage 7 by construction. The reviewer and security agents get a Write tool scoped to their own record file (they previously had to write records they had no tool for). `.claude/` symlinks are now relative, so a moved repo keeps working. Escalated/filed changes get real statuses (`ESCALATED`, `ESCALATED_LATE`, `FILED`), resume is status-driven, and the migration chain is repaired end-to-end — old scripts exit non-zero on failed verification and the v0.9.2/v0.10.0 span splices still work against the new template.
 >
-> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.8.1→v0.8.2→v0.9.0→v0.9.1→v0.9.2) in order. See [`docs/migrating-v0.8-to-v0.9.md`](./docs/migrating-v0.8-to-v0.9.md).
+> **Existing users:** run `/espalier-migrate`. It auto-detects your install version and applies the needed migration chain (… v0.9.2→v0.9.3→v0.9.4→v0.10.0→v0.11.0) in order. See [`docs/migrating-v0.10-to-v0.11.md`](./docs/migrating-v0.10-to-v0.11.md).
 
 ---
 
@@ -64,7 +64,7 @@ Requirement-prefix routing (the `<slug>` is date-prefixed `YYYY-MM-DD-<name>` so
 | `docs:` | `docs` | `espalier/changes/docs/<slug>/` |
 | `fix:` | `fix` — full pipeline, for LARGE fixes only (>5 files / multi-layer / schema); a typical single bug belongs in `/espalier-fix`, which adds causal linking | `espalier/changes/fix/<slug>/` |
 
-### `/espalier-fix <bug>` — 5-stage bug-fix lane
+### `/espalier-fix <bug>` — bug-fix lane, 7 stages (0–7, no Stage 2)
 
 For real bug fixes. Slimmer than full pipeline but adds **Stage 0 auto-link discovery** — the bug-fix gets linked back to the feature change that introduced it (via git blame + reverse-lookup cache + squash-merge mapping). The causing change's `pipeline-state.md` gains a `## Follow-up Fixes` row. Six months later, when someone wonders "why does this feature have 4 fixes against it", the audit trail is right there.
 
@@ -134,7 +134,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 37 validation checks.
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + squash-merge decision + post-merge dispatcher install + .gitignore + 46 validation checks.
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -152,7 +152,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (37 checks, no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (46 checks, no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 
@@ -227,7 +227,7 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 | Command | Cost class |
 |---|---|
 | `/espalier <req>` (full 10-stage pipeline) | MEDIUM — pipeline stages + coding/review sub-agents |
-| `/espalier-fix <bug>` (5-stage lane) | LIGHT-MEDIUM |
+| `/espalier-fix <bug>` (7 stages (0–7, no Stage 2)) | LIGHT-MEDIUM |
 | `/espalier-prune <path>` (refresh a stale artifact) | LIGHT — one scout per file + a gated diff |
 | `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
 | `/espalier-ask <question>` (read-only Q&A) | LIGHT — reads a few docs + verifies against code; no sub-agents |

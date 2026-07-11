@@ -27,9 +27,11 @@ following the Espalier structure below.
 | Wiki | espalier/wiki/ | Business context | On demand |
 | Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
 | Config | espalier/.espalier-config | Escalation caps: review-round (max-req/code/test-rounds) + max-rollbacks, default 3 | Stage 2/4/6 gates + rollback |
-| Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator (5-stage) | Via /espalier-fix |
+| Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator, 7 stages (0–7, no Stage 2) | Via /espalier-fix |
 | Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
 | Audit    | espalier/skills/espalier-audit/ | Repo-wide security audit → wiki/security-audit.md | Via /espalier-audit |
+| Doctor   | espalier/skills/espalier-doctor/ | Periodic drift scan of espalier/ artifacts vs the code | Via /espalier-doctor |
+| Prune    | espalier/skills/espalier-prune/ | Refresh stale rules/wiki/hooks flagged by drift detection | Via /espalier-prune |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting

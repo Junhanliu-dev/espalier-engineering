@@ -1,6 +1,6 @@
 ---
 name: espalier-grill
-description: Stress-test a requirement (spec) or a bug diagnosis before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, and missing edge cases at Stage 1
+description: Internal pipeline stage — invoked by /espalier and /espalier-fix Stage 1 with a mode and reqs_path; not for direct user invocation. Stress-test a requirement (spec) or a bug diagnosis before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, and missing edge cases at Stage 1
 ---
 
 # Espalier Grill
@@ -131,7 +131,11 @@ in the conversation.
 **Coverage guard (before returning `GRILLED`).** Re-read the Step 1 signal list. Every
 signal you counted must now appear in `requirements.md` as a resolved criterion, a
 scope-out line, or an `## Open Questions` entry. A counted signal with no written trace
-is a coverage miss — ask it now (within the tier cap) or record it, then return.
+is a coverage miss — ask it now (within the tier cap) or record it under
+`## Open Questions` in requirements.md with a chosen conservative default and one
+line of why (the same convention as the user-non-answer rule above) — the record
+option is allowed ONLY when the tier's question cap is exhausted; never exceed
+the cap. Then return.
 
 ## Verdict
 
@@ -141,7 +145,7 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
 |---------|------|
 | `GRILLED` | grill ran (`light` or `full`); `requirements.md` updated |
 | `SKIPPED: crisp` | tier was `skip` — input already well-specified |
-| `SKIPPED: non-interactive` | no TTY (Step 0) |
+| `SKIPPED: non-interactive` | unattended run (Step 0's interactivity_mode check) |
 | `SKIPPED: --no-grill` | the invoking stage passed the opt-out flag |
 
 ## Anti-Patterns

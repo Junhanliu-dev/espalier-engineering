@@ -241,6 +241,7 @@ else
   check "pipeline.md refreshed"             "test -f espalier/pipeline.md"
   echo ""
   echo "  Verification: $pass passed, $fail failed"
+  [ "$fail" -gt 0 ] && exit 1
 fi
 
 # --- Summary -----------------------------------------------------------------

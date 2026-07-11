@@ -22,7 +22,7 @@
 #   - Merges .claude/settings.json hooks (Appendix A algorithm).
 #   - Persists squash-merge decision + installs the post-merge dispatcher.
 #   - Appends .gitignore entries for the commit-index + drift sidecars.
-#   - Runs 37 validation checks (R6).
+#   - Runs 46 validation checks (R6).
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -35,7 +35,7 @@
 #   --project-dir=<path>     Default: $PWD
 #   --plugin-dir=<path>      Auto-detect from $ESPALIER_PLUGIN_DIR (or legacy
 #                            $HARNESS_PLUGIN_DIR) + common locations.
-#   --lang=<ts|py|go|unsupported>
+#   --lang=<typescript|python|go|unsupported>
 #                            Boundary-check variant. "unsupported" emits a no-op.
 #   --doctor-cadence=<val>   every-change | weekly | monthly | manual (default: weekly).
 #   --dry-run                Print actions without executing.
@@ -45,7 +45,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (37-check validation).
+#   --validate-only          Only Stage 11 (46-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -201,9 +201,9 @@ case "$MODE" in
     ;;
 esac
 
-# Validate --lang
+# Validate --lang (single vocabulary end-to-end: typescript|python|go|unsupported)
 case "$LANG_VARIANT" in
-  ts|py|go|unsupported) ;;
+  typescript|python|go|unsupported) ;;
   *)
     echo "WARNING: unknown --lang='$LANG_VARIANT', falling back to 'unsupported' (no-op hook)" >&2
     LANG_VARIANT=unsupported
@@ -291,6 +291,16 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/drift-detect.sh' espalier/hooks/drift-detect.sh"
   run "cp '$PLUGIN_DIR/hook-templates/drift-helpers.sh' espalier/hooks/drift-helpers.sh"
   run "cp '$PLUGIN_DIR/hook-templates/parse-drift-blocks.py' espalier/hooks/parse-drift-blocks.py"
+  # --lang=unsupported: guarantee post-edit-wrapper never execs a missing file.
+  # Write-if-absent ONLY — never clobber a Phase-2-adapted hook.
+  if [ "$LANG_VARIANT" = "unsupported" ] && [ ! -f espalier/hooks/check-layer-boundaries.sh ]; then
+    if [ "$DRY_RUN" = "yes" ]; then
+      echo "[dry-run] write no-op espalier/hooks/check-layer-boundaries.sh"
+    else
+      printf '#!/bin/bash\n# no-op: --lang=unsupported at init — no layer-boundary rules for this stack\nexit 0\n' \
+        > espalier/hooks/check-layer-boundaries.sh
+    fi
+  fi
   # R10 — chmod every *.sh in espalier/hooks/ (catches LLM-written pre-push-gate.sh
   # and check-layer-boundaries.sh from Phase 2-7 Write batch).
   if [ "$DRY_RUN" = "yes" ]; then
@@ -313,19 +323,26 @@ stage_symlinks() {
       [ -f "$hook" ] && chmod +x "$hook" 2>/dev/null || true
     done
   fi
-  safe_ln "$(abspath espalier/rules/engineering-structure.md)" .claude/rules/espalier-structure.md
-  safe_ln "$(abspath espalier/rules/coding-standards.md)"      .claude/rules/espalier-standards.md
-  safe_ln "$(abspath espalier/rules/development-process.md)"   .claude/rules/espalier-process.md
-  safe_ln "$(abspath espalier/rules/security-standards.md)"    .claude/rules/espalier-security.md
-  safe_ln "$(abspath espalier/rules/production-standards.md)"  .claude/rules/espalier-production.md
+  # Targets are RELATIVE to the symlink's own directory (.claude/{rules,skills,
+  # agents}/<link> is two levels below the repo root, hence ../../espalier/…) —
+  # a repo moved or checked out at another path keeps every link resolving.
+  WIRED_RULES=0; WIRED_SKILLS=0; WIRED_AGENTS=0
+  safe_ln "../../espalier/rules/engineering-structure.md" .claude/rules/espalier-structure.md && WIRED_RULES=$((WIRED_RULES+1))
+  safe_ln "../../espalier/rules/coding-standards.md"      .claude/rules/espalier-standards.md && WIRED_RULES=$((WIRED_RULES+1))
+  safe_ln "../../espalier/rules/development-process.md"   .claude/rules/espalier-process.md && WIRED_RULES=$((WIRED_RULES+1))
+  safe_ln "../../espalier/rules/security-standards.md"    .claude/rules/espalier-security.md && WIRED_RULES=$((WIRED_RULES+1))
+  safe_ln "../../espalier/rules/production-standards.md"  .claude/rules/espalier-production.md && WIRED_RULES=$((WIRED_RULES+1))
   for s in espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit; do
-    safe_ln "$(abspath "espalier/skills/$s")" ".claude/skills/$s"
+    safe_ln "../../espalier/skills/$s" ".claude/skills/$s" && WIRED_SKILLS=$((WIRED_SKILLS+1))
   done
   # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
   # (see SKILL.md Phase 0 note).
-  safe_ln "$(abspath espalier/agents/harness-coder.md)"    .claude/agents/harness-coder.md
-  safe_ln "$(abspath espalier/agents/harness-reviewer.md)" .claude/agents/harness-reviewer.md
-  safe_ln "$(abspath espalier/agents/harness-security.md)" .claude/agents/harness-security.md
+  safe_ln "../../espalier/agents/harness-coder.md"    .claude/agents/harness-coder.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+  safe_ln "../../espalier/agents/harness-reviewer.md" .claude/agents/harness-reviewer.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+  safe_ln "../../espalier/agents/harness-security.md" .claude/agents/harness-security.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+  # Read by espalier-init SKILL.md Phase 4 for the completion message — keep
+  # this exact format.
+  echo "WIRED: skills=$WIRED_SKILLS rules=$WIRED_RULES agents=$WIRED_AGENTS"
 }
 
 # --- Stage 6: pipeline-state.md template heredoc ----------------------------
@@ -374,7 +391,7 @@ This project uses Espalier for AI code quality — auto-discovered, project-spec
 
 **For any implementation work**, use `/espalier <requirement>` to execute the full pipeline.
 
-**For bug fixes**, use `/espalier-fix <bug>` for the slim 5-stage lane.
+**For bug fixes**, use `/espalier-fix <bug>` for the slim lane — 7 stages (0–7, no Stage 2).
 
 **For questions** ("how does X work", "where is Y"), use `/espalier-ask <question>` — read-only, answers from espalier/ docs first.
 
@@ -686,9 +703,9 @@ stage_gitignore() {
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  log "Stage 11: validation (37 checks — R6)"
+  log "Stage 11: validation (46 checks — R6)"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] would run 37 validation checks (skipped — nothing to validate yet)"
+    echo "[dry-run] would run 46 validation checks (skipped — nothing to validate yet)"
     return 0
   fi
 
@@ -704,11 +721,11 @@ stage_validate() {
     # like $name leaking into outer scope), (b) `exit` inside cmd killing
     # the run_check function.
     if ( eval "$cmd" ) >/dev/null 2>&1; then
-      echo "[$n/37] OK   $check_name" > "$tmpdir/$idx"
+      echo "[$n/46] OK   $check_name" > "$tmpdir/$idx"
     else
       local err
       err=$( ( eval "$cmd" ) 2>&1 | head -1 )
-      echo "[$n/37] FAIL $check_name: $err" > "$tmpdir/$idx"
+      echo "[$n/46] FAIL $check_name: $err" > "$tmpdir/$idx"
       echo "fail" > "$tmpdir/$idx.fail"
     fi
   }
@@ -716,7 +733,7 @@ stage_validate() {
   # Check #25 — invoked DIRECTLY (not via run_check): the run_check harness
   # discards stdout, which would swallow #25's per-tier table.
   run_check_25() {
-    [ -f espalier/.drift-state.tsv ] || { echo "[25/37] OK   stale-tiers: no drift"; return 0; }
+    [ -f espalier/.drift-state.tsv ] || { echo "[25/46] OK   stale-tiers: no drift"; return 0; }
     local NOW; NOW=$(date -u +%s)
     local fresh=0 aging=0 stale=0 critical=0 expired=0
     while IFS=$'\t' read -r FILE SHA FIRST_SEEN REASON; do
@@ -736,7 +753,7 @@ stage_validate() {
       else expired=$((expired+1));                           echo "  [expired]  ${AGE}d  $FILE"
       fi
     done < espalier/.drift-state.tsv
-    echo "[25/37] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
+    echo "[25/46] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
     [ "$critical" -gt 0 ] && echo "  WARN: $critical artifact(s) 60-90d stale"
     if [ "$expired" -gt 0 ]; then
       if [ "${IGNORE_DRIFT:-no}" = "yes" ]; then
@@ -789,23 +806,33 @@ stage_validate() {
   run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
   run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   run_check 37 "scout-prompts"      'test -f espalier/.scout-prompts.md' &
+  # 38-46: LLM-written artifacts (Phase 2) — existence checks with fix hints.
+  run_check 38 "phase2-coding-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-coding/SKILL.md' &
+  run_check 39 "phase2-review-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-review/SKILL.md' &
+  run_check 40 "phase2-testing-skill (fix: re-run espalier-init Phase 2)"  'test -f espalier/skills/espalier-testing/SKILL.md' &
+  run_check 41 "wiki-architecture (fix: re-run espalier-init Phase 2)"     'test -f espalier/wiki/architecture.md' &
+  run_check 42 "wiki-data-models (fix: re-run espalier-init Phase 2)"      'test -f espalier/wiki/data-models.md' &
+  run_check 43 "wiki-critical-paths (fix: re-run espalier-init Phase 2)"   'test -f espalier/wiki/critical-paths.md' &
+  run_check 44 "wiki-external-services (fix: re-run espalier-init Phase 2)" 'test -f espalier/wiki/external-services.md' &
+  run_check 45 "rules-development-process (fix: re-run espalier-init Phase 2)" 'test -f espalier/rules/development-process.md' &
+  run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-37.
+  # must reach stdout, which the run_check harness discards), then 26-46.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3[0-7] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-6] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"
 
   if [ "$failed" -gt 0 ]; then
-    log "Validation: $failed/37 FAILED"
+    log "Validation: $failed/46 FAILED"
     return 1
   fi
-  log "Validation: 37/37 passed"
+  log "Validation: 46/46 passed"
   return 0
 }
 

@@ -22,12 +22,16 @@ losing nothing; that one is about hostile input.
 - **P1 — production-readiness class (must fix before Stage 7):** missing
   timeout or failure handling on an external call; unbounded list query on a
   request path; missing structured log on a new endpoint/consumer; a mutating
-  consumer/webhook that is not idempotent.
+  consumer/webhook that is not idempotent; read-modify-write on shared mutable
+  state across a request boundary; unbounded fan-out (N calls in a loop) on a
+  request path.
 - **P2/P3** — improvements (better log context, tighter bounds), not blockers.
 
-A P1 does not loop the panel by itself — the coder fixes it and the SAME
-re-review round that verifies a P0 fix verifies it. Nothing above P2 may be
-waved through on "it works".
+A P1 loops the panel via the verdict word: the security auditor and the
+reviewer both emit `FAIL` while any P0 **or P1** is open, and the gate
+re-spawns the coder on any non-PASS verdict — so P1s are fixed before Stage 7
+by construction, sharing the same `max-code-rounds` counter. Nothing above P2
+may be waved through on "it works".
 
 ## Resilience (universal seeds)
 

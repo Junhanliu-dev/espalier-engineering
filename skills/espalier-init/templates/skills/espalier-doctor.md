@@ -27,7 +27,7 @@ doc. Refresh is always `/espalier-prune`.
 | Mode | Scope | Cost |
 |------|-------|------|
 | `--quick` (default) | re-scout architecture, CI, data-models, critical-paths, external-services | ~3 min |
-| `--full` | every embedded scout (also coding-patterns, unwritten-rules, per-layer specs) | ~8 min |
+| `--full` | every shipped scout prompt (also coding-patterns, unwritten-rules, per-layer specs) | ~8 min |
 | `--since <sha>` | only re-scout layers with files touched since `<sha>` | varies |
 
 ## What It Does
@@ -95,12 +95,12 @@ directly — bootstrap writes it once and never auto-rewrites it.
 | `rules/production-standards.md` | 1.3 + 1.10 + 1.8 — `{discovered}` cells only (merge before diff) | `--full` only |
 | `skills/espalier-coding/specs/{layer}.md` | per-layer spec scout | `--full` only |
 
-## Embedded Scout Prompts
+## Scout Prompts (shipped file)
 
-The scout prompts live in ONE shipped file — `espalier/.scout-prompts.md` (copied
-into this project at init). Read it and spawn the scout(s) mapped to each artifact
-in scope (Scout Mapping above); run each as an Agent/Task scout against the current
-codebase. `/espalier-prune` reads the same file, so the two can never drift apart.
+Read the prompts from `espalier/.scout-prompts.md` — they are NOT embedded here. The file is copied into this project at init. Spawn the scout(s)
+mapped to each artifact in scope (Scout Mapping above); run each as an
+Agent/Task scout against the current codebase. `/espalier-prune` reads the same
+file, so the two can never drift apart.
 
 For an artifact with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both
 and merge before the two-way diff.

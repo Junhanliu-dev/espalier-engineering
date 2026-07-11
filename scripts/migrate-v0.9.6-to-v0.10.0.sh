@@ -97,7 +97,13 @@ if [ "$CUSTOMISED" = yes ]; then
   echo "      (the old template ran '<cmd> 2>/dev/null' and printed nothing)"
   echo "    - tests: run via a run_tests() function so several suites can run"
   echo
-  log "gate left untouched (customised). Nothing else to do."
+  # Record the skip so /espalier-migrate reports this version as "handled
+  # (manual)" once instead of re-proposing the patch every run. Append-once.
+  if [ "$DRY_RUN" != yes ] \
+     && ! grep -qF 'v0.10.0-gate:' espalier/.migrations-skipped 2>/dev/null; then
+    echo "v0.10.0-gate: customised, manual port needed" >> espalier/.migrations-skipped
+  fi
+  log "gate left untouched (customised). Marker written to espalier/.migrations-skipped. Nothing else to do."
   exit 0
 fi
 

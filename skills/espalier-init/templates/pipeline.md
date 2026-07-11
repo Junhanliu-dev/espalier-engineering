@@ -14,10 +14,18 @@
 - **Load:** Read espalier/skills/espalier-review/SKILL.md
 - **Execute:** Main agent reviews the requirements doc
 - **Gate:** No P0/P1 findings remaining
-- **Limit:** Max `max-req-rounds` review rounds (default 3, from `espalier/.espalier-config`) → escalate to human
+- **Limit:** Max `max-req-rounds` review rounds (default 3, from `espalier/.espalier-config`)
+  → escalate to human. Check the cap BEFORE re-spawning: if the counter already
+  equals `max-req-rounds`, escalate to the human immediately — no further review
+  round runs. Before stopping, set `- Status: ESCALATED` and add a Stage History
+  row `| 2 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
 - **Human checkpoint (BLOCKING):** user approves `requirements.md` before ANY
   coding. Stage 3 does not start on a Stage 2 PASS alone — see the espalier
-  skill → "Requirements Approval Gate". Auto-approved only on a no-TTY run.
+  skill → "Requirements Approval Gate". Auto-approved only on an explicitly
+  unattended run (interactivity_mode = unattended — CI / ESPALIER_UNATTENDED /
+  ESPALIER_LOOP / ESPALIER_HEADLESS). NEVER keyed off a TTY test: stdin has no
+  TTY inside Claude Code even when the user is present (see the espalier skill →
+  Requirements Approval Gate).
 - **Output:** espalier/changes/{type}/{slug}/review-record.md (append)
 
 ### 3. Coding Implementation
@@ -45,13 +53,13 @@
      agent the "changed since last review" set — the fix's files from the latest
      coding-report.md — so they scrutinize the new code while still owning the
      whole-diff verdict.
-  2. **P0 found by EITHER agent →** re-spawn `harness-coder` with the combined
-     findings (a Stage 3 action), then **return to step 1 and re-review the NEW
-     diff with the whole panel.** Never advance to Stage 5 on the coder's fix report
-     alone — a fix is never the last action before the gate; a clean panel is. Each
-     P0 round increments the counter.
-  3. **Zero P0 from BOTH agents on a fresh review of the current code →** PASS;
-     record the certificate (below) and exit.
+  2. **Non-PASS verdict (word `FAIL`, or p0/p1 > 0) from EITHER agent →** re-spawn
+     `harness-coder` with the combined findings (a Stage 3 action), then **return
+     to step 1 and re-review the NEW diff with the whole panel.** Never advance to
+     Stage 5 on the coder's fix report alone — a fix is never the last action
+     before the gate; a clean panel is. Each non-PASS round increments the counter.
+  3. **Both last sentinels PASS/PASS_WITH_FIXES with p0=0 p1=0 on a fresh review
+     of the current code →** PASS; record the certificate (below) and exit.
 - **Gate (to leave Stage 4):** the MOST RECENT run of BOTH panel agents saw the
   CURRENT code and returned zero P0 — NOT "the earlier P0s were addressed." A coder
   fix always triggers another full panel round.
@@ -60,18 +68,32 @@
   `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
   where `<Base-Ref>` is the Stage 3 SHA. The Stage 7 push gate blocks unless this
   fingerprint still matches the code being pushed.
-- **Limit:** Max `max-code-rounds` P0 rounds (default 3, from `espalier/.espalier-config`)
-  → escalate to human (never silently ship); at counter = `max-code-rounds`, escalate
-  WITHOUT another coder re-spawn. A security P0 (from `harness-security`) shares this
-  counter with correctness P0s.
-- **Panel P0 collection (procedural — see the espalier skill):** each round, after
-  BOTH agents return, confirm BOTH records were written THIS round (baseline
-  size/mtime + a `VERDICT:` sentinel whose `round=` matches), then read the gate
-  from the sentinel line of EACH file: `grep '^VERDICT:' <record> | tail -1` —
-  either `p0=` > 0 → re-spawn coder + re-run panel. A record missing its sentinel,
-  or unchanged since baseline, means that agent did NOT complete — re-spawn that
-  agent; never treat a missing/stale record as a pass. The certificate is written
-  only when BOTH sentinels read `p0=0`; drift processing runs only on that PASS.
+- **Limit:** Max `max-code-rounds` rounds (default 3, from `espalier/.espalier-config`)
+  → escalate to human (never silently ship). Check the cap BEFORE re-spawning: if
+  the counter already equals `max-code-rounds`, escalate to the human
+  immediately — the coder is NOT re-spawned and no further panel round runs.
+  Before stopping, set `- Status: ESCALATED` and add a Stage History row
+  `| 4 | ESCALATED | {ts} | {reason, round count} |`. Otherwise re-spawn,
+  increment the counter, and loop. A security P0/P1 (from `harness-security`)
+  shares this counter with correctness findings.
+- **Panel verdict collection (procedural — see the espalier skill):** each round,
+  after BOTH agents return, confirm BOTH records were written THIS round (baseline
+  size/mtime + a `VERDICT:` sentinel whose `round=` matches). A record missing its
+  sentinel, or unchanged since baseline, means that agent did NOT complete —
+  re-spawn that agent; never treat a missing/stale record as a pass.
+  **Gate read (deterministic).** From EACH record:
+  `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+  - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+    and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
+    (fix lane: the late-escalation prompt; full lane: escalate to the human with
+    the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
+    still an escalation.
+  - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
+    with the combined findings and loop (counter + `max-code-rounds` cap unchanged).
+  - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+    `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+  The certificate is written only when both last sentinels are
+  PASS/PASS_WITH_FIXES with p0=0 p1=0; drift processing runs only on that PASS.
 - **Security contract (on PASS):** `harness-security` writes a
   `## Security-Sensitive Fields` block into security-record.md — one entry per
   client-supplied sensitive field in scope. This is the Stage 5/6 abuse-test contract.
@@ -101,13 +123,28 @@
   field in security-record.md's `## Security-Sensitive Fields` contract has a
   passing abuse test (tamper → rejected → store unchanged). A missing one is a P0.
   Same record semantics as Stage 4: the reviewer OVERWRITES review-record.md with
-  a `VERDICT:` sentinel; the orchestrator freshness-checks + greps it.
-- **Loop:** same fixpoint rule as Stage 4 — a P0 sends the tests back to Stage 5
-  (re-spawn coder), then **re-review**; never exit on the fix report alone.
+  a `VERDICT:` sentinel; the orchestrator freshness-checks it.
+  **Gate read (deterministic).** From EACH record:
+  `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
+  - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+    and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
+    (fix lane: the late-escalation prompt; full lane: escalate to the human with
+    the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
+    still an escalation.
+  - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
+    with the combined findings and loop (counter + `max-test-rounds` cap unchanged).
+  - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+    `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
+- **Loop:** same fixpoint rule as Stage 4 — a non-PASS verdict sends the tests
+  back to Stage 5 (re-spawn coder), then **re-review**; never exit on the fix
+  report alone.
 - **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
   tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
   against this value.
-- **Limit:** Max `max-test-rounds` rounds (default 3, from `espalier/.espalier-config`) → escalate
+- **Limit:** Max `max-test-rounds` rounds (default 3, from `espalier/.espalier-config`)
+  → escalate. Check the cap BEFORE re-spawning: if the counter already equals
+  `max-test-rounds`, escalate to the human immediately — the coder is NOT
+  re-spawned and no further review round runs.
 
 ### 7. Code Push
 - **Trigger:** Tests reviewed

@@ -332,6 +332,7 @@ else
   check "pre-push-gate.sh patched"         "grep -q 'Doctor-cadence reminder' espalier/hooks/pre-push-gate.sh"
   echo ""
   echo "  Verification: $pass passed, $fail failed"
+  [ "$fail" -gt 0 ] && exit 1
 fi
 
 echo ""

@@ -232,6 +232,7 @@ else
   check "pipeline.md Stage 2 blocking checkpoint" "grep -q 'Human checkpoint (BLOCKING)' espalier/pipeline.md"
   echo ""
   echo "  Verification: $pass passed, $fail failed"
+  [ "$fail" -gt 0 ] && exit 1
 fi
 
 # --- Summary -----------------------------------------------------------------

@@ -1,4 +1,5 @@
 #!/bin/bash
+# PostToolUse contract: violations exit 2 with the message on stderr; exit 0 otherwise.
 FILE="$1"
 
 LAYER=""
@@ -12,10 +13,14 @@ esac
 
 case "$LAYER" in
   view)
-    if grep -qE "^from .*(repositories|db)" "$FILE" 2>/dev/null; then
-      echo "LAYER VIOLATION: View/route cannot import from repository"
-      echo "File: $FILE"
-      exit 1
+    # Module-boundary match: `from repositories.x`, `from app.db import y` hit;
+    # `from db_config import x` does not.
+    if grep -qE "^from[[:space:]]+([[:alnum:]_.]*\.)?(repositories|db)(\.|[[:space:]])" "$FILE" 2>/dev/null; then
+      {
+        echo "LAYER VIOLATION: View/route cannot import from repository"
+        echo "File: $FILE"
+      } >&2
+      exit 2
     fi
     ;;
 esac

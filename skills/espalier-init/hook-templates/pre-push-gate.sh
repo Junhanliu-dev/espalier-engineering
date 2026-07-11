@@ -2,6 +2,10 @@
 # Pre-push quality gate
 # Blocks git push unless all conditions are met.
 #
+# Exit-code contract (Claude Code PreToolUse semantics): blocking paths exit
+# with code 2 and the reason on stderr — exit code 1 would NOT block, and
+# stdout is invisible in hook context. Warnings also print to stderr, exit 0.
+#
 # Runs from the repo root: the wrapper cd's here, but cd defensively too so a
 # direct invocation from a subdir still resolves the relative espalier/ paths
 # below (a wrong cwd would make every `-f` test miss and fail OPEN).
@@ -10,7 +14,9 @@ _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 
 # Doctor-cadence reminder — non-blocking, printed before any gate logic so it
 # fires on every push regardless of gate outcome (the gate has early-exit
-# paths). Never affects the exit code.
+# paths). Never affects the exit code. Blocking paths elsewhere in this script
+# exit with code 2 and the reason on stderr — Claude Code PreToolUse semantics;
+# exit code 1 would NOT block.
 if [ -f espalier/hooks/drift-helpers.sh ]; then
   . espalier/hooks/drift-helpers.sh
   doctor_due && echo "Reminder: an /espalier-doctor drift scan is due."
@@ -42,8 +48,8 @@ while IFS= read -r _cand; do
   [ -n "$_cand" ] || continue
   _f="${_cand#* }"   # strip the leading epoch; path may contain spaces
   [ -f "$_f" ] || continue
-  if grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE)\b' "$_f" 2>/dev/null; then
-    continue   # terminal — finished work never gates a later push
+  if grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE|FILED)\b' "$_f" 2>/dev/null; then
+    continue   # terminal or not-yet-started (FILED skeleton) — never gates a later push
   fi
   ACTIVE_COUNT=$((ACTIVE_COUNT + 1))
   if [ -z "$STATE_FILE" ]; then
@@ -57,24 +63,44 @@ $(find "$CHANGES_DIR" -mindepth 3 -maxdepth 3 -name pipeline-state.md \
     -exec stat "${STAT_ARGS[@]}" {} + 2>/dev/null | sort -rn)
 EOF_STATES
 
+# No in-flight change is NOT an early exit: the pipeline-only gates (stage,
+# certificate, build/lint/test) are skipped, but the secret scan and dependency
+# audit below still run — a leaked credential must fail closed on EVERY push.
+PIPELINE_TRACKED=yes
 if [ -z "$STATE_FILE" ] || [ ! -f "$STATE_FILE" ]; then
-  echo "WARNING: No in-flight Espalier change found. Pushing without pipeline tracking."
-  exit 0  # Allow but warn
+  PIPELINE_TRACKED=no
+  echo "WARNING: No in-flight Espalier change found. Pushing without pipeline tracking." >&2
 fi
 
 if [ "$ACTIVE_COUNT" -gt 1 ]; then
-  echo "WARNING: $ACTIVE_COUNT in-flight changes found; gating the most recent: $STATE_FILE"
-  echo "         Not checked:$OTHER_ACTIVE"
-  echo "         If this push belongs to one of those, complete or abort the newer change first."
+  {
+    echo "WARNING: $ACTIVE_COUNT in-flight changes found; gating the most recent: $STATE_FILE"
+    echo "         Not checked:$OTHER_ACTIVE"
+    echo "         If this push belongs to one of those, complete or abort the newer change first."
+  } >&2
 fi
 
 # Check pipeline stage (must be ≥ 7). Take the FIRST match's first integer —
 # `grep -oE '[0-9]+'` across multiple matching lines would concatenate digits.
-CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" | head -1 | grep -oE '[0-9]+' | head -1)
-if [ -n "$CURRENT_STAGE" ] && [ "$CURRENT_STAGE" -lt 7 ]; then
-  echo "BLOCKED: Pipeline is at Stage $CURRENT_STAGE (need ≥ 7 for push)"
-  echo "Complete code review and tests before pushing."
-  exit 1
+CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+if [ "$PIPELINE_TRACKED" = "yes" ]; then
+  if [ -z "$CURRENT_STAGE" ]; then
+    # Fail closed: a tracked change whose stage cannot be parsed means the
+    # state file is corrupt or hand-edited — never silently skip the gate.
+    {
+      echo "BLOCKED: pipeline-state.md has no parsable 'Current Stage:' line — state file corrupt or hand-edited."
+      echo "  File: $STATE_FILE"
+      echo "Restore the 'Current Stage:' line (or abort the change) before pushing."
+    } >&2
+    exit 2
+  fi
+  if [ "$CURRENT_STAGE" -lt 7 ]; then
+    {
+      echo "BLOCKED: Pipeline is at Stage $CURRENT_STAGE (need ≥ 7 for push)"
+      echo "Complete code review and tests before pushing."
+    } >&2
+    exit 2
+  fi
 fi
 
 # Review-certificate check — the code being pushed must match what the last review
@@ -83,20 +109,39 @@ fi
 # recorded at Stage 3. A code change after review changes the fingerprint and blocks
 # the push until a fresh review re-certifies the current diff. This is what makes the
 # coder→reviewer→coder loop fail closed: a fix that skipped re-review cannot ship.
-REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
-BASE_REF=$(grep "Base-Ref:" "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
-if [ -n "$REVIEWED" ] && [ -n "$BASE_REF" ]; then
-  CURRENT=$(git diff "$BASE_REF" -- . ':(exclude)espalier/' | git hash-object --stdin)
-  if [ "$CURRENT" != "$REVIEWED" ]; then
-    echo "BLOCKED: Source changed after its last review (Reviewed-Diff mismatch)."
-    echo "  reviewed fingerprint: $REVIEWED"
-    echo "  current  fingerprint: $CURRENT"
-    echo "Re-run code review on the current diff (Stage 4) before pushing."
-    exit 1
+REVIEWED=""
+BASE_REF=""
+if [ "$PIPELINE_TRACKED" = "yes" ]; then
+  REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
+  BASE_REF=$(grep "Base-Ref:" "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+  if [ -n "$REVIEWED" ] && [ -n "$BASE_REF" ]; then
+    CURRENT=$(git diff "$BASE_REF" -- . ':(exclude)espalier/' | git hash-object --stdin)
+    if [ "$CURRENT" != "$REVIEWED" ]; then
+      {
+        echo "BLOCKED: Source changed after its last review (Reviewed-Diff mismatch)."
+        echo "  reviewed fingerprint: $REVIEWED"
+        echo "  current  fingerprint: $CURRENT"
+        echo "Re-run code review on the current diff (Stage 4) before pushing."
+      } >&2
+      exit 2
+    fi
+  elif grep -qE '^\|[[:space:]]*4[[:space:]]*\|[[:space:]]*PASSED' "$STATE_FILE" 2>/dev/null; then
+    # A Stage-4 PASSED row proves a review ran, so the certificate SHOULD exist.
+    # Its absence means the state file was hand-edited or corrupted: fail closed.
+    {
+      echo "BLOCKED: Stage 4 passed but the review certificate is missing"
+      echo "  (no Base-Ref/Reviewed-Diff in $STATE_FILE despite a '| 4 | PASSED |' row)."
+      echo "Re-run code review (Stage 4) to re-certify, or restore the certificate lines."
+    } >&2
+    exit 2
+  else
+    # True legacy: no Stage-4 PASSED row means no review ever recorded one —
+    # pre-certificate installs only. Warn, don't block.
+    {
+      echo "WARNING: No review certificate (Base-Ref/Reviewed-Diff) in $STATE_FILE —"
+      echo "         legacy or pre-review change. Skipping the re-review check."
+    } >&2
   fi
-else
-  echo "WARNING: No review certificate (Base-Ref/Reviewed-Diff) in $STATE_FILE —"
-  echo "         legacy or pre-review change. Skipping the re-review check."
 fi
 
 # --- Security scan: secrets BLOCK, dependency audit WARNS -------------------
@@ -120,24 +165,28 @@ else
   fi
 fi
 if [ -z "$SEC_RANGE" ]; then
-  echo "WARNING: cannot determine a push range (no Base-Ref, upstream, or prior commit) — secret scan skipped."
+  echo "WARNING: cannot determine a push range (no Base-Ref, upstream, or prior commit) — secret scan skipped." >&2
 fi
 
 if [ -n "$SEC_RANGE" ]; then
   if command -v gitleaks >/dev/null 2>&1; then
     if ! gitleaks detect --no-banner --redact --log-opts="$SEC_RANGE" >/dev/null 2>&1; then
-      echo "BLOCKED: gitleaks found a potential secret in the pushed diff."
-      echo "  Inspect with: gitleaks detect --log-opts=\"$SEC_RANGE\" -v"
-      exit 1
+      {
+        echo "BLOCKED: gitleaks found a potential secret in the pushed diff."
+        echo "  Inspect with: gitleaks detect --log-opts=\"$SEC_RANGE\" -v"
+      } >&2
+      exit 2
     fi
   else
     # Fallback: high-signal pattern grep over the ADDED lines of the pushed diff.
     ADDED=$(git diff "$SEC_RANGE" -- . ':(exclude)espalier/' 2>/dev/null | grep '^+' | grep -v '^+++')
     if printf '%s\n' "$ADDED" | grep -qiE '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Za-z ]*PRIVATE KEY-----|(secret|api[_-]?key|apikey|access[_-]?token|password|passwd|private[_-]?key)[[:space:]]*[:=][[:space:]]*.{0,3}[A-Za-z0-9/+_-]{16,})'; then
-      echo "BLOCKED: a possible hard-coded secret was added in this push."
-      echo "  Matched an AWS key / private key / long api_key=… assignment."
-      echo "  Move it to config/env and re-push (install 'gitleaks' for higher fidelity)."
-      exit 1
+      {
+        echo "BLOCKED: a possible hard-coded secret was added in this push."
+        echo "  Matched an AWS key / private key / long api_key=… assignment."
+        echo "  Move it to config/env and re-push (install 'gitleaks' for higher fidelity)."
+      } >&2
+      exit 2
     fi
   fi
 fi
@@ -147,13 +196,13 @@ fi
 # push; a nonzero exit may mean vulnerabilities OR a tool/network error (never blocks).
 command -v timeout >/dev/null 2>&1 && _to="timeout 45" || _to=""
 if   [ -f package.json ] && command -v npm >/dev/null 2>&1; then
-  $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || echo "WARNING: 'npm audit' flagged high-severity advisories or errored (non-blocking)."
+  $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || echo "WARNING: 'npm audit' flagged high-severity advisories or errored (non-blocking)." >&2
 elif { [ -f pyproject.toml ] || [ -f requirements.txt ]; } && command -v pip-audit >/dev/null 2>&1; then
-  $_to pip-audit >/dev/null 2>&1 || echo "WARNING: 'pip-audit' flagged vulnerable dependencies or errored (non-blocking)."
+  $_to pip-audit >/dev/null 2>&1 || echo "WARNING: 'pip-audit' flagged vulnerable dependencies or errored (non-blocking)." >&2
 elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
-  $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: 'govulncheck' flagged vulnerabilities or errored (non-blocking)."
+  $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: 'govulncheck' flagged vulnerabilities or errored (non-blocking)." >&2
 elif [ -f Cargo.toml ] && command -v cargo-audit >/dev/null 2>&1; then
-  $_to cargo audit >/dev/null 2>&1 || echo "WARNING: 'cargo audit' flagged vulnerable crates or errored (non-blocking)."
+  $_to cargo audit >/dev/null 2>&1 || echo "WARNING: 'cargo audit' flagged vulnerable crates or errored (non-blocking)." >&2
 fi
 
 # The three {command} placeholders below were substituted from
@@ -172,24 +221,36 @@ fi
 run_build() {
   {build_command}
 }
-BUILD_OUTPUT=$(run_build 2>&1)
-if [ $? -ne 0 ]; then
-  echo "BLOCKED: Build fails"
-  # Show why. A gate that blocks without printing the failure gets disabled.
-  printf '%s\n' "$BUILD_OUTPUT" | tail -20
-  exit 1
-fi
+# Pipeline-only gate: wrapped in a function so a no-state-file push can skip it
+# with a single-line guard while the secret scan above still ran.
+gate_build_section() {
+  BUILD_OUTPUT=$(run_build 2>&1)
+  if [ $? -ne 0 ]; then
+    {
+      echo "BLOCKED: Build fails"
+      # Show why. A gate that blocks without printing the failure gets disabled.
+      printf '%s\n' "$BUILD_OUTPUT" | tail -20
+    } >&2
+    exit 2
+  fi
+}
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_build_section; fi
 
 # Run lint check
 run_lint() {
   {lint_command}
 }
-LINT_OUTPUT=$(run_lint 2>&1)
-if [ $? -ne 0 ]; then
-  echo "BLOCKED: Lint fails"
-  printf '%s\n' "$LINT_OUTPUT" | tail -20
-  exit 1
-fi
+gate_lint_section() {
+  LINT_OUTPUT=$(run_lint 2>&1)
+  if [ $? -ne 0 ]; then
+    {
+      echo "BLOCKED: Lint fails"
+      printf '%s\n' "$LINT_OUTPUT" | tail -20
+    } >&2
+    exit 2
+  fi
+}
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_lint_section; fi
 
 # Run tests and check count. Runners word their counts differently —
 # jest/pytest/cargo "N passed", mocha "N passing", rspec "N examples",
@@ -200,31 +261,38 @@ fi
 run_tests() {
   {test_command}
 }
-TEST_OUTPUT=$(run_tests 2>&1)
-TEST_EXIT=$?
+gate_tests_section() {
+  TEST_OUTPUT=$(run_tests 2>&1)
+  TEST_EXIT=$?
 
-if [ $TEST_EXIT -ne 0 ]; then
-  echo "BLOCKED: Tests fail"
-  printf '%s\n' "$TEST_OUTPUT" | tail -20
-  exit 1
-fi
+  if [ $TEST_EXIT -ne 0 ]; then
+    {
+      echo "BLOCKED: Tests fail"
+      printf '%s\n' "$TEST_OUTPUT" | tail -20
+    } >&2
+    exit 2
+  fi
 
-TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
-if [ -z "$TEST_COUNT" ]; then
-  _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
-  [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok
-fi
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  if [ -z "$TEST_COUNT" ]; then
+    _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
+    [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok
+  fi
 
-if [ -z "$TEST_COUNT" ]; then
-  # A passing suite whose output format we cannot parse must not hard-block
-  # the push — that is a false BLOCKED on mocha/rspec/go-shaped output, and a
-  # blocking gate that cries wolf gets disabled. Exit code stays the gate.
-  echo "WARNING: could not parse a test count from the runner output (unrecognized format)."
-  echo "         Exit code 0 accepted; the total_tests>0 check was skipped this push."
-elif [ "$TEST_COUNT" -eq 0 ]; then
-  echo "BLOCKED: No tests found (total_tests must be > 0)"
-  exit 1
-fi
+  if [ -z "$TEST_COUNT" ]; then
+    # A passing suite whose output format we cannot parse must not hard-block
+    # the push — that is a false BLOCKED on mocha/rspec/go-shaped output, and a
+    # blocking gate that cries wolf gets disabled. Exit code stays the gate.
+    {
+      echo "WARNING: could not parse a test count from the runner output (unrecognized format)."
+      echo "         Exit code 0 accepted; the total_tests>0 check was skipped this push."
+    } >&2
+  elif [ "$TEST_COUNT" -eq 0 ]; then
+    echo "BLOCKED: No tests found (total_tests must be > 0)" >&2
+    exit 2
+  fi
+}
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_tests_section; fi
 
 echo "All gates passed. Push allowed."
 exit 0

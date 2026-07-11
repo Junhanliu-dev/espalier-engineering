@@ -3,9 +3,14 @@
 #   - lookup-helpers.sh   (_fuzzy_file_overlap_match, _dedupe_entries_preserve_primary, _cache_append)
 #   - post-merge-backlink.sh (squash detection + hardened overlap match)
 #   - rebuild-commit-index.sh (section parsing)
-#   - pre-push-gate.sh    (active-change selection, certificate, test-count parse)
+#   - pre-push-gate.sh    (active-change selection, certificate, test-count parse,
+#                          exit-2 blocking contract, secret scan, corrupt-state fail-closed)
+#   - pre-push-gate-wrapper.sh (push detection matrix, fail-closed python probe)
 #   - drift-helpers.sh    (mark/clear/tier, interactivity_mode)
 #   - phantom-helper lint (every `_fn` a skill template calls must be defined in a hook template)
+#
+# Hook exit-code contract asserted throughout: a blocking run exits 2 with
+# BLOCKED on stderr (Claude Code PreToolUse semantics); an allowed run exits 0.
 #
 # Complements scripts/test-bootstrap.sh (which covers install wiring).
 # Bash 3.2 compatible (macOS system bash). No GNU-only tools.
@@ -253,8 +258,11 @@ make_repo "$TMP2"
 install_hooks "$TMP2"
 make_gate "$TMP2" "echo '3 passed'"
 state_file "$TMP2" feat 2026-01-01-wip 3 IN_PROGRESS
-( cd "$TMP2" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 )
-assert "T5b in-progress change at Stage 3 blocks push" "[ $? -ne 0 ]"
+GATE2_ERR="$TMP2/err.txt"
+( cd "$TMP2" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$GATE2_ERR" )
+GATE2_RC=$?
+assert "T5b in-progress change at Stage 3 blocks push (exit 2)" "[ $GATE2_RC -eq 2 ]"
+assert "T5b2 stage block writes BLOCKED to stderr" "grep -q 'BLOCKED' '$GATE2_ERR'"
 
 # T5c: active change is gated even when a terminal change has a NEWER state file.
 TMP3=$(mktemp -d -t hooks-t5c.XXXX)
@@ -280,8 +288,11 @@ assert "T5c newer terminal state does not shadow the active change" "[ $GATE3_RC
 # T5d: active change whose source changed after review is still blocked (cert holds).
 echo tamper >> "$TMP3/live.txt"
 ( cd "$TMP3" && git add -A && git -c user.email=t@t -c user.name=t commit -q -m "sneaky post-review edit" )
-( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 )
-assert "T5d post-review edit on ACTIVE change fails closed" "[ $? -ne 0 ]"
+GATE3D_ERR="$TMP3/err.txt"
+( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$GATE3D_ERR" )
+GATE3D_RC=$?
+assert "T5d post-review edit on ACTIVE change fails closed (exit 2)" "[ $GATE3D_RC -eq 2 ]"
+assert "T5d2 cert block writes BLOCKED to stderr" "grep -q 'BLOCKED' '$GATE3D_ERR'"
 
 # T5e: two in-flight changes → gate warns about the ambiguity.
 TMP4=$(mktemp -d -t hooks-t5e.XXXX)
@@ -294,6 +305,7 @@ GATE4_OUT=$(cd "$TMP4" && bash espalier/hooks/pre-push-gate.sh 2>&1)
 assert "T5e multiple in-flight changes produce a warning" "echo \"$GATE4_OUT\" | grep -qi 'in-flight'"
 
 # T5f/g/h: test-count parsing across runner output formats (all runs exit 0).
+# A blocked case must exit 2 (not merely non-zero) with BLOCKED on stderr.
 run_count_case() {  # name, fake-test-command, expect_rc
   local name=$1 cmd=$2 expect=$3
   local dir; dir=$(mktemp -d -t hooks-t5cnt.XXXX)
@@ -301,18 +313,84 @@ run_count_case() {  # name, fake-test-command, expect_rc
   install_hooks "$dir"
   make_gate "$dir" "$cmd"
   state_file "$dir" feat 2026-01-01-cnt 7 IN_PROGRESS
-  ( cd "$dir" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 )
+  ( cd "$dir" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$dir/err.txt" )
   local rc=$?
   assert "$name" "[ $rc -eq $expect ]"
+  if [ "$expect" -eq 2 ]; then
+    assert "$name (BLOCKED on stderr)" "grep -q 'BLOCKED' '$dir/err.txt'"
+  fi
   [ "$KEEP" != "yes" ] && rm -rf "$dir"
 }
 run_count_case "T5f jest-style '5 passed' passes"        "echo '5 passed'"                 0
 run_count_case "T5g mocha-style '12 passing' passes"     "echo '  12 passing (34ms)'"      0
 run_count_case "T5h go-style 'ok <pkg>' passes"          "printf 'ok  \texample.com/pkg\t0.012s\n'" 0
 run_count_case "T5i rspec-style '8 examples' passes"     "echo '8 examples, 0 failures'"   0
-run_count_case "T5j explicit '0 passed' still blocks"    "echo '0 passed'"                 1
+run_count_case "T5j explicit '0 passed' still blocks"    "echo '0 passed'"                 2
+run_count_case "T5k failing test command blocks"         "echo '1 failed'; false"          2
 
-[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4"
+# T5l: gate-template exit-code totals — the installed gate must have exactly the
+# 10 blocking `exit 2` statements and zero blocking `exit 1`.
+TMP5=$(mktemp -d -t hooks-t5l.XXXX)
+make_repo "$TMP5"
+install_hooks "$TMP5"
+make_gate "$TMP5" "echo '3 passed'"
+assert "T5l installed gate has 10 'exit 2' sites" \
+  "[ \"\$(grep -c 'exit 2' '$TMP5/espalier/hooks/pre-push-gate.sh')\" = '10' ]"
+assert "T5l2 installed gate has zero 'exit 1' sites" \
+  "[ \"\$(grep -c 'exit 1' '$TMP5/espalier/hooks/pre-push-gate.sh')\" = '0' ]"
+
+# T5m: multi-line two-command build function body, second command fails → blocked.
+# make_gate's sed is line-based, so splice the two-line body with awk.
+awk '{
+  if ($0 ~ /^[[:space:]]*true[[:space:]]*$/ && !done_build) { print "  echo compiling"; print "  false"; done_build=1 }
+  else print
+}' "$TMP5/espalier/hooks/pre-push-gate.sh" > "$TMP5/espalier/hooks/pre-push-gate.sh.new" \
+  && mv "$TMP5/espalier/hooks/pre-push-gate.sh.new" "$TMP5/espalier/hooks/pre-push-gate.sh"
+state_file "$TMP5" feat 2026-01-01-mlbuild 7 IN_PROGRESS
+( cd "$TMP5" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP5/err.txt" )
+T5M_RC=$?
+assert "T5m multi-line build body failing 2nd command blocks (exit 2)" "[ $T5M_RC -eq 2 ]"
+assert "T5m2 build block writes BLOCKED to stderr" "grep -q 'BLOCKED: Build fails' '$TMP5/err.txt'"
+
+# T5n: no state file + committed fake secret → secret scan still runs, blocks.
+# Two commits so the HEAD~1 fallback range exists; secret added in the second.
+TMP6=$(mktemp -d -t hooks-t5n.XXXX)
+make_repo "$TMP6"
+install_hooks "$TMP6"
+make_gate "$TMP6" "echo '3 passed'"
+printf 'aws_key = "AKIAABCDEFGHIJKLMNOP"\n' > "$TMP6/config.py"
+( cd "$TMP6" && git add config.py && git -c user.email=t@t -c user.name=t commit -q -m "leak" )
+( cd "$TMP6" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP6/err.txt" )
+T5N_RC=$?
+assert "T5n secret scan blocks even with no in-flight change (exit 2)" "[ $T5N_RC -eq 2 ]"
+assert "T5n2 secret block names the secret on stderr" "grep -q 'BLOCKED' '$TMP6/err.txt'"
+
+# T5o: state file missing its 'Current Stage:' line → fail closed.
+TMP7=$(mktemp -d -t hooks-t5o.XXXX)
+make_repo "$TMP7"
+install_hooks "$TMP7"
+make_gate "$TMP7" "echo '3 passed'"
+state_file "$TMP7" feat 2026-01-01-nostage 7 IN_PROGRESS
+sed '/Current Stage:/d' "$TMP7/espalier/changes/feat/2026-01-01-nostage/pipeline-state.md" \
+  > "$TMP7/tmp.md" && mv "$TMP7/tmp.md" "$TMP7/espalier/changes/feat/2026-01-01-nostage/pipeline-state.md"
+( cd "$TMP7" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP7/err.txt" )
+T5O_RC=$?
+assert "T5o missing 'Current Stage:' line fails closed (exit 2)" "[ $T5O_RC -eq 2 ]"
+assert "T5o2 corrupt-state block on stderr" "grep -q 'no parsable' '$TMP7/err.txt'"
+
+# T5p: Stage-4 PASSED row but no Base-Ref/Reviewed-Diff → certificate required.
+TMP8=$(mktemp -d -t hooks-t5p.XXXX)
+make_repo "$TMP8"
+install_hooks "$TMP8"
+make_gate "$TMP8" "echo '3 passed'"
+state_file "$TMP8" feat 2026-01-01-nocert 7 IN_PROGRESS \
+  "| 4 | PASSED | 2026-01-01T10:00 | 1 round, no P0s |"
+( cd "$TMP8" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP8/err.txt" )
+T5P_RC=$?
+assert "T5p Stage-4-PASSED without certificate fails closed (exit 2)" "[ $T5P_RC -eq 2 ]"
+assert "T5p2 missing-certificate block on stderr" "grep -q 'review certificate is missing' '$TMP8/err.txt'"
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8"
 
 # ─── T6: drift-helpers basics ──────────────────────────────────────────────
 echo "T6: drift-helpers"
@@ -354,6 +432,57 @@ for fn in $CALLED; do
 done
 assert "T7a no skill template calls an undefined _helper" "[ -z \"$PHANTOMS\" ]"
 [ -n "$PHANTOMS" ] && echo "       phantoms:$PHANTOMS"
+
+# ─── T8: pre-push-gate-wrapper.sh push-detection matrix ───────────────────
+# The wrapper reads PreToolUse JSON on stdin. A dispatch must reach the gate
+# (stub exits 2 with GATE_RAN on stderr); a non-push must exit 0 untouched.
+echo "T8: pre-push-gate-wrapper"
+WRAPPER="$HOOKS_SRC/pre-push-gate-wrapper.sh"
+TMP=$(mktemp -d -t hooks-t8.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/hooks"
+printf '#!/bin/bash\necho GATE_RAN >&2\nexit 2\n' > "$TMP/espalier/hooks/pre-push-gate.sh"
+chmod +x "$TMP/espalier/hooks/pre-push-gate.sh"
+
+# run_wrapper_case NAME JSON EXPECT_RC EXPECT_DISPATCH(yes|no)
+run_wrapper_case() {
+  local name=$1 json=$2 expect_rc=$3 expect_dispatch=$4
+  local rc err="$TMP/w_err.txt"
+  ( cd "$TMP" && printf '%s' "$json" | bash "$WRAPPER" >/dev/null 2>"$err" )
+  rc=$?
+  assert "$name (rc)" "[ $rc -eq $expect_rc ]"
+  if [ "$expect_dispatch" = "yes" ]; then
+    assert "$name (gate dispatched)" "grep -q 'GATE_RAN' '$err'"
+  else
+    assert "$name (gate NOT dispatched)" "! grep -q 'GATE_RAN' '$err'"
+  fi
+}
+
+run_wrapper_case "T8a plain 'git push' dispatches" \
+  '{"tool_input":{"command":"git push"}}' 2 yes
+run_wrapper_case "T8b 'git -C /tmp/x push' dispatches" \
+  '{"tool_input":{"command":"git -C /tmp/x push"}}' 2 yes
+run_wrapper_case "T8c multi-line 'npm test\\ngit push' dispatches" \
+  '{"tool_input":{"command":"npm test\ngit push"}}' 2 yes
+run_wrapper_case "T8d quoted mention 'echo \"git push\"' does NOT dispatch" \
+  '{"tool_input":{"command":"echo \"git push\""}}' 0 no
+run_wrapper_case "T8e commit message + real push dispatches" \
+  '{"tool_input":{"command":"git commit -m \"git push docs\" && git push"}}' 2 yes
+
+# T8f: python3 AND python absent → fail CLOSED (exit 2, BLOCKED on stderr).
+# Build a PATH with only the non-python tools the wrapper needs.
+PBIN="$TMP/nopython-bin"
+mkdir -p "$PBIN"
+for _t in bash sh cat grep sed git; do
+  _p=$(command -v "$_t" 2>/dev/null) && [ -x "$_p" ] && ln -s "$_p" "$PBIN/$_t"
+done
+( cd "$TMP" && printf '%s' '{"tool_input":{"command":"git push"}}' \
+    | env PATH="$PBIN" "$PBIN/bash" "$WRAPPER" >/dev/null 2>"$TMP/w_err.txt" )
+T8F_RC=$?
+assert "T8f no python on PATH fails closed (exit 2)" "[ $T8F_RC -eq 2 ]"
+assert "T8f2 no-python block on stderr" "grep -q 'BLOCKED' '$TMP/w_err.txt'"
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""

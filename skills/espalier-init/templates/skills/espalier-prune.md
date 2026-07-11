@@ -34,8 +34,8 @@ Each step is a real tool action (scout spawn, Read, diff, AskUserQuestion) —
 NOT a bash script. For each file:
 
 1. **Look up the scout(s)** for the file (Scout Mapping below).
-2. **Spawn the scout(s)** — prompts are embedded in this skill (Embedded Scout
-   Prompts below). The scout runs against the CURRENT codebase. For a file with
+2. **Spawn the scout(s)** — read the prompts from `espalier/.scout-prompts.md`
+   (Scout Prompts (shipped file) below). The scout runs against the CURRENT codebase. For a file with
    two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both and merge their
    outputs into ONE proposed file before diffing.
 3. **Two-way diff:** current file vs the proposed scout output. Two-way, not
@@ -119,13 +119,12 @@ A hook is not a prose doc. For `check-layer-boundaries.sh` regenerate the layer
 1.5's `ci_checks`. Always dry-run a refreshed hook (`bash -n <hook>`) before the
 apply gate.
 
-## Embedded Scout Prompts
+## Scout Prompts (shipped file)
 
-The scout prompts live in ONE shipped file — `espalier/.scout-prompts.md` (copied
-into this project at init). Read it and spawn the scout(s) mapped to the artifact
-under refresh (Scout Mapping above); run each as an Agent/Task scout against the
-current codebase. Keeping the prompts in a single shipped file means `/espalier-prune`
-and `/espalier-doctor` can never drift apart.
+Read the prompts from `espalier/.scout-prompts.md` — they are NOT embedded here. The file is copied into this project at init. Spawn the scout(s)
+mapped to the artifact under refresh (Scout Mapping above); run each as an
+Agent/Task scout against the current codebase. Keeping the prompts in a single
+shipped file means `/espalier-prune` and `/espalier-doctor` can never drift apart.
 
 For a file with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both and
 merge their outputs into ONE proposed file before diffing. For a hook, regenerate

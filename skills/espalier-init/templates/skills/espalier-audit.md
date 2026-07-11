@@ -140,7 +140,16 @@ Merge the batch results (dedupe a finding reported by two batches on the same
 
 The `Status` column starts `OPEN` for every finding; when a finding is
 dispatched to the fix lane (step 4), rewrite its cell to the fix's change slug
-(`fix/{slug}`). This page is the only artifact this skill writes to the wiki.
+(`fix/{slug}`). If a dispatched lane ends `ABORTED` or `PARTIAL_FIX`, set the
+cell to `DISPATCH_ABORTED(fix/{slug})`. A later audit run preserves rather
+than overwrites non-`OPEN` cells (`fix/{slug}` and `DISPATCH_ABORTED(...)`
+carry history the fresh scan cannot re-derive). This page is the only artifact
+this skill writes to the wiki.
+
+After writing/updating the page, commit it immediately (`git add
+espalier/wiki/security-audit.md && git commit -m 'docs(espalier): security
+audit {date}'`) — dispatched fix lanes require a clean tree at Stage 7 and
+must not sweep this page into their own commit.
 
 ### 4. Offer the fix handoff (interactive only)
 
@@ -166,9 +175,13 @@ control: {required_control}. Abuse test: {abuse_test}. (Source:
 espalier/wiki/security-audit.md finding #{n}.)
 ```
 
-Then update that finding's `Status` cell as above. The fix lane's Stage 0
-causal-link discovery may find no causing change for a pre-existing hole —
-that is expected; the lane proceeds without a link.
+Then update that finding's `Status` cell as above (a lane that ends `ABORTED`
+or `PARTIAL_FIX` gets `DISPATCH_ABORTED(fix/{slug})`), and commit the page
+immediately after each status edit (`git add espalier/wiki/security-audit.md
+&& git commit -m 'docs(espalier): security audit {date}'`) so the next
+dispatched lane starts from a clean tree. The fix lane's Stage 0 causal-link
+discovery may find no causing change for a pre-existing hole — that is
+expected; the lane proceeds without a link.
 
 Only an EXPLICITLY unattended run (`CI` / `ESPALIER_UNATTENDED` /
 `ESPALIER_LOOP` / `ESPALIER_HEADLESS` set → `interactivity_mode` returns

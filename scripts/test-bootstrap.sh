@@ -149,7 +149,7 @@ EOF
 echo "Test 1: --dry-run"
 TMP=$(mktemp -d -t smoke1.XXXX)
 make_smoke_repo "$TMP"
-( cd "$TMP" && bash "$BOOTSTRAP" --dry-run --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
+( cd "$TMP" && bash "$BOOTSTRAP" --dry-run --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
 assert "dry-run made no espalier/" "[ ! -d '$TMP/espalier' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -157,8 +157,8 @@ assert "dry-run made no espalier/" "[ ! -d '$TMP/espalier' ]"
 echo "Test 2: full single invocation (R1)"
 TMP=$(mktemp -d -t smoke2.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
-( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 EXIT=$?
 assert "bootstrap exit 0"                 "[ $EXIT -eq 0 ]"
 assert "espalier/pipeline.md exists"       "[ -f '$TMP/espalier/pipeline.md' ]"
@@ -198,9 +198,9 @@ assert "gitignore has drift-state glob"         "grep -qxF 'espalier/.drift-stat
 echo "Test 3: re-run on complete install"
 TMP=$(mktemp -d -t smoke3.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
-( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
-RERUN_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+RERUN_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 RERUN_EXIT=$?
 assert "re-run exit 0"                          "[ $RERUN_EXIT -eq 0 ]"
 assert "re-run detected complete install"       "echo \"\$RERUN_OUT\" | grep -q 'Existing complete install'"
@@ -216,9 +216,9 @@ assert "re-run left no nested skill symlinks"   "[ -z \"\$(find '$TMP/espalier/s
 echo "Test 4: --force override"
 TMP=$(mktemp -d -t smoke4.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
-( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
-FORCE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+FORCE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
 assert "--force does NOT trigger re-run path"   "echo \"\$FORCE_OUT\" | grep -qv 'Existing complete install'"
 assert "--force re-run left no nested symlinks" "[ -z \"\$(find '$TMP/espalier/skills' -mindepth 2 -maxdepth 2 -type l)\" ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -236,9 +236,9 @@ assert "copy-only did NOT create symlinks"      "[ ! -L '$TMP/.claude/rules/espa
 echo "Test 6: --wire-only debug flag"
 TMP=$(mktemp -d -t smoke6.XXXX)
 make_smoke_repo "$TMP"
-( cd "$TMP" && bash "$BOOTSTRAP" --copy-only --lang=ts --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
-simulate_llm_writes "$TMP" ts
-( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
+( cd "$TMP" && bash "$BOOTSTRAP" --copy-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
 WIRE_EXIT=$?
 assert "wire-only exit 0"                       "[ $WIRE_EXIT -eq 0 ]"
 assert "wire-only created symlinks"             "[ -L '$TMP/.claude/rules/espalier-structure.md' ]"
@@ -248,10 +248,10 @@ assert "wire-only created symlinks"             "[ -L '$TMP/.claude/rules/espali
 echo "Test 7: safe_ln pre-flight"
 TMP=$(mktemp -d -t smoke7.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
+simulate_llm_writes "$TMP" typescript
 mkdir -p "$TMP/.claude/rules"
 echo "user content" > "$TMP/.claude/rules/espalier-structure.md"  # regular file, not symlink
-SAFE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
+SAFE_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "safe_ln blocked regular file"           "echo \"\$SAFE_OUT\" | grep -q 'exists as regular file'"
 assert "user file preserved"                    "[ \"\$(cat '$TMP/.claude/rules/espalier-structure.md')\" = 'user content' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -260,7 +260,7 @@ assert "user file preserved"                    "[ \"\$(cat '$TMP/.claude/rules/
 echo "Test 8: settings.json merge"
 TMP=$(mktemp -d -t smoke8.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
+simulate_llm_writes "$TMP" typescript
 mkdir -p "$TMP/.claude"
 cat > "$TMP/.claude/settings.json" << 'EOF'
 {
@@ -269,7 +269,7 @@ cat > "$TMP/.claude/settings.json" << 'EOF'
   }
 }
 EOF
-( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 assert "user hook survived merge"               "grep -q 'echo user-hook' '$TMP/.claude/settings.json'"
 assert "Espalier hook added"                    "grep -q 'post-edit-wrapper' '$TMP/.claude/settings.json'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -278,23 +278,28 @@ assert "Espalier hook added"                    "grep -q 'post-edit-wrapper' '$T
 echo "Test 9: portable abspath"
 TMP=$(mktemp -d -t smoke9.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
+simulate_llm_writes "$TMP" typescript
 # Force absence of realpath by running with restricted PATH
-( cd "$TMP" && env PATH="/usr/bin:/bin" bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+( cd "$TMP" && env PATH="/usr/bin:/bin" bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 ABS_EXIT=$?
 assert "bootstrap works without realpath"       "[ $ABS_EXIT -eq 0 ]"
-assert "symlink uses absolute path"             "[ \"\$(readlink '$TMP/.claude/rules/espalier-structure.md' | head -c 1)\" = '/' ]"
-[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+assert "symlink target is relative"             "case \"\$(readlink '$TMP/.claude/rules/espalier-structure.md')\" in ../*) true ;; *) false ;; esac"
+# D1: a moved repo keeps every link resolving (relative targets).
+MOVED="$TMP-moved"
+mv "$TMP" "$MOVED"
+DANGLING=$( cd "$MOVED" && find .claude -type l ! -exec test -e {} \; -print )
+assert "moved repo: all symlinks resolve"       "[ -z \"\$DANGLING\" ]"
+[ "$KEEP" != "yes" ] && rm -rf "$MOVED"
 
 # ─── Test 10: parallel validation output is sorted ────────────────────────
 echo "Test 10: parallel validation output order"
 TMP=$(mktemp -d -t smoke10.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
-( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
-VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/37\]' | head -3 | sed 's/\[//;s/\/37\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/46\]' | head -3 | sed 's/\[//;s/\/46\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -302,10 +307,10 @@ assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 echo "Test 11: merge-decision validation"
 TMP=$(mktemp -d -t smoke11.XXXX)
 make_smoke_repo "$TMP"
-simulate_llm_writes "$TMP" ts
-INVALID_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=garbage --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
+simulate_llm_writes "$TMP" typescript
+INVALID_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=garbage --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "rejects invalid merge-decision"         "echo \"\$INVALID_OUT\" | grep -q \"invalid --merge-decision='garbage'\""
-MISSING_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
+MISSING_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "rejects missing merge-decision"         "echo \"\$MISSING_OUT\" | grep -q 'required for mode'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -317,12 +322,12 @@ echo "Test 12: core.hooksPath honored"
 TMP=$(mktemp -d -t smoke12a.XXXX)
 make_smoke_repo "$TMP"
 ( cd "$TMP" && mkdir -p .githooks && git config core.hooksPath .githooks )
-simulate_llm_writes "$TMP" ts
-HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
+simulate_llm_writes "$TMP" typescript
+HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/37] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/46] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -331,13 +336,30 @@ TMP=$(mktemp -d -t smoke12b.XXXX)
 OUTSIDE=$(mktemp -d -t smoke12bout.XXXX)
 make_smoke_repo "$TMP"
 ( cd "$TMP" && git config core.hooksPath "$OUTSIDE" )
-simulate_llm_writes "$TMP" ts
-HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=ts --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
+simulate_llm_writes "$TMP" typescript
+HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 || true )
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/37] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/46] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
+
+# ─── Test 13: --lang=unsupported writes a no-op boundary hook ─────────────
+echo "Test 13: --lang=unsupported no-op hook"
+TMP=$(mktemp -d -t smoke13.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+# The unsupported path must provide the hook itself: remove the simulated one.
+rm -f "$TMP/espalier/hooks/check-layer-boundaries.sh"
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=unsupported --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "13a no-op hook exists"       "[ -f '$TMP/espalier/hooks/check-layer-boundaries.sh' ]"
+assert "13b no-op hook executable"   "[ -x '$TMP/espalier/hooks/check-layer-boundaries.sh' ]"
+# Write-if-absent: a Phase-2-adapted hook must survive a second run untouched.
+echo "# customised marker" >> "$TMP/espalier/hooks/check-layer-boundaries.sh"
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=unsupported --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "13c second run does not overwrite a modified hook" \
+  "grep -q 'customised marker' '$TMP/espalier/hooks/check-layer-boundaries.sh'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""

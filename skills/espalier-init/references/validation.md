@@ -1,50 +1,61 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 37 checks: 36 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override. The per-check table below describes what each check verifies and is retained as the source of truth for the check definitions.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks: 45 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+
+> **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
 After all generation and wiring is complete, validate end-to-end.
 
 ## Final Wiring Verification
 
-| # | Check | Command | Expected |
-|---|-------|---------|----------|
-| 1 | Rules auto-load | `ls -la .claude/rules/espalier-*` | 5 symlinks (structure, standards, process, security, production) |
-| 2 | Skills discoverable | `ls -la .claude/skills/espalier*` | all 12 skill symlinks, incl. bare `espalier`, `espalier-security`, `espalier-prune`, `espalier-doctor` |
-| 3 | Agents registered | `ls -la .claude/agents/harness-*` | 3 symlinks (harness-coder, harness-reviewer, harness-security) |
-| 4 | Hooks configured | `cat .claude/settings.json \| grep espalier` | Hook entries |
-| 5 | Symlinks valid | `readlink .claude/rules/espalier-structure.md` | Points to espalier/ |
-| 6 | Hooks executable | `test -x espalier/hooks/check-layer-boundaries.sh` | Exit 0 |
-| 7 | Pipeline state template | `cat espalier/changes/_template/pipeline-state.md` | Template content |
-| 8 | CLAUDE.md updated | `grep "espalier" CLAUDE.md` | Reference found |
-| 9 | Build command works | `{build_command}` | Exit 0 |
-| 10 | Test command works | `{test_command}` | Exit 0 with count > 0 |
-| 11 | Skill folder/name parity | `for f in espalier/skills/*/SKILL.md; do dir=$(basename $(dirname "$f")); name=$(grep '^name:' "$f" \| awk '{print $2}'); [ "$dir" = "$name" ] \|\| echo "MISMATCH $dir != $name"; done` | No output (all match) |
-| 12 | Typed changes layout | `find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md` | All state files at depth 3 under `{type}/{slug}/` |
-| 13 | espalier-fix skill present | `ls .claude/skills/espalier-fix/SKILL.md` | Symlink resolves |
-| 14 | espalier-fix folder/name parity | `grep '^name:' .claude/skills/espalier-fix/SKILL.md` | `name: espalier-fix` |
-| 15 | Pre-push gate finds typed paths | (manual — see Test C) | Gate reads correct state file |
-| 16 | Commits table format (when present) | `grep -A2 '## Commits' espalier/changes/*/*/pipeline-state.md 2>/dev/null \|\| true` | Either header rows visible OR clean exit (no fixes shipped yet) |
-| 17 | Merge-hook decision cached | `cat espalier/.merge-hook-decision` | One of: not-needed, installed, fuzzy-allowed, skip-only, never-ask, ask-later |
-| 18 | Hook template copied | `test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh` | Exit 0 |
-| 19 | Lookup helpers present | `test -f espalier/hooks/lookup-helpers.sh` | Exit 0 |
-| 20 | Post-merge dispatcher installed | `_hd=$(git config core.hooksPath); grep -qE "ESPALIER_POSTMERGE_DISPATCH" "${_hd:-.git/hooks}/post-merge" .husky/post-merge 2>/dev/null` | Match found at git's real hooks dir — `core.hooksPath` is honored. Dispatcher installed unconditionally; runs drift-detect every merge, backlink only when decision=installed. If `core.hooksPath` points outside the repo, bootstrap skips the install and warns. |
-| 21 | Rebuild script present + executable | `test -x espalier/hooks/rebuild-commit-index.sh` | Exit 0 |
-| 22 | .gitignore excludes cache | `grep -qxF "espalier/.commit-index.tsv" .gitignore` | Exit 0 |
-| 23 | Manual rebuild produces valid cache | `bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv` | All exit 0 |
-| 24 | Cache TSV format valid | `[ ! -s espalier/.commit-index.tsv ] || awk -F'\t' 'NF != 4 { exit 1 }' espalier/.commit-index.tsv` | Exit 0 (empty file allowed; all populated rows have 4 tab-separated fields) |
-| 25 | Stale-artifact tiers (Policy 3) | (serial — `run_check_25`; reads `espalier/.drift-state.tsv`) | Per-tier table; exit 0 unless an artifact is expired (>90d). `--ignore-drift` downgrades the hard fail to a logged override |
-| 26 | Drift-state TSV structural | `[ ! -s espalier/.drift-state.tsv ] \|\| awk -F'\t' 'NF != 4 { exit 1 }' espalier/.drift-state.tsv` | Exit 0 (absent/empty allowed; every row has 4 tab-separated fields) |
-| 27 | Conventions TSV structural | `[ ! -s espalier/.conventions.tsv ] \|\| awk -F'\t' 'NF != 5 && NF != 6 { exit 1 }' espalier/.conventions.tsv` | Exit 0 (absent/empty allowed; every row has 5 or 6 tab-separated fields) |
-| 28 | Doctor cadence valid | `[ ! -f espalier/.doctor-cadence ] \|\| grep -qE '^cadence: (every-change\|weekly\|monthly\|manual)$' espalier/.doctor-cadence` | Exit 0 (absent allowed; if present, `cadence:` is a known value) |
-| 29 | espalier-ask skill present | `test -f .claude/skills/espalier-ask/SKILL.md` | Symlink resolves to the read-only Q&A skill |
-| 30 | Security rule wired | `[ -L .claude/rules/espalier-security.md ] && [ -e .claude/rules/espalier-security.md ]` | Symlink resolves to `espalier/rules/security-standards.md` |
-| 31 | Security agent present | `test -f .claude/agents/harness-security.md` | Symlink resolves to the trust-boundary auditor |
-| 32 | Security skill present | `test -f .claude/skills/espalier-security/SKILL.md` | Symlink resolves to the audit checklist |
-| 33 | Audit skill present | `test -f .claude/skills/espalier-audit/SKILL.md` | Symlink resolves to the repo-wide audit lane |
-| 34 | Repo-audit mode wired | `grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md` | The auditor agent carries the /espalier-audit mode section |
-| 35 | Production rule wired | `[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]` | Symlink resolves to `espalier/rules/production-standards.md` |
-| 36 | Production rule present | `test -f espalier/rules/production-standards.md` | The always-loaded NFR bar exists |
-| 37 | Scout prompts shipped | `test -f espalier/.scout-prompts.md` | Shared discovery prompts for prune + doctor |
+| # | Check name | What it runs | How to fix a failure |
+|---|-----------|--------------|----------------------|
+| 1 | rules-load | `ls .claude/rules/espalier-*.md` | Re-run bootstrap Stage 5 (`--wire-only`) to recreate the rule symlinks |
+| 2 | skills-load | `ls -d .claude/skills/espalier-coding … espalier-audit` (all 12 skill symlinks, incl. bare `espalier`) | Re-run bootstrap Stage 5; a missing source folder means the Phase 2/Stage 3 write was skipped |
+| 3 | agents-load | `ls .claude/agents/harness-coder.md harness-reviewer.md harness-security.md` | Re-run bootstrap Stage 5; missing source = Phase 2 agent write skipped |
+| 4 | hooks-configured | `grep -q "espalier/hooks" .claude/settings.json` | Re-run bootstrap Stage 8 (settings merge) |
+| 5 | symlinks-valid | `[ -L .claude/rules/espalier-structure.md ] && [ -e … ]` | Broken link → the target rule file is missing; re-run Phase 2 write, then Stage 5 |
+| 6 | hooks-executable | `test -x` post-edit-wrapper.sh, pre-push-gate.sh, pre-push-gate-wrapper.sh | `chmod +x espalier/hooks/*.sh` (bootstrap Stage 4 does this) |
+| 7 | state-template | `test -f espalier/changes/_template/pipeline-state.md` | Re-run bootstrap Stage 6 |
+| 8 | claudemd-updated | `grep -q "## Espalier" CLAUDE.md` | Re-run bootstrap Stage 7 |
+| 9 | espalier-agent-md | `test -f espalier/agent.md` | Re-run espalier-init Phase 2 (agent.md write) |
+| 10 | espalier-pipeline-md | `test -f espalier/pipeline.md` | Re-run bootstrap Stage 3 (pure copy) |
+| 11 | skill-name-parity | every `espalier/skills/*/SKILL.md` folder name == its `name:` frontmatter | Rename the folder or fix the frontmatter so they match |
+| 12 | typed-changes-dirs | `[ -d espalier/changes/feat ] && fix && refactor` | Re-run bootstrap Stage 2 (mkdir) |
+| 13 | espalier-fix-skill | `test -f .claude/skills/espalier-fix/SKILL.md` | Re-run bootstrap Stages 3 + 5 |
+| 14 | espalier-fix-name | `grep -q "^name: espalier-fix" .claude/skills/espalier-fix/SKILL.md` | The copied template is stale/edited — recopy from the plugin |
+| 15 | rules-engineering | `test -f espalier/rules/engineering-structure.md` | Re-run espalier-init Phase 2 |
+| 16 | rules-standards | `test -f espalier/rules/coding-standards.md` | Re-run espalier-init Phase 2 |
+| 17 | merge-decision | `.merge-hook-decision` is one of the six accepted values | Rewrite the file with a valid value (or re-run bootstrap Stage 9) |
+| 18 | hook-template-copy | `test -f && test -x espalier/hooks/post-merge-backlink.sh` | Re-run bootstrap Stage 4 |
+| 19 | lookup-helpers | `test -f espalier/hooks/lookup-helpers.sh` | Re-run bootstrap Stage 4 |
+| 20 | post-merge-dispatcher | `ESPALIER_POSTMERGE_DISPATCH` present in git's real hooks dir (`core.hooksPath` honored) or `.husky/post-merge` | Re-run bootstrap Stage 9; if `core.hooksPath` points outside the repo, bootstrap refuses and warns — fix the config first |
+| 21 | rebuild-script | `test -x espalier/hooks/rebuild-commit-index.sh` | Re-run bootstrap Stage 4 |
+| 22 | gitignore-cache | `grep -qxF "espalier/.commit-index.tsv" .gitignore` | Re-run bootstrap Stage 10 |
+| 23 | rebuild-runs | `bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv` | Read the script's stderr — usually a malformed pipeline-state.md |
+| 24 | cache-tsv-format | every populated `.commit-index.tsv` row has 4 tab-separated fields | Delete the cache and re-run the rebuild script |
+| 25 | stale-tiers (serial — `run_check_25`) | reads `espalier/.drift-state.tsv`; per-tier table; fails only on expired (>90d) artifacts | Run `/espalier-prune --all-stale`, or `--ignore-drift` to log an override |
+| 26 | drift-state-format | every populated `.drift-state.tsv` row has 4 tab-separated fields | Fix or delete the malformed row (see `.drift.log` for its origin) |
+| 27 | conventions-format | every populated `.conventions.tsv` row has 5 or 6 tab-separated fields | Fix or delete the malformed row |
+| 28 | doctor-cadence | `.doctor-cadence` absent, or `cadence:` is a known value | Rewrite the file (`cadence: weekly` etc.) |
+| 29 | espalier-ask-skill | `test -f .claude/skills/espalier-ask/SKILL.md` | Re-run bootstrap Stages 3 + 5 |
+| 30 | security-rule | `[ -L .claude/rules/espalier-security.md ] && [ -e … ]` | Re-run Phase 2 (security-standards.md) + Stage 5 |
+| 31 | security-agent | `test -f .claude/agents/harness-security.md` | Re-run Phase 2 agent write + Stage 5 |
+| 32 | security-skill | `test -f .claude/skills/espalier-security/SKILL.md` | Re-run Phase 2 write + Stage 5 |
+| 33 | audit-skill | `test -f .claude/skills/espalier-audit/SKILL.md` | Re-run bootstrap Stages 3 + 5 |
+| 34 | audit-mode | `grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md` | The agent file is stale — re-run Phase 2 from the current template |
+| 35 | production-rule | `[ -L .claude/rules/espalier-production.md ] && [ -e … ]` | Re-run Phase 2 (production-standards.md) + Stage 5 |
+| 36 | production-file | `test -f espalier/rules/production-standards.md` | Re-run espalier-init Phase 2 |
+| 37 | scout-prompts | `test -f espalier/.scout-prompts.md` | Re-run bootstrap Stage 3 |
+| 38 | phase2-coding-skill | `test -f espalier/skills/espalier-coding/SKILL.md` | Re-run espalier-init Phase 2 (LLM write) |
+| 39 | phase2-review-skill | `test -f espalier/skills/espalier-review/SKILL.md` | Re-run espalier-init Phase 2 (LLM write) |
+| 40 | phase2-testing-skill | `test -f espalier/skills/espalier-testing/SKILL.md` | Re-run espalier-init Phase 2 (LLM write) |
+| 41 | wiki-architecture | `test -f espalier/wiki/architecture.md` | Re-run espalier-init Phase 2 (scout 1.2 → wiki write) |
+| 42 | wiki-data-models | `test -f espalier/wiki/data-models.md` | Re-run espalier-init Phase 2 (scout 1.8 → wiki write) |
+| 43 | wiki-critical-paths | `test -f espalier/wiki/critical-paths.md` | Re-run espalier-init Phase 2 (scout 1.9 → wiki write) |
+| 44 | wiki-external-services | `test -f espalier/wiki/external-services.md` | Re-run espalier-init Phase 2 (scout 1.10 → wiki write) |
+| 45 | rules-development-process | `test -f espalier/rules/development-process.md` | Re-run espalier-init Phase 2 (LLM write) |
+| 46 | layer-boundaries-hook | `test -f && test -x espalier/hooks/check-layer-boundaries.sh` | Phase 2 writes it for typescript/python/go; `--lang=unsupported` makes bootstrap write a no-op; `chmod +x` if present but not executable |
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),
@@ -64,8 +75,8 @@ fails). Thresholds are hardcoded in v1.
    - coding-standards.md vs. layer specs (no conflicts?)
    - pipeline gates vs. development-process (aligned?)
 4. **Test hooks:**
-   - Create a file violating layer boundaries → hook blocks
-   - Attempt push at Stage 2 → gate blocks
+   - Create a file violating layer boundaries → hook blocks (exit 2, stderr)
+   - Attempt push at Stage 2 → gate blocks (exit 2, stderr)
 5. **Session resumption test:**
    - Create a pipeline-state.md at Stage 3
    - Run `/espalier` → it should resume, not restart
@@ -81,7 +92,7 @@ Quick summary:
 | C | Pre-push gate | Blocks at Stage <7, passes at ≥7 |
 | D | Squash hook recording | post-merge writes `squashed_to:` row |
 | E | Squash skip-only path | Marks `unknown_squash`, fix proceeds |
-| F | ask-later fallback | Prompt fires once; subsequent invocations silent |
+| F | ask-later fallback | Orchestrator prompt fires once; subsequent invocations silent |
 | G | Reverse-lookup cache | Cold scan auto-builds; Layer 0 hit on second invocation; --no-index bypass; --rebuild-index works |
 
 Report: "Espalier validated. {N} checks passed, {M} issues found: {list}"
