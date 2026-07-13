@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.11.0</span>
+      <span class="nav-pill">v0.12.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1745,6 +1745,9 @@ footer {
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.12.0</span> — Stage 1 now cross-references your own conventions. A blind-spot pass (grill Step 1.5) checks every requirement against your <code style="font-family:var(--f-mono);color:var(--vine)">espalier/rules/</code> and <code style="font-family:var(--f-mono);color:var(--vine)">espalier/wiki/</code> and surfaces the collision you couldn&rsquo;t: an approach that violates an encoded rule (<code style="font-family:var(--f-mono);color:var(--vine)">throw</code> where the repo standardised on <code style="font-family:var(--f-mono);color:var(--vine)">Result&lt;T&gt;</code>), a capability the wiki already documents, an unstated ripple across a documented critical path. Each confirmed collision becomes a Stage 1 question citing the exact <code style="font-family:var(--f-mono);color:var(--vine)">rules/&lt;file&gt;#section</code>, and floors the tier so a crisp-but-colliding requirement can&rsquo;t skip grilling — the reviewer&rsquo;s convention check, pulled a full rework round earlier. It verifies each doc claim against the code first, so a stale doc is flagged (<code style="font-family:var(--f-mono);color:var(--vine)">mark_stale</code>), never raised as a false collision — and stays silent when there&rsquo;s no map to collide with, so nothing changes on an uninitialised input. The grill eval harness is hardened too (all four known-issues fixed); the golden set now runs <em>24/24, catch-rate 1.00</em>. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.11.0</span> — the push gate actually blocks now. Claude Code hooks block only on <em>exit code 2 with the message on stderr</em> — the old gates&rsquo; exit 1 was a silent no-op. Every gate script and wrapper speaks the real contract (the wrapper fails <em>closed</em> without python and matches <code style="font-family:var(--f-mono);color:var(--vine)">git -C &hellip; push</code> and multi-line commands), the Stage 4/6 gates read the verdict <em>word</em> — closing the FAIL-with-P1-only and ESCALATION_REQUIRED-as-PASS holes — the reviewer/security agents get a record-file-scoped Write tool, and <code style="font-family:var(--f-mono);color:var(--vine)">.claude/</code> symlinks go relative so a moved repo keeps working. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
@@ -1760,7 +1763,7 @@ footer {
           <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.9.4 → v0.10.0 → v0.11.0) in order.
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.10.0 → v0.11.0 → v0.12.0) in order.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           New pipeline runs get the loop; in-flight changes are unaffected. <span style="color:var(--paper)">Non-breaking.</span>

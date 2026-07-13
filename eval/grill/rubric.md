@@ -56,6 +56,31 @@ one and ship the wrong one.
 - 1 — mostly independent questions
 - 0 — a flat batched checklist
 
+### 6. Collision coverage (fixtures with `planted_collisions` only)
+For a fixture carrying `planted_collisions` (the Step 1.5 blind-spot pass), how many did
+grill surface **with a correct citation**? Score = surfaced-with-citation / total planted
+collisions. A planted collision counts as surfaced only if a grill question both (a) names
+the conflict concretely and (b) cites the specific `rules/<file>` or `wiki/<file>` it came
+from — an uncited "have you considered X?" does not count.
+
+**False-collision penalty.** Deduct one surfaced-credit for every collision grill raises
+that the fixture did not plant — in particular, raising a conflict off a doc the fixture
+planted as *stale* (grill should have run `mark_stale`, not asked a question). A run that
+invents collisions is worse than one that misses them: it teaches the user to distrust the
+pass.
+
+Collisions fold into the aggregate catch-rate exactly like ambiguities: **each planted
+collision is one `planted`; each surfaced-with-citation is one `surfaced`.** So the judge
+reports them through the same `planted`/`surfaced` counts — no separate score field, and
+the harness math is unchanged. A pure-collision fixture is a coverage test (mark it
+`coverage_only: true`, below): the value is the collision *surfaced and cited*, not the
+question's artistry, so the non-obviousness / discrimination bars do not apply.
+
+The anti-stale fixture is self-policing: it plants **zero** collisions and a crisp
+(`skip`-tier) requirement, so the correct run flags the stale doc and still chooses `skip`.
+A wrongly-raised collision floors the tier off `skip`, which fails depth-calibration — the
+existing gate catches the false positive with no extra machinery.
+
 ## Per-fixture pass
 
 A fixture passes when: coverage ≥ 0.8 AND depth-calibration = 2 AND mean
@@ -82,6 +107,10 @@ This is not an escape hatch for weak fixtures: a `coverage_only` fixture still m
 its gaps (coverage) and pick the right tier (depth). Use it only when the ambiguities are
 genuinely all announced — never to excuse a fixture that *should* contain hidden forks. The
 trustworthy signal remains the shadow subset, which should include real insight fixtures.
+
+**Collision fixtures** (those with `planted_collisions`, dimension 6) are `coverage_only`
+by nature: a collision's value is that it was surfaced and cited, not that the question was
+non-obvious. Score them on collision coverage + depth alone.
 
 ## Aggregate gate
 

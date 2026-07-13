@@ -8,6 +8,17 @@ skill regression; every failure below is a harness or fixture defect.
 Recorded 2026-07-11. `RESULT: FAIL` at HEAD is caused entirely by items 1–4 — NOT
 by any change to the grill skill.
 
+## Status — all four addressed 2026-07-13 (grill blind-spot / cross-check work)
+
+| # | Fix | Where |
+|---|-----|-------|
+| 1 | `run.sh` retries `claude -p` `CLAUDE_RETRIES` times; a call that still can't execute is an INFRA failure (`infra_fail_count`), never scored. Distinct exit codes: `0` PASS / `1` scoring FAIL / `3` INCONCLUSIVE (infra). | `run.sh` `run_claude`, main loop, final block |
+| 2 | `json_extract` collapses newlines and keeps first `{`…last `}`, so a fenced/prose-wrapped judge line parses. | `run.sh` `json_extract` |
+| 3 | `shadow-light-04` merged its two format-related signals into one → 3 planted, satisfiable at the light cap of 3. (Bump-to-full rejected: 4 signals still map to `light`, so `full` would fail depth-cal.) | `fixtures/shadow-light-04-auto-assign-ids.md` |
+| 4 | The three announced-gap fixtures now carry `coverage_only: true` (`full-01` already did; `full-03`, `light-02` added) — the pre-existing mechanism `rubric.md` built for exactly this. They gate on coverage + depth, not the `non_obvious ≥ 1.3` bar they could never clear. | `fixtures/full-03-*.md`, `fixtures/light-02-*.md` |
+
+Everything below is the original diagnosis, kept for the record.
+
 ## 1. `run.sh` conflates infra failure with scoring failure (HIGH)
 
 `run_grill` / `judge` shell out to `claude -p`. When a call fails for an
