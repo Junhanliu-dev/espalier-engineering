@@ -3,6 +3,12 @@ fixture_id: full-03-checkout-broken
 mode: diagnosis
 expected_tier: full
 expected_signals: 6
+# KNOWN-ISSUES #4: for a bare "checkout is broken" report every gap (no anchor, no repro,
+# undefined symptom, no cause, no expected behaviour, which step) is announced by the
+# vagueness itself, so each question is a reflexive non_obvious-1 (rubric "announced-gap
+# test"). This is a coverage test — does grill surface all the reflexive diagnosis gaps —
+# not an insight test, so it is gated on coverage + depth only (rubric "Coverage-only").
+coverage_only: true
 planted_ambiguities:
   - no anchor — no file, line, or stack trace
   - no reproduction steps

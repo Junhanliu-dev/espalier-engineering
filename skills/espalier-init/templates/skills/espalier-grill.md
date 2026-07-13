@@ -1,6 +1,6 @@
 ---
 name: espalier-grill
-description: Internal pipeline stage — invoked by /espalier and /espalier-fix Stage 1 with a mode and reqs_path; not for direct user invocation. Stress-test a requirement (spec) or a bug diagnosis before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, and missing edge cases at Stage 1
+description: Internal pipeline stage — invoked by /espalier and /espalier-fix Stage 1 with a mode and reqs_path; not for direct user invocation. Stress-test a requirement (spec) or a bug diagnosis before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, missing edge cases, and collisions with the project's own rules/wiki conventions at Stage 1
 ---
 
 # Espalier Grill
@@ -11,6 +11,12 @@ Interrogate the Stage 1 input before any code is written. A vague requirement or
 unconfirmed diagnosis that passes Stage 1 is trusted by every later stage — and no
 later gate audits it. Grill is that audit: it converts an under-specified input into
 one a coding agent can execute without guessing.
+
+Grill also closes the one blind spot a bare reading of the input cannot: a requirement
+that will violate a convention the project already encoded in `espalier/rules/` or
+re-implement something `espalier/wiki/` already documents. That collision is known to
+the repo but unknown to the requester — Step 1.5 cross-references the input against the
+project map and turns it into a question before any code is written.
 
 Grill is invoked BY Stage 1 of `/espalier` and `/espalier-fix`. It is not a slash
 command and is never called directly by the user.
@@ -26,7 +32,7 @@ command and is never called directly by the user.
 
 ## Process
 
-Run Steps 0–3 in order.
+Run Steps 0–3 in order (Step 1.5 sits between Step 1 and Step 2).
 
 ### Step 0 — Environment check
 
@@ -60,6 +66,14 @@ Do not judge ambiguity by feel. Count concrete ambiguity **signals** in `input_t
 | Unscoped edge case | the input describes only the happy path |
 | (diagnosis) Unconfirmed cause | the cause is asserted, not evidenced |
 | (diagnosis) Weak reproduction | "sometimes fails" — no exact, repeatable steps |
+| Rule collision | the requirement's approach contradicts an `espalier/rules/` convention |
+| Wiki duplication | the requirement re-implements a capability `espalier/wiki/` documents |
+| Unstated ripple | the requirement touches a documented critical-path / data-model with unstated downstream |
+
+The last three are not in `input_text` — they surface only by cross-referencing the
+project's own map, which **Step 1.5** does. A collision confirmed there counts as a
+signal and floors the tier at `light` (Step 1.5). Count the text signals now; let
+Step 1.5 add any collision signals before you commit to a tier.
 
 Map the count to a depth tier:
 
@@ -80,6 +94,61 @@ back on the tier ("this is more involved than that" / "don't bother grilling"), 
 their tier and proceed — their read of the requirement's stakes overrides the signal
 count. A `skip`→`light`/`full` bump runs Step 2; a bump down to `skip` returns
 `SKIPPED: crisp`.
+
+### Step 1.5 — Blind-spot pass (convention cross-check)
+
+Runs in both modes, after Step 1, before Step 2. Its job is the collision the requester
+could not have flagged — a rule they don't know exists, a capability the wiki already
+documents. These are known to the repo but unknown to the requester, and no text-signal
+count in Step 1 can catch them. This is the one class of unknown the project's own map
+can surface and a bare reading of `input_text` cannot.
+
+Read the project map — NOT source code:
+- `espalier/rules/*.md` — the encoded conventions.
+- `espalier/wiki/*.md` — architecture, data-models, critical-paths, external-services.
+
+**If neither directory exists or both are empty, skip this step silently** — there is
+nothing to cross-check (e.g. a repo not yet initialised by `/espalier-init`). No signal,
+no tier change, no output. (This keeps grill's behaviour identical to before on any
+input that has no map to collide with.)
+
+Scan for three collision classes (the last three rows of Step 1's signal table):
+
+| Class | You are looking for |
+|-------|---------------------|
+| Rule collision | the requirement's implied approach contradicts a `rules/` convention (e.g. `throw` where coding-standards mandates `Result<T>`) |
+| Wiki duplication | the requirement re-implements a capability `wiki/` already documents (e.g. a new HTTP client where `external-services.md` documents one) |
+| Unstated ripple | the requirement touches a `wiki/` critical-path or data-model whose documented downstream is not in the requirement (e.g. "add a field to Order" when `critical-paths.md` shows Order feeding three consumers) |
+
+Reading `rules/`/`wiki/` does NOT count against Step 2's ≤ 8 code-read budget — they are
+the curated map, and consulting them is the whole point. Scope wiki reads to the
+requirement's surface; skim rules.
+
+**Verify before you raise it.** A doc can be stale. Before treating a collision as real,
+confirm the cited convention still holds in the current code (this DOES draw from the
+≤ 8 code-read budget). If the doc contradicts the code, do not raise a false collision —
+flag the doc as drifted instead, with the same helper `/espalier-ask` uses:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+mark_stale "espalier/<rules|wiki>/<file>.md" "$(git rev-parse HEAD)" "grill-verify: <one-line mismatch>"
+```
+
+Then move on — a stale doc is not a collision.
+
+**What a confirmed collision does:**
+- **Becomes a Step 2 question** — the sharpest kind, because it carries a concrete fork
+  and a citation: *"Requirement implies X; `rules/coding-standards.md#error-handling`
+  says this repo returns `Result<T>` — reconcile to `Result<T>`, or is `throw` intended
+  here (and why)?"* Always cite the exact `rules/<file>#section` or `wiki/<file>#section`.
+- **Floors the tier at `light`.** A `skip`-scored requirement (0–1 text signals) that
+  nonetheless collides must not skip — the collision is exactly the hidden default grill
+  exists to catch. `skip` + ≥ 1 confirmed collision → run Step 2 for the collisions alone.
+
+**Scope guard.** Surface collisions with conventions that already exist in `rules/`/`wiki/`
+only. Never propose new designs, generate alternatives, or brainstorm — that is not
+grill's job, and it would fight the point of encoding conventions. Zero collisions → add
+nothing and stay silent.
 
 ### Step 2 — Grill loop (tiers `light` and `full`)
 
@@ -125,6 +194,19 @@ batched at the end:
 | `spec` | concrete `## Acceptance Criteria` entries + explicit `## Scope Definition` in / out lines |
 | `diagnosis` | populate `## Root Cause`; sharpen `## Reproduction` into exact, repeatable steps |
 
+A **resolved collision** (Step 1.5) lands the same way, carrying its citation:
+
+| Collision resolved to | Lands as |
+|-----------------------|----------|
+| follow the convention | a `## Acceptance Criteria` line naming it ("errors returned as `Result<T>` per `rules/coding-standards.md`") |
+| reuse the existing capability | a `## Scope Definition` out-line ("reuse the documented `PaymentClient`; do not add a new HTTP client") |
+| intentional deviation | a `## Acceptance Criteria` line + one line of *why* the convention is overridden |
+| unresolved (non-answer / unattended) | an `## Open Questions` entry with the cited path + a conservative default |
+
+When Step 1.5 ran, add a short `## Convention Notes` block to `requirements.md` listing
+each `rules/`/`wiki/` path consulted and the collision verdict (raised / cleared / doc
+flagged stale) — so the audit trail shows the cross-check ran even when it found nothing.
+
 Every grilled decision must land as a verifiable line. Never leave a resolution only
 in the conversation.
 
@@ -144,7 +226,7 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
 | Verdict | When |
 |---------|------|
 | `GRILLED` | grill ran (`light` or `full`); `requirements.md` updated |
-| `SKIPPED: crisp` | tier was `skip` — input already well-specified |
+| `SKIPPED: crisp` | tier was `skip`, input already well-specified, **and** Step 1.5 confirmed zero collisions. A crisp input that collides with a rule/wiki convention returns `GRILLED`, not this. |
 | `SKIPPED: non-interactive` | unattended run (Step 0's interactivity_mode check) |
 | `SKIPPED: --no-grill` | the invoking stage passed the opt-out flag |
 
@@ -158,3 +240,7 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
 - NEVER leave a resolved decision only in the chat — it must be written to
   `requirements.md`.
 - NEVER batch questions — sequential only.
+- NEVER raise a collision (Step 1.5) without first verifying the cited `rules/`/`wiki/`
+  claim against the current code — a stale doc gets `mark_stale`, not a question.
+- NEVER brainstorm new designs or generate alternatives in Step 1.5 — it surfaces
+  collisions with conventions that already exist in `rules/`/`wiki/`, nothing more.

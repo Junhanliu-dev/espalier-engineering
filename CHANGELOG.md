@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.12.0 — 2026-07-13
+
+Minor: **Stage 1 now cross-references your own conventions.** Grill gains a
+blind-spot pass (Step 1.5) that reads `espalier/rules/` + `espalier/wiki/` and
+turns a convention collision into a Stage 1 question before any code is written.
+MINOR rather than PATCH because the generated grill skill changes shape (a new
+process step, a new `## Convention Notes` block in `requirements.md`).
+
+**Grill blind-spot pass (the feature).** After scoring the requirement's text
+signals and before the question loop, grill cross-references the requirement
+against the project map and looks for three collision classes: a **rule
+collision** (the approach contradicts a `rules/` convention — `throw` where
+coding-standards mandates `Result<T>`), a **wiki duplication** (re-implementing a
+capability `wiki/` documents — a new HTTP client for an API `external-services.md`
+already wraps), and an **unstated ripple** (a new field on a model
+`critical-paths.md` shows feeding several consumers). Each **confirmed** collision
+becomes a Stage 1 question citing the exact `rules/<file>#section`, and floors the
+tier so a crisp-but-colliding requirement can't skip grilling. Before raising a
+collision grill **verifies the cited convention still holds in the code** — a
+stale doc is flagged via `mark_stale` (the same signal `/espalier-doctor` and the
+post-merge hook use), never raised as a false collision. It surfaces collisions
+with existing conventions only (never brainstorms new designs) and stays **silent
+when there is no map to collide with**, so behaviour is unchanged on an
+uninitialised input — zero regression by construction. Resolutions are written
+back to `requirements.md` (Acceptance Criteria / Scope-out / Open Questions) plus a
+`## Convention Notes` audit block. `SKIPPED: crisp` now additionally requires zero
+collisions. Reads of `rules/`/`wiki/` do not count against grill's ≤ 8 code-read
+budget; code-verification of a candidate collision does.
+
+**Grill eval harness hardening.** All four `eval/grill/KNOWN-ISSUES.md` defects
+fixed: (1) `run.sh` retries `claude -p` and reports a call that still can't
+execute as a distinct **INCONCLUSIVE** exit (3), never folded into the scoring
+gate — an infra hiccup no longer reads as a regression; (2) fenced/prose-wrapped
+judge JSON now parses (`json_extract` keeps the first `{`…last `}`); (3) the
+mis-tiered `shadow-light-04` (4 signals at a 3-question cap) merged its two
+format-related signals into one, so it is satisfiable at `light`; (4) three
+announced-gap fixtures (`full-01` already, `full-03` + `light-02` new) carry
+`coverage_only: true`, so the non-obviousness bar they could never clear no longer
+fails them. New rubric dimension 6 (collision coverage + false-collision penalty);
+collisions fold into the existing `planted`/`surfaced` counts, so the harness math
+is unchanged. Four new fixtures: three `collision-*` and one anti-stale (which
+stays `skip` — a wrongly-raised collision floors the tier off `skip` and fails
+depth-calibration, so the false positive is caught by the existing gate). Full
+golden-set run: **24/24 PASS, catch-rate 1.00 all / 1.00 shadow** (was 0.98 /
+0.97), `RESULT` FAIL→PASS.
+
+**Honest caveat.** The `collision-*` fixtures inline their mock `rules/`/`wiki/`
+context, which **under-measures** the real gain: a capable model reasons over any
+context handed to it, so an A/B that pre-supplies the map erases the difference
+Step 1.5 makes. The fixtures are a capability + regression check, not a clean
+causal isolation; a faithful A/B needs an on-disk `espalier/` fixture project and
+is deferred (`docs/grill-blindspot-crosscheck-plan.md` §5.1).
+
+**Migration.** New `scripts/migrate-v0.11.0-to-v0.12.0.sh` — the change is confined
+to one pure-copy file, so it backs up and refreshes
+`espalier/skills/espalier-grill/SKILL.md` from the v0.12.0 template
+(`.pre-v0.12.bak`), verifies Step 1.5 landed, and no-ops on re-run. It refuses a
+stale plugin whose grill template lacks Step 1.5. No `python3` needed. Wired into
+`/espalier-migrate` (detection keyed on Step 1.5 absence; the seventeenth step in
+the chain). See `docs/migrating-v0.11-to-v0.12.md`.
+
 ## 0.11.0 — 2026-07-10
 
 Minor: **the push gate now actually blocks** — Claude Code hooks block on exit 2,
