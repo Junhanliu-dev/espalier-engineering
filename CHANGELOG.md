@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.13.1 — 2026-07-17
+
+Patch: **v0.13.0 polish round** — the three residuals the v0.13.0 quality
+report named, fixed and re-verified. No gate math, sentinel vocabulary, round
+cap, or review-dimension change; this sharpens what v0.13.0 already mandates.
+Post-fix scores: espalier-coding 75.7 → 90.4, harness-reviewer 91.0 → 96.0,
+espalier-review 88.1 → 93.8; suites green (coder 4/4, over-scope 0, over-build
+0; review 8/8, catch-rate 1.00, FP 0, verdict match 8/8).
+
+- **`templates/skills/espalier-coding.md`** — new `## How This Skill Applies
+  by Stage` section delivering the stage-conditional guidance the frontmatter
+  always promised: Stage 3 (the whole skill applies), Stage 5 testing mode
+  (layer specs govern where tests live; the ladder applies to test code —
+  reuse the project's test helpers/fixtures first, and a test-only dependency
+  is still a NEW dependency needing its `requirements.md` line; the abuse-test
+  and failure-mode recipes stay canonical in `harness-coder.md` /
+  `espalier-security`), and fix rounds (findings-only scope, smallest
+  convention-compliant change, never "improve" adjacent code the finding
+  didn't name). The Implementation Checklist placeholder gains an
+  `{e.g., ...}` illustration for the init scout (fresh-install only — an
+  existing install's checklist is already scout-filled).
+- **`templates/agents/harness-reviewer.md`** — the Stage 6 Security Abuse-Test
+  Coverage duty (a section since v0.9.0) is now numbered Review Process step 7,
+  explicitly conditional ("Test-review rounds only … Skip this step on
+  code-review rounds"); "Produce findings" renumbers to step 8. The duty
+  itself is unchanged.
+- **`templates/skills/espalier-review.md`** — the code-review loop gains the
+  Gate line its plan-review loop got in v0.13.0: verdict
+  `PASS`/`PASS_WITH_FIXES` with `p0=0 p1=0` on the sentinel, P2/P3 (minimalism
+  advisories included) never blocking, round counting and escalation owned by
+  pipeline Stage 4 (`max-code-rounds`).
+- **`scripts/migrate-v0.13.0-to-v0.13.1.sh`** (new) — surgical, anchored,
+  idempotent target-repo upgrade: inserts the By-Stage section (extracted from
+  the plugin template at runtime, placeholder-free), splices abuse-test step 7
+  + the renumber, inserts the code-review Gate line. Anchors verified on both
+  fresh v0.13.0 installs and installs migrated from v0.12.0. Skips the
+  `{e.g., ...}` checklist illustration by design (scout authoring hint —
+  nothing to illustrate in an already-filled install). Backs up to
+  `<file>.pre-v0.13.1.bak`. `--dry-run` / `--yes` / `--plugin-dir=`.
+  **`skills/espalier-migrate/SKILL.md`** gains the chain step (nineteenth) and
+  its plugin-location probe bumps to this script.
+- Docs: `docs/quality-report-v0.13.0.md` residuals annotated as fixed, with
+  the new scorer-surfaced follow-ups recorded; score history in
+  `eval/{coder,review}/auto-optimize-results.tsv`.
+
 ## 0.13.0 — 2026-07-17
 
 Minor: **the coder gets a laziness ladder; the reviewer gets an advisory
