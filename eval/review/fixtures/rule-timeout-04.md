@@ -8,9 +8,12 @@ planted_issues:
     severity: P1
     hint: fetch() to an external gateway with no timeout — unbounded await on I/O
 false_positive_watch:
-  - "wrapped in try/catch returning an err Result — do NOT flag error handling or a possible throw"
+  - "a try/catch exists and the catch returns an err Result — do NOT flag a missing try/catch or a possible unhandled throw"
+  - "GENUINE extras, never false positives if filed: the malformed Result on a non-2xx (`ok: res.ok` yields `{ ok: false }` with no err field while parsing the body as value), the catch flattening the cause to a constant string / missing structured log, and missing sibling modules (src/ contains only the file under review by harness design)"
 shadow: false
 ---
+const { AppError } = require('../errors');
+
 // charge — calls the external payment gateway. Returns Result<Charge, AppError>.
 async function charge(token, amount) {
   try {
