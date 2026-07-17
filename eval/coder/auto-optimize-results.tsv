@@ -1,0 +1,3 @@
+timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
+2026-07-17T13:37	b494987	harness-coder	-	83.2	baseline	-	v0.13.0 ladder baseline; weakest frontmatter(6)+checkpoints(7); effect 4/4 overbuild-trap incl	full_test
+2026-07-17T13:37	b494987	espalier-coding	-	75.7	baseline	-	v0.13.0 baseline; weakest frontmatter(6)+boundary(6); Before-Writing steps duplicate harness-coder (DRY liability); effect shared 4/4	full_test
