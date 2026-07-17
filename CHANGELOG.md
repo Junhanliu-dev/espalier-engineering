@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.0 — 2026-07-17 (draft)
+## 0.13.0 — 2026-07-17
 
 Minor: **the coder gets a laziness ladder; the reviewer gets an advisory
 minimalism lens.** Idea adapted from
@@ -48,6 +48,34 @@ formatter class). Review eval gains `clean-02-minimal-guard` (lean,
 convention-mandated code — any minimalism P0/P1 is a false positive, guarding
 severity inflation) and `rule-newdep-06` (a planted `dayjs` import for a
 stdlib-covered format — the one minimalism finding that must gate at P1).
+Separately, a baseline attribution run (v0.12 templates + fixtures under the
+current default model) showed the review suite was already failing — a
+stronger reviewer surfaces genuine defects the fixtures accidentally carried.
+Fixed at source (elided `AppError` imports in `rule-throw-01`/`rule-timeout-04`,
+a genuinely-defective "clean" fixture body, over-broad watch lines that
+shadowed real findings) plus a rubric class-rule: harness-world findings
+(missing sibling modules, absent requirements.md) are genuine, never false
+positives. Logged as eval-integrity in `auto-optimize-results.tsv` — NOT a
+skill win.
+
+**Quality gate (darwin rubric).** All four touched artifacts scored by
+independent reviewer agents (8 dimensions, structure + measured effect from
+the real harness runs), every scorer finding fixed, suites re-run green after
+each fix: `harness-reviewer` 87.9 → **91.0** (adds the `p1=` row-count
+binding; restores the fan-out P1 bullet that had drifted from
+production-standards.md), `harness-coder` 83.2 → **88.6**, `espalier-review`
+82.4 → **88.1** (plan-review loop gains an explicit pass condition),
+`espalier-coding` 75.7 (frontmatter 6→9; Before-Writing steps de-duplicated
+into a pointer at the canonical coder sequence). Average **82.3 → 85.9**.
+Full report: `docs/quality-report-v0.13.0.md`.
+
+**Migration.** `scripts/migrate-v0.12.0-to-v0.13.0.sh` — surgical anchored
+inserts into the four per-project files (never a template overwrite; section
+bodies extracted from the installed plugin's templates at runtime so script
+and templates cannot drift), idempotent, backups at `<file>.pre-v0.13.bak`.
+`/espalier-migrate` chain extended (18 steps). Fresh-install-only cosmetic
+delta: the richer frontmatter descriptions. See
+`docs/migrating-v0.12-to-v0.13.md`.
 
 ## 0.12.0 — 2026-07-13
 
