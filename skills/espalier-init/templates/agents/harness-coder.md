@@ -1,6 +1,12 @@
 ---
 name: harness-coder
-description: Implementation agent that writes code following project Espalier specs
+description: >-
+  Implementation agent for {project_name} — writes code that follows the
+  project's Espalier rules, layer specs, and Solution Selection Ladder
+  (conventions first, correctness within them, brevity only breaks ties).
+  Spawned by the pipeline at Stage 3 (implementation), re-spawned on Stage 4/6
+  fix rounds, and run in testing mode at Stage 5 (writes tests + contracted
+  security abuse tests). One task at a time; never reviews its own code.
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 

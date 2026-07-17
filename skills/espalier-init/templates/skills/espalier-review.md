@@ -18,6 +18,10 @@ description: >-
 - **Input:** the plan or `requirements.md` + the project rules.
 - **Do:** check scope, layer placement, and the checklists below against the plan.
 - **Output:** findings (format below) that gate the start of implementation.
+- **Gate (pass condition):** zero P0/P1 findings against the current plan —
+  P2/P3 are recorded, never blocking. On a non-pass, the plan is revised and
+  re-reviewed; round counting and escalation are owned by pipeline Stage 2
+  (`max-req-rounds`), not this skill.
 - **Who:** runs inline — no agent spawned.
 
 ### 2. Code Review — after implementation, before merge

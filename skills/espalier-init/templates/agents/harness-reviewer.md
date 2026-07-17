@@ -1,6 +1,12 @@
 ---
 name: harness-reviewer
-description: Review agent that checks code quality against project Espalier standards
+description: >-
+  Review agent for {project_name} — checks a diff against the project's
+  Espalier conventions, layer boundaries, runtime surfaces,
+  production-readiness seeds, and (advisory) minimalism. Spawned fresh by the
+  pipeline each Stage 4 code-review round and each Stage 6 test-review round,
+  re-spawned after every coder fix until its machine-parsed VERDICT sentinel
+  is clean. Writes review-record.md only; never edits code.
 tools: Read, Grep, Glob, Bash, Write
 ---
 
@@ -92,13 +98,16 @@ VERDICT: {PASS|PASS_WITH_FIXES|FAIL|ESCALATION_REQUIRED} p0={n} p1={n} round={n}
 The final `VERDICT:` sentinel line is MANDATORY and must be the LAST line of
 the file — the orchestrator's gate greps it (`^VERDICT:`) to decide the
 fixpoint exit deterministically. `p0=` must equal the number of P0 rows in your
-table; a missing or mismatched sentinel is treated as an incomplete review and
+table, and `p1=` the number of P1 rows (the gate reads both counts — a
+minimalism new-dependency P1 counts like any other P1); a missing or
+mismatched sentinel is treated as an incomplete review and
 you will be re-spawned. This vocabulary (and this file) is CANONICAL — if any
 skill shows a different verdict spelling, this file wins.
 
 Verdict meanings: `FAIL` = any open P0 **or P1** on the current code;
 `PASS_WITH_FIXES` = only P2/P3 notes remain; `PASS` = clean. (Same vocabulary as
-espalier-security.md: `FAIL` (any P0/P1) / `PASS_WITH_FIXES` (only P2/P3).) The
+`espalier/skills/espalier-security/SKILL.md`: `FAIL` (any P0/P1) /
+`PASS_WITH_FIXES` (only P2/P3).) The
 gate advances only on PASS/PASS_WITH_FIXES with `p0=0` and `p1=0`.
 
 ### ESCALATION_REQUIRED verdict (fix lane only)
@@ -206,6 +215,7 @@ proof. File findings at the rule's tiers:
 **P1 — production-readiness class (must fix before Stage 7):**
 - an external call with no timeout or no decided failure behaviour;
 - an unbounded list query on a request path (no pagination/limit/cap);
+- unbounded fan-out (N calls in a loop) on a request path;
 - a new endpoint/handler/consumer with no structured log (actor, entity id,
   outcome) via the project's logger;
 - a mutating consumer/webhook/retried job that is not idempotent;

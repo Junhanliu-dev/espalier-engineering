@@ -1,3 +1,5 @@
 timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-07-17T13:37	b494987	harness-coder	-	83.2	baseline	-	v0.13.0 ladder baseline; weakest frontmatter(6)+checkpoints(7); effect 4/4 overbuild-trap incl	full_test
 2026-07-17T13:37	b494987	espalier-coding	-	75.7	baseline	-	v0.13.0 baseline; weakest frontmatter(6)+boundary(6); Before-Writing steps duplicate harness-coder (DRY liability); effect shared 4/4	full_test
+2026-07-17T14:37	HEAD	harness-coder	83.2	88.6	keep	frontmatter	stage-trigger description (6->9); ladder verified 1:1 vs reviewer Minimalism; suites 4/4	full_test
+2026-07-17T14:37	HEAD	espalier-coding	75.7	75.7	keep	frontmatter+architecture	frontmatter 6->9 ({project}+triggers), Before-Writing de-duped to harness-coder pointer; total flat (judge re-weighted boundary/checkpoints); next: stage-conditional guidance	full_test

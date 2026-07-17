@@ -1,6 +1,12 @@
 ---
 name: espalier-coding
-description: Implementation skill with per-layer specs for this project
+description: >-
+  How {project} implements features — the per-layer spec map, the
+  project-specific implementation checklist, and the lean solution-selection
+  rule. Load BEFORE writing any code in {project}; used by harness-coder at
+  Stage 3 (implementation), Stage 5 (testing mode), and on fix rounds.
+  Triggers: "implement", "add feature", "write code", "which layer does this
+  go in", "layer spec".
 ---
 
 # Coding Skill
@@ -20,11 +26,12 @@ description: Implementation skill with per-layer specs for this project
 - [ ] ...
 
 ## Before Writing Code
-1. Identify which layer(s) this change touches
-2. Read the relevant spec file(s) from specs/
-3. Find 1-2 existing files in that layer as reference
-4. Follow the template structure exactly
-5. Climb the Solution Selection Ladder (below) before choosing the change's shape
+The canonical pre-coding sequence (identify layer → read spec → find 1-2
+reference files → follow the template exactly → climb the Solution Selection
+Ladder) lives in `espalier/agents/harness-coder.md` ("Before Writing ANY
+Code") — follow it from there; it is deliberately not restated here so the two
+files cannot drift. This skill adds the project-specific parts: the Layer
+Specs map and the Implementation Checklist above.
 
 ## Solution Selection (keep it lean)
 Best convention-compliant solution wins: conventions first, correctness within
