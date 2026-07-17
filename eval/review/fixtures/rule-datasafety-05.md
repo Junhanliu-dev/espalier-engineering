@@ -12,6 +12,7 @@ planted_issues:
     hint: the delete failure is caught and ignored, so a failed purge reports success
 false_positive_watch:
   - "the injected logger import itself is fine — the defect is that the catch swallows the error, not that a logger exists"
+  - "GENUINE extras, never false positives if filed: a second P0 reading the same delete as 'destructive operation without requirements.md authorization' (no requirements.md exists in this harness world), and a P1 for logger-imported-but-never-called / no structured log on either path"
 shadow: false
 ---
 const { db } = require('../repositories/db');

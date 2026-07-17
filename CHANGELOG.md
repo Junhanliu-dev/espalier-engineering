@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.13.0 — 2026-07-17
+
+Minor: **the coder gets a laziness ladder; the reviewer gets an advisory
+minimalism lens.** Idea adapted from
+[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT) —
+an idea-level borrow, re-grounded in Espalier's convention-first model. The
+governing rule everywhere: **conventions first, correctness within them,
+brevity only breaks ties.** "Short is always best" is explicitly NOT the rule
+— a construct the project's rules or layer specs mandate is never over-build,
+even when a shorter form exists. MINOR because the generated `harness-coder`
+and `harness-reviewer` agent files change shape.
+
+**Solution Selection Ladder (`harness-coder`, `espalier-coding`).** Before
+choosing a change's shape, the coder climbs: (1) speculative extra → don't
+build it; (2) the project already has it (reference files, `espalier/wiki/`)
+→ reuse; (3) a convention names the mechanism → use THAT, even when stdlib
+would be shorter; (4) conventions silent → stdlib, then native platform
+feature, then already-installed dependency — never a NEW dependency without a
+`requirements.md` line naming it; (5) only then the leanest
+convention-compliant implementation that is correct on the edge cases. The
+ladder runs after understanding (specs, references, blast radius), never
+instead of it; trust-boundary validation, the project error pattern, and the
+security/production rules are the floor, not rungs. Deliberate
+simplifications land in coding-report.md "Notes" so the reviewer confirms
+them instead of re-deriving them.
+
+**Minimalism Review (`harness-reviewer`, `espalier-review`).** A new advisory
+dimension: `delete:` / `stdlib:` / `native:` / `yagni:` findings, each
+required to name its concrete replacement, capped at **P2/P3** so they can
+never re-open the Stage 4 fixpoint loop or touch the sentinel's `p0=`/`p1=`.
+ONE exception may block at P1: a NEW dependency covering what stdlib, a
+native feature, or an installed dependency provides — the objectively
+checkable mirror image of the existing "hand-rolls what the discovered
+wrapper covers" P1. Tie-break: a finding is invalid against a
+rules/specs-mandated construct; "the convention itself is over-built" routes
+to a Convention Observation (the human promotion path), never a finding. No
+finding quota — "Minimalism: lean" is the expected common case. Gate math,
+sentinel vocabulary, round caps, and panel structure are untouched.
+
+**Eval hardening.** Coder eval gains an `overbuild` judge field (built the
+in-scope task too big: new dependency, hand-rolled stdlib, single-impl
+abstraction, unrequested config) with a `== 0` release gate alongside
+`overscope`, plus the `coder-04-overbuild-trap` fixture (the classic
+date-formatting trap: `toISOString().slice(0, 10)` vs a date library or a
+formatter class). Review eval gains `clean-02-minimal-guard` (lean,
+convention-mandated code — any minimalism P0/P1 is a false positive, guarding
+severity inflation) and `rule-newdep-06` (a planted `dayjs` import for a
+stdlib-covered format — the one minimalism finding that must gate at P1).
+Separately, a baseline attribution run (v0.12 templates + fixtures under the
+current default model) showed the review suite was already failing — a
+stronger reviewer surfaces genuine defects the fixtures accidentally carried.
+Fixed at source (elided `AppError` imports in `rule-throw-01`/`rule-timeout-04`,
+a genuinely-defective "clean" fixture body, over-broad watch lines that
+shadowed real findings) plus a rubric class-rule: harness-world findings
+(missing sibling modules, absent requirements.md) are genuine, never false
+positives. Logged as eval-integrity in `auto-optimize-results.tsv` — NOT a
+skill win.
+
+**Quality gate (darwin rubric).** All four touched artifacts scored by
+independent reviewer agents (8 dimensions, structure + measured effect from
+the real harness runs), every scorer finding fixed, suites re-run green after
+each fix: `harness-reviewer` 87.9 → **91.0** (adds the `p1=` row-count
+binding; restores the fan-out P1 bullet that had drifted from
+production-standards.md), `harness-coder` 83.2 → **88.6**, `espalier-review`
+82.4 → **88.1** (plan-review loop gains an explicit pass condition),
+`espalier-coding` 75.7 (frontmatter 6→9; Before-Writing steps de-duplicated
+into a pointer at the canonical coder sequence). Average **82.3 → 85.9**.
+Full report: `docs/quality-report-v0.13.0.md`.
+
+**Migration.** `scripts/migrate-v0.12.0-to-v0.13.0.sh` — surgical anchored
+inserts into the four per-project files (never a template overwrite; section
+bodies extracted from the installed plugin's templates at runtime so script
+and templates cannot drift), idempotent, backups at `<file>.pre-v0.13.bak`.
+`/espalier-migrate` chain extended (18 steps). Fresh-install-only cosmetic
+delta: the richer frontmatter descriptions. See
+`docs/migrating-v0.12-to-v0.13.md`.
+
 ## 0.12.0 — 2026-07-13
 
 Minor: **Stage 1 now cross-references your own conventions.** Grill gains a

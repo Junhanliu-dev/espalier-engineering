@@ -10,6 +10,7 @@ planted_issues:
 false_positive_watch:
   - "returns via result.ok branch — do NOT flag error handling"
   - "imports a service, not db — do NOT flag layers"
+  - "GENUINE extras, never false positives if filed: the missing structured outcome log on this new handler (the console.log P1 is the planted subset of the logging problem), and the unverifiable user-service contract (src/ contains only the file under review by harness design)"
 shadow: false
 ---
 const { getUser } = require('../services/user-service');

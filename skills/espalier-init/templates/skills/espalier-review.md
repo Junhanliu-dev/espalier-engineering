@@ -18,13 +18,18 @@ description: >-
 - **Input:** the plan or `requirements.md` + the project rules.
 - **Do:** check scope, layer placement, and the checklists below against the plan.
 - **Output:** findings (format below) that gate the start of implementation.
+- **Gate (pass condition):** zero P0/P1 findings against the current plan —
+  P2/P3 are recorded, never blocking. On a non-pass, the plan is revised and
+  re-reviewed; round counting and escalation are owned by pipeline Stage 2
+  (`max-req-rounds`), not this skill.
 - **Who:** runs inline — no agent spawned.
 
 ### 2. Code Review — after implementation, before merge
 - **When:** the coder reports a change complete.
 - **Input:** the diff + the coder's `coding-report.md` + the project rules.
 - **Do:** spawn `harness-reviewer` (the canonical agent) — it runs the
-  Runtime-Surface and Production-Readiness reviews and writes `review-record.md`.
+  Runtime-Surface, Production-Readiness, and (advisory) Minimalism reviews and
+  writes `review-record.md`.
 - **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
 - **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
 
@@ -46,6 +51,11 @@ Each finding MUST include:
 - [ ] Correctness: Does it do what the requirement says?
 - [ ] Consistency: Does it match existing patterns?
 - [ ] Completeness: Edge cases handled?
+- [ ] Leanness: nothing built beyond the requirement (no speculative
+      abstraction/config); no NEW dependency where stdlib, a native feature, or
+      an installed dependency covers it. Advisory P2/P3 except the new-dependency
+      P1 — canonical rules in `espalier/agents/harness-reviewer.md` (Minimalism
+      Review). Never flag a construct the rules/specs mandate.
 
 ## Production-Readiness Checks
 `espalier/rules/production-standards.md` is the SINGLE SOURCE for these checks and

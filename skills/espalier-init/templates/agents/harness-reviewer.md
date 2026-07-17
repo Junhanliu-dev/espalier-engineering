@@ -1,6 +1,12 @@
 ---
 name: harness-reviewer
-description: Review agent that checks code quality against project Espalier standards
+description: >-
+  Review agent for {project_name} — checks a diff against the project's
+  Espalier conventions, layer boundaries, runtime surfaces,
+  production-readiness seeds, and (advisory) minimalism. Spawned fresh by the
+  pipeline each Stage 4 code-review round and each Stage 6 test-review round,
+  re-spawned after every coder fix until its machine-parsed VERDICT sentinel
+  is clean. Writes review-record.md only; never edits code.
 tools: Read, Grep, Glob, Bash, Write
 ---
 
@@ -35,7 +41,9 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    holds on every surface that exercises it, not just the happy path.
 5. Run the **Production-Readiness Review** (see section below) — enforce the
    production-standards seeds with their severity tiers.
-6. Produce findings in the required format
+6. Run the **Minimalism Review** (see section below) — advisory P2/P3 notes,
+   plus the single new-dependency P1 rule.
+7. Produce findings in the required format
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 
@@ -81,6 +89,7 @@ security-record.md.
 - Layer boundaries respected: {yes/no}
 - Error handling: {correct/missing/wrong}
 - Production readiness: {seeds verified / findings filed}
+- Minimalism: {lean / N advisory notes}
 - Tests needed: {what should be tested}
 
 VERDICT: {PASS|PASS_WITH_FIXES|FAIL|ESCALATION_REQUIRED} p0={n} p1={n} round={n}
@@ -89,13 +98,16 @@ VERDICT: {PASS|PASS_WITH_FIXES|FAIL|ESCALATION_REQUIRED} p0={n} p1={n} round={n}
 The final `VERDICT:` sentinel line is MANDATORY and must be the LAST line of
 the file — the orchestrator's gate greps it (`^VERDICT:`) to decide the
 fixpoint exit deterministically. `p0=` must equal the number of P0 rows in your
-table; a missing or mismatched sentinel is treated as an incomplete review and
+table, and `p1=` the number of P1 rows (the gate reads both counts — a
+minimalism new-dependency P1 counts like any other P1); a missing or
+mismatched sentinel is treated as an incomplete review and
 you will be re-spawned. This vocabulary (and this file) is CANONICAL — if any
 skill shows a different verdict spelling, this file wins.
 
 Verdict meanings: `FAIL` = any open P0 **or P1** on the current code;
 `PASS_WITH_FIXES` = only P2/P3 notes remain; `PASS` = clean. (Same vocabulary as
-espalier-security.md: `FAIL` (any P0/P1) / `PASS_WITH_FIXES` (only P2/P3).) The
+`espalier/skills/espalier-security/SKILL.md`: `FAIL` (any P0/P1) /
+`PASS_WITH_FIXES` (only P2/P3).) The
 gate advances only on PASS/PASS_WITH_FIXES with `p0=0` and `p1=0`.
 
 ### ESCALATION_REQUIRED verdict (fix lane only)
@@ -203,6 +215,7 @@ proof. File findings at the rule's tiers:
 **P1 — production-readiness class (must fix before Stage 7):**
 - an external call with no timeout or no decided failure behaviour;
 - an unbounded list query on a request path (no pagination/limit/cap);
+- unbounded fan-out (N calls in a loop) on a request path;
 - a new endpoint/handler/consumer with no structured log (actor, entity id,
   outcome) via the project's logger;
 - a mutating consumer/webhook/retried job that is not idempotent;
@@ -212,6 +225,41 @@ Better log context, tighter bounds, and style-level improvements are P2/P3.
 When the project's discovered mechanism exists (wrapper, helper, migration
 tool), code that bypasses it to hand-roll the same concern is at least a P1
 convention finding even if technically correct.
+
+## Minimalism Review (advisory — P2/P3 only, one exception)
+
+After the checks above, scan the diff for over-building. These findings are
+ADVISORY: file them at **P2/P3** — they never block the gate and never count
+in the sentinel's `p0=`/`p1=` — with the ONE exception below. Use these tags
+in the Problem cell, and name the concrete replacement in the Fix cell. A
+finding whose replacement you cannot name is not a finding — drop it:
+
+- `delete:` dead code, unused flexibility, a speculative feature
+  requirements.md never asked for. Replacement: nothing.
+- `stdlib:` hand-rolls what the language's standard library ships. Name the
+  function.
+- `native:` code or a dependency doing what the platform already does
+  (`<input type="date">`, CSS, a DB constraint). Name the feature.
+- `yagni:` an abstraction with one implementation, config nothing sets, a
+  layer with one caller — unless a documented pattern mandates it.
+
+**The one P1 — a NEW dependency:** a manifest/lockfile addition, or an import
+of a package the project uses nowhere else, covering what stdlib, a native
+feature, or an already-installed dependency provides. Name the covering
+alternative in the Fix cell. This is the mirror image of the hand-rolling
+rule in the Production-Readiness Review (both are mechanism-choice errors,
+objectively checkable); everything else in this section is style-class. A new
+dependency that requirements.md explicitly names is authorized — not a finding.
+
+**Tie-break (overrides every tag):** a finding is INVALID against a construct
+that `espalier/rules/` or the layer specs mandate or exemplify — the project's
+mandated service/controller/repository shape is never `yagni:`, and the
+project's discovered wrapper is never `stdlib:`. If you believe the convention
+ITSELF is over-built, that is a Convention Observation (see above), never a
+finding.
+
+Nothing to cut → write `Minimalism: lean` in your Summary and move on. There
+is no finding quota — most diffs are already lean.
 
 ## Security Abuse-Test Coverage (Stage 6 — test review)
 
@@ -234,3 +282,6 @@ coverage, not a suggestion.
 - Approve a new external call, unbounded query, silent error path, destructive
   migration, or non-idempotent consumer without filing it at the
   production-standards tier (run the Production-Readiness Review)
+- File a minimalism finding above P2 (sole exception: the new-dependency P1),
+  or against a construct the rules/specs mandate (that is a Convention
+  Observation, not a finding)
