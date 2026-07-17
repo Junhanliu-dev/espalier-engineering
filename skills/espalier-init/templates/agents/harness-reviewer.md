@@ -35,7 +35,9 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    holds on every surface that exercises it, not just the happy path.
 5. Run the **Production-Readiness Review** (see section below) — enforce the
    production-standards seeds with their severity tiers.
-6. Produce findings in the required format
+6. Run the **Minimalism Review** (see section below) — advisory P2/P3 notes,
+   plus the single new-dependency P1 rule.
+7. Produce findings in the required format
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 
@@ -81,6 +83,7 @@ security-record.md.
 - Layer boundaries respected: {yes/no}
 - Error handling: {correct/missing/wrong}
 - Production readiness: {seeds verified / findings filed}
+- Minimalism: {lean / N advisory notes}
 - Tests needed: {what should be tested}
 
 VERDICT: {PASS|PASS_WITH_FIXES|FAIL|ESCALATION_REQUIRED} p0={n} p1={n} round={n}
@@ -213,6 +216,41 @@ When the project's discovered mechanism exists (wrapper, helper, migration
 tool), code that bypasses it to hand-roll the same concern is at least a P1
 convention finding even if technically correct.
 
+## Minimalism Review (advisory — P2/P3 only, one exception)
+
+After the checks above, scan the diff for over-building. These findings are
+ADVISORY: file them at **P2/P3** — they never block the gate and never count
+in the sentinel's `p0=`/`p1=` — with the ONE exception below. Use these tags
+in the Problem cell, and name the concrete replacement in the Fix cell. A
+finding whose replacement you cannot name is not a finding — drop it:
+
+- `delete:` dead code, unused flexibility, a speculative feature
+  requirements.md never asked for. Replacement: nothing.
+- `stdlib:` hand-rolls what the language's standard library ships. Name the
+  function.
+- `native:` code or a dependency doing what the platform already does
+  (`<input type="date">`, CSS, a DB constraint). Name the feature.
+- `yagni:` an abstraction with one implementation, config nothing sets, a
+  layer with one caller — unless a documented pattern mandates it.
+
+**The one P1 — a NEW dependency:** a manifest/lockfile addition, or an import
+of a package the project uses nowhere else, covering what stdlib, a native
+feature, or an already-installed dependency provides. Name the covering
+alternative in the Fix cell. This is the mirror image of the hand-rolling
+rule in the Production-Readiness Review (both are mechanism-choice errors,
+objectively checkable); everything else in this section is style-class. A new
+dependency that requirements.md explicitly names is authorized — not a finding.
+
+**Tie-break (overrides every tag):** a finding is INVALID against a construct
+that `espalier/rules/` or the layer specs mandate or exemplify — the project's
+mandated service/controller/repository shape is never `yagni:`, and the
+project's discovered wrapper is never `stdlib:`. If you believe the convention
+ITSELF is over-built, that is a Convention Observation (see above), never a
+finding.
+
+Nothing to cut → write `Minimalism: lean` in your Summary and move on. There
+is no finding quota — most diffs are already lean.
+
 ## Security Abuse-Test Coverage (Stage 6 — test review)
 
 When reviewing tests, if the change has an
@@ -234,3 +272,6 @@ coverage, not a suggestion.
 - Approve a new external call, unbounded query, silent error path, destructive
   migration, or non-idempotent consumer without filing it at the
   production-standards tier (run the Production-Readiness Review)
+- File a minimalism finding above P2 (sole exception: the new-dependency P1),
+  or against a construct the rules/specs mandate (that is a Convention
+  Observation, not a finding)

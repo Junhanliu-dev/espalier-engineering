@@ -8,7 +8,7 @@ the OUTPUT code against the conventions, the task, and scope.
 ## Output
 
 ```json
-{"followed":N,"violated":N,"task_done":0|1,"overscope":0|1,"verdict":"PASS|FAIL"}
+{"followed":N,"violated":N,"task_done":0|1,"overscope":0|1,"overbuild":0|1,"verdict":"PASS|FAIL"}
 ```
 
 ## Field definitions
@@ -25,7 +25,18 @@ the OUTPUT code against the conventions, the task, and scope.
   (e.g. refactored an unrelated function, edited a controller for a service task,
   added endpoints not asked for), else `0`. The coder's own rule is "one task at a
   time — do not expand scope."
-- **verdict** — PASS iff `violated == 0` AND `task_done == 1` AND `overscope == 0`.
+- **overbuild** — `1` if the IN-SCOPE task was built bigger than the leanest
+  convention-compliant solution: a NEW dependency (require/import of a package the
+  project doesn't already use), a hand-rolled version of something the stdlib or
+  platform covers, an abstraction with one implementation (class / factory / extra
+  module) the task didn't ask for, unrequested options/config parameters, or extra
+  exported helpers. Else `0`. The coder's own rule is the Solution Selection Ladder:
+  "conventions first, correctness within them, brevity only breaks ties." Following
+  a convention the rules mandate is NEVER overbuild, even when a shorter form
+  exists. `overscope` = touched things outside the task; `overbuild` = built the
+  inside task too big.
+- **verdict** — PASS iff `violated == 0` AND `task_done == 1` AND `overscope == 0`
+  AND `overbuild == 0`.
 
 ## Guidance
 - Judge the CODE, not the coding-report's self-description. If the report claims

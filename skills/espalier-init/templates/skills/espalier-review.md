@@ -24,7 +24,8 @@ description: >-
 - **When:** the coder reports a change complete.
 - **Input:** the diff + the coder's `coding-report.md` + the project rules.
 - **Do:** spawn `harness-reviewer` (the canonical agent) — it runs the
-  Runtime-Surface and Production-Readiness reviews and writes `review-record.md`.
+  Runtime-Surface, Production-Readiness, and (advisory) Minimalism reviews and
+  writes `review-record.md`.
 - **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
 - **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
 
@@ -46,6 +47,11 @@ Each finding MUST include:
 - [ ] Correctness: Does it do what the requirement says?
 - [ ] Consistency: Does it match existing patterns?
 - [ ] Completeness: Edge cases handled?
+- [ ] Leanness: nothing built beyond the requirement (no speculative
+      abstraction/config); no NEW dependency where stdlib, a native feature, or
+      an installed dependency covers it. Advisory P2/P3 except the new-dependency
+      P1 — canonical rules in `espalier/agents/harness-reviewer.md` (Minimalism
+      Review). Never flag a construct the rules/specs mandate.
 
 ## Production-Readiness Checks
 `espalier/rules/production-standards.md` is the SINGLE SOURCE for these checks and

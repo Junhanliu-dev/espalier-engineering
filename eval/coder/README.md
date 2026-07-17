@@ -57,8 +57,8 @@ shadow: false
 ```
 
 ## Discipline
-- Reach 20–30 fixtures. Seed is 3 (a service method, an external-call timeout, a
-  scope-guard). All `shadow: false`.
+- Reach 20–30 fixtures. Seed is 4 (a service method, an external-call timeout, a
+  scope-guard, an overbuild trap). All `shadow: false`.
 - Shadow subset from real tickets once the set grows.
 - Validate the judge heavily — generative scoring is the least reliable; confirm
   agreement with hand scores before trusting the gate.

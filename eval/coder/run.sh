@@ -25,7 +25,7 @@ for f in "$CODER_TPL" "$CODING_SKILL_TPL" "$RUBRIC" \
 done
 [ -d "$FIXTURES" ] || { echo "ERROR: fixtures dir not found at $FIXTURES"; exit 2; }
 
-total=0; passed=0; overscope_total=0; fail_count=0; results=""
+total=0; passed=0; overscope_total=0; overbuild_total=0; fail_count=0; results=""
 
 setup_and_run() {
   local fixture="$1" fid="$2"
@@ -70,7 +70,7 @@ Coder's coding-report:
 $(cat "$report" 2>/dev/null || echo '(none)')
 
 Output ONE line of compact JSON only, no prose:
-{\"followed\":N,\"violated\":N,\"task_done\":0,\"overscope\":0,\"verdict\":\"PASS\"}" \
+{\"followed\":N,\"violated\":N,\"task_done\":0,\"overscope\":0,\"overbuild\":0,\"verdict\":\"PASS\"}" \
     2>/dev/null
 }
 
@@ -97,22 +97,24 @@ for fixture in "$FIXTURES"/*.md; do
   violated="$(printf '%s' "$line" | sed -E 's/.*"violated":([0-9]+).*/\1/')"
   tdone="$(printf '%s'    "$line" | sed -E 's/.*"task_done":([01]).*/\1/')"
   oscope="$(printf '%s'   "$line" | sed -E 's/.*"overscope":([01]).*/\1/')"
+  obuild="$(printf '%s'   "$line" | sed -E 's/.*"overbuild":([01]).*/\1/')"
 
-  case "$violated$tdone$oscope" in *[!0-9]*|"") echo "$fid: unparseable judge output: $line"; fail_count=$((fail_count + 1)); continue ;; esac
+  case "$violated$tdone$oscope$obuild" in *[!0-9]*|"") echo "$fid: unparseable judge output: $line"; fail_count=$((fail_count + 1)); continue ;; esac
 
   overscope_total=$((overscope_total + oscope))
+  overbuild_total=$((overbuild_total + obuild))
   fverdict="FAIL"
-  if [ "$violated" -eq 0 ] && [ "$tdone" -eq 1 ] && [ "$oscope" -eq 0 ]; then
+  if [ "$violated" -eq 0 ] && [ "$tdone" -eq 1 ] && [ "$oscope" -eq 0 ] && [ "$obuild" -eq 0 ]; then
     fverdict="PASS"; passed=$((passed + 1))
   else
     fail_count=$((fail_count + 1))
   fi
 
-  results="${results}${fid}\tviol=${violated}\ttask=${tdone}\tscope=$([ "$oscope" -eq 1 ] && echo OVER || echo ok)\t${fverdict}\n"
+  results="${results}${fid}\tviol=${violated}\ttask=${tdone}\tscope=$([ "$oscope" -eq 1 ] && echo OVER || echo ok)\tbuild=$([ "$obuild" -eq 1 ] && echo OVER || echo ok)\t${fverdict}\n"
 done
 
 echo
-printf 'fixture\tviolations\ttask\tscope\tresult\n'
+printf 'fixture\tviolations\ttask\tscope\tbuild\tresult\n'
 printf '%b' "$results"
 echo
 
@@ -120,10 +122,11 @@ pass_rate="0.00"
 [ "$total" -gt 0 ] && pass_rate="$(awk "BEGIN{printf \"%.2f\", $passed/$total}")"
 echo "pass-rate:        $pass_rate  (gate >= $GATE_PASS_RATE)"
 echo "over-scope count: $overscope_total  (gate == 0)"
+echo "over-build count: $overbuild_total  (gate == 0)"
 echo "fixture failures: $fail_count"
 
 rate_ok="$(awk "BEGIN{print ($pass_rate >= $GATE_PASS_RATE) ? 1 : 0}")"
-if [ "$rate_ok" -eq 1 ] && [ "$overscope_total" -eq 0 ]; then
+if [ "$rate_ok" -eq 1 ] && [ "$overscope_total" -eq 0 ] && [ "$overbuild_total" -eq 0 ]; then
   echo "RESULT: PASS"
 else
   echo "RESULT: FAIL"

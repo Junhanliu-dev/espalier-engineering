@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.13.0 — 2026-07-17 (draft)
+
+Minor: **the coder gets a laziness ladder; the reviewer gets an advisory
+minimalism lens.** Idea adapted from
+[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT) —
+an idea-level borrow, re-grounded in Espalier's convention-first model. The
+governing rule everywhere: **conventions first, correctness within them,
+brevity only breaks ties.** "Short is always best" is explicitly NOT the rule
+— a construct the project's rules or layer specs mandate is never over-build,
+even when a shorter form exists. MINOR because the generated `harness-coder`
+and `harness-reviewer` agent files change shape.
+
+**Solution Selection Ladder (`harness-coder`, `espalier-coding`).** Before
+choosing a change's shape, the coder climbs: (1) speculative extra → don't
+build it; (2) the project already has it (reference files, `espalier/wiki/`)
+→ reuse; (3) a convention names the mechanism → use THAT, even when stdlib
+would be shorter; (4) conventions silent → stdlib, then native platform
+feature, then already-installed dependency — never a NEW dependency without a
+`requirements.md` line naming it; (5) only then the leanest
+convention-compliant implementation that is correct on the edge cases. The
+ladder runs after understanding (specs, references, blast radius), never
+instead of it; trust-boundary validation, the project error pattern, and the
+security/production rules are the floor, not rungs. Deliberate
+simplifications land in coding-report.md "Notes" so the reviewer confirms
+them instead of re-deriving them.
+
+**Minimalism Review (`harness-reviewer`, `espalier-review`).** A new advisory
+dimension: `delete:` / `stdlib:` / `native:` / `yagni:` findings, each
+required to name its concrete replacement, capped at **P2/P3** so they can
+never re-open the Stage 4 fixpoint loop or touch the sentinel's `p0=`/`p1=`.
+ONE exception may block at P1: a NEW dependency covering what stdlib, a
+native feature, or an installed dependency provides — the objectively
+checkable mirror image of the existing "hand-rolls what the discovered
+wrapper covers" P1. Tie-break: a finding is invalid against a
+rules/specs-mandated construct; "the convention itself is over-built" routes
+to a Convention Observation (the human promotion path), never a finding. No
+finding quota — "Minimalism: lean" is the expected common case. Gate math,
+sentinel vocabulary, round caps, and panel structure are untouched.
+
+**Eval hardening.** Coder eval gains an `overbuild` judge field (built the
+in-scope task too big: new dependency, hand-rolled stdlib, single-impl
+abstraction, unrequested config) with a `== 0` release gate alongside
+`overscope`, plus the `coder-04-overbuild-trap` fixture (the classic
+date-formatting trap: `toISOString().slice(0, 10)` vs a date library or a
+formatter class). Review eval gains `clean-02-minimal-guard` (lean,
+convention-mandated code — any minimalism P0/P1 is a false positive, guarding
+severity inflation) and `rule-newdep-06` (a planted `dayjs` import for a
+stdlib-covered format — the one minimalism finding that must gate at P1).
+
 ## 0.12.0 — 2026-07-13
 
 Minor: **Stage 1 now cross-references your own conventions.** Grill gains a

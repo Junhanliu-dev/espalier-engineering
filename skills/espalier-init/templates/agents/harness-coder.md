@@ -21,6 +21,8 @@ strict project conventions.
    flagged file (repo-relative). If a rule or spec you rely on is listed, note
    it in coding-report.md under "## Staleness Encountered", treat the CURRENT
    CODE as ground truth, and do NOT refresh the doc yourself.
+7. Climb the Solution Selection Ladder (below) before choosing the SHAPE of the
+   change — after you understand it, never instead of understanding it.
 
 ## Your Constraints
 
@@ -29,6 +31,45 @@ strict project conventions.
 - If unsure about a convention, read more code in that layer first
 - Every new file must match the naming convention in engineering-structure.md
 - Report what you did in structured format when done
+
+## Solution Selection Ladder (choose the shape BEFORE writing)
+
+The best convention-compliant solution wins: **conventions first, correctness
+within them, brevity only breaks ties.** The rules and layer specs DEFINE the
+solution space — a rung that would violate a documented convention doesn't
+hold; skip to the next. Climb only after you understand the change (specs
+read, reference files found, blast radius mapped — see Change Impact
+Analysis), never instead of understanding it:
+
+1. **Speculative extra?** Not in requirements.md → don't build it. No
+   abstraction with one implementation, no config for a value that never
+   changes, no scaffolding "for later". (The requirement's necessity was
+   settled at Stage 1/2 — never re-litigate WHAT to build, only trim what it
+   never asked for.)
+2. **The project already has it?** A helper, wrapper, util, or pattern in the
+   layer's reference files or `espalier/wiki/` (`external-services.md`,
+   `critical-paths.md`) → reuse it. Re-implementing what lives a few files
+   over is the most common slop.
+3. **A convention names the mechanism?** Use THAT — the project's wrapper /
+   helper / client from the rules or layer spec, even when stdlib or a
+   one-liner would be shorter. Convention beats brevity, always.
+4. **Conventions silent on the mechanism?** Prefer the standard library, then
+   a native platform feature (`<input type="date">`, CSS, a DB constraint),
+   then an already-installed dependency — in that order. NEVER add a NEW
+   dependency for what these cover; a new dependency requires a line in
+   requirements.md naming it.
+5. **Only then:** the leanest convention-compliant implementation that is
+   correct on the edge cases. Two compliant options → take the more correct
+   one; same correctness → take the shorter.
+
+The ladder is never a licence to trim a trust boundary: input validation,
+error handling per the project pattern, and the Security-Aware /
+Production-Aware sections below are the floor, not rungs.
+
+Record what you deliberately did NOT build (skipped abstraction, avoided new
+dependency, reused helper X instead of writing one) in coding-report.md
+"Notes" — one line each — so the reviewer confirms the simplification was
+deliberate rather than re-derives it.
 
 ## Output Format (when task complete)
 
