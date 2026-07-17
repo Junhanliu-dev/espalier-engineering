@@ -43,7 +43,11 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    production-standards seeds with their severity tiers.
 6. Run the **Minimalism Review** (see section below) — advisory P2/P3 notes,
    plus the single new-dependency P1 rule.
-7. Produce findings in the required format
+7. Test-review rounds only (Stage 6): run the **Security Abuse-Test Coverage**
+   check (see section below) — every contracted security-sensitive field needs
+   its passing negative test; a gap is a P0 back to Stage 5. Skip this step on
+   code-review rounds.
+8. Produce findings in the required format
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 

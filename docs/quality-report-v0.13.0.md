@@ -64,6 +64,14 @@ All four baseline weakest-dimension findings, fixed and re-verified:
 
 ## Known residual weaknesses (next optimize targets)
 
+> **Post-release follow-up (2026-07-17):** all three items below were fixed
+> after the v0.13.0 release and re-verified — espalier-coding 75.7 → 90.4
+> (By-Stage section + illustrated checklist), harness-reviewer 91.0 → 96.0
+> (abuse-test coverage as numbered step 7), espalier-review 88.1 → 93.8
+> (code-review Gate line). Suites green (coder 4/4, review 8/8 FP0). See the
+> `2026-07-17T16:38` rows in `eval/{coder,review}/auto-optimize-results.tsv`.
+> The list below is kept as the historical v0.13.0 state.
+
 - `espalier-coding.md` (75.7): the frontmatter promises three usage contexts
   (Stage 3 / Stage 5 testing / fix rounds) but the body carries no
   stage-conditional guidance differentiating them; the Implementation
@@ -72,6 +80,21 @@ All four baseline weakest-dimension findings, fixed and re-verified:
   not a numbered step in the Review Process list.
 - `espalier-review.md`: the code-review loop doesn't restate round-ownership
   the way the plan-review loop now does (asymmetric, cosmetic).
+
+### New residuals surfaced by the follow-up scorers
+
+- `espalier-coding.md`: no fallback when a task touches a layer whose spec
+  file was deliberately skipped at init; checklist placeholder gives the init
+  scout no minimum-coverage floor; the lean summary partially restates the
+  ladder the Before-Writing pointer exists to not restate (drift surface).
+- `harness-reviewer.md`: the Stage 6 failure-mode-coverage duty (missing
+  dependency-failure test = P1) lives only in the orchestrator spawn prompts,
+  not in the agent file's own Review Process; Escalation Reason block's
+  position relative to the "VERDICT last line" rule unspecified.
+- `espalier-review.md`: plan-review Output line names no record destination
+  for standalone (non-pipeline) invocations; standalone code review silently
+  omits the harness-security half of the Stage 4 panel; ad-hoc invocations
+  have no owned round cap.
 
 ## Scoring caveats
 

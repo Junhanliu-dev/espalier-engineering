@@ -31,6 +31,11 @@ description: >-
   Runtime-Surface, Production-Readiness, and (advisory) Minimalism reviews and
   writes `review-record.md`.
 - **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
+- **Gate (pass condition):** verdict `PASS`/`PASS_WITH_FIXES` with `p0=0 p1=0`
+  on the sentinel — P2/P3 (minimalism advisories included) are recorded, never
+  blocking. On a non-pass, the coder fixes and the change is re-reviewed; round
+  counting and escalation are owned by pipeline Stage 4 (`max-code-rounds`),
+  not this skill.
 - **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
 
 ## Review Output Format

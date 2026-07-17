@@ -24,6 +24,9 @@ description: >-
 - [ ] {project-specific step 1}
 - [ ] {project-specific step 2}
 - [ ] ...
+{e.g., "- [ ] Route registered in the route index", "- [ ] Service returns the
+project's Result type — never throws across the layer boundary", "- [ ] New
+list query is bounded (limit / pagination)"}
 
 ## Before Writing Code
 The canonical pre-coding sequence (identify layer → read spec → find 1-2
@@ -32,6 +35,28 @@ Ladder) lives in `espalier/agents/harness-coder.md` ("Before Writing ANY
 Code") — follow it from there; it is deliberately not restated here so the two
 files cannot drift. This skill adds the project-specific parts: the Layer
 Specs map and the Implementation Checklist above.
+
+## How This Skill Applies by Stage
+
+The layer map above is stage-agnostic; which parts carry the weight changes
+with the context the pipeline loaded this skill in:
+
+- **Stage 3 — implementation.** The whole skill applies: the layer spec for
+  every layer touched, the full Implementation Checklist, the Solution
+  Selection Ladder before choosing the change's shape.
+- **Stage 5 — testing mode.** Layer specs still govern WHERE tests live and
+  what naming/structure they follow; the ladder applies to test code too —
+  reuse the project's existing test helpers, fixtures, and factories before
+  writing new ones, and a new test-only dependency is still a NEW dependency
+  (needs its `requirements.md` line). The test recipes themselves (abuse
+  tests, failure-mode tests) are canonical in
+  `espalier/agents/harness-coder.md` and
+  `espalier/skills/espalier-security/SKILL.md`, not here.
+- **Fix rounds — Stage 4/6 re-spawns.** Scope is the findings, nothing else:
+  re-read only the spec(s) for the layers the fix touches, make the smallest
+  convention-compliant change that clears the finding, and never "improve"
+  adjacent code the finding didn't name. The checklist applies to what the
+  fix DID touch; record the delta in coding-report.md.
 
 ## Solution Selection (keep it lean)
 Best convention-compliant solution wins: conventions first, correctness within
