@@ -205,7 +205,7 @@ Issue ONE message with up to 11 parallel tool calls:
 
 1. **Bash batch (1.1 + 1.5):** `tldr tree && tldr arch && tldr structure && ls package.json go.mod pyproject.toml Cargo.toml Gemfile pom.xml 2>/dev/null && ls .github/workflows Jenkinsfile Makefile justfile 2>/dev/null && git log --oneline -20`
 2. **scout (1.2 — architecture):** layers, dep directions, boundary table
-3. **scout (1.3 — coding patterns):** read 5-8 source files; naming/errors/async/types/logging/validation
+3. **scout (1.3 — coding patterns):** read 5-8 source files; naming/errors/async/types/logging/validation/comments
 4. **scout (1.4 — testing):** read 2-3 test files; framework + mock pattern
 5. **scout (1.5 — git + CI):** branch strategy, commit conventions, CI checks (build/lint/test commands)
 6. **scout (1.6 — unwritten rules):** compare 3+ files of same type per layer; invariants + anti-patterns

@@ -60,7 +60,7 @@ with the context the pipeline loaded this skill in:
 
 ## Solution Selection (keep it lean)
 Best convention-compliant solution wins: conventions first, correctness within
-them, brevity only breaks ties. Reuse what the project already has (reference
+them, clarity then brevity break ties. Reuse what the project already has (reference
 files, `espalier/wiki/`) before writing new code; where conventions are silent
 on the mechanism, prefer stdlib → native platform feature → already-installed
 dependency; NEVER add a new dependency without a `requirements.md` line naming

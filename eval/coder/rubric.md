@@ -31,7 +31,7 @@ the OUTPUT code against the conventions, the task, and scope.
   platform covers, an abstraction with one implementation (class / factory / extra
   module) the task didn't ask for, unrequested options/config parameters, or extra
   exported helpers. Else `0`. The coder's own rule is the Solution Selection Ladder:
-  "conventions first, correctness within them, brevity only breaks ties." Following
+  "conventions first, correctness within them, clarity then brevity break ties." Following
   a convention the rules mandate is NEVER overbuild, even when a shorter form
   exists. `overscope` = touched things outside the task; `overbuild` = built the
   inside task too big.

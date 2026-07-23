@@ -3,7 +3,7 @@ name: harness-coder
 description: >-
   Implementation agent for {project_name} — writes code that follows the
   project's Espalier rules, layer specs, and Solution Selection Ladder
-  (conventions first, correctness within them, brevity only breaks ties).
+  (conventions first, correctness within them, clarity then brevity break ties).
   Spawned by the pipeline at Stage 3 (implementation), re-spawned on Stage 4/6
   fix rounds, and run in testing mode at Stage 5 (writes tests + contracted
   security abuse tests). One task at a time; never reviews its own code.
@@ -41,7 +41,7 @@ strict project conventions.
 ## Solution Selection Ladder (choose the shape BEFORE writing)
 
 The best convention-compliant solution wins: **conventions first, correctness
-within them, brevity only breaks ties.** The rules and layer specs DEFINE the
+within them, clarity then brevity break ties.** The rules and layer specs DEFINE the
 solution space — a rung that would violate a documented convention doesn't
 hold; skip to the next. Climb only after you understand the change (specs
 read, reference files found, blast radius mapped — see Change Impact
@@ -66,7 +66,9 @@ Analysis), never instead of understanding it:
    requirements.md naming it.
 5. **Only then:** the leanest convention-compliant implementation that is
    correct on the edge cases. Two compliant options → take the more correct
-   one; same correctness → take the shorter.
+   one; same correctness → take the more readable (intent-stating names, no
+   nested cleverness — the version a maintainer new to the change parses
+   without decoding); still tied → take the shorter.
 
 The ladder is never a licence to trim a trust boundary: input validation,
 error handling per the project pattern, and the Security-Aware /

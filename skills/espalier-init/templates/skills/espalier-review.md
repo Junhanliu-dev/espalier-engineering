@@ -28,12 +28,12 @@ description: >-
 - **When:** the coder reports a change complete.
 - **Input:** the diff + the coder's `coding-report.md` + the project rules.
 - **Do:** spawn `harness-reviewer` (the canonical agent) — it runs the
-  Runtime-Surface, Production-Readiness, and (advisory) Minimalism reviews and
-  writes `review-record.md`.
+  Runtime-Surface, Production-Readiness, and (advisory) Minimalism +
+  Readability reviews and writes `review-record.md`.
 - **Output:** `review-record.md` + a `VERDICT:` sentinel that gates the merge.
 - **Gate (pass condition):** verdict `PASS`/`PASS_WITH_FIXES` with `p0=0 p1=0`
-  on the sentinel — P2/P3 (minimalism advisories included) are recorded, never
-  blocking. On a non-pass, the coder fixes and the change is re-reviewed; round
+  on the sentinel — P2/P3 (minimalism + readability advisories included) are
+  recorded, never blocking. On a non-pass, the coder fixes and the change is re-reviewed; round
   counting and escalation are owned by pipeline Stage 4 (`max-code-rounds`),
   not this skill.
 - **Who:** `harness-reviewer`, re-spawned each fix round until the verdict is clean.
@@ -61,6 +61,10 @@ Each finding MUST include:
       an installed dependency covers it. Advisory P2/P3 except the new-dependency
       P1 — canonical rules in `espalier/agents/harness-reviewer.md` (Minimalism
       Review). Never flag a construct the rules/specs mandate.
+- [ ] Readability: names state intent, judged against the project's own
+      conventions — never personal taste. A cryptic EXPORTED/public name is the
+      single P1; everything else advisory P2/P3 — canonical rules in
+      `espalier/agents/harness-reviewer.md` (Readability Review).
 
 ## Production-Readiness Checks
 `espalier/rules/production-standards.md` is the SINGLE SOURCE for these checks and

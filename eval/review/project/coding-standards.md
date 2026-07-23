@@ -25,3 +25,9 @@ a status code — a controller is NOT required to itself return `Result<T>`.
 - No `console.log` in application code — use the injected `logger`. A `console.log`
   is a **P1**.
 - No swallowed errors (`catch {}` with an empty body). A **P1**.
+
+## Readability
+- A name states what it holds or does — a reader can tell without opening the
+  body. An EXPORTED symbol (`module.exports`, a route path) with an opaque or
+  misleading name is a **P1**. An opaque INTERNAL local is advisory (P2/P3)
+  only — never P0/P1.

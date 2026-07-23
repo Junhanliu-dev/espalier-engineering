@@ -35,7 +35,8 @@ Return JSON ONLY:
 ```
 Read 5-8 representative source files from different parts of the codebase.
 Extract: naming conventions (files/functions/types/constants), error-handling
-pattern, async style, type discipline, logging library + format, validation.
+pattern, async style, type discipline, logging library + format, validation,
+comment conventions (density / docstring style / what earns a comment).
 
 Return JSON ONLY:
 {
@@ -48,7 +49,8 @@ Return JSON ONLY:
     "async_pattern": "...",
     "type_usage": "...",
     "logging": {"library": "...", "format": "..."},
-    "validation": "..."
+    "validation": "...",
+    "comments": {"density": "...", "docstrings": "...", "what_gets_commented": "..."}
   },
   "evidence_files": [...]
 }

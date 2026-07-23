@@ -30,7 +30,8 @@ misses AND false alarms on clean code.
 - **verdict_match** — decide by the fixture's `kind`, NOT a literal string compare:
   - `kind: clean` → `1` iff the reviewer's `**Verdict:**` is `PASS`, OR is
     `PASS_WITH_FIXES` while the findings table contains ONLY P2/P3 rows (no P0, no
-    P1). Advisory P2/P3 notes (log-context improvements, minimalism notes) are
+    P1). Advisory P2/P3 notes (log-context improvements, minimalism notes,
+    readability notes on internal locals) are
     canonical reviewer behaviour on clean code and gate identically to PASS; a
     clean verdict is only wrong when a P0/P1 would have blocked the merge.
   - `kind: violation` → `1` iff the reviewer's `**Verdict:**` is `FAIL` OR
