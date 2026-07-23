@@ -23,29 +23,6 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 - **`eval/`-suite fixture for wrapper matching** — the deterministic test-hooks.sh wrapper matrix shipped in v0.11.0 (A6); only the LLM-judged eval variant is deferred.
 - **test-bootstrap gaps** — spaces-in-path, `--force` re-run settings.json dedup assertion, invalid-JSON settings path, husky branch.
 
-## Items deferred from the readability pass (post-v0.13.1)
-
-The readability pass (clarity tie-break, comment discovery, reviewer Readability
-Review + cryptic-public-name P1, eval fixture `rule-readability-07`) landed as
-template/eval edits only. Punted:
-
-- **v0.13.1 → v0.13.2 migration script + `espalier-migrate` SKILL.md entry** —
-  existing installs keep pre-readability templates until a migration patches
-  them (markers verified compatible: `## Minimalism Review` span-extraction now
-  carries the Readability section for free on older migrations).
-  - **Trigger to revisit**: next release cut, or first user asking why their
-    install's reviewer lacks the Readability Review.
-- **CHANGELOG entry + version bump** — release-lane, follows repo's `release:`
-  commit convention.
-  - **Trigger to revisit**: next release cut.
-- **Live eval run of `rule-readability-07`** — fixture + rubric wording are
-  authored but not yet validated against a live `harness-reviewer` (LLM-judge
-  run costs tokens). Risk: judge/reviewer disagreement on the single-finding
-  double-count guard.
-  - **Trigger to revisit**: before the release that ships the readability
-    templates, run `bash eval/review/run.sh` and validate judge agreement on
-    the new fixture.
-
 ## Algorithm complexity upgrades (`_dedupe_entries_preserve_primary`)
 
 Current implementation in `skills/harness-engineering/hook-templates/lookup-helpers.sh` is **Option A** (C-style nested loops, cached array accesses, ~30% faster than the original `seq`-based version). O(N²) worst case, ~25 ops at the Stage 0 fan-out cap of 5. Per-call cost well under 1ms.

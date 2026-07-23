@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.13.2 — 2026-07-23
+
+Patch: **the readability release** — "human readable" stops being an accident
+of discovered conventions and becomes an explicit duty on both agents. The
+gap: the coder had no semantic-naming duty (the naming table encodes casing,
+not meaning), comment conventions were never discovered, the reviewer had no
+channel that could block a cryptic name, and the ladder's tie-break actively
+preferred shorter over clearer. ONE new P1 class (a cryptic EXPORTED/public
+name) joins the sentinel's `p1=` count; everything else lands advisory P2/P3.
+Suites green: coder 4/4 (over-scope 0, over-build 0); review 9/9 (catch-rate
+1.00, FP 0, verdict match 9/9) — including the new readability fixture.
+
+- **`templates/agents/harness-coder.md`** — the Solution Selection Ladder
+  tie-break becomes **clarity then brevity**: same correctness → take the
+  more readable (intent-stating names, no nested cleverness — the version a
+  maintainer new to the change parses without decoding); still tied → take
+  the shorter. The slogan is updated everywhere it is quoted (agent
+  description, ladder intro, `espalier-coding` summary, coder eval rubric).
+- **`templates/rules/coding-standards.md`** — Naming Conventions gains an
+  intent floor ("a name STATES what it holds or does"; public/exported names
+  are contracts) and a new `## Comments & Docstrings` section. Scout 1.3 now
+  extracts comment conventions — density / docstring style / what earns a
+  comment — in BOTH mirror copies (`references/discovery-checklist.md`,
+  shipped `templates/scout-prompts.md`) and the init skill's Phase 1 list.
+- **`templates/agents/harness-reviewer.md`** — new **Readability Review**
+  (advisory — P2/P3 only, one exception): `naming:` / `nesting:` / `magic:` /
+  `comments:` findings, judged against the project's own conventions never
+  personal taste, each Fix cell naming the concrete rewrite. **The one P1: a
+  cryptic EXPORTED/public name** (exported function/class, endpoint path, DB
+  column, event field, config key) — public names freeze into contracts
+  callers bind to, so this is the only readability finding that blocks the
+  gate; internal locals never P1. Review Process step 6 runs it beside the
+  Minimalism Review; the Summary gains a `Readability:` line; the sentinel
+  note counts the readability P1 like any other; Must-NOT gains the
+  taste-vs-convention bullet. **`templates/skills/espalier-review.md`**
+  mirrors the checklist item, panel description, and Gate-line wording.
+- **Review eval** — the canned ReviewApp rules gain a citable `## Readability`
+  rule; new fixture `rule-readability-07` plants an exported `proc` service
+  function (works, follows every other convention, name states nothing —
+  expected FAIL at P1) with false-positive guards for internal locals and
+  double-counting; the rubric lists internal-local readability notes as
+  canonical advisory behaviour on clean fixtures. Seed 7 → 8 (9 rows with
+  both cleans). Rule text landed BEFORE the fixture so the judge's
+  no-convention-invention clause cannot punish the catch.
+- **`scripts/migrate-v0.13.1-to-v0.13.2.sh`** (new) — surgical, anchored,
+  idempotent target-repo upgrade (requires python3 for backtick/apostrophe-
+  safe exact-string splices): refreshes the ladder and the
+  Minimalism+Readability spans from the plugin templates at runtime, splices
+  the step-6 / Summary / sentinel / Must-NOT / Gate / checklist lines,
+  inserts the naming-intent floor + `## Comments & Docstrings` before
+  `## Required Patterns` (EOF fallback), and patches scout 1.3 in
+  `espalier/.scout-prompts.md`. Agent-description lines and scout-prompts are
+  warn-only (chain-migrated installs keep older wording; a customised file is
+  reported, never mangled). Verified: fresh-v0.13.1 AND
+  v0.13.0→v0.13.1→v0.13.2 chain fixtures both converge byte-identical to a
+  fresh v0.13.2 install (sole benign delta: the fresh-install-only
+  `{e.g., ...}` checklist illustration, per the v0.13.1 design). The new
+  coding-standards sections carry `{observed ...}` placeholders until
+  `/espalier-prune` re-scouts. Backs up to `<file>.pre-v0.13.2.bak`.
+  `--dry-run` / `--yes` / `--plugin-dir=`.
+  **`skills/espalier-migrate/SKILL.md`** gains the chain step (twentieth),
+  the v0.13.2 detection block, and its plugin-location probe bumps to this
+  script.
+
 ## 0.13.1 — 2026-07-17
 
 Patch: **v0.13.0 polish round** — the three residuals the v0.13.0 quality

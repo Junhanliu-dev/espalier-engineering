@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), and the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line) you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), and the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1) you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -185,22 +185,41 @@ version. Up to NINETEEN migrations may apply, always in this order:
    anchored inserts, the By-Stage body extracted from the plugin template at
    runtime. Backs up to `<file>.pre-v0.13.1.bak`. Mechanical:
    `scripts/migrate-v0.13.0-to-v0.13.1.sh`.
+20. **v0.13.1 → v0.13.2** — readability release: "human readable" stops being
+   an accident of discovered conventions and becomes an explicit duty on both
+   agents. The coder's ladder tie-break becomes clarity then brevity (same
+   correctness → the more readable → only then the shorter); coding-standards
+   gains a naming-intent floor ("a name STATES what it holds or does") and a
+   `## Comments & Docstrings` section (scout 1.3 now discovers comment
+   conventions); the reviewer gains an advisory Readability Review
+   (`naming:`/`nesting:`/`magic:`/`comments:` findings capped at P2/P3, judged
+   against the project's own conventions never taste; ONE P1 exception: a
+   cryptic EXPORTED/public name — public names freeze into contracts callers
+   bind to), with the sentinel's `p1=` counting that P1 like any other. All
+   six touched files are per-project — surgical anchored splices (requires
+   python3), the refreshed spans extracted from the plugin templates at
+   runtime. The new coding-standards sections carry `{observed ...}`
+   placeholders until `/espalier-prune` re-scouts. Backs up to
+   `<file>.pre-v0.13.2.bak`. Mechanical:
+   `scripts/migrate-v0.13.1-to-v0.13.2.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL NINETEEN; a v0.3.x
-install needs the last eighteen; a v0.4.x install needs the last seventeen; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.13.1; a
-v0.5.3–v0.5.x install needs v0.6 … v0.13.1; a v0.6.x install needs
-v0.7 … v0.13.1; a v0.7.x install needs v0.8 … v0.13.1; a v0.8.0 install needs
-v0.8.1 … v0.13.1; a v0.8.1 install needs v0.8.2 … v0.13.1; a v0.8.2 install
-needs v0.9.0 … v0.13.1; a v0.9.0 install needs v0.9.1 … v0.13.1; a v0.9.1
-install needs v0.9.2 … v0.13.1; a v0.9.2 install needs v0.9.3, v0.9.4,
-v0.10.0, v0.11.0, v0.12.0, v0.13.0, then v0.13.1; a v0.9.3 install needs
-v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, then v0.13.1; a v0.9.4, v0.9.5, or
-v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0, then v0.13.1; a
-v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0, then v0.13.1; a v0.11.0
-install needs v0.12.0, v0.13.0, then v0.13.1; a v0.12.0 install needs v0.13.0
-then v0.13.1; a v0.13.0 install needs only v0.13.1.
+confirmation, apply in order. A v0.1.x install needs ALL TWENTY; a v0.3.x
+install needs the last nineteen; a v0.4.x install needs the last eighteen; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.13.2; a
+v0.5.3–v0.5.x install needs v0.6 … v0.13.2; a v0.6.x install needs
+v0.7 … v0.13.2; a v0.7.x install needs v0.8 … v0.13.2; a v0.8.0 install needs
+v0.8.1 … v0.13.2; a v0.8.1 install needs v0.8.2 … v0.13.2; a v0.8.2 install
+needs v0.9.0 … v0.13.2; a v0.9.0 install needs v0.9.1 … v0.13.2; a v0.9.1
+install needs v0.9.2 … v0.13.2; a v0.9.2 install needs v0.9.3, v0.9.4,
+v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, then v0.13.2; a v0.9.3 install
+needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, then v0.13.2; a
+v0.9.4, v0.9.5, or v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, then v0.13.2; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, then v0.13.2; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
+then v0.13.2; a v0.12.0 install needs v0.13.0, v0.13.1, then v0.13.2; a
+v0.13.0 install needs v0.13.1 then v0.13.2; a v0.13.1 install needs only
+v0.13.2.
 
 Two gaps in the script names are deliberate, not missing steps: there is no
 v0.2→v0.3 script because v0.2/v0.3 detection is lumped — the v0.3→v0.4 step
@@ -239,6 +258,7 @@ NEEDS_V0110_PATCH=no
 NEEDS_V0120_PATCH=no
 NEEDS_V0130_PATCH=no
 NEEDS_V0131_PATCH=no
+NEEDS_V0132_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -269,6 +289,7 @@ if [ -d "harness" ]; then
   NEEDS_V0120_PATCH=yes      # ...then the v0.12.0 grill blind-spot pass
   NEEDS_V0130_PATCH=yes      # ...then the v0.13.0 minimalism release
   NEEDS_V0131_PATCH=yes      # ...then the v0.13.1 minimalism polish patch
+  NEEDS_V0132_PATCH=yes      # ...then the v0.13.2 readability release
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -437,6 +458,20 @@ elif [ -d "espalier" ]; then
      || ! grep -qF -- 'max-code-rounds' espalier/skills/espalier-review/SKILL.md 2>/dev/null; then
     NEEDS_V0131_PATCH=yes
   fi
+  # v0.13.2: the readability release. The coder ladder tie-break becomes
+  # clarity-then-brevity, coding-standards gains the naming-intent floor +
+  # Comments & Docstrings, and the reviewer gains the advisory Readability
+  # Review (ONE P1: a cryptic EXPORTED/public name). All touched files are
+  # per-project files a plugin update cannot reach — any marker missing ⇒
+  # pre-v0.13.2. Keep these in sync with migrate-v0.13.1-to-v0.13.2.sh's own
+  # idempotency check.
+  if ! grep -qF -- 'clarity then brevity break ties' espalier/agents/harness-coder.md 2>/dev/null \
+     || ! grep -qF -- '## Readability Review' espalier/agents/harness-reviewer.md 2>/dev/null \
+     || ! grep -qF -- '## Comments & Docstrings' espalier/rules/coding-standards.md 2>/dev/null \
+     || ! grep -qF -- 'clarity then brevity break ties' espalier/skills/espalier-coding/SKILL.md 2>/dev/null \
+     || ! grep -qF -- 'Readability: names state intent' espalier/skills/espalier-review/SKILL.md 2>/dev/null; then
+    NEEDS_V0132_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -448,7 +483,7 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V093_PATCH" = no ] && [ "$NEEDS_V094_PATCH" = no ] \
    && [ "$NEEDS_V0100_PATCH" = no ] && [ "$NEEDS_V0110_PATCH" = no ] \
    && [ "$NEEDS_V0120_PATCH" = no ] && [ "$NEEDS_V0130_PATCH" = no ] \
-   && [ "$NEEDS_V0131_PATCH" = no ]; then
+   && [ "$NEEDS_V0131_PATCH" = no ] && [ "$NEEDS_V0132_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -469,7 +504,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.13.0-to-v0.13.1.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.13.1-to-v0.13.2.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -478,7 +513,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.13.0-to-v0.13.1.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.13.1-to-v0.13.2.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -496,7 +531,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.13.0-to-v0.13.1.sh`) — tell the user to
+is likely stale (no `migrate-v0.13.1-to-v0.13.2.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -525,6 +560,7 @@ verbatim:
 [ "$NEEDS_V0120_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.11.0-to-v0.12.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0130_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.12.0-to-v0.13.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0131_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.0-to-v0.13.1.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0132_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.1-to-v0.13.2.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -589,6 +625,7 @@ completed.
 [ "$NEEDS_V0120_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.11.0-to-v0.12.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0130_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.12.0-to-v0.13.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0131_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.0-to-v0.13.1.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0132_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.1-to-v0.13.2.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every

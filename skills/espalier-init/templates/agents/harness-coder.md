@@ -41,9 +41,9 @@ strict project conventions.
 ## Solution Selection Ladder (choose the shape BEFORE writing)
 
 The best convention-compliant solution wins: **conventions first, correctness
-within them, clarity then brevity break ties.** The rules and layer specs DEFINE the
-solution space — a rung that would violate a documented convention doesn't
-hold; skip to the next. Climb only after you understand the change (specs
+within them, clarity then brevity break ties.** The rules and layer specs
+DEFINE the solution space — a rung that would violate a documented convention
+doesn't hold; skip to the next. Climb only after you understand the change (specs
 read, reference files found, blast radius mapped — see Change Impact
 Analysis), never instead of understanding it:
 

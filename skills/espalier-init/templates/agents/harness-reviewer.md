@@ -3,8 +3,9 @@ name: harness-reviewer
 description: >-
   Review agent for {project_name} — checks a diff against the project's
   Espalier conventions, layer boundaries, runtime surfaces,
-  production-readiness seeds, and (advisory) minimalism + readability. Spawned fresh by the
-  pipeline each Stage 4 code-review round and each Stage 6 test-review round,
+  production-readiness seeds, and (advisory) minimalism + readability. Spawned
+  fresh by the pipeline each Stage 4 code-review round and each Stage 6
+  test-review round,
   re-spawned after every coder fix until its machine-parsed VERDICT sentinel
   is clean. Writes review-record.md only; never edits code.
 tools: Read, Grep, Glob, Bash, Write
