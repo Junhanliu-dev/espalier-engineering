@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.15.0 — 2026-08-03
+
+Minor: **GitHub Copilot platform support** — the wiring layer goes
+three-platform. `--platforms` (and espalier-init's platform question) now
+accepts any subset of `claude`, `codex`, `copilot` (shorthands `both` /
+`all`); the `espalier/` tree stays the single platform-neutral source of
+truth. Additive as ever: `espalier/.platforms` unions, nothing unwires,
+claude-only output stays byte-stable. Suites: bootstrap 117/117 (+3-platform,
+copilot-only, idempotent-re-run fixtures), hooks 86/86 (+adapter payload
+matrix); validation is 46/51/56 by platform set.
+
+- **`scripts/bootstrap-espalier.sh`** — new stages: 7c appends the
+  `## Espalier` section to `.github/copilot-instructions.md` (grep-guarded;
+  always-read-rules instruction + Copilot platform-mapping table:
+  `@harness-*` custom agents, per-surface hook caveats); 8d writes
+  `.github/agents/harness-{coder,reviewer,security}.agent.md` custom agents
+  (write-if-absent; bodies point at the same `espalier/agents/*.md`); 8e
+  writes `.github/hooks/espalier-gates.json` (own file — user hook files
+  untouched; write-if-absent; self-heals the adapter copy on wire-only runs).
+  Stage 5 symlinks the 12 skills into `.github/skills/` — the one Agent
+  Skills location ALL Copilot surfaces read (VS Code, CLI, cloud coding
+  agent). Validation: checks 52-56; totals 46/51/56 with codex's 47-51
+  skip-rendered when only copilot forces the range, keeping numbering
+  contiguous.
+- **`hook-templates/copilot-hook-adapter.sh`** (new) — translates Copilot's
+  camelCase hook payload (`toolName`/`toolArgs`, incl. `path`/`filePath` →
+  `file_path`) into the Claude/Codex shape and dispatches to the shared
+  wrappers; exit codes pass through (Copilot fails non-zero `preToolUse`
+  exits closed — the exit-2 contract carries over). Without python it passes
+  the raw payload through, preserving the push gate's grep fast-path and
+  fail-closed probe. Missing wrapper → exit 0, never bricks a session.
+- **`skills/espalier-init/SKILL.md`** — Q4 becomes multiSelect across the
+  three platforms; Phase 3/Phase 4 and the "Running under Codex or Copilot"
+  fallback table extended (Copilot user-scope install via `~/.copilot/skills`).
+- **`skills/espalier-migrate/SKILL.md` + `scripts/migrate-v0.14.0-to-v0.15.0.sh`**
+  — migration #22: always installs the adapter (one new file, no backups
+  needed); `--with-copilot` (asked in the skill's Step 4c) wires copilot
+  additively via `bootstrap --wire-only`.
+- **Docs** — `docs/copilot-integration.md` (surfaces matrix incl. the
+  VS Code-runs-no-hooks gap, adapter contract, troubleshooting),
+  `docs/migrating-v0.14-to-v0.15.md`, README Copilot install section;
+  `references/wiring.md` + `references/validation.md` extended.
+
 ## 0.14.0 — 2026-08-03
 
 Minor: **Codex platform support** — the same discovered guardrails wire into

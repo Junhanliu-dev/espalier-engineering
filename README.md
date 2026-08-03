@@ -8,6 +8,10 @@
 /espalier-init
 ```
 
+> **v0.15.0 — Espalier learns Copilot; the wiring layer goes three-platform.** `/espalier-init` now targets any subset of **Claude Code, Codex, and GitHub Copilot**. For Copilot the same `espalier/` tree wires through Copilot-native surfaces: the 12 skills as **Agent Skills** in `.github/skills/` (read by VS Code, Copilot CLI, and the cloud coding agent; invoked `/espalier…`), the always-loaded rules via a generated `.github/copilot-instructions.md` section, coder/reviewer/security separation as `@harness-*` **custom agents** (`.github/agents/*.agent.md`), and the two quality gates as **Copilot hooks** (`.github/hooks/espalier-gates.json`) — a small adapter translates Copilot's camelCase hook payload into the Claude/Codex shape, so the *same* two wrapper scripts now gate all three platforms (Copilot fails non-zero `preToolUse` exits closed, matching the exit-2 contract). Wiring stays additive (`espalier/.platforms` unions; nothing ever unwires) and claude-only output stays byte-stable. Suites: bootstrap 117/117, hooks 86/86; validation is 46/51/56 checks by platform set. Setup guide: [`docs/copilot-integration.md`](./docs/copilot-integration.md).
+>
+> **Existing users:** run `/espalier-migrate` — the v0.15 step installs the one new adapter file and asks whether to wire Copilot. See [`docs/migrating-v0.14-to-v0.15.md`](./docs/migrating-v0.14-to-v0.15.md).
+
 > **v0.14.0 — Espalier learns Codex.** The same discovered guardrails now wire into **OpenAI Codex** as first-class output: `/espalier-init` asks which platform(s) to target (Claude Code, Codex, or both) and, for Codex, wires the very same `espalier/` content through Codex-native surfaces — the 12 skills as repo skills in `.agents/skills/` (invoked `$espalier`, `$espalier-fix`, …), the always-loaded rules via a generated `AGENTS.md` section, the coder/reviewer/security separation as `.codex/agents/harness-*.toml` subagents, and the two quality gates as `PreToolUse`/`PostToolUse` hooks in `.codex/config.toml` (Codex shares Claude Code's hook JSON schema and exit-2-blocks contract, so the *same* wrapper scripts serve both — now hardened to parse `apply_patch` patch bodies and argv-array commands). You can even run `$espalier-init` from inside Codex itself: the skill carries a platform-fallback table (chat questions instead of `AskUserQuestion`, inline discovery instead of scout spawns). Wiring is additive and re-runnable — a claude-only install adds codex later with one `--wire-only --platforms=codex` run (or `/espalier-migrate`), never unwiring anything. Suites extended and green: bootstrap 97/97, hooks 73/73, validation grows to 51 checks on codex installs while claude-only output stays byte-stable at 46. Setup guide: [`docs/codex-integration.md`](./docs/codex-integration.md).
 >
 > **Existing users:** run `/espalier-migrate`. It applies the chain (… v0.12.0→v0.13.0→v0.13.1→v0.13.2→v0.14.0) in order; the v0.14 step refreshes the two hook wrappers (backups at `<file>.pre-v0.14.bak`) and asks whether to wire Codex — declining changes nothing else. See [`docs/migrating-v0.13-to-v0.14.md`](./docs/migrating-v0.13-to-v0.14.md).
@@ -49,6 +53,7 @@ Plus platform wiring for whichever agent(s) you target (`--platforms`, asked at 
 
 - **Claude Code** — symlinks into `.claude/{rules,skills,agents}` so everything auto-loads, plus a `.claude/settings.json` hook entry for the quality gates.
 - **Codex** (v0.14.0) — symlinks into `.agents/skills/` (repo-skill discovery; invoke `$espalier` etc.), an `## Espalier` section in `AGENTS.md` (always-read rules instruction + platform mapping), `.codex/agents/harness-*.toml` subagents, and the same two quality-gate hooks in `.codex/config.toml`. See [`docs/codex-integration.md`](./docs/codex-integration.md).
+- **GitHub Copilot** (v0.15.0) — symlinks into `.github/skills/` (Agent Skills for VS Code, Copilot CLI, and the cloud coding agent; invoke `/espalier` etc.), an `## Espalier` section in `.github/copilot-instructions.md`, `@harness-*` custom agents in `.github/agents/`, and the same two gates as Copilot hooks in `.github/hooks/espalier-gates.json` (CLI + cloud agent). See [`docs/copilot-integration.md`](./docs/copilot-integration.md).
 
 The `espalier/` directory itself is platform-neutral — one source of truth however many agents read it.
 
@@ -170,6 +175,32 @@ bash ~/repos/espalier-engineering/scripts/bootstrap-espalier.sh \
 
 Full guide (what lands where, trust model, degradations): [`docs/codex-integration.md`](./docs/codex-integration.md).
 
+### GitHub Copilot install
+
+Copilot reads Agent Skills from user scope too — link the init skill there:
+
+```bash
+git clone https://github.com/Junhanliu-dev/espalier-engineering ~/repos/espalier-engineering
+mkdir -p ~/.copilot/skills
+ln -sfn ~/repos/espalier-engineering/skills/espalier-init    ~/.copilot/skills/espalier-init
+ln -sfn ~/repos/espalier-engineering/skills/espalier-migrate ~/.copilot/skills/espalier-migrate
+```
+
+Reload VS Code (or restart Copilot CLI), then in your project run
+`/espalier-init` and include **GitHub Copilot** at the platform question.
+After init, pipelines are `/espalier <requirement>`, `/espalier-fix <bug>`,
+etc., and sub-agents are `@harness-coder` / `@harness-reviewer` /
+`@harness-security`. Add Copilot to an existing install without redoing
+discovery:
+
+```bash
+bash ~/repos/espalier-engineering/scripts/bootstrap-espalier.sh \
+  --wire-only --platforms=copilot \
+  --plugin-dir=~/repos/espalier-engineering/skills/espalier-init --yes
+```
+
+Full guide (per-surface matrix, adapter, degradations): [`docs/copilot-integration.md`](./docs/copilot-integration.md).
+
 ## How `/espalier-init` Works
 
 On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's a one-time tax — every future `/espalier` and `/espalier-fix` reuses the generated structure. You earn the time back inside the first few requirements via dropped rework rounds.
@@ -177,7 +208,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + squash-merge decision + post-merge dispatcher install + .gitignore + 46 validation checks (51 with codex).
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + copilot wiring when targeted (`.github/copilot-instructions.md` section, `.github/skills/` links, `.github/agents/*.agent.md`, `.github/hooks/espalier-gates.json`) + squash-merge decision + post-merge dispatcher install + .gitignore + 46 validation checks (51 with codex, 56 with copilot).
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -195,7 +226,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (46 checks; 51 with codex — no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (46/51/56 checks by platform set — no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 
