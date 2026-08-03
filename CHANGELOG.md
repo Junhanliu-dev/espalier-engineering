@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.14.0 — 2026-08-03
+
+Minor: **Codex platform support** — the same discovered guardrails wire into
+OpenAI Codex as a first-class target. `espalier-init` gains a Phase 0 platform
+question (Claude Code / Codex / Both) and `bootstrap-espalier.sh` a
+`--platforms=` flag; the `espalier/` tree stays platform-neutral, only wiring
+differs. Additive + idempotent: `espalier/.platforms` records the set, re-runs
+union (adding codex later never unwires claude), and a complete pre-v0.14
+install is inferred as `claude`. Suites: bootstrap 97/97 (+3 codex tests),
+hooks 73/73 (+payload matrix), validation 51 checks on codex installs while
+claude-only output stays byte-stable at 46.
+
+- **`scripts/bootstrap-espalier.sh`** — new stages: 7b appends the `## Espalier`
+  section to `AGENTS.md` (grep-guarded; carries the always-read-rules
+  instruction — Codex has no auto-loaded rules dir — plus the platform-mapping
+  table: `AskUserQuestion` → chat, sub-agent spawn → `.codex/agents/`,
+  `/espalier*` → `$espalier*`); 8b appends a marker-guarded hook block to
+  `.codex/config.toml` (`PostToolUse ^(apply_patch|Edit|Write)$` →
+  post-edit-wrapper, `PreToolUse ^(Bash|shell|local_shell)$` →
+  pre-push-gate-wrapper — Codex shares Claude Code's hook JSON schema and
+  exit-2-blocks contract, so the same wrappers serve both; backup + valid-TOML
+  append); 8c writes `.codex/agents/harness-{coder,reviewer,security}.toml`
+  (write-if-absent — user model tuning survives; `developer_instructions`
+  point at the same `espalier/agents/*.md`). Stage 5 symlinks the 12 skills
+  into `.agents/skills/` (Codex repo-skill discovery; same folder-name ==
+  frontmatter-name invariant). Claude-only stages gate on the platform set;
+  codex-only installs create no `.claude/` litter. `--wire-only` now reuses a
+  persisted `--merge-decision` and runs `stage_mkdirs`, so "add a platform
+  later" is one flag. Validation: checks 47-51 (codex wiring), dynamic totals,
+  claude checks skip (or swap to `espalier/`-source equivalents) when claude
+  is not targeted.
+- **`hook-templates/post-edit-wrapper.sh`** — platform-neutral: uses
+  `tool_input.file_path` when present, else extracts every
+  `*** Add|Update File:` path from the apply_patch body (string or argv
+  array); checks each file, exit 2 if any violates; repo root from
+  `$CLAUDE_PROJECT_DIR` else `git rev-parse --show-toplevel`.
+- **`hook-templates/pre-push-gate-wrapper.sh`** — joins argv-array commands
+  before the push-pattern match (the Python-list rendering would have been
+  eaten by the quote-span stripper and failed OPEN); `CLAUDE_PROJECT_DIR`
+  fallback is now unset-safe.
+- **`skills/espalier-init/SKILL.md`** — Phase 0 Q4 (platforms), Phase 3
+  `--platforms=` flag + `${CLAUDE_SKILL_DIR}` Codex fallback, Phase 4
+  codex trust steps in the completion message, and a "Running under Codex"
+  fallback table so `$espalier-init` runs from inside Codex itself.
+- **`skills/espalier-migrate/SKILL.md` + `scripts/migrate-v0.13.2-to-v0.14.0.sh`**
+  — migration #21: always refreshes the two wrappers (backups
+  `<file>.pre-v0.14.bak`); `--with-codex` (asked in the skill's Step 4b)
+  wires codex additively via `bootstrap --wire-only`.
+- **Docs** — `docs/codex-integration.md` (surfaces, trust model, degradations,
+  troubleshooting), `docs/migrating-v0.13-to-v0.14.md`, README Codex install
+  section; `references/wiring.md` + `references/validation.md` extended.
+
 ## 0.13.2 — 2026-07-23
 
 Patch: **the readability release** — "human readable" stops being an accident
