@@ -433,6 +433,48 @@ assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Valida
 assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 17: --platforms=all wires claude+codex+copilot ──────────────────
+echo "Test 17: --platforms=all (three platforms)"
+TMP=$(mktemp -d -t smoke17.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+A_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=all --yes --force 2>&1 )
+A_EXIT=$?
+assert "17a exit 0"                            "[ $A_EXIT -eq 0 ]"
+assert "17b platforms normalized+persisted"    "grep -qx 'claude,codex,copilot' '$TMP/espalier/.platforms'"
+assert "17c .github/skills/espalier link"      "[ -L '$TMP/.github/skills/espalier' ] && [ -e '$TMP/.github/skills/espalier' ]"
+assert "17d copilot agents written"            "grep -q '^name: harness-coder' '$TMP/.github/agents/harness-coder.agent.md' && [ -f '$TMP/.github/agents/harness-reviewer.agent.md' ] && [ -f '$TMP/.github/agents/harness-security.agent.md' ]"
+assert "17e hooks json valid + adapter wired"  "python3 -c 'import json; json.load(open(\"$TMP/.github/hooks/espalier-gates.json\"))' && grep -q 'copilot-hook-adapter' '$TMP/.github/hooks/espalier-gates.json'"
+assert "17f adapter copied + executable"       "[ -x '$TMP/espalier/hooks/copilot-hook-adapter.sh' ]"
+assert "17g copilot-instructions section"      "grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
+assert "17h claude + codex wiring intact"      "[ -L '$TMP/.claude/skills/espalier' ] && [ -L '$TMP/.agents/skills/espalier' ]"
+assert "17i validation total is 56"            "echo \"\$A_OUT\" | grep -q 'Validation: 56/56 passed'"
+assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/56] OK'"
+# Idempotent re-run: sections/files not duplicated, user tuning preserved.
+echo "<!-- user tuning marker -->" >> "$TMP/.github/agents/harness-coder.agent.md"
+( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=all --yes >/dev/null 2>&1 )
+assert "17k re-run keeps ONE instructions section" "[ \$(grep -c '^## Espalier' '$TMP/.github/copilot-instructions.md') -eq 1 ]"
+assert "17l re-run preserves agent tuning"     "grep -q 'user tuning marker' '$TMP/.github/agents/harness-coder.agent.md'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 18: copilot-only (no .claude litter, claude+codex checks skip) ──
+echo "Test 18: --platforms=copilot only"
+TMP=$(mktemp -d -t smoke18.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+rm -rf "$TMP/.claude"
+P_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=copilot --yes --force 2>&1 )
+P_EXIT=$?
+assert "18a exit 0"                          "[ $P_EXIT -eq 0 ]"
+assert "18b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
+assert "18c no AGENTS.md written"            "[ ! -f '$TMP/AGENTS.md' ]"
+assert "18d copilot fully wired"             "[ -L '$TMP/.github/skills/espalier' ] && [ -f '$TMP/.github/agents/harness-coder.agent.md' ] && grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
+assert "18e claude checks skipped OK"        "echo \"\$P_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
+assert "18f codex checks skipped OK"         "echo \"\$P_OUT\" | grep -qF 'OK   codex-skills-load (skipped — codex not targeted)'"
+assert "18g validation total is 56"          "echo \"\$P_OUT\" | grep -q 'Validation: 56/56 passed'"
+assert "18h platforms = copilot"             "grep -qx 'copilot' '$TMP/espalier/.platforms'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

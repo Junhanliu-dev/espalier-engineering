@@ -1,8 +1,8 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks when only claude is targeted, 51 with codex: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks when only claude is targeted, 51 with codex, 56 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
 >
-> **Platform gating (v0.14.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run only when codex IS targeted (claude-only installs still print exactly 46 lines — byte-stable with pre-v0.14 output).
+> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Claude-only installs still print exactly 46 lines — byte-stable with pre-v0.14 output.
 
 > **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
@@ -63,6 +63,13 @@ After all generation and wiring is complete, validate end-to-end.
 | 49 | codex-agents-toml *(codex only)* | `name = "harness-…"` present in all three `.codex/agents/harness-*.toml` | Re-run bootstrap Stage 8c (delete the bad file first — stage is write-if-absent) |
 | 50 | codex-hooks-configured *(codex only)* | `grep -q "espalier/hooks" .codex/config.toml` | Re-run bootstrap Stage 8b; if a stale `ESPALIER HOOKS` marker exists without the commands, delete the block and re-run |
 | 51 | codex-agentsmd *(codex only)* | `grep -q "## Espalier" AGENTS.md` | Re-run bootstrap Stage 7b |
+| 52 | copilot-skills-load *(copilot only)* | `ls -d .github/skills/espalier-coding … espalier-audit` (all 12 skill symlinks) | Re-run bootstrap Stage 5 with copilot in `--platforms` |
+| 53 | copilot-symlinks-valid *(copilot only)* | `[ -L .github/skills/espalier ] && [ -e … ]` | Broken link → source skill folder missing; re-run Stage 3/Phase 2, then Stage 5 |
+| 54 | copilot-agents *(copilot only)* | `name: harness-…` present in all three `.github/agents/harness-*.agent.md` | Re-run bootstrap Stage 8d (delete the bad file first — stage is write-if-absent) |
+| 55 | copilot-hooks-json *(copilot only)* | `espalier-gates.json` parses as JSON, references `copilot-hook-adapter`, and the adapter is executable | Re-run bootstrap Stage 8e (delete the bad file first); `chmod +x espalier/hooks/copilot-hook-adapter.sh` |
+| 56 | copilot-instructions *(copilot only)* | `grep -q "## Espalier" .github/copilot-instructions.md` | Re-run bootstrap Stage 7c |
+
+When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 46 (claude-only) / 51 (+codex) / 56 (+copilot).
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

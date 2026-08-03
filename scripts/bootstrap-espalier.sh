@@ -24,7 +24,11 @@
 #   - Appends .gitignore entries for the commit-index + drift sidecars.
 #   - Wires the codex platform when targeted (.agents/skills symlinks,
 #     AGENTS.md section, .codex/config.toml hooks, .codex/agents/*.toml).
-#   - Runs the validation checks (R6) — 46 claude-only, 51 with codex.
+#   - Wires the copilot platform when targeted (.github/skills symlinks,
+#     copilot-instructions.md section, .github/agents/*.agent.md,
+#     .github/hooks/espalier-gates.json via the camelCase adapter).
+#   - Runs the validation checks (R6) — 46 claude-only, 51 with codex,
+#     56 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -40,11 +44,16 @@
 #   --lang=<typescript|python|go|unsupported>
 #                            Boundary-check variant. "unsupported" emits a no-op.
 #   --doctor-cadence=<val>   every-change | weekly | monthly | manual (default: weekly).
-#   --platforms=<list>       Comma list of agent platforms to wire: claude | codex
-#                            (or the shorthand "both"). Default: claude.
-#                            claude → .claude/ symlinks + CLAUDE.md + settings.json
-#                            codex  → .agents/skills/ symlinks + AGENTS.md +
-#                                     .codex/config.toml hooks + .codex/agents/*.toml
+#   --platforms=<list>       Comma list of agent platforms to wire:
+#                            claude | codex | copilot (shorthands: "both" =
+#                            claude,codex; "all" = all three). Default: claude.
+#                            claude  → .claude/ symlinks + CLAUDE.md + settings.json
+#                            codex   → .agents/skills/ symlinks + AGENTS.md +
+#                                      .codex/config.toml hooks + .codex/agents/*.toml
+#                            copilot → .github/skills/ symlinks +
+#                                      .github/copilot-instructions.md section +
+#                                      .github/agents/*.agent.md +
+#                                      .github/hooks/espalier-gates.json
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -52,7 +61,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (46/51-check validation).
+#   --validate-only          Only Stage 11 (46/51/56-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -91,7 +100,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,57p' "$0"
+      sed -n '2,66p' "$0"
       exit 0
       ;;
     *)
@@ -239,24 +248,27 @@ esac
 # existing espalier/.platforms (re-runs are ADDITIVE — wiring codex later never
 # unwires claude) > persisted file alone > default claude.
 normalize_platforms() {
-  # stdin: comma list → stdout: canonical "claude"|"codex"|"claude,codex"; rc 1 on junk
-  local raw p want_c=no want_x=no
+  # stdin: comma list → stdout: canonical subset of "claude,codex,copilot"
+  # (that order); rc 1 on junk / empty
+  local raw p want_c=no want_x=no want_p=no out=""
   raw=$(cat | tr 'A-Z' 'a-z' | tr -d '[:space:]')
-  [ "$raw" = "both" ] && raw="claude,codex"
+  raw=${raw//both/claude,codex}
+  raw=${raw//all/claude,codex,copilot}
   local IFS=','
   for p in $raw; do
     case "$p" in
       claude)      want_c=yes ;;
       codex)       want_x=yes ;;
+      copilot)     want_p=yes ;;
       "")          ;;
       *)           return 1 ;;
     esac
   done
-  [ "$want_c" = "no" ] && [ "$want_x" = "no" ] && return 1
-  if [ "$want_c" = "yes" ] && [ "$want_x" = "yes" ]; then echo "claude,codex"
-  elif [ "$want_x" = "yes" ]; then echo "codex"
-  else echo "claude"
-  fi
+  [ "$want_c" = "yes" ] && out="claude"
+  [ "$want_x" = "yes" ] && out="${out:+$out,}codex"
+  [ "$want_p" = "yes" ] && out="${out:+$out,}copilot"
+  [ -z "$out" ] && return 1
+  echo "$out"
 }
 
 EXISTING_PLATFORMS=""
@@ -271,7 +283,7 @@ fi
 
 if [ -n "$PLATFORMS_FLAG" ]; then
   PLATFORMS=$(printf '%s,%s' "$PLATFORMS_FLAG" "$EXISTING_PLATFORMS" | normalize_platforms) || {
-    echo "ERROR: invalid --platforms='$PLATFORMS_FLAG' (valid: claude | codex | claude,codex | both)" >&2
+    echo "ERROR: invalid --platforms='$PLATFORMS_FLAG' (valid: any comma list of claude|codex|copilot, or both|all)" >&2
     exit 1
   }
 elif [ -n "$EXISTING_PLATFORMS" ]; then
@@ -280,8 +292,9 @@ else
   PLATFORMS="claude"
 fi
 
-want_claude() { case "$PLATFORMS" in *claude*) return 0 ;; *) return 1 ;; esac; }
-want_codex()  { case "$PLATFORMS" in *codex*)  return 0 ;; *) return 1 ;; esac; }
+want_claude()  { case "$PLATFORMS" in *claude*)  return 0 ;; *) return 1 ;; esac; }
+want_codex()   { case "$PLATFORMS" in *codex*)   return 0 ;; *) return 1 ;; esac; }
+want_copilot() { case "$PLATFORMS" in *copilot*) return 0 ;; *) return 1 ;; esac; }
 
 log "Mode: $MODE | project: $PROJECT_DIR | plugin: $PLUGIN_DIR | lang: $LANG_VARIANT | platforms: $PLATFORMS"
 
@@ -327,6 +340,11 @@ stage_mkdirs() {
     run "mkdir -p .agents/skills"
     run "mkdir -p .codex/agents"
   fi
+  if want_copilot; then
+    run "mkdir -p .github/skills"
+    run "mkdir -p .github/agents"
+    run "mkdir -p .github/hooks"
+  fi
 }
 
 # --- Stage 3: Pure-copy templates -------------------------------------------
@@ -361,6 +379,9 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/drift-detect.sh' espalier/hooks/drift-detect.sh"
   run "cp '$PLUGIN_DIR/hook-templates/drift-helpers.sh' espalier/hooks/drift-helpers.sh"
   run "cp '$PLUGIN_DIR/hook-templates/parse-drift-blocks.py' espalier/hooks/parse-drift-blocks.py"
+  # Copilot camelCase→snake_case hook shim (pure copy; inert unless
+  # .github/hooks/espalier-gates.json references it — Stage 8e, copilot only).
+  run "cp '$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh' espalier/hooks/copilot-hook-adapter.sh"
   # --lang=unsupported: guarantee post-edit-wrapper never execs a missing file.
   # Write-if-absent ONLY — never clobber a Phase-2-adapted hook.
   if [ "$LANG_VARIANT" = "unsupported" ] && [ ! -f espalier/hooks/check-layer-boundaries.sh ]; then
@@ -431,6 +452,24 @@ stage_symlinks() {
       WIRED_SKILLS=$CODEX_SKILLS
       WIRED_RULES=5    # bound via the AGENTS.md always-read instruction
       WIRED_AGENTS=3   # bound via .codex/agents/harness-*.toml
+    fi
+  fi
+  if want_copilot; then
+    # Copilot Agent Skills read .github/skills/ across ALL its surfaces
+    # (VS Code, CLI, cloud agent). VS Code additionally reads .claude/skills/
+    # and .agents/skills/, but .github/skills/ is the only cross-surface
+    # location — wire it explicitly, same invariant, invoked /espalier….
+    COPILOT_SKILLS=0
+    for s in $ESPALIER_SKILL_NAMES; do
+      safe_ln "../../espalier/skills/$s" ".github/skills/$s" && COPILOT_SKILLS=$((COPILOT_SKILLS+1))
+    done
+    log "  copilot: $COPILOT_SKILLS skills linked into .github/skills/"
+    # Rules load via the copilot-instructions.md instruction (Stage 7c) and
+    # sub-agents via .github/agents/*.agent.md (Stage 8d).
+    if ! want_claude && ! want_codex; then
+      WIRED_SKILLS=$COPILOT_SKILLS
+      WIRED_RULES=5    # bound via the copilot-instructions always-read instruction
+      WIRED_AGENTS=3   # bound via .github/agents/harness-*.agent.md
     fi
   fi
   # Read by espalier-init SKILL.md Phase 4 for the completion message — keep
@@ -786,6 +825,192 @@ SECURITYAGENT
   fi
 }
 
+# --- Stage 7c: .github/copilot-instructions.md append (copilot) --------------
+
+stage_copilot_instructions() {
+  if ! want_copilot; then
+    return
+  fi
+  log "Stage 7c: .github/copilot-instructions.md append (idempotent grep-guard)"
+  if [ -f .github/copilot-instructions.md ] && grep -q "## Espalier" .github/copilot-instructions.md 2>/dev/null; then
+    log "  copilot-instructions.md already has Espalier section — skipping"
+    return
+  fi
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] append Espalier section to .github/copilot-instructions.md"
+    return
+  fi
+  mkdir -p .github
+  cat >> .github/copilot-instructions.md << 'COPILOTTMPL'
+
+## Espalier
+
+This project uses Espalier for AI code quality — auto-discovered, project-specific guardrails.
+
+**Always-loaded rules:** before writing or reviewing ANY code, read every file in
+`espalier/rules/` (engineering-structure, coding-standards, development-process,
+security-standards, production-standards). This instruction IS the load
+mechanism — do not skip it. (If AGENTS.md also carries an `## Espalier`
+section, it is the same contract — follow it once.)
+
+**For any implementation work**, invoke the `espalier` skill (`/espalier <requirement>`) to execute the full pipeline.
+
+**For bug fixes**, invoke `/espalier-fix <bug>` — 7 stages (0–7, no Stage 2).
+
+**For questions** ("how does X work", "where is Y"), invoke `/espalier-ask <question>` — read-only, answers from espalier/ docs first.
+
+**For a repo-wide security audit**, invoke `/espalier-audit` — inventories trust-boundary defects to `espalier/wiki/security-audit.md`; dispatch fixes via `/espalier-fix`.
+
+**Agent definition:** Read `espalier/agent.md` for your operating instructions.
+
+**Key principle:** The coder agent and reviewer agent are ALWAYS separate.
+Never review your own code in the same invocation that wrote it.
+
+### Platform mapping (Copilot)
+
+Espalier's skill files use Claude Code vocabulary in places; on Copilot apply these mappings:
+
+- `/espalier*` slash commands → the same-named Agent Skills (wired in
+  `.github/skills/`; invoke via `/espalier…` in chat/CLI or let Copilot load
+  them by description).
+- `AskUserQuestion` → ask the user directly in chat and WAIT for the reply.
+  Where a skill says "if you can call AskUserQuestion you are interactive",
+  read it as: if you can ask the user in chat, you ARE interactive.
+- "Spawn sub-agent harness-coder / harness-reviewer / harness-security with
+  prompt X" → hand off to the matching custom agent (`@harness-coder`,
+  `@harness-reviewer`, `@harness-security` — defined in `.github/agents/`)
+  with the same prompt. If custom-agent handoff is unavailable in this
+  surface, execute the roles inline in strict sequence and NEVER let the pass
+  that wrote code also approve it: finish the coder role, then re-read
+  `espalier/agents/harness-reviewer.md` and review the actual diff as if you
+  had not written it.
+- `.claude/settings.json` hooks → wired as Copilot hooks in
+  `.github/hooks/espalier-gates.json` (Copilot CLI + cloud agent; VS Code
+  chat does not run hooks — the pipeline's in-skill gates still apply).
+- `$CLAUDE_PROJECT_DIR` in docs → the repo root (`git rev-parse --show-toplevel`).
+COPILOTTMPL
+}
+
+# --- Stage 8d: .github/agents/*.agent.md sub-agents (copilot) -----------------
+
+stage_copilot_agents() {
+  if ! want_copilot; then
+    return
+  fi
+  log "Stage 8d: .github/agents/harness-*.agent.md (write-if-absent)"
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] write .github/agents/harness-{coder,reviewer,security}.agent.md (if absent)"
+    return
+  fi
+  mkdir -p .github/agents
+
+  # Write-if-absent ONLY — user tuning (model, tools) survives re-bootstrap,
+  # same policy as the codex .toml sub-agents.
+  if [ ! -f .github/agents/harness-coder.agent.md ]; then
+    cat > .github/agents/harness-coder.agent.md << 'CODERAGENTMD'
+---
+name: harness-coder
+description: Espalier implementation sub-agent — writes code strictly inside espalier/ rules; never reviews its own work
+---
+
+You are the harness-coder. Read espalier/agents/harness-coder.md and follow it
+exactly. Before writing any code, read every file in espalier/rules/ and the
+skill file espalier/skills/espalier-coding/SKILL.md. You implement; you never
+review or approve your own output.
+CODERAGENTMD
+    log "  wrote .github/agents/harness-coder.agent.md"
+  else
+    log "  .github/agents/harness-coder.agent.md exists — preserving"
+  fi
+
+  if [ ! -f .github/agents/harness-reviewer.agent.md ]; then
+    cat > .github/agents/harness-reviewer.agent.md << 'REVIEWERAGENTMD'
+---
+name: harness-reviewer
+description: Espalier review sub-agent — reviews diffs against espalier/ rules; writes ONLY its own review-record file
+---
+
+You are the harness-reviewer. Read espalier/agents/harness-reviewer.md and
+follow it exactly. Your ONLY permitted write is your own review record file
+(review-record.md in the active espalier/changes/ dir) — never source, tests,
+or any other file. Review the diff as written by someone else.
+REVIEWERAGENTMD
+    log "  wrote .github/agents/harness-reviewer.agent.md"
+  else
+    log "  .github/agents/harness-reviewer.agent.md exists — preserving"
+  fi
+
+  if [ ! -f .github/agents/harness-security.agent.md ]; then
+    cat > .github/agents/harness-security.agent.md << 'SECURITYAGENTMD'
+---
+name: harness-security
+description: Espalier security sub-agent — trust-boundary review against espalier/rules/security-standards.md; writes ONLY its own security-record file
+---
+
+You are the harness-security agent. Read espalier/agents/harness-security.md
+and follow it exactly. Your ONLY permitted write is your own security record
+file (security-record.md in the active espalier/changes/ dir, or
+espalier/wiki/security-audit.md in repo-audit mode) — never source, tests, or
+any other file.
+SECURITYAGENTMD
+    log "  wrote .github/agents/harness-security.agent.md"
+  else
+    log "  .github/agents/harness-security.agent.md exists — preserving"
+  fi
+}
+
+# --- Stage 8e: .github/hooks/espalier-gates.json (copilot) --------------------
+
+stage_copilot_hooks() {
+  if ! want_copilot; then
+    return
+  fi
+  log "Stage 8e: .github/hooks/espalier-gates.json (write-if-absent)"
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] write .github/hooks/espalier-gates.json (if absent)"
+    return
+  fi
+  mkdir -p .github/hooks
+  # wire-only runs skip Stage 4 — make sure the adapter this json dispatches
+  # to actually exists before referencing it.
+  if [ ! -f espalier/hooks/copilot-hook-adapter.sh ] && [ -f "$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh" ]; then
+    cp "$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh" espalier/hooks/copilot-hook-adapter.sh
+    chmod +x espalier/hooks/copilot-hook-adapter.sh
+    log "  copied espalier/hooks/copilot-hook-adapter.sh (wire-only run)"
+  fi
+  # Own file — Copilot loads every .github/hooks/*.json, so user hook files
+  # are never touched. Write-if-absent: user edits (timeouts, matchers)
+  # survive re-bootstrap.
+  if [ -f .github/hooks/espalier-gates.json ]; then
+    log "  .github/hooks/espalier-gates.json exists — preserving"
+    return
+  fi
+  cat > .github/hooks/espalier-gates.json << 'COPILOTHOOKS'
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "matcher": "bash|shell",
+        "bash": "bash espalier/hooks/copilot-hook-adapter.sh pre-push-gate-wrapper.sh",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "matcher": "edit|write|create|apply_patch|str_replace_editor",
+        "bash": "bash espalier/hooks/copilot-hook-adapter.sh post-edit-wrapper.sh",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
+COPILOTHOOKS
+  log "  wrote .github/hooks/espalier-gates.json"
+}
+
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
 stage_merge_decision() {
@@ -990,9 +1215,15 @@ stage_gitignore() {
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  # Check count is platform-dependent: 46 base + 5 codex-wiring checks.
+  # Check count is platform-dependent: 46 base + 5 codex (47-51) + 5 copilot
+  # (52-56). Numbering is FIXED per platform; copilot without codex still
+  # renders 47-51 as skip lines so the sequence stays contiguous.
   local TOTAL_CHECKS=46
-  want_codex && TOTAL_CHECKS=51
+  if want_copilot; then
+    TOTAL_CHECKS=56
+  elif want_codex; then
+    TOTAL_CHECKS=51
+  fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] would run $TOTAL_CHECKS validation checks (skipped — nothing to validate yet)"
@@ -1144,13 +1375,27 @@ stage_validate() {
   run_check 44 "wiki-external-services (fix: re-run espalier-init Phase 2)" 'test -f espalier/wiki/external-services.md' &
   run_check 45 "rules-development-process (fix: re-run espalier-init Phase 2)" 'test -f espalier/rules/development-process.md' &
   run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
-  # 47-51: codex wiring (only when codex is a target platform).
+  # 47-51: codex wiring (skip-rendered when copilot alone keeps numbering contiguous).
   if want_codex; then
     run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit' &
     run_check 48 "codex-symlinks-valid" '[ -L .agents/skills/espalier ] && [ -e .agents/skills/espalier ]' &
     run_check 49 "codex-agents-toml"   'grep -q "^name = \"harness-coder\"" .codex/agents/harness-coder.toml && grep -q "^name = \"harness-reviewer\"" .codex/agents/harness-reviewer.toml && grep -q "^name = \"harness-security\"" .codex/agents/harness-security.toml' &
     run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
     run_check 51 "codex-agentsmd"      'grep -q "## Espalier" AGENTS.md' &
+  elif want_copilot; then
+    skip_check 47 "codex-skills-load"     "codex not targeted"
+    skip_check 48 "codex-symlinks-valid"  "codex not targeted"
+    skip_check 49 "codex-agents-toml"     "codex not targeted"
+    skip_check 50 "codex-hooks-configured" "codex not targeted"
+    skip_check 51 "codex-agentsmd"        "codex not targeted"
+  fi
+  # 52-56: copilot wiring (only when copilot is a target platform).
+  if want_copilot; then
+    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit' &
+    run_check 53 "copilot-symlinks-valid" '[ -L .github/skills/espalier ] && [ -e .github/skills/espalier ]' &
+    run_check 54 "copilot-agents"       'grep -q "^name: harness-coder" .github/agents/harness-coder.agent.md && grep -q "^name: harness-reviewer" .github/agents/harness-reviewer.agent.md && grep -q "^name: harness-security" .github/agents/harness-security.agent.md' &
+    run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
+    run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
 
   wait
@@ -1159,7 +1404,7 @@ stage_validate() {
   # must reach stdout, which the run_check harness discards), then 26-51.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-1] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-6] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"
@@ -1183,9 +1428,12 @@ case "$MODE" in
     stage_state_template
     stage_claudemd
     stage_agentsmd
+    stage_copilot_instructions
     stage_settings_json
     stage_codex_config
     stage_codex_agents
+    stage_copilot_agents
+    stage_copilot_hooks
     stage_merge_decision
     stage_gitignore
     stage_validate
@@ -1202,9 +1450,12 @@ case "$MODE" in
     stage_state_template
     stage_claudemd
     stage_agentsmd
+    stage_copilot_instructions
     stage_settings_json
     stage_codex_config
     stage_codex_agents
+    stage_copilot_agents
+    stage_copilot_hooks
     stage_merge_decision
     stage_gitignore
     stage_validate

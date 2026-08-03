@@ -8,6 +8,13 @@
 > - `.codex/config.toml` marker-guarded hook block (`# >>> ESPALIER HOOKS v1 >>>` … `# <<<`): PostToolUse matcher `^(apply_patch|Edit|Write)$` → `post-edit-wrapper.sh`; PreToolUse matcher `^(Bash|shell|local_shell)$` → `pre-push-gate-wrapper.sh`. Same stdin JSON schema and exit-2-blocks contract as Claude Code, so the SAME wrapper scripts serve both platforms. Project hooks require the project to be trusted AND `/hooks` trust once inside Codex.
 > - `.codex/agents/harness-{coder,reviewer,security}.toml` sub-agents (write-if-absent — user model/effort tuning survives re-runs), each pointing `developer_instructions` at the matching `espalier/agents/*.md`.
 > - `espalier/.platforms` records the wired platform set; re-runs are additive (a later `--wire-only --platforms=codex` on a claude install unions to `claude,codex` and never unwires anything).
+>
+> **v0.15.0 note (Copilot platform):** with `copilot` in `--platforms` bootstrap additionally wires GitHub Copilot:
+> - `.github/skills/<name>` → `../../espalier/skills/<name>` symlinks (Copilot Agent Skills — the one location ALL Copilot surfaces read: VS Code, CLI, cloud coding agent; VS Code alone also reads `.claude/skills/` and `.agents/skills/`). Invoked `/espalier`, `/espalier-fix`, … Same folder-name == `name:` invariant.
+> - `.github/copilot-instructions.md` `## Espalier` section (grep-guarded append) — always-read-rules instruction + the Copilot platform-mapping table (`@harness-*` custom agents, hook surface caveats).
+> - `.github/agents/harness-{coder,reviewer,security}.agent.md` custom agents (write-if-absent; body points at the matching `espalier/agents/*.md`; invoked `@harness-coder` etc.).
+> - `.github/hooks/espalier-gates.json` (write-if-absent, own file — user hook files untouched): `preToolUse` matcher `bash|shell` and `postToolUse` matcher `edit|write|create|apply_patch|str_replace_editor`, each dispatching through `espalier/hooks/copilot-hook-adapter.sh`, which translates Copilot's camelCase payload (`toolName`/`toolArgs`) into the Claude/Codex shape (`tool_name`/`tool_input`) and passes exit codes through — Copilot treats a non-zero `preToolUse` exit as DENY (fail-closed), so the shared wrappers' exit-2 contract carries over. Hooks run in Copilot CLI + cloud agent; VS Code chat does not execute hooks.
+> - Validation checks 52-56; totals become 56 (47-51 render as skip lines when codex isn't also targeted, keeping numbering contiguous).
 
 Generated files are inert until wired into the execution environment. Run these steps in order.
 

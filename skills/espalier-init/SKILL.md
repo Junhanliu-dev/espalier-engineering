@@ -1,6 +1,6 @@
 ---
 name: espalier-init
-description: Analyze any existing codebase, discover its patterns and best practices, and generate an Espalier structure (rules, skills, wiki, pipeline) so AI coders produce code matching that project's language and conventions. Wires into Claude Code and/or Codex (.claude/ or .agents/skills/ + .codex/).
+description: Analyze any existing codebase, discover its patterns and best practices, and generate an Espalier structure (rules, skills, wiki, pipeline) so AI coders produce code matching that project's language and conventions. Wires into Claude Code, Codex, and/or GitHub Copilot (.claude/, .agents/skills/ + .codex/, .github/).
 ---
 
 # Espalier Init
@@ -58,6 +58,11 @@ project-root/
 ├── .codex/                         # [codex platform]
 │   ├── config.toml                # PreToolUse/PostToolUse hook block (marker-guarded)
 │   └── agents/                    # harness-{coder,reviewer,security}.toml sub-agents
+├── .github/                        # [copilot platform]
+│   ├── skills/                    # symlinks to espalier/skills/* (Copilot Agent Skills — VS Code/CLI/cloud agent)
+│   ├── agents/                    # harness-*.agent.md custom agents (@harness-coder …)
+│   ├── hooks/espalier-gates.json  # preToolUse/postToolUse gates via copilot-hook-adapter.sh
+│   └── copilot-instructions.md    # Espalier section + platform mapping (bootstrap-appended)
 ├── AGENTS.md                       # [codex] Espalier section + platform mapping (bootstrap-appended)
 ├── CLAUDE.md                       # [claude] references espalier/agent.md
 ├── espalier/
@@ -194,24 +199,28 @@ A doctor scan is activity-gated — an idle repo never triggers one.
        Never automatic; runs only when you invoke /espalier-doctor.
 ```
 
-### Q4 — Agent platform(s)
+### Q4 — Agent platform(s) (multiSelect: true — any subset)
 
 ```
-Which agent platform(s) should Espalier wire into this repo?
+Which agent platform(s) should Espalier wire into this repo? (pick every one
+your team uses; PLATFORMS = the comma list of selections)
 
-  1. Claude Code (default)                 → PLATFORMS = claude
+  1. Claude Code (default)                 → claude
        .claude/{rules,skills,agents} symlinks + CLAUDE.md + settings.json hooks.
-  2. Codex                                 → PLATFORMS = codex
+  2. Codex                                 → codex
        .agents/skills/ symlinks + AGENTS.md section + .codex/config.toml hooks
        + .codex/agents/harness-*.toml sub-agents.
-  3. Both                                  → PLATFORMS = claude,codex
-       All of the above. Pick this for mixed teams.
+  3. GitHub Copilot                        → copilot
+       .github/skills/ symlinks + .github/copilot-instructions.md section
+       + .github/agents/harness-*.agent.md sub-agents
+       + .github/hooks/espalier-gates.json gates (CLI + cloud agent).
 ```
 
-Default intelligently: if the repo already has an `AGENTS.md` or a teammate's
-`.codex/` dir, recommend Both; if you are RUNNING inside Codex, recommend
-Codex (or Both). The espalier/ content is identical either way — only the
-wiring differs.
+Default intelligently: `AGENTS.md` or a `.codex/` dir present → suggest adding
+codex; `.github/copilot-instructions.md` or the repo living on github.com with
+Copilot reviews → suggest adding copilot; RUNNING inside Codex/Copilot →
+include that platform. The espalier/ content is identical regardless — only
+the wiring differs, and later additions are one `--wire-only` run.
 
 > Why agent identifiers stay `harness-coder` / `harness-reviewer`: these are internal sub-agent names baked into pipeline orchestration. Renaming them mid-pipeline would break any in-flight changes. The plugin name and slash commands rebranded to Espalier in v0.4.0; agent identifiers remain frozen.
 
@@ -222,7 +231,7 @@ Phase 2's Write batch reads the Q2 answer (AGENT_TOOLS) when emitting `espalier/
 - `restricted` → keep the `tools:` frontmatter line from the template verbatim
 - `inherit` → omit the `tools:` line entirely (Claude Code interprets missing `tools:` as "inherit from parent")
 
-Pass the Q1, Q3, and Q4 answers to `bootstrap-espalier.sh` in Phase 3 as literal flag values (`--merge-decision=<answer from Q1> --doctor-cadence=<answer from Q3> --platforms=<answer from Q4>`). The Q2 answer only affects Phase 2 LLM writes, no bootstrap flag needed (the `.codex/agents/*.toml` sub-agents bootstrap emits for the codex platform always carry their contractual restrictions in `developer_instructions` — Q2 only shapes the Claude `tools:` frontmatter).
+Pass the Q1, Q3, and Q4 answers to `bootstrap-espalier.sh` in Phase 3 as literal flag values (`--merge-decision=<answer from Q1> --doctor-cadence=<answer from Q3> --platforms=<answer from Q4>`). The Q2 answer only affects Phase 2 LLM writes, no bootstrap flag needed (the `.codex/agents/*.toml` and `.github/agents/*.agent.md` sub-agents bootstrap emits for the codex/copilot platforms always carry their contractual restrictions in their instruction bodies — Q2 only shapes the Claude `tools:` frontmatter).
 
 ---
 
@@ -319,7 +328,7 @@ bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
   --lang=<LANG_CHOICE from Phase 1 discovery: typescript|python|go|unsupported> \
   --merge-decision=<answer from Q1> \
   --doctor-cadence=<answer from Q3> \
-  --platforms=<answer from Q4: claude|codex|claude,codex>
+  --platforms=<answer from Q4: comma list of claude|codex|copilot>
 ```
 
 Shell variables do NOT persist between Bash calls — substitute literal values
@@ -345,7 +354,7 @@ Bootstrap runs all 11 internal stages in one shell process:
 - **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup).
 - **Stage 9:** persist the merge decision (the literal Q1 answer passed via `--merge-decision`) to `espalier/.merge-hook-decision` and the Phase 0 Q3 cadence to `espalier/.doctor-cadence` (written once, never auto-rewritten). Install the post-merge dispatcher (`.husky/post-merge` or `.git/hooks/post-merge`) unconditionally — it runs `drift-detect.sh` on every merge and `post-merge-backlink.sh` only when the decision is `installed`.
 - **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) to `.gitignore` (newline-guarded).
-- **Stage 11:** run the validation checks — 46 when only claude is targeted, 51 with codex (all but #25 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
+- **Stage 11:** run the validation checks — 46 when only claude is targeted, 51 with codex, 56 with copilot (all but #25 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
 
 **Re-run safety:** if `espalier/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
 
@@ -373,7 +382,7 @@ Either way — thanks for trying it.
 
 Fill `N`, `M`, `K` from the `WIRED: skills=<n> rules=<n> agents=<n>` line bootstrap Stage 5 printed. If the line is absent, drop that clause rather than guess.
 
-**If the codex platform was wired** (Q4 = codex or both), insert this block
+**If the codex platform was wired** (codex in Q4), insert this block
 IMMEDIATELY BEFORE the message above (verbatim, it is part of the final reply):
 
 ```
@@ -384,27 +393,38 @@ Codex wiring is in place. Three one-time steps inside Codex:
 Then invoke the pipeline with $espalier <requirement> ($espalier-fix, $espalier-ask, $espalier-audit likewise).
 ```
 
+**If the copilot platform was wired** (copilot in Q4), also insert:
+
+```
+Copilot wiring is in place. Notes:
+  - Reload VS Code (or restart Copilot CLI) so the Agent Skills register; invoke with /espalier <requirement>.
+  - The quality gates (.github/hooks/espalier-gates.json) run in Copilot CLI and the cloud coding agent; VS Code chat does not execute hooks — the pipeline's in-skill gates still apply there.
+  - Sub-agents are @harness-coder / @harness-reviewer / @harness-security (.github/agents/).
+```
+
 **Rule:** this is the ONLY end-of-install ask. No telemetry, no follow-up nag, no second prompt on re-runs — bootstrap's idempotent re-run path (`espalier/.merge-hook-decision` already present → validate-only) skips Phase 4 entirely.
 
 ---
 
-## Running under Codex (platform fallbacks)
+## Running under Codex or Copilot (platform fallbacks)
 
 This skill was written for Claude Code but runs under Codex (installed per the
 README: clone espalier-engineering, symlink `skills/espalier-init` into
-`~/.agents/skills/`, invoke `$espalier-init`). Every phase works — substitute
-these mechanics:
+`~/.agents/skills/`, invoke `$espalier-init`) or Copilot (symlink into
+`~/.copilot/skills/` — or rely on `~/.agents/skills/`, which VS Code also
+reads — invoke `/espalier-init`). Every phase works — substitute these
+mechanics:
 
 | Claude Code mechanic | Codex substitute |
 |---|---|
 | `AskUserQuestion` (Phase 0, no-evidence follow-ups) | Ask the same questions in chat, numbered, and WAIT for the reply. Never guess an answer to proceed. |
-| `scout` / `oracle` sub-agent calls (Phase 1/2) | Spawn Codex subagents with the same prompt text if subagent spawning is available; otherwise run each scout's instructions yourself, inline, one at a time (read the named files, produce the same JSON shape). Sequential is fine — correctness beats parallelism. |
+| `scout` / `oracle` sub-agent calls (Phase 1/2) | Spawn platform subagents (Codex subagents / Copilot custom agents) with the same prompt text if available; otherwise run each scout's instructions yourself, inline, one at a time (read the named files, produce the same JSON shape). Sequential is fine — correctness beats parallelism. |
 | `${CLAUDE_SKILL_DIR}` (Phase 3) | The absolute directory of this SKILL.md, physically resolved (`pwd -P`) so the `../../scripts/` hop works through the install symlink. |
 | `AskUserQuestion` availability as the interactivity test | "Can I ask the user in chat" is the same test. |
 
 Phase 2's Write batch and Phase 3's bootstrap are already platform-neutral
-(plain file writes + one bash script). Pick `codex` (or `claude,codex`) at
-Q4 — you are the proof the user runs Codex.
+(plain file writes + one bash script). Include the platform you are running
+on in the Q4 answer — you are the proof the user uses it.
 
 ---
 
