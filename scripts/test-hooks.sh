@@ -482,6 +482,67 @@ T8F_RC=$?
 assert "T8f no python on PATH fails closed (exit 2)" "[ $T8F_RC -eq 2 ]"
 assert "T8f2 no-python block on stderr" "grep -q 'BLOCKED' '$TMP/w_err.txt'"
 
+run_wrapper_case "T8g codex argv-array push dispatches" \
+  '{"tool_input":{"command":["bash","-lc","git push origin main"]}}' 2 yes
+run_wrapper_case "T8h codex argv-array non-push exits 0" \
+  '{"tool_input":{"command":["bash","-lc","git status && ls"]}}' 0 no
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T9: post-edit-wrapper.sh payload matrix (Claude file_path + Codex apply_patch) ──
+echo "T9: post-edit-wrapper"
+PWRAP="$HOOKS_SRC/post-edit-wrapper.sh"
+TMP=$(mktemp -d -t hooks-t9.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/hooks" "$TMP/src"
+# Boundary-check stub: exit 2 (violation) for any path containing "bad", else 0.
+# Echoes CHECKED:<path> to stderr so dispatch + path resolution are observable.
+cat > "$TMP/espalier/hooks/check-layer-boundaries.sh" << 'STUB'
+#!/bin/bash
+echo "CHECKED:$1" >&2
+case "$1" in *bad*) echo "violation in $1" >&2; exit 2 ;; esac
+exit 0
+STUB
+chmod +x "$TMP/espalier/hooks/check-layer-boundaries.sh"
+touch "$TMP/src/ok.ts" "$TMP/src/bad.ts" "$TMP/src/ok2.ts"
+
+# run_pwrap_case NAME JSON EXPECT_RC EXPECT_CHECKED_SUBSTR("-" = none)
+run_pwrap_case() {
+  local name=$1 json=$2 expect_rc=$3 expect_checked=$4
+  local rc err="$TMP/p_err.txt"
+  ( cd "$TMP" && printf '%s' "$json" | env -u CLAUDE_PROJECT_DIR bash "$PWRAP" >/dev/null 2>"$err" )
+  rc=$?
+  assert "$name (rc)" "[ $rc -eq $expect_rc ]"
+  if [ "$expect_checked" = "-" ]; then
+    assert "$name (no check ran)" "! grep -q 'CHECKED:' '$err'"
+  else
+    assert "$name (checked $expect_checked)" "grep -q 'CHECKED:.*$expect_checked' '$err'"
+  fi
+}
+
+run_pwrap_case "T9a claude file_path clean file" \
+  "{\"tool_input\":{\"file_path\":\"$TMP/src/ok.ts\"}}" 0 "src/ok.ts"
+run_pwrap_case "T9b claude file_path violating file" \
+  "{\"tool_input\":{\"file_path\":\"$TMP/src/bad.ts\"}}" 2 "src/bad.ts"
+CODEX_PATCH='{"tool_input":{"command":"*** Begin Patch\n*** Update File: src/ok.ts\n@@\n-a\n+b\n*** Add File: src/ok2.ts\n+x\n*** End Patch"}}'
+run_pwrap_case "T9c codex apply_patch multi-file (both clean)" \
+  "$CODEX_PATCH" 0 "src/ok2.ts"
+CODEX_BAD='{"tool_input":{"command":"*** Begin Patch\n*** Update File: src/ok.ts\n@@\n-a\n+b\n*** Update File: src/bad.ts\n@@\n-a\n+b\n*** End Patch"}}'
+run_pwrap_case "T9d codex apply_patch one violation → exit 2" \
+  "$CODEX_BAD" 2 "src/bad.ts"
+run_pwrap_case "T9e codex deleted-file patch line ignored" \
+  '{"tool_input":{"command":"*** Begin Patch\n*** Delete File: src/ok.ts\n*** End Patch"}}' 0 "-"
+run_pwrap_case "T9f empty/unknown tool_input exits 0" \
+  '{"tool_input":{"description":"noop"}}' 0 "-"
+# T9g: relative path from patch resolves against the git root even from a subdir.
+mkdir -p "$TMP/deep/nest"
+( cd "$TMP/deep/nest" && printf '%s' "$CODEX_BAD" | env -u CLAUDE_PROJECT_DIR bash "$PWRAP" >/dev/null 2>"$TMP/p_err.txt" )
+T9G_RC=$?
+assert "T9g subdir cwd still resolves + blocks (rc 2)" "[ $T9G_RC -eq 2 ]"
+# Absolute-path assertion, not string-equal to $TMP: on macOS git returns the
+# /private/var realpath while mktemp reports /var — same dir, different spelling.
+assert "T9g2 checked path is absolute repo-rooted" "grep -q 'CHECKED:/.*src/bad.ts' '$TMP/p_err.txt'"
+
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

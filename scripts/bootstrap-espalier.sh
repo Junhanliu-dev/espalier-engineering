@@ -22,7 +22,9 @@
 #   - Merges .claude/settings.json hooks (Appendix A algorithm).
 #   - Persists squash-merge decision + installs the post-merge dispatcher.
 #   - Appends .gitignore entries for the commit-index + drift sidecars.
-#   - Runs 46 validation checks (R6).
+#   - Wires the codex platform when targeted (.agents/skills symlinks,
+#     AGENTS.md section, .codex/config.toml hooks, .codex/agents/*.toml).
+#   - Runs the validation checks (R6) — 46 claude-only, 51 with codex.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -38,6 +40,11 @@
 #   --lang=<typescript|python|go|unsupported>
 #                            Boundary-check variant. "unsupported" emits a no-op.
 #   --doctor-cadence=<val>   every-change | weekly | monthly | manual (default: weekly).
+#   --platforms=<list>       Comma list of agent platforms to wire: claude | codex
+#                            (or the shorthand "both"). Default: claude.
+#                            claude → .claude/ symlinks + CLAUDE.md + settings.json
+#                            codex  → .agents/skills/ symlinks + AGENTS.md +
+#                                     .codex/config.toml hooks + .codex/agents/*.toml
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -45,7 +52,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (46-check validation).
+#   --validate-only          Only Stage 11 (46/51-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -63,6 +70,8 @@ FORCE=no
 IGNORE_DRIFT=no
 IGNORE_DRIFT_REASON=""
 DOCTOR_CADENCE=weekly
+PLATFORMS=""          # resolved after parsing: flag > espalier/.platforms > claude
+PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -72,6 +81,7 @@ for arg in "$@"; do
     --lang=*)               LANG_VARIANT="${arg#--lang=}" ;;
     --merge-decision=*)     MERGE_DECISION="${arg#--merge-decision=}" ;;
     --doctor-cadence=*)     DOCTOR_CADENCE="${arg#--doctor-cadence=}" ;;
+    --platforms=*)          PLATFORMS_FLAG="${arg#--platforms=}" ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -81,7 +91,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,49p' "$0"
+      sed -n '2,57p' "$0"
       exit 0
       ;;
     *)
@@ -182,7 +192,13 @@ if [ "$MODE" = "full" ] && [ "$FORCE" != "yes" ]; then
   # Else: espalier/ may exist with partial LLM writes — proceed (fresh install).
 fi
 
-# Validate --merge-decision (required for full and wire-only)
+# Validate --merge-decision (required for full and wire-only).
+# wire-only convenience: an existing install already persisted the decision —
+# reuse it so "add a platform later" runs don't force the user to re-answer.
+if [ -z "$MERGE_DECISION" ] && [ "$MODE" = "wire-only" ] && [ -f espalier/.merge-hook-decision ]; then
+  MERGE_DECISION=$(head -1 espalier/.merge-hook-decision | tr -d '[:space:]')
+  log "wire-only: reusing persisted merge decision '$MERGE_DECISION' (espalier/.merge-hook-decision)"
+fi
 case "$MODE" in
   full|wire-only)
     case "$MERGE_DECISION" in
@@ -219,7 +235,55 @@ case "$DOCTOR_CADENCE" in
     ;;
 esac
 
-log "Mode: $MODE | project: $PROJECT_DIR | plugin: $PLUGIN_DIR | lang: $LANG_VARIANT"
+# Resolve + validate platforms. Precedence: --platforms flag > union with any
+# existing espalier/.platforms (re-runs are ADDITIVE — wiring codex later never
+# unwires claude) > persisted file alone > default claude.
+normalize_platforms() {
+  # stdin: comma list → stdout: canonical "claude"|"codex"|"claude,codex"; rc 1 on junk
+  local raw p want_c=no want_x=no
+  raw=$(cat | tr 'A-Z' 'a-z' | tr -d '[:space:]')
+  [ "$raw" = "both" ] && raw="claude,codex"
+  local IFS=','
+  for p in $raw; do
+    case "$p" in
+      claude)      want_c=yes ;;
+      codex)       want_x=yes ;;
+      "")          ;;
+      *)           return 1 ;;
+    esac
+  done
+  [ "$want_c" = "no" ] && [ "$want_x" = "no" ] && return 1
+  if [ "$want_c" = "yes" ] && [ "$want_x" = "yes" ]; then echo "claude,codex"
+  elif [ "$want_x" = "yes" ]; then echo "codex"
+  else echo "claude"
+  fi
+}
+
+EXISTING_PLATFORMS=""
+if [ -f espalier/.platforms ]; then
+  EXISTING_PLATFORMS=$(head -1 espalier/.platforms | tr -d '[:space:]')
+elif [ -f espalier/.merge-hook-decision ]; then
+  # Complete pre-v0.14 install: predates .platforms, so it is a claude install.
+  # Without this inference, "--wire-only --platforms=codex" on a legacy install
+  # would record codex-only and validation would stop checking claude wiring.
+  EXISTING_PLATFORMS="claude"
+fi
+
+if [ -n "$PLATFORMS_FLAG" ]; then
+  PLATFORMS=$(printf '%s,%s' "$PLATFORMS_FLAG" "$EXISTING_PLATFORMS" | normalize_platforms) || {
+    echo "ERROR: invalid --platforms='$PLATFORMS_FLAG' (valid: claude | codex | claude,codex | both)" >&2
+    exit 1
+  }
+elif [ -n "$EXISTING_PLATFORMS" ]; then
+  PLATFORMS=$(printf '%s' "$EXISTING_PLATFORMS" | normalize_platforms) || PLATFORMS="claude"
+else
+  PLATFORMS="claude"
+fi
+
+want_claude() { case "$PLATFORMS" in *claude*) return 0 ;; *) return 1 ;; esac; }
+want_codex()  { case "$PLATFORMS" in *codex*)  return 0 ;; *) return 1 ;; esac; }
+
+log "Mode: $MODE | project: $PROJECT_DIR | plugin: $PLUGIN_DIR | lang: $LANG_VARIANT | platforms: $PLATFORMS"
 
 # Resolve the --ignore-drift audit reason once (prompt only when interactive).
 if [ "$IGNORE_DRIFT" = "yes" ] && [ -z "$IGNORE_DRIFT_REASON" ]; then
@@ -254,9 +318,15 @@ stage_mkdirs() {
   run "mkdir -p espalier/changes/feat"
   run "mkdir -p espalier/changes/fix"
   run "mkdir -p espalier/changes/refactor"
-  run "mkdir -p .claude/rules"
-  run "mkdir -p .claude/skills"
-  run "mkdir -p .claude/agents"
+  if want_claude; then
+    run "mkdir -p .claude/rules"
+    run "mkdir -p .claude/skills"
+    run "mkdir -p .claude/agents"
+  fi
+  if want_codex; then
+    run "mkdir -p .agents/skills"
+    run "mkdir -p .codex/agents"
+  fi
 }
 
 # --- Stage 3: Pure-copy templates -------------------------------------------
@@ -314,8 +384,10 @@ stage_hooks() {
 
 # --- Stage 5: Symlinks ------------------------------------------------------
 
+ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit"
+
 stage_symlinks() {
-  log "Stage 5: symlinks into .claude/ (safe + portable abspath)"
+  log "Stage 5: platform wiring symlinks ($PLATFORMS)"
   # chmod-glob also runs here (idempotent) so wire-only mode picks up
   # LLM-written hooks. Full mode already chmodded in Stage 4 — harmless re-chmod.
   if [ "$DRY_RUN" != "yes" ]; then
@@ -324,22 +396,43 @@ stage_symlinks() {
     done
   fi
   # Targets are RELATIVE to the symlink's own directory (.claude/{rules,skills,
-  # agents}/<link> is two levels below the repo root, hence ../../espalier/…) —
-  # a repo moved or checked out at another path keeps every link resolving.
+  # agents}/<link> and .agents/skills/<link> are two levels below the repo root,
+  # hence ../../espalier/…) — a repo moved or checked out at another path keeps
+  # every link resolving.
   WIRED_RULES=0; WIRED_SKILLS=0; WIRED_AGENTS=0
-  safe_ln "../../espalier/rules/engineering-structure.md" .claude/rules/espalier-structure.md && WIRED_RULES=$((WIRED_RULES+1))
-  safe_ln "../../espalier/rules/coding-standards.md"      .claude/rules/espalier-standards.md && WIRED_RULES=$((WIRED_RULES+1))
-  safe_ln "../../espalier/rules/development-process.md"   .claude/rules/espalier-process.md && WIRED_RULES=$((WIRED_RULES+1))
-  safe_ln "../../espalier/rules/security-standards.md"    .claude/rules/espalier-security.md && WIRED_RULES=$((WIRED_RULES+1))
-  safe_ln "../../espalier/rules/production-standards.md"  .claude/rules/espalier-production.md && WIRED_RULES=$((WIRED_RULES+1))
-  for s in espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit; do
-    safe_ln "../../espalier/skills/$s" ".claude/skills/$s" && WIRED_SKILLS=$((WIRED_SKILLS+1))
-  done
-  # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
-  # (see SKILL.md Phase 0 note).
-  safe_ln "../../espalier/agents/harness-coder.md"    .claude/agents/harness-coder.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
-  safe_ln "../../espalier/agents/harness-reviewer.md" .claude/agents/harness-reviewer.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
-  safe_ln "../../espalier/agents/harness-security.md" .claude/agents/harness-security.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+  if want_claude; then
+    safe_ln "../../espalier/rules/engineering-structure.md" .claude/rules/espalier-structure.md && WIRED_RULES=$((WIRED_RULES+1))
+    safe_ln "../../espalier/rules/coding-standards.md"      .claude/rules/espalier-standards.md && WIRED_RULES=$((WIRED_RULES+1))
+    safe_ln "../../espalier/rules/development-process.md"   .claude/rules/espalier-process.md && WIRED_RULES=$((WIRED_RULES+1))
+    safe_ln "../../espalier/rules/security-standards.md"    .claude/rules/espalier-security.md && WIRED_RULES=$((WIRED_RULES+1))
+    safe_ln "../../espalier/rules/production-standards.md"  .claude/rules/espalier-production.md && WIRED_RULES=$((WIRED_RULES+1))
+    for s in $ESPALIER_SKILL_NAMES; do
+      safe_ln "../../espalier/skills/$s" ".claude/skills/$s" && WIRED_SKILLS=$((WIRED_SKILLS+1))
+    done
+    # Sub-agent identifiers intentionally kept as harness-coder / harness-reviewer
+    # (see SKILL.md Phase 0 note).
+    safe_ln "../../espalier/agents/harness-coder.md"    .claude/agents/harness-coder.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+    safe_ln "../../espalier/agents/harness-reviewer.md" .claude/agents/harness-reviewer.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+    safe_ln "../../espalier/agents/harness-security.md" .claude/agents/harness-security.md && WIRED_AGENTS=$((WIRED_AGENTS+1))
+  fi
+  if want_codex; then
+    # Codex discovers repo skills by probing .agents/skills/ (SkillScope::Repo).
+    # Same folder-name == frontmatter-name invariant as Claude Code, so the
+    # very same espalier/skills/<name> dirs wire straight in.
+    CODEX_SKILLS=0
+    for s in $ESPALIER_SKILL_NAMES; do
+      safe_ln "../../espalier/skills/$s" ".agents/skills/$s" && CODEX_SKILLS=$((CODEX_SKILLS+1))
+    done
+    log "  codex: $CODEX_SKILLS skills linked into .agents/skills/"
+    # Codex has no auto-loaded rules dir or agent .md registry; rules load via
+    # the AGENTS.md instruction (Stage 7b) and sub-agents via .codex/agents/*.toml
+    # (Stage 8c). Count them as wired only when claude didn't already.
+    if ! want_claude; then
+      WIRED_SKILLS=$CODEX_SKILLS
+      WIRED_RULES=5    # bound via the AGENTS.md always-read instruction
+      WIRED_AGENTS=3   # bound via .codex/agents/harness-*.toml
+    fi
+  fi
   # Read by espalier-init SKILL.md Phase 4 for the completion message — keep
   # this exact format.
   echo "WIRED: skills=$WIRED_SKILLS rules=$WIRED_RULES agents=$WIRED_AGENTS"
@@ -372,6 +465,10 @@ STATETMPL
 # --- Stage 7: CLAUDE.md append ----------------------------------------------
 
 stage_claudemd() {
+  if ! want_claude; then
+    log "Stage 7: CLAUDE.md append — skipped (claude not in --platforms)"
+    return
+  fi
   log "Stage 7: CLAUDE.md append (idempotent grep-guard)"
   if [ -f CLAUDE.md ] && grep -q "## Espalier" CLAUDE.md 2>/dev/null; then
     log "  CLAUDE.md already has Espalier section — skipping"
@@ -407,6 +504,10 @@ CLAUDETMPL
 # --- Stage 8: .claude/settings.json merge (Appendix A algorithm) ------------
 
 stage_settings_json() {
+  if ! want_claude; then
+    log "Stage 8: .claude/settings.json merge — skipped (claude not in --platforms)"
+    return
+  fi
   log "Stage 8: .claude/settings.json merge"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] merge .claude/settings.json (Appendix A algorithm)"
@@ -505,12 +606,193 @@ except Exception as e:
 PYMERGE
 }
 
+# --- Stage 7b: AGENTS.md append (codex) --------------------------------------
+
+stage_agentsmd() {
+  if ! want_codex; then
+    return
+  fi
+  log "Stage 7b: AGENTS.md append (idempotent grep-guard)"
+  if [ -f AGENTS.md ] && grep -q "## Espalier" AGENTS.md 2>/dev/null; then
+    log "  AGENTS.md already has Espalier section — skipping"
+    return
+  fi
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] append Espalier section to AGENTS.md"
+    return
+  fi
+  cat >> AGENTS.md << 'AGENTSTMPL'
+
+## Espalier
+
+This project uses Espalier for AI code quality — auto-discovered, project-specific guardrails.
+
+**Always-loaded rules:** before writing or reviewing ANY code, read every file in
+`espalier/rules/` (engineering-structure, coding-standards, development-process,
+security-standards, production-standards). Codex has no auto-loaded rules
+directory — this instruction IS the load mechanism; do not skip it.
+
+**For any implementation work**, invoke the `espalier` skill (`$espalier <requirement>`) to execute the full pipeline.
+
+**For bug fixes**, invoke `$espalier-fix <bug>` for the slim lane — 7 stages (0–7, no Stage 2).
+
+**For questions** ("how does X work", "where is Y"), invoke `$espalier-ask <question>` — read-only, answers from espalier/ docs first.
+
+**For a repo-wide security audit**, invoke `$espalier-audit` — inventories trust-boundary defects in the existing code to `espalier/wiki/security-audit.md`; dispatch fixes via `$espalier-fix`.
+
+**Agent definition:** Read `espalier/agent.md` for your operating instructions.
+
+**Key principle:** The coder agent and reviewer agent are ALWAYS separate.
+Never review your own code in the same invocation that wrote it.
+
+### Platform mapping (Codex)
+
+Espalier's skill files use Claude Code vocabulary in places; on Codex apply these mappings:
+
+- `/espalier*` slash commands → `$espalier*` skill invocations.
+- `AskUserQuestion` → ask the user directly in chat and WAIT for the reply.
+  Where a skill says "if you can call AskUserQuestion you are interactive",
+  read it as: if you can ask the user in chat, you ARE interactive.
+- "Spawn sub-agent harness-coder / harness-reviewer / harness-security with
+  prompt X" → spawn the matching Codex subagent (defined in
+  `.codex/agents/<name>.toml`) with the same prompt. If subagent spawning is
+  unavailable in this session, execute the roles inline in strict sequence and
+  NEVER let the pass that wrote code also approve it: finish the coder role,
+  then re-read `espalier/agents/harness-reviewer.md` and review against the
+  actual diff as if you had not written it.
+- `.claude/settings.json` hooks → already wired in `.codex/config.toml`
+  (run `/hooks` once in Codex to trust them; they are the quality gates).
+- `$CLAUDE_PROJECT_DIR` in docs → the repo root (`git rev-parse --show-toplevel`).
+AGENTSTMPL
+}
+
+# --- Stage 8b: .codex/config.toml hooks merge (codex) ------------------------
+
+stage_codex_config() {
+  if ! want_codex; then
+    return
+  fi
+  log "Stage 8b: .codex/config.toml hooks merge (marker-guarded)"
+  if [ -f .codex/config.toml ] && grep -q "ESPALIER HOOKS" .codex/config.toml 2>/dev/null; then
+    log "  .codex/config.toml already has Espalier hook block — skipping"
+    return
+  fi
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] append Espalier hook block to .codex/config.toml"
+    return
+  fi
+  mkdir -p .codex
+  if [ -f .codex/config.toml ]; then
+    cp .codex/config.toml ".codex/config.toml.espalier-backup-$(date +%s)"
+    ls -t .codex/config.toml.espalier-backup-* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+    # Appending [[hooks.*]] tables at EOF is always valid top-level TOML.
+    printf '\n' >> .codex/config.toml
+  fi
+  cat >> .codex/config.toml << 'CODEXHOOKS'
+# >>> ESPALIER HOOKS v1 >>> (managed by espalier bootstrap — do not edit between markers)
+# Same exit-code contract as Claude Code hooks: exit 2 + stderr blocks/feeds back.
+# Codex loads this project layer only when the project is trusted; run /hooks
+# once to trust these commands.
+[[hooks.PostToolUse]]
+matcher = "^(apply_patch|Edit|Write)$"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "bash espalier/hooks/post-edit-wrapper.sh"
+statusMessage = "Espalier layer-boundary check"
+timeout = 10
+
+[[hooks.PreToolUse]]
+matcher = "^(Bash|shell|local_shell)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "bash espalier/hooks/pre-push-gate-wrapper.sh"
+statusMessage = "Espalier push gate"
+timeout = 30
+# <<< ESPALIER HOOKS v1 <<<
+CODEXHOOKS
+  log "  .codex/config.toml: Espalier hook block appended"
+}
+
+# --- Stage 8c: .codex/agents/*.toml sub-agents (codex) ------------------------
+
+stage_codex_agents() {
+  if ! want_codex; then
+    return
+  fi
+  log "Stage 8c: .codex/agents/harness-*.toml (write-if-absent)"
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] write .codex/agents/harness-{coder,reviewer,security}.toml (if absent)"
+    return
+  fi
+  mkdir -p .codex/agents
+
+  # Write-if-absent ONLY — a user's later tuning (model, reasoning effort)
+  # survives re-bootstrap, same policy as espalier/.doctor-cadence.
+  if [ ! -f .codex/agents/harness-coder.toml ]; then
+    cat > .codex/agents/harness-coder.toml << 'CODERAGENT'
+# Espalier coder sub-agent (Codex). Instructions live in espalier/agents/harness-coder.md.
+name = "harness-coder"
+description = "Espalier implementation sub-agent — writes code strictly inside espalier/ rules; never reviews its own work"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+You are the harness-coder. Read espalier/agents/harness-coder.md and follow it
+exactly. Before writing any code, read every file in espalier/rules/ and the
+skill file espalier/skills/espalier-coding/SKILL.md. You implement; you never
+review or approve your own output.
+"""
+CODERAGENT
+    log "  wrote .codex/agents/harness-coder.toml"
+  else
+    log "  .codex/agents/harness-coder.toml exists — preserving"
+  fi
+
+  if [ ! -f .codex/agents/harness-reviewer.toml ]; then
+    cat > .codex/agents/harness-reviewer.toml << 'REVIEWERAGENT'
+# Espalier reviewer sub-agent (Codex). Instructions live in espalier/agents/harness-reviewer.md.
+name = "harness-reviewer"
+description = "Espalier review sub-agent — reviews diffs against espalier/ rules; writes ONLY its own review-record file"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+You are the harness-reviewer. Read espalier/agents/harness-reviewer.md and
+follow it exactly. Your ONLY permitted write is your own review record file
+(review-record.md in the active espalier/changes/ dir) — never source, tests,
+or any other file. Review the diff as written by someone else.
+"""
+REVIEWERAGENT
+    log "  wrote .codex/agents/harness-reviewer.toml"
+  else
+    log "  .codex/agents/harness-reviewer.toml exists — preserving"
+  fi
+
+  if [ ! -f .codex/agents/harness-security.toml ]; then
+    cat > .codex/agents/harness-security.toml << 'SECURITYAGENT'
+# Espalier security sub-agent (Codex). Instructions live in espalier/agents/harness-security.md.
+name = "harness-security"
+description = "Espalier security sub-agent — trust-boundary review against espalier/rules/security-standards.md; writes ONLY its own security-record file"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+You are the harness-security agent. Read espalier/agents/harness-security.md
+and follow it exactly. Your ONLY permitted write is your own security record
+file (security-record.md in the active espalier/changes/ dir, or
+espalier/wiki/security-audit.md in repo-audit mode) — never source, tests, or
+any other file.
+"""
+SECURITYAGENT
+    log "  wrote .codex/agents/harness-security.toml"
+  else
+    log "  .codex/agents/harness-security.toml exists — preserving"
+  fi
+}
+
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
 stage_merge_decision() {
   log "Stage 9: persist Phase 0 decisions + post-merge dispatcher"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] write espalier/.merge-hook-decision = $MERGE_DECISION"
+    echo "[dry-run] write espalier/.platforms = $PLATFORMS"
     echo "[dry-run] write espalier/.doctor-cadence = $DOCTOR_CADENCE (if absent)"
     echo "[dry-run] write espalier/.espalier-config = review-round caps (if absent)"
     echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
@@ -518,6 +800,11 @@ stage_merge_decision() {
   fi
 
   echo "$MERGE_DECISION" > espalier/.merge-hook-decision
+
+  # espalier/.platforms — tracked; which agent platforms this repo is wired for.
+  # $PLATFORMS is already the union of the flag and any previous value (resolved
+  # at preflight), so a later "add codex" wire-only run extends, never shrinks.
+  echo "$PLATFORMS" > espalier/.platforms
 
   # espalier/.doctor-cadence — tracked, cadence-line only. Written ONCE; never
   # auto-rewritten, so a user's later edit to the cadence survives re-bootstrap.
@@ -703,9 +990,12 @@ stage_gitignore() {
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  log "Stage 11: validation (46 checks — R6)"
+  # Check count is platform-dependent: 46 base + 5 codex-wiring checks.
+  local TOTAL_CHECKS=46
+  want_codex && TOTAL_CHECKS=51
+  log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] would run 46 validation checks (skipped — nothing to validate yet)"
+    echo "[dry-run] would run $TOTAL_CHECKS validation checks (skipped — nothing to validate yet)"
     return 0
   fi
 
@@ -721,19 +1011,28 @@ stage_validate() {
     # like $name leaking into outer scope), (b) `exit` inside cmd killing
     # the run_check function.
     if ( eval "$cmd" ) >/dev/null 2>&1; then
-      echo "[$n/46] OK   $check_name" > "$tmpdir/$idx"
+      echo "[$n/$TOTAL_CHECKS] OK   $check_name" > "$tmpdir/$idx"
     else
       local err
       err=$( ( eval "$cmd" ) 2>&1 | head -1 )
-      echo "[$n/46] FAIL $check_name: $err" > "$tmpdir/$idx"
+      echo "[$n/$TOTAL_CHECKS] FAIL $check_name: $err" > "$tmpdir/$idx"
       echo "fail" > "$tmpdir/$idx.fail"
     fi
+  }
+
+  # For checks whose platform isn't targeted (e.g. .claude/ wiring on a
+  # codex-only install): report OK with a skip note, keep numbering stable.
+  skip_check() {
+    local n=$1 check_name=$2 why=$3
+    local idx
+    idx=$(printf '%02d' "$n")
+    echo "[$n/$TOTAL_CHECKS] OK   $check_name (skipped — $why)" > "$tmpdir/$idx"
   }
 
   # Check #25 — invoked DIRECTLY (not via run_check): the run_check harness
   # discards stdout, which would swallow #25's per-tier table.
   run_check_25() {
-    [ -f espalier/.drift-state.tsv ] || { echo "[25/46] OK   stale-tiers: no drift"; return 0; }
+    [ -f espalier/.drift-state.tsv ] || { echo "[25/$TOTAL_CHECKS] OK   stale-tiers: no drift"; return 0; }
     local NOW; NOW=$(date -u +%s)
     local fresh=0 aging=0 stale=0 critical=0 expired=0
     while IFS=$'\t' read -r FILE SHA FIRST_SEEN REASON; do
@@ -753,7 +1052,7 @@ stage_validate() {
       else expired=$((expired+1));                           echo "  [expired]  ${AGE}d  $FILE"
       fi
     done < espalier/.drift-state.tsv
-    echo "[25/46] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
+    echo "[25/$TOTAL_CHECKS] stale-tiers: fresh=$fresh aging=$aging stale=$stale critical=$critical expired=$expired"
     [ "$critical" -gt 0 ] && echo "  WARN: $critical artifact(s) 60-90d stale"
     if [ "$expired" -gt 0 ]; then
       if [ "${IGNORE_DRIFT:-no}" = "yes" ]; then
@@ -770,20 +1069,37 @@ stage_validate() {
     return 0
   }
 
-  run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-  run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit' &
-  run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
-  run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
-  run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
+  if want_claude; then
+    run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
+    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit' &
+    run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
+    run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
+    run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
+  else
+    skip_check 1 "rules-load"       "claude not targeted"
+    skip_check 2 "skills-load"      "claude not targeted"
+    skip_check 3 "agents-load"      "claude not targeted"
+    skip_check 4 "hooks-configured" "claude not targeted"
+    skip_check 5 "symlinks-valid"   "claude not targeted"
+  fi
   run_check  6 "hooks-executable"    'test -x espalier/hooks/post-edit-wrapper.sh && test -x espalier/hooks/pre-push-gate.sh && test -x espalier/hooks/pre-push-gate-wrapper.sh' &
   run_check  7 "state-template"      'test -f espalier/changes/_template/pipeline-state.md' &
-  run_check  8 "claudemd-updated"    'grep -q "## Espalier" CLAUDE.md' &
+  if want_claude; then
+    run_check  8 "claudemd-updated"    'grep -q "## Espalier" CLAUDE.md' &
+  else
+    skip_check 8 "claudemd-updated" "claude not targeted"
+  fi
   run_check  9 "espalier-agent-md"   'test -f espalier/agent.md' &
   run_check 10 "espalier-pipeline-md" 'test -f espalier/pipeline.md' &
   run_check 11 "skill-name-parity"   'for f in espalier/skills/*/SKILL.md; do dir=$(basename $(dirname "$f")); name=$(grep "^name:" "$f" | awk "{print \$2}"); [ "$dir" = "$name" ] || exit 1; done' &
   run_check 12 "typed-changes-dirs"  '[ -d espalier/changes/feat ] && [ -d espalier/changes/fix ] && [ -d espalier/changes/refactor ]' &
-  run_check 13 "espalier-fix-skill"  'test -f .claude/skills/espalier-fix/SKILL.md' &
-  run_check 14 "espalier-fix-name"   'grep -q "^name: espalier-fix" .claude/skills/espalier-fix/SKILL.md' &
+  if want_claude; then
+    run_check 13 "espalier-fix-skill"  'test -f .claude/skills/espalier-fix/SKILL.md' &
+    run_check 14 "espalier-fix-name"   'grep -q "^name: espalier-fix" .claude/skills/espalier-fix/SKILL.md' &
+  else
+    run_check 13 "espalier-fix-skill"  'test -f espalier/skills/espalier-fix/SKILL.md' &
+    run_check 14 "espalier-fix-name"   'grep -q "^name: espalier-fix" espalier/skills/espalier-fix/SKILL.md' &
+  fi
   run_check 15 "rules-engineering"   'test -f espalier/rules/engineering-structure.md' &
   run_check 16 "rules-standards"     'test -f espalier/rules/coding-standards.md' &
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
@@ -797,13 +1113,25 @@ stage_validate() {
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
   run_check 27 "conventions-format"  '[ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv' &
   run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
-  run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
-  run_check 30 "security-rule"       '[ -L .claude/rules/espalier-security.md ] && [ -e .claude/rules/espalier-security.md ]' &
-  run_check 31 "security-agent"      'test -f .claude/agents/harness-security.md' &
-  run_check 32 "security-skill"      'test -f .claude/skills/espalier-security/SKILL.md' &
-  run_check 33 "audit-skill"         'test -f .claude/skills/espalier-audit/SKILL.md' &
+  if want_claude; then
+    run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
+    run_check 30 "security-rule"       '[ -L .claude/rules/espalier-security.md ] && [ -e .claude/rules/espalier-security.md ]' &
+    run_check 31 "security-agent"      'test -f .claude/agents/harness-security.md' &
+    run_check 32 "security-skill"      'test -f .claude/skills/espalier-security/SKILL.md' &
+    run_check 33 "audit-skill"         'test -f .claude/skills/espalier-audit/SKILL.md' &
+  else
+    run_check 29 "espalier-ask-skill"  'test -f espalier/skills/espalier-ask/SKILL.md' &
+    run_check 30 "security-rule"       'test -f espalier/rules/security-standards.md' &
+    run_check 31 "security-agent"      'test -f espalier/agents/harness-security.md' &
+    run_check 32 "security-skill"      'test -f espalier/skills/espalier-security/SKILL.md' &
+    run_check 33 "audit-skill"         'test -f espalier/skills/espalier-audit/SKILL.md' &
+  fi
   run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
-  run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
+  if want_claude; then
+    run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
+  else
+    run_check 35 "production-rule"     'test -f espalier/rules/production-standards.md' &
+  fi
   run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   run_check 37 "scout-prompts"      'test -f espalier/.scout-prompts.md' &
   # 38-46: LLM-written artifacts (Phase 2) — existence checks with fix hints.
@@ -816,23 +1144,31 @@ stage_validate() {
   run_check 44 "wiki-external-services (fix: re-run espalier-init Phase 2)" 'test -f espalier/wiki/external-services.md' &
   run_check 45 "rules-development-process (fix: re-run espalier-init Phase 2)" 'test -f espalier/rules/development-process.md' &
   run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
+  # 47-51: codex wiring (only when codex is a target platform).
+  if want_codex; then
+    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit' &
+    run_check 48 "codex-symlinks-valid" '[ -L .agents/skills/espalier ] && [ -e .agents/skills/espalier ]' &
+    run_check 49 "codex-agents-toml"   'grep -q "^name = \"harness-coder\"" .codex/agents/harness-coder.toml && grep -q "^name = \"harness-reviewer\"" .codex/agents/harness-reviewer.toml && grep -q "^name = \"harness-security\"" .codex/agents/harness-security.toml' &
+    run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
+    run_check 51 "codex-agentsmd"      'grep -q "## Espalier" AGENTS.md' &
+  fi
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-46.
+  # must reach stdout, which the run_check harness discards), then 26-51.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-6] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-1] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"
 
   if [ "$failed" -gt 0 ]; then
-    log "Validation: $failed/46 FAILED"
+    log "Validation: $failed/$TOTAL_CHECKS FAILED"
     return 1
   fi
-  log "Validation: 46/46 passed"
+  log "Validation: $TOTAL_CHECKS/$TOTAL_CHECKS passed"
   return 0
 }
 
@@ -846,7 +1182,10 @@ case "$MODE" in
     stage_symlinks
     stage_state_template
     stage_claudemd
+    stage_agentsmd
     stage_settings_json
+    stage_codex_config
+    stage_codex_agents
     stage_merge_decision
     stage_gitignore
     stage_validate
@@ -858,10 +1197,14 @@ case "$MODE" in
     log "copy-only mode — stopping after Stage 4"
     ;;
   wire-only)
+    stage_mkdirs
     stage_symlinks
     stage_state_template
     stage_claudemd
+    stage_agentsmd
     stage_settings_json
+    stage_codex_config
+    stage_codex_agents
     stage_merge_decision
     stage_gitignore
     stage_validate

@@ -7,7 +7,8 @@
 # Bash invocations; this wrapper narrows the scope to push operations only.
 #
 # Exit-code contract: blocking paths exit with code 2 and the reason on stderr
-# (Claude Code PreToolUse semantics — exit code 1 would NOT block).
+# (PreToolUse semantics shared by Claude Code AND Codex — exit code 1 would
+# NOT block on either platform).
 
 INPUT=$(cat)
 
@@ -28,8 +29,15 @@ if [ -z "$PYBIN" ]; then
   echo "BLOCKED: espalier push gate cannot run — python3 not found (needed to parse the hook input). Install python3, or bypass once with ESPALIER_SKIP_GATE=1." >&2
   exit 2
 fi
-COMMAND=$(printf '%s' "$INPUT" | "$PYBIN" -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('command',''))") \
-  || { echo "BLOCKED: espalier push gate could not parse hook input JSON." >&2; exit 2; }
+# Codex's shell tool may send command as an argv ARRAY (["bash","-lc","git push"]);
+# Claude Code sends a string. Join arrays so the push-pattern grep below sees
+# plain words — printing the raw Python list would quote each element and the
+# quote-span stripper would then delete them (gate would fail OPEN).
+COMMAND=$(printf '%s' "$INPUT" | "$PYBIN" -c "
+import sys, json
+c = json.load(sys.stdin).get('tool_input', {}).get('command', '')
+print(' '.join(str(x) for x in c) if isinstance(c, list) else c)
+") || { echo "BLOCKED: espalier push gate could not parse hook input JSON." >&2; exit 2; }
 
 # Match a real `git push` invocation anywhere in the (possibly multi-line,
 # possibly `git -C dir push`) command. Strip quoted SPANS first (not whole lines)
@@ -40,9 +48,11 @@ if printf '%s\n' "$STRIPPED" \
    | grep -qE '(^|[;&|[:space:]])git([[:space:]]+(-C[[:space:]]*[^[:space:]]+|--?[[:alnum:]][^[:space:]]*))*[[:space:]]+push([[:space:]]|$)'; then
   # Run the gate from the repo root so its relative espalier/ paths resolve
   # regardless of the cwd the push was invoked from. Prefer the git toplevel;
-  # fall back to CLAUDE_PROJECT_DIR. A push from a subdir must NEVER silently
-  # skip the gate (that would fail OPEN — the exact hole this closes).
-  ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$CLAUDE_PROJECT_DIR")
+  # fall back to CLAUDE_PROJECT_DIR (Claude Code only — Codex doesn't set it,
+  # but under Codex the git fallback always resolves). A push from a subdir
+  # must NEVER silently skip the gate (that would fail OPEN — the exact hole
+  # this closes).
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "${CLAUDE_PROJECT_DIR:-}")
   cd "$ROOT" || { echo "BLOCKED: cannot cd to repo root ($ROOT) to run the push gate." >&2; exit 2; }
   exec bash "$ROOT/espalier/hooks/pre-push-gate.sh"
 fi

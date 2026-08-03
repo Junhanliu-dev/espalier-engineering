@@ -1,6 +1,8 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks: 45 in parallel, plus #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks when only claude is targeted, 51 with codex: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+>
+> **Platform gating (v0.14.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run only when codex IS targeted (claude-only installs still print exactly 46 lines — byte-stable with pre-v0.14 output).
 
 > **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
@@ -56,6 +58,11 @@ After all generation and wiring is complete, validate end-to-end.
 | 44 | wiki-external-services | `test -f espalier/wiki/external-services.md` | Re-run espalier-init Phase 2 (scout 1.10 → wiki write) |
 | 45 | rules-development-process | `test -f espalier/rules/development-process.md` | Re-run espalier-init Phase 2 (LLM write) |
 | 46 | layer-boundaries-hook | `test -f && test -x espalier/hooks/check-layer-boundaries.sh` | Phase 2 writes it for typescript/python/go; `--lang=unsupported` makes bootstrap write a no-op; `chmod +x` if present but not executable |
+| 47 | codex-skills-load *(codex only)* | `ls -d .agents/skills/espalier-coding … espalier-audit` (all 12 skill symlinks) | Re-run bootstrap Stage 5 with `--platforms=codex` (or `claude,codex`) |
+| 48 | codex-symlinks-valid *(codex only)* | `[ -L .agents/skills/espalier ] && [ -e … ]` | Broken link → source skill folder missing; re-run Stage 3/Phase 2, then Stage 5 |
+| 49 | codex-agents-toml *(codex only)* | `name = "harness-…"` present in all three `.codex/agents/harness-*.toml` | Re-run bootstrap Stage 8c (delete the bad file first — stage is write-if-absent) |
+| 50 | codex-hooks-configured *(codex only)* | `grep -q "espalier/hooks" .codex/config.toml` | Re-run bootstrap Stage 8b; if a stale `ESPALIER HOOKS` marker exists without the commands, delete the block and re-run |
+| 51 | codex-agentsmd *(codex only)* | `grep -q "## Espalier" AGENTS.md` | Re-run bootstrap Stage 7b |
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

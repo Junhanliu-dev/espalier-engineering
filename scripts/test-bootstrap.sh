@@ -361,6 +361,78 @@ assert "13c second run does not overwrite a modified hook" \
   "grep -q 'customised marker' '$TMP/espalier/hooks/check-layer-boundaries.sh'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 14: --platforms=claude,codex wires both platforms ───────────────
+echo "Test 14: --platforms=claude,codex"
+TMP=$(mktemp -d -t smoke14.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+P_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude,codex --yes --force 2>&1 )
+P_EXIT=$?
+assert "14a exit 0"                          "[ $P_EXIT -eq 0 ]"
+assert "14b .agents/skills/espalier link"    "[ -L '$TMP/.agents/skills/espalier' ] && [ -e '$TMP/.agents/skills/espalier' ]"
+assert "14c .agents/skills/espalier-fix link" "[ -L '$TMP/.agents/skills/espalier-fix' ]"
+assert "14d .claude wiring still present"    "[ -L '$TMP/.claude/skills/espalier' ]"
+assert "14e AGENTS.md Espalier section"      "grep -q '## Espalier' '$TMP/AGENTS.md'"
+assert "14f AGENTS.md platform mapping"      "grep -q 'Platform mapping (Codex)' '$TMP/AGENTS.md'"
+assert "14g codex config hook block"         "grep -q 'espalier/hooks/post-edit-wrapper.sh' '$TMP/.codex/config.toml'"
+assert "14h codex config marker"             "grep -q 'ESPALIER HOOKS v1' '$TMP/.codex/config.toml'"
+assert "14i coder agent toml"                "grep -q '^name = \"harness-coder\"' '$TMP/.codex/agents/harness-coder.toml'"
+assert "14j reviewer agent toml"             "[ -f '$TMP/.codex/agents/harness-reviewer.toml' ]"
+assert "14k security agent toml"             "[ -f '$TMP/.codex/agents/harness-security.toml' ]"
+assert "14l platforms persisted"             "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
+assert "14m validation total is 51"          "echo \"\$P_OUT\" | grep -q 'Validation: 51/51 passed'"
+assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/51] OK'"
+assert "14o CLAUDE.md section still written" "grep -q '## Espalier' '$TMP/CLAUDE.md'"
+# TOML sanity: python tomllib parses the generated config + agent files.
+assert "14p config.toml parses"              "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
+assert "14q agent toml parses"               "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/agents/harness-coder.toml\",\"rb\"))'"
+# Idempotent re-run: no duplicate hook block, agent tomls preserved.
+echo "# user tuning marker" >> "$TMP/.codex/agents/harness-coder.toml"
+( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=claude,codex --yes >/dev/null 2>&1 )
+assert "14r re-run keeps ONE hook block"     "[ \$(grep -c '>>> ESPALIER HOOKS v1 >>>' '$TMP/.codex/config.toml') -eq 1 ]"
+assert "14s re-run preserves agent tuning"   "grep -q 'user tuning marker' '$TMP/.codex/agents/harness-coder.toml'"
+assert "14t re-run keeps ONE AGENTS.md section" "[ \$(grep -c '## Espalier' '$TMP/AGENTS.md') -eq 1 ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 15: codex added to legacy claude install (additive union) ───────
+echo "Test 15: legacy install + --wire-only --platforms=codex"
+TMP=$(mktemp -d -t smoke15.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+# Legacy claude-only install: full run WITHOUT --platforms, then delete
+# .platforms to simulate a pre-v0.14 install.
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+rm -f "$TMP/espalier/.platforms"
+# Add codex later: wire-only, codex flag only, no --merge-decision (reused).
+W_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=codex --yes 2>&1 )
+W_EXIT=$?
+assert "15a wire-only exit 0"                "[ $W_EXIT -eq 0 ]"
+assert "15b merge decision reused"           "echo \"\$W_OUT\" | grep -q \"reusing persisted merge decision 'ask-later'\""
+assert "15c platforms unioned to claude,codex" "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
+assert "15d codex wired"                     "[ -L '$TMP/.agents/skills/espalier' ] && grep -q 'ESPALIER HOOKS' '$TMP/.codex/config.toml'"
+assert "15e claude wiring untouched"         "[ -L '$TMP/.claude/skills/espalier' ] && grep -q 'espalier/hooks' '$TMP/.claude/settings.json'"
+assert "15f validation total is 51"          "echo \"\$W_OUT\" | grep -q 'Validation: 51/51 passed'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 16: codex-only install (no .claude litter, claude checks skip) ──
+echo "Test 16: --platforms=codex only"
+TMP=$(mktemp -d -t smoke16.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+# simulate_llm_writes' --copy-only helper ran with the claude default and made
+# empty .claude/ dirs — remove them so we can assert codex-only recreates none.
+rm -rf "$TMP/.claude"
+C_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=codex --yes --force 2>&1 )
+C_EXIT=$?
+assert "16a exit 0"                          "[ $C_EXIT -eq 0 ]"
+assert "16b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
+assert "16c no CLAUDE.md section"            "! grep -q '## Espalier' '$TMP/CLAUDE.md' 2>/dev/null"
+assert "16d codex fully wired"               "[ -L '$TMP/.agents/skills/espalier' ] && [ -f '$TMP/.codex/agents/harness-coder.toml' ] && grep -q '## Espalier' '$TMP/AGENTS.md'"
+assert "16e claude checks skipped OK"        "echo \"\$C_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
+assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 51/51 passed'"
+assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

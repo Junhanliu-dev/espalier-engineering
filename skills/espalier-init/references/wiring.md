@@ -1,6 +1,13 @@
-# Phase 10: Wiring (Connect Espalier to Claude Code Runtime)
+# Phase 10: Wiring (Connect Espalier to the Agent Runtime)
 
 > **v0.5.0 note:** `scripts/bootstrap-espalier.sh` is the source of truth for wiring — it bundles all of Phase 10 (Stages 5-11) and is kept current. The manual steps below are a **v0.4-era illustration** of *what* wiring does; they do NOT include the v0.5 doc-drift components — the `drift-detect.sh` / `drift-helpers.sh` / `parse-drift-blocks.py` hooks, the `espalier-prune` + `espalier-doctor` skills, the post-merge dispatcher, the drift sidecars in `.gitignore`, and `espalier/.doctor-cadence`. For real manual recovery after a failed wiring, re-run `bash scripts/bootstrap-espalier.sh --wire-only` (or `--force`) — do not hand-replay the steps below.
+>
+> **v0.14.0 note (Codex platform):** with `--platforms=codex` (or `claude,codex`) bootstrap additionally wires the Codex runtime — none of it is illustrated in the Claude-era steps below:
+> - `.agents/skills/<name>` → `../../espalier/skills/<name>` symlinks (Codex repo-skill discovery probes `.agents/skills/`; same folder-name == `name:` frontmatter invariant, invoked as `$espalier`, `$espalier-fix`, …).
+> - `AGENTS.md` `## Espalier` section (grep-guarded append) — carries the always-read-rules instruction (Codex has no auto-loaded rules dir) plus the Codex platform-mapping table (AskUserQuestion → chat, sub-agent spawn → `.codex/agents/`, `/cmd` → `$skill`).
+> - `.codex/config.toml` marker-guarded hook block (`# >>> ESPALIER HOOKS v1 >>>` … `# <<<`): PostToolUse matcher `^(apply_patch|Edit|Write)$` → `post-edit-wrapper.sh`; PreToolUse matcher `^(Bash|shell|local_shell)$` → `pre-push-gate-wrapper.sh`. Same stdin JSON schema and exit-2-blocks contract as Claude Code, so the SAME wrapper scripts serve both platforms. Project hooks require the project to be trusted AND `/hooks` trust once inside Codex.
+> - `.codex/agents/harness-{coder,reviewer,security}.toml` sub-agents (write-if-absent — user model/effort tuning survives re-runs), each pointing `developer_instructions` at the matching `espalier/agents/*.md`.
+> - `espalier/.platforms` records the wired platform set; re-runs are additive (a later `--wire-only --platforms=codex` on a claude install unions to `claude,codex` and never unwires anything).
 
 Generated files are inert until wired into the execution environment. Run these steps in order.
 
