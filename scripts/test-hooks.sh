@@ -482,6 +482,128 @@ T8F_RC=$?
 assert "T8f no python on PATH fails closed (exit 2)" "[ $T8F_RC -eq 2 ]"
 assert "T8f2 no-python block on stderr" "grep -q 'BLOCKED' '$TMP/w_err.txt'"
 
+run_wrapper_case "T8g codex argv-array push dispatches" \
+  '{"tool_input":{"command":["bash","-lc","git push origin main"]}}' 2 yes
+run_wrapper_case "T8h codex argv-array non-push exits 0" \
+  '{"tool_input":{"command":["bash","-lc","git status && ls"]}}' 0 no
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T9: post-edit-wrapper.sh payload matrix (Claude file_path + Codex apply_patch) ──
+echo "T9: post-edit-wrapper"
+PWRAP="$HOOKS_SRC/post-edit-wrapper.sh"
+TMP=$(mktemp -d -t hooks-t9.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/hooks" "$TMP/src"
+# Boundary-check stub: exit 2 (violation) for any path containing "bad", else 0.
+# Echoes CHECKED:<path> to stderr so dispatch + path resolution are observable.
+cat > "$TMP/espalier/hooks/check-layer-boundaries.sh" << 'STUB'
+#!/bin/bash
+echo "CHECKED:$1" >&2
+case "$1" in *bad*) echo "violation in $1" >&2; exit 2 ;; esac
+exit 0
+STUB
+chmod +x "$TMP/espalier/hooks/check-layer-boundaries.sh"
+touch "$TMP/src/ok.ts" "$TMP/src/bad.ts" "$TMP/src/ok2.ts"
+
+# run_pwrap_case NAME JSON EXPECT_RC EXPECT_CHECKED_SUBSTR("-" = none)
+run_pwrap_case() {
+  local name=$1 json=$2 expect_rc=$3 expect_checked=$4
+  local rc err="$TMP/p_err.txt"
+  ( cd "$TMP" && printf '%s' "$json" | env -u CLAUDE_PROJECT_DIR bash "$PWRAP" >/dev/null 2>"$err" )
+  rc=$?
+  assert "$name (rc)" "[ $rc -eq $expect_rc ]"
+  if [ "$expect_checked" = "-" ]; then
+    assert "$name (no check ran)" "! grep -q 'CHECKED:' '$err'"
+  else
+    assert "$name (checked $expect_checked)" "grep -q 'CHECKED:.*$expect_checked' '$err'"
+  fi
+}
+
+run_pwrap_case "T9a claude file_path clean file" \
+  "{\"tool_input\":{\"file_path\":\"$TMP/src/ok.ts\"}}" 0 "src/ok.ts"
+run_pwrap_case "T9b claude file_path violating file" \
+  "{\"tool_input\":{\"file_path\":\"$TMP/src/bad.ts\"}}" 2 "src/bad.ts"
+CODEX_PATCH='{"tool_input":{"command":"*** Begin Patch\n*** Update File: src/ok.ts\n@@\n-a\n+b\n*** Add File: src/ok2.ts\n+x\n*** End Patch"}}'
+run_pwrap_case "T9c codex apply_patch multi-file (both clean)" \
+  "$CODEX_PATCH" 0 "src/ok2.ts"
+CODEX_BAD='{"tool_input":{"command":"*** Begin Patch\n*** Update File: src/ok.ts\n@@\n-a\n+b\n*** Update File: src/bad.ts\n@@\n-a\n+b\n*** End Patch"}}'
+run_pwrap_case "T9d codex apply_patch one violation → exit 2" \
+  "$CODEX_BAD" 2 "src/bad.ts"
+run_pwrap_case "T9e codex deleted-file patch line ignored" \
+  '{"tool_input":{"command":"*** Begin Patch\n*** Delete File: src/ok.ts\n*** End Patch"}}' 0 "-"
+run_pwrap_case "T9f empty/unknown tool_input exits 0" \
+  '{"tool_input":{"description":"noop"}}' 0 "-"
+# T9g: relative path from patch resolves against the git root even from a subdir.
+mkdir -p "$TMP/deep/nest"
+( cd "$TMP/deep/nest" && printf '%s' "$CODEX_BAD" | env -u CLAUDE_PROJECT_DIR bash "$PWRAP" >/dev/null 2>"$TMP/p_err.txt" )
+T9G_RC=$?
+assert "T9g subdir cwd still resolves + blocks (rc 2)" "[ $T9G_RC -eq 2 ]"
+# Absolute-path assertion, not string-equal to $TMP: on macOS git returns the
+# /private/var realpath while mktemp reports /var — same dir, different spelling.
+assert "T9g2 checked path is absolute repo-rooted" "grep -q 'CHECKED:/.*src/bad.ts' '$TMP/p_err.txt'"
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T10: copilot-hook-adapter.sh payload translation ─────────────────────
+echo "T10: copilot-hook-adapter"
+ADAPTER="$HOOKS_SRC/copilot-hook-adapter.sh"
+TMP=$(mktemp -d -t hooks-t10.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/hooks" "$TMP/src"
+cp "$ADAPTER" "$TMP/espalier/hooks/copilot-hook-adapter.sh"
+cp "$HOOKS_SRC/pre-push-gate-wrapper.sh" "$TMP/espalier/hooks/pre-push-gate-wrapper.sh"
+cp "$HOOKS_SRC/post-edit-wrapper.sh" "$TMP/espalier/hooks/post-edit-wrapper.sh"
+chmod +x "$TMP/espalier/hooks/"*.sh
+printf '#!/bin/bash\necho GATE_RAN >&2\nexit 2\n' > "$TMP/espalier/hooks/pre-push-gate.sh"
+cat > "$TMP/espalier/hooks/check-layer-boundaries.sh" << 'STUB2'
+#!/bin/bash
+echo "CHECKED:$1" >&2
+case "$1" in *bad*) exit 2 ;; esac
+exit 0
+STUB2
+chmod +x "$TMP/espalier/hooks/pre-push-gate.sh" "$TMP/espalier/hooks/check-layer-boundaries.sh"
+touch "$TMP/src/ok.ts" "$TMP/src/bad.ts"
+
+# run_adapter_case NAME WRAPPER JSON EXPECT_RC EXPECT_MARK("-" = none)
+run_adapter_case() {
+  local name=$1 wrapper=$2 json=$3 expect_rc=$4 expect_mark=$5
+  local rc err="$TMP/a_err.txt"
+  ( cd "$TMP" && printf '%s' "$json" | env -u CLAUDE_PROJECT_DIR bash espalier/hooks/copilot-hook-adapter.sh "$wrapper" >/dev/null 2>"$err" )
+  rc=$?
+  assert "$name (rc)" "[ $rc -eq $expect_rc ]"
+  if [ "$expect_mark" = "-" ]; then
+    assert "$name (no dispatch)" "! grep -qE 'GATE_RAN|CHECKED:' '$err'"
+  else
+    assert "$name (marker)" "grep -q '$expect_mark' '$err'"
+  fi
+}
+
+run_adapter_case "T10a copilot bash push payload dispatches gate" \
+  pre-push-gate-wrapper.sh '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' 2 GATE_RAN
+run_adapter_case "T10b copilot bash non-push exits 0" \
+  pre-push-gate-wrapper.sh '{"toolName":"bash","toolArgs":{"command":"git status"}}' 0 -
+run_adapter_case "T10c copilot edit payload (path field) checks file" \
+  post-edit-wrapper.sh "{\"toolName\":\"edit\",\"toolArgs\":{\"path\":\"$TMP/src/bad.ts\"}}" 2 "CHECKED:.*src/bad.ts"
+run_adapter_case "T10d copilot edit payload (filePath variant) clean file" \
+  post-edit-wrapper.sh "{\"toolName\":\"str_replace_editor\",\"toolArgs\":{\"filePath\":\"$TMP/src/ok.ts\"}}" 0 "CHECKED:.*src/ok.ts"
+run_adapter_case "T10e garbage payload passes through harmlessly" \
+  post-edit-wrapper.sh 'not json at all' 0 -
+# T10f: missing wrapper → exit 0, never bricks the session.
+( cd "$TMP" && printf '%s' '{"toolName":"bash","toolArgs":{"command":"git push"}}' | bash espalier/hooks/copilot-hook-adapter.sh no-such-wrapper.sh >/dev/null 2>&1 )
+assert "T10f missing wrapper exits 0" "[ $? -eq 0 ]"
+# T10g: no python on PATH → raw passthrough; push-gate wrapper still fails CLOSED.
+PBIN10="$TMP/nopython-bin"
+mkdir -p "$PBIN10"
+for _t in bash sh cat grep sed git dirname; do
+  _p=$(command -v "$_t" 2>/dev/null) && [ -x "$_p" ] && ln -s "$_p" "$PBIN10/$_t"
+done
+( cd "$TMP" && printf '%s' '{"toolName":"bash","toolArgs":{"command":"git push"}}' \
+    | env -u CLAUDE_PROJECT_DIR PATH="$PBIN10" "$PBIN10/bash" espalier/hooks/copilot-hook-adapter.sh pre-push-gate-wrapper.sh >/dev/null 2>"$TMP/a_err.txt" )
+T10G_RC=$?
+assert "T10g no-python push still fails closed (exit 2)" "[ $T10G_RC -eq 2 ]"
+assert "T10g2 BLOCKED reason on stderr" "grep -q 'BLOCKED' '$TMP/a_err.txt'"
+
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
