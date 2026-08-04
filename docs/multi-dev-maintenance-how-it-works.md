@@ -60,7 +60,7 @@ Two facts need to be visible to the whole team through git:
 The old design goal was "conflicts must be impossible", which required event logs, merge folds, and format versioning. The shipped design accepts a weaker, cheaper goal: **conflicts are rare, and when they happen they're tiny and they mean something**.
 
 - Two people promote the *same* convention differently on two branches? Git shows a conflict in one five-line file. That conflict **is** the alarm — two people made contradictory rule decisions, and a human (the rule owner) should look. The tooling couldn't have decided that for you anyway.
-- Two branches both recorded an observation about the *same* pattern in the same window? A two-line conflict in that pattern's file. Keep both lines. Thirty seconds.
+- Two branches both recorded an observation about the *same* pattern in the same window? A two-line conflict in that pattern's file. Keep both lines. Thirty seconds. (Same answer when an observation append meets a status flip on the other branch — measured on current git, that also surfaces as a conflict: keep the decided rows *and* the fresh observation; the reader deduplicates, so nothing double-counts.)
 - Two doctors ran in the same week (a rota mix-up)? The stamp file conflicts: one line versus one line. Keep the newer one. Done.
 - Two branches both regenerated the same wiki page? Don't hand-merge regenerated prose. Take either side, finish the merge, and re-run `/espalier-prune` on that file — regeneration over the merged code *is* the merge.
 

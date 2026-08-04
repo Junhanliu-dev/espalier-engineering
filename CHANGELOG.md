@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.17.0 — 2026-08-04
+
+Minor: **multi-dev maintenance, Release B-team** — maintenance becomes a
+scheduled singleton with two small shared files, closing G2 (doctor
+diffusion) and G3 (conventions merge unsafety) structurally instead of via
+event-log machinery (design §4, revision 5). Suites: bootstrap 177/177,
+hooks 127/127 (all new assertions red-first, incl. two-clone git sims).
+
+- **`espalier/.doctor-stamp`** (tracked, ONE line: `ts sha writer result`) —
+  written only by the doctor, at the END of the maintenance session, as its
+  own commit in the weekly maintenance PR. `doctor_due()` v2: only a fresh
+  `clean` stamp satisfies team-wide; `dirty:<N>` satisfies just the writing
+  clone (via its gitignored local stamp); a stamp beyond now + 25h skew is
+  rejected with a warning. End-of-session rule: if the session's prune
+  cleared every finding, the doctor re-runs and restamps `clean` — a dirty
+  stamp whose findings were fixed in the same PR would nag the team forever.
+  Last-writer-wins whole-file; deliberately never append-only and never
+  union-merged. Conflict story: keep the newer line (or either `clean`).
+- **Conventions file-per-key** — observations and decisions live in
+  `espalier/conventions/k-<slug>.tsv` (same 5/6-col row format; the `k-`
+  prefix keeps `aux`/`con`/`nul` off Windows-reserved filenames; filename is
+  routing only — `conv_fold` folds by column value). `append_convention` v2
+  targets the key file (created on first write) and dedupes across the key
+  file AND the legacy file; status flips edit the key file IN PLACE — safe
+  now, and a concurrent same-key decision surfaces as an ordinary git
+  conflict in that ~5-line file, which IS the race detection. The legacy
+  `.conventions.tsv` is read forever, written never. Honest costs measured
+  in the two-clone sims: same-key append-vs-append AND append-vs-flip both
+  conflict on current git (the plan's flip-vs-append auto-merge expectation
+  was an empirical claim — measured false; its recorded §7 fallback applies)
+  — playbook: keep both lines, `conv_fold` dedupes at read time.
+- **Weekly gardener rota** — one rotating dev per cadence interval runs the
+  ~15-minute loop (worktree of the canonical branch → doctor → prune →
+  restamp-clean if everything cleared → one `docs: weekly espalier
+  maintenance` PR). Stage 0 pre-flight defaults flip to **Proceed** with a
+  rota pointer in BOTH lanes; "Handle now" stays the default only for your
+  own critical/expired flag. A skipped week self-corrects — the stamp ages
+  out and the pre-rota nagging returns.
+- **Race guard v2** — reads `FETCH_HEAD:espalier/conventions/k-<slug>.tsv`
+  first (single-file read via the same `conv_slug` the writer uses), legacy
+  scan as the pre-conversion fallback.
+- **`scripts/migrate-v0.16.0-to-v0.17.0.sh`** (new, migration #24) —
+  pure-copy refresh only (backup-on-diff `<file>.pre-v0.17.bak`); no config,
+  attribute, or data migration (dir + stamp appear on first write); run-time
+  `git check-ignore` assert that `.doctor-stamp` is not ignored.
+
 ## 0.16.0 — 2026-08-04
 
 Minor: **multi-dev maintenance, Release A** — the discipline, guards, and
