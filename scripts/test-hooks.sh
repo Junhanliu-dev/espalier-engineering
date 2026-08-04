@@ -710,8 +710,8 @@ assert "T12g malformed stamp reads as absent (due)" "[ \"$(d_due)\" = 'DUE' ]"
 # Restamp-clean flow: dirty stamp then (after prune cleared all) clean stamp.
 ( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared aaa dirty:2 && doctor_stamp_shared bbb clean )
 assert "T12h restamp-clean ends NOT due (deadlock case closed)" "[ \"$(d_due)\" = 'NOT_DUE' ]"
-assert "T12i stamp stays ONE line (last-writer-wins, never append)" \
-  "[ \"$(wc -l < \"$TMP/espalier/.doctor-stamp\" | tr -d ' ')\" = '1' ]"
+STAMP_LINES=$(wc -l < "$TMP/espalier/.doctor-stamp" | tr -d ' ')
+assert "T12i stamp stays ONE line (last-writer-wins, never append)" "[ \"$STAMP_LINES\" = '1' ]"
 D_BAD=$( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared ccc bogus 2>&1; echo "RC=$?" )
 assert "T12j invalid result vocabulary refused" "echo \"$D_BAD\" | grep -q 'RC=1'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -750,12 +750,12 @@ assert "T14a key file created under espalier/conventions/" \
   "[ -f '$TMP/espalier/conventions/k-error-shape.tsv' ]"
 assert "T14b duplicate-vs-legacy observation NOT re-appended" \
   "! grep -q 'src/x.ts:1' '$TMP/espalier/conventions/k-error-shape.tsv'"
-assert "T14c writer-side dedupe within the key file" \
-  "[ \"$(grep -c 'src/y.ts:2' '$TMP/espalier/conventions/k-error-shape.tsv')\" = '1' ]"
+Y_CNT=$(grep -c 'src/y.ts:2' "$TMP/espalier/conventions/k-error-shape.tsv" 2>/dev/null)
+assert "T14c writer-side dedupe within the key file" "[ \"$Y_CNT\" = '1' ]"
 assert "T14d coupled_with lands as 6th column" \
-  "grep -q \"$(printf 'coupling-key')\" '$TMP/espalier/conventions/k-logging-style.tsv'"
-assert "T14e v0.17 writer NEVER touches the legacy file" \
-  "[ \"$(wc -l < '$TMP/espalier/.conventions.tsv' | tr -d ' ')\" = '1' ]"
+  "grep -q 'coupling-key' '$TMP/espalier/conventions/k-logging-style.tsv'"
+LEG_LINES=$(wc -l < "$TMP/espalier/.conventions.tsv" | tr -d ' ')
+assert "T14e v0.17 writer NEVER touches the legacy file" "[ \"$LEG_LINES\" = '1' ]"
 # In-place status flip in the key file — conv_fold sees the decision.
 sed_flip() { if [ "$(uname)" = "Darwin" ]; then sed -i '' "$@"; else sed -i "$@"; fi; }
 sed_flip 's/\tdiverges$/\tpromoted/' "$TMP/espalier/conventions/k-error-shape.tsv"
@@ -807,15 +807,26 @@ DK_OUT=$( cd "$B" && git pull --no-rebase -q origin main 2>&1; echo "RC=$?" )
 assert "T15e different-key concurrent writes merge clean" "echo \"$DK_OUT\" | grep -q 'RC=0'"
 ( cd "$B" && git push -q origin main )
 
-# d) flip-vs-append on ONE key auto-merges to decided-plus-one-observation.
+# d) flip-vs-append on ONE key. The plan's auto-merge expectation was an
+# EMPIRICAL hunk-adjacency claim (§7) — measured here: git's xdiff treats a
+# tail-modify and an EOF-append as overlapping and CONFLICTS. Per §7 the case
+# degrades to the keep-both playbook (flipped rows + appended observation),
+# never to data loss — this sim asserts that contract.
 ( cd "$A" && git pull -q origin main )
 ( cd "$A" && if [ "$(uname)" = "Darwin" ]; then sed -i '' 's/\tdiverges$/\texception/' espalier/conventions/k-key-a.tsv; else sed -i 's/\tdiverges$/\texception/' espalier/conventions/k-key-a.tsv; fi \
   && git add -A && git -c user.email=a@t -c user.name=a commit -qm "exception key-a" && git push -q origin main )
 ( cd "$B" && . espalier/hooks/drift-helpers.sh && append_convention feat/6 key-a src/f.ts:6 && git add -A && git -c user.email=b@t -c user.name=b commit -qm "obs2 key-a" )
 FA_OUT=$( cd "$B" && git pull --no-rebase -q origin main 2>&1; echo "RC=$?" )
+FA_CONFLICTS=$( cd "$B" && git diff --name-only --diff-filter=U )
+assert "T15f flip-vs-append conflicts confined to that key file (playbook case)" \
+  "echo \"$FA_OUT\" | grep -q 'RC=1' && [ \"$FA_CONFLICTS\" = 'espalier/conventions/k-key-a.tsv' ]"
+# Keep-both resolution: the decided (flipped) rows AND the fresh observation.
+( cd "$B" && printf '' > espalier/conventions/k-key-a.tsv \
+  && git show MERGE_HEAD:espalier/conventions/k-key-a.tsv >> espalier/conventions/k-key-a.tsv \
+  && git show HEAD:espalier/conventions/k-key-a.tsv | grep 'src/f.ts:6' >> espalier/conventions/k-key-a.tsv \
+  && git add -A && git -c user.email=b@t -c user.name=b commit -qm "resolve: keep decided rows + fresh observation" )
 FA_FOLD=$( cd "$B" && . espalier/hooks/drift-helpers.sh && conv_fold | grep '^key-a' )
-assert "T15f flip-vs-append auto-merges (empirical hunk-adjacency claim)" "echo \"$FA_OUT\" | grep -q 'RC=0'"
-assert "T15g merged key folds decided-plus-one-fresh-observation" \
+assert "T15g keep-both resolution folds decided-plus-one-fresh-observation" \
   "echo \"$FA_FOLD\" | grep -q \"$(printf 'key-a\t1\texception')\""
 [ "$KEEP" != "yes" ] && rm -rf "$BASE"
 
