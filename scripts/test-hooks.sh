@@ -606,6 +606,74 @@ assert "T10g2 BLOCKED reason on stderr" "grep -q 'BLOCKED' '$TMP/a_err.txt'"
 
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── T11: conv_fold / conv_observations (drift-helpers) ───────────────────
+# The executable conventions reader: folds the legacy espalier/.conventions.tsv
+# AND every espalier/conventions/*.tsv per-key file (same 5/6-col row format)
+# into `key<TAB>diverges_count<TAB>status` lines. Width-tolerant (malformed
+# rows skipped, never fatal), empty-glob safe (bash 3.2), read-time observation
+# dedupe on (slug,key,location) ACROSS both sources, status precedence:
+# a per-key-file status beats a legacy status; legacy honored when the key
+# file has no decision.
+echo "T11: conv_fold / conv_observations"
+TMP=$(mktemp -d -t hooks-t11.XXXX)
+make_repo "$TMP"
+install_hooks "$TMP"
+printf '%s\n' \
+  "$(printf '2026-01-01\tfeat/a\terror-shape\tsrc/x.ts:1\tdiverges')" \
+  "$(printf '2026-01-02\tfeat/b\terror-shape\tsrc/y.ts:2\tdiverges')" \
+  "$(printf '2026-01-03\tfeat/c\terror-shape\tsrc/z.ts:3\tdiverges\tlogging-style')" \
+  "malformed row with no tabs" \
+  "$(printf '2026-01-04\tfeat/d\tlogging-style\tsrc/l.ts:4\tpromoted')" \
+  "$(printf '2026-01-05\tfeat/e\tnaming\tsrc/n.ts:5\tdiverges')" \
+  "$(printf '2026-01-08\tfeat/h\tretry-style\tsrc/r.ts:8\texception')" \
+  > "$TMP/espalier/.conventions.tsv"
+
+# Legacy-only folding (no per-key dir yet — the Release A shape).
+F_OUT=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11a legacy 5+6-col diverges rows fold (count 3)" \
+  "echo \"$F_OUT\" | grep -q \"$(printf 'error-shape\t3\tdiverges')\""
+assert "T11b malformed legacy row skipped, not fatal"     "echo \"$F_OUT\" | grep -q 'RC=0'"
+assert "T11c legacy status row wins for its key"          \
+  "echo \"$F_OUT\" | grep -q \"$(printf 'logging-style\t0\tpromoted')\""
+OBS_OUT=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_observations error-shape)
+assert "T11d conv_observations returns the evidence rows" \
+  "[ \"$(echo \"$OBS_OUT\" | grep -c 'feat/')\" = '3' ]"
+assert "T11e conv_observations keeps coupled_with column" \
+  "echo \"$OBS_OUT\" | grep -q 'logging-style'"
+
+# Empty per-key dir: bash 3.2 iterates the literal *.tsv pattern — must not die.
+mkdir -p "$TMP/espalier/conventions"
+F_EMPTY=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11f empty per-key dir is glob-safe"              "echo \"$F_EMPTY\" | grep -q 'RC=0'"
+assert "T11g empty dir leaves legacy counts intact"       \
+  "echo \"$F_EMPTY\" | grep -q \"$(printf 'error-shape\t3\tdiverges')\""
+
+# Per-key files alongside the legacy file (the B-team shape; A's reader must
+# already understand it — readers-first contract).
+printf '2026-01-06\tfeat/f\terror-shape\tsrc/w.ts:6\tdiverges\n2026-01-01\tfeat/a\terror-shape\tsrc/x.ts:1\tdiverges\nbad row\n' \
+  > "$TMP/espalier/conventions/k-error-shape.tsv"
+printf '2026-01-07\tfeat/g\tnaming\tsrc/n2.ts:7\trejected\n' \
+  > "$TMP/espalier/conventions/k-naming.tsv"
+printf '2026-01-09\tfeat/i\tretry-style\tsrc/r2.ts:9\tpromoted\n' \
+  > "$TMP/espalier/conventions/k-retry-style.tsv"
+F_MIX=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11h cross-source duplicate observation counted once (3+1 new = 4)" \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'error-shape\t4\tdiverges')\""
+assert "T11i key-file status beats legacy diverges"       \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'naming\t1\trejected')\""
+assert "T11j key-file status beats legacy status"         \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'retry-style\t0\tpromoted')\""
+assert "T11k legacy status honored when key file has none" \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'logging-style\t0\tpromoted')\""
+assert "T11l malformed key-file row skipped, not fatal"   "echo \"$F_MIX\" | grep -q 'RC=0'"
+
+# Dir-only folding (legacy file absent — a fresh v0.17+ repo).
+rm -f "$TMP/espalier/.conventions.tsv"
+F_DIR=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11m dir-only folding works without a legacy file" \
+  "echo \"$F_DIR\" | grep -q \"$(printf 'error-shape\t2\tdiverges')\" && echo \"$F_DIR\" | grep -q 'RC=0'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"
