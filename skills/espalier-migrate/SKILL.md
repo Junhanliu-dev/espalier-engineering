@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), and the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS) you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS), and the v0.16.0→v0.17.0 B-team release (weekly gardener rota + tracked single-line .doctor-stamp with clean/dirty semantics + conventions file-per-key) you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to TWENTY-THREE migrations may apply, always in this order:
+version. Up to TWENTY-FOUR migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -238,6 +238,16 @@ version. Up to TWENTY-THREE migrations may apply, always in this order:
    backup). Optional: `--codeowners-rules`/`--codeowners-wiki` (asked in
    Step 4d) write the CODEOWNERS marker block. Mechanical:
    `scripts/migrate-v0.15.0-to-v0.16.0.sh`.
+24. **v0.16.0 → v0.17.0** — multi-dev maintenance B-team. Pure-copy only:
+   refreshes `pipeline.md`, the espalier / espalier-fix / espalier-prune /
+   espalier-doctor SKILL files, and `drift-helpers.sh` (doctor_due v2 with
+   clean/dirty shared-stamp semantics + skew rejection, `doctor_stamp_shared`,
+   `conv_slug`, per-key `append_convention`) with backup-on-diff
+   (`<file>.pre-v0.17.bak`). No config change, no attribute change, no data
+   migration — `espalier/conventions/` and `espalier/.doctor-stamp` appear on
+   first write; the legacy `.conventions.tsv` is read forever, written never.
+   Run-time assert: `.doctor-stamp` must not be gitignored. Mechanical:
+   `scripts/migrate-v0.16.0-to-v0.17.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
 confirmation, apply in order. A v0.1.x install needs ALL TWENTY-THREE; a v0.3.x
@@ -256,8 +266,9 @@ v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.11.0 install needs v0.12.
 v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
 then v0.16.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.13.1
 install needs v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.13.2 install needs v0.14.0,
-v0.15.0, then v0.16.0; a v0.14.0 install needs v0.15.0 then v0.16.0; a v0.15.0
-install needs only v0.16.0.
+v0.15.0, then v0.16.0; a v0.14.0 install needs v0.15.0,
+v0.16.0, then v0.17.0; a v0.15.0 install needs v0.16.0 then v0.17.0; a
+v0.16.0 install needs only v0.17.0.
 
 Two gaps in the script names are deliberate, not missing steps: there is no
 v0.2→v0.3 script because v0.2/v0.3 detection is lumped — the v0.3→v0.4 step
@@ -349,6 +360,7 @@ NEEDS_V0132_PATCH=no
 NEEDS_V0140_PATCH=no
 NEEDS_V0150_PATCH=no
 NEEDS_V0160_PATCH=no
+NEEDS_V0170_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -383,6 +395,7 @@ if [ -d "harness" ]; then
   NEEDS_V0140_PATCH=yes      # ...then the v0.14.0 codex platform release
   NEEDS_V0150_PATCH=yes      # ...then the v0.15.0 copilot platform release
   NEEDS_V0160_PATCH=yes      # ...then the v0.16.0 multi-dev maintenance floor
+  NEEDS_V0170_PATCH=yes      # ...then the v0.17.0 gardener/per-key release
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -598,6 +611,17 @@ elif [ -d "espalier" ]; then
      || ! grep -qF 'conv_fold' espalier/hooks/drift-helpers.sh 2>/dev/null; then
     NEEDS_V0160_PATCH=yes
   fi
+  # v0.17.0: the B-team release rides pure-copy files only. Keep these
+  # markers in sync with migrate-v0.16.0-to-v0.17.0.sh's own idempotency
+  # check. Any missing ⇒ pre-v0.17.0.
+  if ! grep -qF 'doctor_stamp_shared' espalier/hooks/drift-helpers.sh 2>/dev/null \
+     || ! grep -qF 'doctor_stamp_shared' espalier/skills/espalier-doctor/SKILL.md 2>/dev/null \
+     || ! grep -qiF 'gardener' espalier/skills/espalier-prune/SKILL.md 2>/dev/null \
+     || ! grep -qiF 'gardener rota' espalier/skills/espalier/SKILL.md 2>/dev/null \
+     || ! grep -qiF 'gardener rota' espalier/skills/espalier-fix/SKILL.md 2>/dev/null \
+     || ! grep -qiF 'keep both lines' espalier/pipeline.md 2>/dev/null; then
+    NEEDS_V0170_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -611,7 +635,7 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V0120_PATCH" = no ] && [ "$NEEDS_V0130_PATCH" = no ] \
    && [ "$NEEDS_V0131_PATCH" = no ] && [ "$NEEDS_V0132_PATCH" = no ] \
    && [ "$NEEDS_V0140_PATCH" = no ] && [ "$NEEDS_V0150_PATCH" = no ] \
-   && [ "$NEEDS_V0160_PATCH" = no ]; then
+   && [ "$NEEDS_V0160_PATCH" = no ] && [ "$NEEDS_V0170_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -632,7 +656,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.15.0-to-v0.16.0.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.16.0-to-v0.17.0.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -641,7 +665,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.15.0-to-v0.16.0.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.16.0-to-v0.17.0.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -659,7 +683,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.15.0-to-v0.16.0.sh`) — tell the user to
+is likely stale (no `migrate-v0.16.0-to-v0.17.0.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -692,6 +716,7 @@ verbatim:
 [ "$NEEDS_V0140_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.2-to-v0.14.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR" $WITH_CODEX_FLAG
 [ "$NEEDS_V0150_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.14.0-to-v0.15.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR" $WITH_COPILOT_FLAG
 [ "$NEEDS_V0160_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.15.0-to-v0.16.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR" $CODEOWNERS_FLAGS
+[ "$NEEDS_V0170_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.16.0-to-v0.17.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -827,6 +852,7 @@ completed.
 [ "$NEEDS_V0140_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.13.2-to-v0.14.0.sh" --yes --plugin-dir="$PLUGIN_DIR" $WITH_CODEX_FLAG
 [ "$NEEDS_V0150_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.14.0-to-v0.15.0.sh" --yes --plugin-dir="$PLUGIN_DIR" $WITH_COPILOT_FLAG
 [ "$NEEDS_V0160_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.15.0-to-v0.16.0.sh" --yes --plugin-dir="$PLUGIN_DIR" $CODEOWNERS_FLAGS
+[ "$NEEDS_V0170_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.16.0-to-v0.17.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every

@@ -99,6 +99,32 @@ lane — the failure mode each lane prevents is different:
 The canonical branch is `canonical-branch` in `espalier/.espalier-config`
 (remote: `canonical-remote`) — detected at init, edit if wrong.
 
+**The weekly gardener rota (social, documented — what makes the lanes
+sufficient).** One rotating dev per cadence interval is the gardener; the
+rota names WHO, which is what kills "someone else surely ran it". The
+gardener's loop, ~15 minutes:
+
+1. Open a temporary worktree of the canonical branch (flow below).
+2. `/espalier-doctor` — the weekly scan.
+3. `/espalier-prune` over the flagged files (normal per-file gates).
+4. **If the prune cleared every finding, re-run `/espalier-doctor`** so the
+   shared stamp says `clean` (the doctor skill's end-of-session rule — a
+   dirty stamp whose findings were fixed in the same PR would nag the whole
+   team forever).
+5. One maintenance PR — `docs: weekly espalier maintenance` — containing the
+   stamp commit plus the refresh commits. CODEOWNERS routes any
+   rules-touching part to the rule owner automatically. On a protected
+   integration branch (assume protected at team scale) the PR IS the lane —
+   any teammate approves the routine parts (~1 min of someone's week); with
+   direct-push rights the worktree flow pushes straight.
+
+A skipped gardener week self-corrects: the shared stamp ages out,
+`doctor_due()` starts nagging everyone again — the pre-rota behavior is the
+fallback, not a new failure.
+
+Payoff: most devs stop seeing maintenance pressure entirely; exactly one
+scan and at most one prune sweep per interval.
+
 **Worktree flow — do the discipline FOR the user, not BY the user.** When a
 maintenance-lane action should land on the canonical branch while the user
 sits on a feature branch, offer: *"run this in a temporary worktree of the
@@ -136,6 +162,15 @@ hand-merge scout prose:
 
 A modify/delete conflict on an espalier doc resolves as DELETION — the other
 side retired the doc; run `/espalier-doctor` afterwards if in doubt.
+
+**Per-key convention files (`espalier/conventions/k-*.tsv`):** a same-key
+conflict is the race DETECTION, not a breakage. Two decisions (both sides
+flipped statuses) → pick the decision that should win, exactly like any
+5-line conflict. An observation append against another append or against a
+status flip → **keep both lines** (the decided rows AND every fresh
+observation row) — nothing is ever lost, and `conv_fold` dedupes repeated
+observations at read time. The shared `espalier/.doctor-stamp` is one line:
+keep the newer line (or either `clean`).
 
 ## Scout Mapping
 

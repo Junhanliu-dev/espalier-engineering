@@ -27,6 +27,13 @@ pipeline Stage 9 runs/verifies. If DISCOVERY.deploy was null, write exactly:
   may ride your feature branch as its own isolated `docs:` commit; convention
   promotions may ride the deciding feature branch as their own isolated
   commit. Maintenance commits are never folded into feature commits.
+- The weekly gardener rota: one rotating dev per cadence interval runs the
+  maintenance loop (worktree of the canonical branch → `/espalier-doctor` →
+  `/espalier-prune` over flagged files → re-run the doctor if the prune
+  cleared everything, so the shared `espalier/.doctor-stamp` says `clean` →
+  one `docs: weekly espalier maintenance` PR). The rota names who — that is
+  what kills "someone else surely ran it". A skipped week self-corrects: the
+  stamp ages out and `doctor_due()` nags everyone again.
 - Rule-canon gate: every PR touching `espalier/rules/` gets the rule owner's
   review. CODEOWNERS routes it automatically ONLY when "Require review from
   Code Owners" branch protection is on — without protection the file is

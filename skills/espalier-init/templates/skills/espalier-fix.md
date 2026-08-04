@@ -288,8 +288,13 @@ Options:
   3. Abort
 ```
 
-Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
-If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
+Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
+maintenance handles this (gardener rota — see /espalier-prune's
+Multi-Developer Discipline)". "Handle now" stays available and becomes the
+default ONLY when a critical/expired flag is present — the drift sidecar is
+per-clone, so a critical/expired row here is YOUR OWN flag (the prune
+escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
+signal → treat as empty.
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -976,13 +981,16 @@ tests; the push gate compares against this.
 
 ### 7.0 Stage the convention index
 
-If this run appended to `espalier/.conventions.tsv` (Stage 4) or flipped a
-row's status, stage it BEFORE the push commit so the tracked file lands in this
-fix's commit and the Stage 7 clean-tree gate stays green:
+If this run appended an observation (Stage 4) or flipped a status, stage the
+per-key files BEFORE the push commit so the tracked state lands in this fix's
+commit and the Stage 7 clean-tree gate stays green:
 
 ```bash
-git add espalier/.conventions.tsv
+[ -d espalier/conventions ] && git add espalier/conventions/
 ```
+
+(The legacy `espalier/.conventions.tsv` is read-only to this plugin version —
+never written, nothing to stage.)
 
 Standard push. Then:
 

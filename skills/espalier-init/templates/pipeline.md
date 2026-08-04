@@ -245,6 +245,16 @@ commits. Two recipes for the residual conflicts:
 A modify/delete conflict on an espalier doc resolves as DELETION (the other
 side retired the doc).
 
+### Per-key convention conflicts (`espalier/conventions/k-*.tsv`)
+
+A same-key conflict is the promotion race DETECTION, not a breakage. Two
+decisions (both sides flipped statuses) → pick the winning decision like any
+5-line conflict. An observation append against another append or against a
+status flip → **keep both lines** — every decided row AND every fresh
+observation row survive; `conv_fold` dedupes repeated observations at read time,
+so nothing double-counts. The shared `espalier/.doctor-stamp` is one line:
+keep the newer line (or either `clean`).
+
 ### Slug collisions across branches
 
 Two branches can mint the same `espalier/changes/{type}/{slug}/` folder on
