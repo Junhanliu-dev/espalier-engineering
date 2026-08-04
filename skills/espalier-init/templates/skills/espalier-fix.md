@@ -210,6 +210,14 @@ Options:
   5. Abort
 ```
 
+**Cross-branch slug collisions (merge-time).** The glob above sees only THIS
+checkout's branch: two branches can mint the same dated slug independently
+and collide only when the second PR merges — git surfaces it as add/add
+conflicts under `espalier/changes/`. The resolution recipe lives in
+`espalier/pipeline.md` → "Slug collisions across branches" (rename one dir to
+the next free `-N` suffix, run `espalier/hooks/rebuild-commit-index.sh`, and
+rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
+
 ### Step 12: Final validation
 - Confirm the dated slug matches `^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]{0,79}$`
   (a `--slug` literal override that omits the date is instead allowed by the
@@ -283,9 +291,20 @@ Options:
 Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
 If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
 
-For a `pattern_key` at the promotion threshold (>= 3 `diverges` rows), handle it
-per the `espalier` skill's Convention Promotion section — the same four options
-(promote / reject / exception / wait).
+**Unattended runs (never prompt here):** when `interactivity_mode` (in
+`drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
+question. Write the three-signal summary to `espalier/.drift-report.md`,
+print ONE line, and continue to THIS LANE's own **Stage 0 Auto-Link
+Discovery** below (not Stage 1 — that is the full pipeline's next stage, not
+the fix lane's). Never prune, never promote, never run a doctor scan
+unattended.
+
+For a `pattern_key` at the promotion threshold (>= 3 deduped `diverges`
+observations per `conv_fold`), handle it per the `espalier` skill's Convention
+Promotion section — the same four options (promote / reject / exception /
+wait), the same branch lane (deciding on your feature branch is fine, as its
+own isolated `docs:` commit — CODEOWNERS routes the rules PR to the owner at
+merge), and the same fetch race guard run before the prompt.
 
 ## Stage 0: Auto-Link Discovery (NEW)
 

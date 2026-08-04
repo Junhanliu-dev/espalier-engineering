@@ -76,13 +76,21 @@ Options:
 Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
 If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
 
+**Unattended runs (never prompt here):** when `interactivity_mode` (in
+`drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
+question. Write the three-signal summary to `espalier/.drift-report.md`,
+print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
+{due|not due} — recorded to espalier/.drift-report.md`), and continue to
+Stage 1. Never prune, never promote, never run a doctor scan unattended.
+
 ### Convention Promotion
 
 When the Stage 0 pre-flight reports a `pattern_key` with >= 3 deduped
 `diverges` observations (from `conv_fold`) and the user picks "Handle now",
 fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (rows, not
 counts — it folds the legacy file and the per-key files and dedupes across
-both) and surface the candidate with `AskUserQuestion`:
+both), run the race guard below, and surface the candidate with
+`AskUserQuestion`:
 
 ```
 Convention "{pattern_key}" has diverged in {N} changes:
@@ -108,6 +116,35 @@ Flip a row's status by editing `espalier/.conventions.tsv` — change the 5th ta
 field (`status`) of every matching row. The edit is committed by the same
 Stage 0 → Stage 7 run (the orchestrator stages `.conventions.tsv` at Stage 7).
 `coupled_with` candidates are surfaced together — promote/reject them as a set.
+
+**Branch lane (multi-dev).** Deciding a promotion on your FEATURE BRANCH is
+fine — make the rule edit + status flip their own isolated commit
+(`docs: promote convention {pattern_key}`), never folded into a feature
+commit, so it can be reviewed, cherry-picked, or reverted independently.
+CODEOWNERS routes the rules-touching PR to the rule owner at merge either way
+(advisory until "Require review from Code Owners" branch protection is on).
+
+**Race guard (courtesy pre-check — run before the promotion prompt).** A
+teammate may have already decided this key on the canonical branch:
+
+```bash
+R=$(grep '^canonical-remote:' espalier/.espalier-config | awk '{print $2}')
+B=$(grep '^canonical-branch:' espalier/.espalier-config | awk '{print $2}')
+if git fetch --quiet "$R" "$B" 2>/dev/null; then
+  git show "FETCH_HEAD:espalier/.conventions.tsv" 2>/dev/null \
+    | awk -F'\t' -v k="$KEY" '(NF==5||NF==6) && $3==k && $5!="diverges" {found=1} END{exit !found}' \
+    && SKIP_PROMPT=yes    # surface the existing canon decision instead of prompting
+else
+  echo "WARN: cannot fetch $R/$B — race guard skipped"   # do NOT read a stale tracking ref
+fi
+```
+
+(FETCH_HEAD, not `$R/$B` — a source-only fetch doesn't update the tracking
+ref, and a fetch failure must SKIP the check rather than consult stale state.
+The width guard keeps a malformed row from vacuously satisfying
+`$5!="diverges"`.) The guard is a courtesy, not the race defense — two
+same-key decisions on different branches surface as an ordinary git conflict
+at merge, which is the structural detection.
 
 ### Session Resumption
 

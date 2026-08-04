@@ -621,6 +621,34 @@ assert "22j partial-apply still applies the surgical edit" \
   "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$TMP/espalier/rules/development-process.md'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 23: A3/A5 insertion points present in installed skill text ──────
+# Prompt-flow behavior itself can't be unit-tested mechanically (recorded
+# exception) — these greps pin the six insertion points instead.
+echo "Test 23: multi-dev insertion points in generated text"
+TMP=$(mktemp -d -t smoke23.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "23a prune: lane table + worktree flow" \
+  "grep -q 'Multi-Developer Discipline' '$TMP/espalier/skills/espalier-prune/SKILL.md' && grep -q 'git worktree add' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "23b prune: conflict recipe (checkout --theirs)" \
+  "grep -q 'checkout --theirs' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "23c doctor: singleton lane text" \
+  "grep -q 'Multi-Developer Discipline' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "23d espalier: promotion feature-branch lane + race guard" \
+  "grep -q 'Branch lane (multi-dev)' '$TMP/espalier/skills/espalier/SKILL.md' && grep -q 'FETCH_HEAD:espalier/.conventions.tsv' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "23e espalier: unattended Stage 0 continues to Stage 1" \
+  "grep -q 'continue to\\s*$' '$TMP/espalier/skills/espalier/SKILL.md' || grep -q 'continue to Stage 1' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "23f fix lane: unattended Stage 0 continues to Auto-Link Discovery" \
+  "grep -q 'Stage 0 Auto-Link' '$TMP/espalier/skills/espalier-fix/SKILL.md' && grep -q 'not Stage 1' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "23g fix lane: cross-branch slug-collision pointer" \
+  "grep -q 'Slug collisions across branches' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "23h pipeline: maintenance section + slug recipe" \
+  "grep -q 'Multi-Developer Maintenance' '$TMP/espalier/pipeline.md' && grep -q 'rebuild-commit-index.sh' '$TMP/espalier/pipeline.md'"
+assert "23i development-process template: Maintenance Commits anchor" \
+  "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$PLUGIN_DIR/templates/rules/development-process.md'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

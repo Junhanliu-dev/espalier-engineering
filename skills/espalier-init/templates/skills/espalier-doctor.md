@@ -81,6 +81,24 @@ repo never triggers a scan (no commits = no drift). It is checked at the
 reminder in `pre-push-gate.sh`. To change the cadence, edit `.doctor-cadence`
 directly — bootstrap writes it once and never auto-rewrites it.
 
+## Multi-Developer Discipline
+
+On a multi-developer repo the doctor is a **scheduled singleton, not a
+concurrent free-for-all**: run it as part of the weekly maintenance flow on
+the canonical branch (`canonical-branch` in `espalier/.espalier-config`),
+via the temporary-worktree flow described in `/espalier-prune`'s
+Multi-Developer Discipline section — one scan per interval, one maintenance
+PR carrying the scan's prune refreshes. Prune and promotion have their own
+lanes (see that section's per-mechanism table); the doctor's lane is the
+weekly maintenance PR only — a scan result stranded on a feature branch
+helps nobody until merge.
+
+In this release the doctor still writes **no tracked file** — its stamp is
+the gitignored `espalier/.doctor-last-run`, so `doctor_due()` is per-clone
+and "a scan happened" is not yet a shared fact; coordinate the weekly run by
+rota until the tracked shared stamp (clean/dirty semantics) lands in a later
+release.
+
 ## Scout Mapping
 
 | Artifact | Scout | In `--quick`? |
