@@ -258,6 +258,55 @@ migrated installs. An install migrated by an older build of that script lacks th
 section — re-running the v0.9.0 step (idempotent) adds it, which is why the chain
 below never skips ahead.
 
+### Step 0: Migration barrier (ENFORCED pre-flight — before any detection or apply)
+
+Migrations rewrite installed skills and hooks; running one over uncommitted
+work or a half-finished pipeline change destroys context. Three checks, all
+enforced — not recommendations:
+
+```bash
+# 1. Clean working tree — abort otherwise (nothing may be applied over
+#    uncommitted changes; migrations must be their own commit).
+if [ -n "$(git status --porcelain)" ]; then
+  echo "BARRIER: working tree not clean — commit or stash first, then re-run /espalier-migrate."
+fi
+
+# 2. No in-flight pipeline change. A change is in-flight unless its
+#    `- Status:` matches the terminal-status vocabulary pre-push-gate.sh uses
+#    (COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE|FILED). A state
+#    file with a MISSING or unrecognized status counts as ACTIVE — fail
+#    closed, exactly like the push gate.
+ACTIVE=""
+for f in espalier/changes/*/*/pipeline-state.md; do
+  [ -f "$f" ] || continue
+  grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE|FILED)\b' "$f" \
+    || ACTIVE="$ACTIVE $f"
+done
+[ -n "$ACTIVE" ] && echo "BARRIER: in-flight change(s):$ACTIVE — finish or abandon first."
+
+# 3. Current branch must equal the canonical branch. Read the key when the
+#    install has it (v0.16.0+); older installs fall back to the remote HEAD
+#    detection, then `main`.
+B=$(grep '^canonical-branch:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
+if [ -z "$B" ]; then
+  R=origin; git remote 2>/dev/null | grep -qx upstream && R=upstream
+  REF=$(git symbolic-ref --short "refs/remotes/$R/HEAD" 2>/dev/null)
+  B=${REF#"$R"/}; [ -n "$B" ] || B=main
+fi
+CUR=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ "$CUR" = "$B" ] || echo "BARRIER: on branch '$CUR', canonical is '$B'."
+```
+
+Any `BARRIER:` line on stdout means STOP:
+
+- Checks 1-2 are hard aborts — surface the line and end the migration run.
+- Check 3 may be acknowledged: ask the user via `AskUserQuestion`
+  ("Migrate on branch '{CUR}' instead of the canonical '{B}'? A migration on
+  a feature branch strands the upgrade until that branch merges and every
+  other branch keeps the old install."). Proceed ONLY on an explicit
+  "migrate here anyway" acknowledgment; on an unattended run there is no one
+  to acknowledge — abort.
+
 ### Step 1: Preflight + detect install version
 
 Run from the current working directory (must be the target project root):
@@ -745,8 +794,11 @@ Migration applied. Recommended next steps:
        git diff --stat
        git status
 
-  2. Commit:
-       git add -A
+  2. Commit — stage EXACTLY the files each script reported touching (every
+     script prints its touched paths, incl. backups and the settings-backup
+     side-effect); never `git add -A`, which would sweep unrelated files
+     into the migration commit:
+       git add <each reported path>
        git commit -m "chore: migrate to Espalier vX.Y.Z"   # the version the chain just reached
 
   3. If you upgraded to v0.5.0, scan for drift that accrued before the upgrade:
