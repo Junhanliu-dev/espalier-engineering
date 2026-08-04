@@ -1134,7 +1134,11 @@ ESPALIERCFG
   else
     HOOKS_PATH_CFG=$(git config core.hooksPath 2>/dev/null || true)
     if [ -z "$HOOKS_PATH_CFG" ]; then
-      HOOK_DST=".git/hooks/post-merge"
+      # Not hardcoded .git/hooks: in a LINKED WORKTREE `.git` is a pointer
+      # file and hooks live in the shared common dir — --git-path resolves
+      # both layouts (and returns .git/hooks in a normal checkout).
+      HOOK_DST="$(git rev-parse --git-path hooks 2>/dev/null)/post-merge"
+      [ "$HOOK_DST" = "/post-merge" ] && HOOK_DST=".git/hooks/post-merge"
     else
       # core.hooksPath is set and husky is not managing it. The dispatcher must
       # land where git reads — and only if that is inside this repo. A hooksPath
@@ -1174,10 +1178,14 @@ ESPALIERCFG
 
   HOOK_DST_PARENT=$(dirname "$HOOK_DST")
   if [ ! -d "$HOOK_DST_PARENT" ]; then
-    if [ "$HOOK_DST_PARENT" = ".git/hooks" ]; then
-      log "  ERROR: .git/hooks does not exist (run 'git init' first?)"
-      return
-    fi
+    case "$HOOK_DST_PARENT" in
+      .git/hooks|*/.git/hooks)
+        # The resolved git hooks dir itself is missing — creating it inside
+        # a broken/absent .git would mask the real problem.
+        log "  ERROR: $HOOK_DST_PARENT does not exist (run 'git init' first?)"
+        return
+        ;;
+    esac
     mkdir -p "$HOOK_DST_PARENT" || { log "  ERROR: cannot create $HOOK_DST_PARENT"; return; }
   fi
 
@@ -1441,7 +1449,7 @@ stage_validate() {
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
-  run_check 20 "post-merge-dispatcher" '_hd=$(git config core.hooksPath 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
+  run_check 20 "post-merge-dispatcher" '_hd=$(git rev-parse --git-path hooks 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
   run_check 21 "rebuild-script"      'test -x espalier/hooks/rebuild-commit-index.sh' &
   run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
