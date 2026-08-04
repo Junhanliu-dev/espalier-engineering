@@ -54,6 +54,9 @@
 #                                      .github/copilot-instructions.md section +
 #                                      .github/agents/*.agent.md +
 #                                      .github/hooks/espalier-gates.json
+#   --codeowners-rules=<h>   GitHub handle/team owning espalier/rules/ (CODEOWNERS
+#                            block, R4). '@' prefixed if missing.
+#   --codeowners-wiki=<h>    Same for espalier/wiki/. Both empty → sub-step no-ops.
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -81,6 +84,8 @@ IGNORE_DRIFT_REASON=""
 DOCTOR_CADENCE=weekly
 PLATFORMS=""          # resolved after parsing: flag > espalier/.platforms > claude
 PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
+CODEOWNERS_RULES=""   # optional @handle owning espalier/rules/ (A4)
+CODEOWNERS_WIKI=""    # optional @handle owning espalier/wiki/
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -91,6 +96,8 @@ for arg in "$@"; do
     --merge-decision=*)     MERGE_DECISION="${arg#--merge-decision=}" ;;
     --doctor-cadence=*)     DOCTOR_CADENCE="${arg#--doctor-cadence=}" ;;
     --platforms=*)          PLATFORMS_FLAG="${arg#--platforms=}" ;;
+    --codeowners-rules=*)   CODEOWNERS_RULES="${arg#--codeowners-rules=}" ;;
+    --codeowners-wiki=*)    CODEOWNERS_WIKI="${arg#--codeowners-wiki=}" ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -100,7 +107,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,66p' "$0"
+      sed -n '2,69p' "$0"
       exit 0
       ;;
     *)
@@ -1219,12 +1226,64 @@ DISPATCH
   log "  Installed post-merge dispatcher → $HOOK_DST"
 }
 
-# --- Stage 10: .gitignore append --------------------------------------------
+# --- Stage 10: .gitignore/.gitattributes/CODEOWNERS append -------------------
+
+stage_codeowners() {
+  # A4/R4 — CODEOWNERS marker block routing rule/wiki edits to their owners.
+  # Enforcement is ADVISORY until "Require review from Code Owners" branch
+  # protection is on — not verified here.
+  if [ -z "$CODEOWNERS_RULES" ] && [ -z "$CODEOWNERS_WIKI" ]; then
+    log "  CODEOWNERS: no --codeowners-* handle given — skipping"
+    return 0
+  fi
+  # Normalize handles: '@' prefixed if missing; no placeholders — an
+  # unanswered handle's line is omitted entirely.
+  case "$CODEOWNERS_RULES" in ""|@*) ;; *) CODEOWNERS_RULES="@$CODEOWNERS_RULES" ;; esac
+  case "$CODEOWNERS_WIKI"  in ""|@*) ;; *) CODEOWNERS_WIKI="@$CODEOWNERS_WIKI" ;; esac
+  # Target file: GitHub's own search order — first existing wins (root-first
+  # would edit a file GitHub ignores whenever .github/CODEOWNERS exists).
+  local co="" c
+  for c in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
+    [ -f "$c" ] && { co="$c"; break; }
+  done
+  [ -z "$co" ] && co=".github/CODEOWNERS"
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] write ESPALIER OWNERS block to $co (rules=$CODEOWNERS_RULES wiki=$CODEOWNERS_WIKI)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$co")" 2>/dev/null || true
+  local block tmp
+  block=$(mktemp) || return 1
+  {
+    echo "# >>> ESPALIER OWNERS v1 >>> (managed by espalier bootstrap — do not edit between markers)"
+    [ -n "$CODEOWNERS_RULES" ] && echo "espalier/rules/ $CODEOWNERS_RULES"
+    [ -n "$CODEOWNERS_WIKI" ]  && echo "espalier/wiki/ $CODEOWNERS_WIKI"
+    echo "# <<< ESPALIER OWNERS v1 <<<"
+  } > "$block"
+  if [ -f "$co" ] && grep -qF ">>> ESPALIER OWNERS v1 >>>" "$co"; then
+    # Replace within markers; everything outside them is untouched.
+    tmp=$(mktemp) || { rm -f "$block"; return 1; }
+    awk -v bf="$block" '
+      /^# >>> ESPALIER OWNERS v1 >>>/ { inb=1; while ((getline l < bf) > 0) print l; close(bf); next }
+      /^# <<< ESPALIER OWNERS v1 <<</ { inb=0; next }
+      !inb { print }
+    ' "$co" > "$tmp" && mv "$tmp" "$co"
+  else
+    if [ -s "$co" ] && [ -n "$(tail -c1 "$co")" ]; then
+      printf '\n' >> "$co"
+    fi
+    cat "$block" >> "$co"
+  fi
+  rm -f "$block"
+  log "  CODEOWNERS block written to $co (advisory until branch protection requires code-owner review)"
+}
 
 stage_gitignore() {
-  log "Stage 10: .gitignore append (idempotent + newline guard)"
+  log "Stage 10: .gitignore/.gitattributes/CODEOWNERS append (idempotent + newline guard)"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] append espalier cache + drift-sidecar entries to .gitignore"
+    echo "[dry-run] append 'espalier/.ask-gaps.tsv merge=union' to .gitattributes"
+    stage_codeowners
     return
   fi
   # commit-index cache + the five drift sidecars (.drift-state.tsv* glob also
@@ -1243,6 +1302,19 @@ stage_gitignore() {
       fi
       echo "$entry" >> .gitignore
     done
+  # .gitattributes — the ONE union attribute in scope (A1): .ask-gaps.tsv is
+  # genuinely append-only. Deliberately NOT here: .conventions.tsv (its status
+  # writer edits rows in place — union would resurrect edited rows) and
+  # .doctor-stamp (single-line last-writer-wins — union would corrupt it into
+  # two lines). Never add attributes for either.
+  entry="espalier/.ask-gaps.tsv merge=union"
+  if ! grep -qxF "$entry" .gitattributes 2>/dev/null; then
+    if [ -s .gitattributes ] && [ -n "$(tail -c1 .gitattributes)" ]; then
+      printf '\n' >> .gitattributes
+    fi
+    echo "$entry" >> .gitattributes
+  fi
+  stage_codeowners
 }
 
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
