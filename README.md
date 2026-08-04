@@ -208,7 +208,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + copilot wiring when targeted (`.github/copilot-instructions.md` section, `.github/skills/` links, `.github/agents/*.agent.md`, `.github/hooks/espalier-gates.json`) + squash-merge decision + post-merge dispatcher install + .gitignore + 46 validation checks (51 with codex, 56 with copilot).
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + copilot wiring when targeted (`.github/copilot-instructions.md` section, `.github/skills/` links, `.github/agents/*.agent.md`, `.github/hooks/espalier-gates.json`) + squash-merge decision + post-merge dispatcher install + .gitignore/.gitattributes/CODEOWNERS + 48 validation checks (53 with codex, 58 with copilot).
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -226,7 +226,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (46/51/56 checks by platform set — no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (48/53/58 checks by platform set — no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 

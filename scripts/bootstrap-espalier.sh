@@ -27,8 +27,9 @@
 #   - Wires the copilot platform when targeted (.github/skills symlinks,
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
-#   - Runs the validation checks (R6) — 46 claude-only, 51 with codex,
-#     56 with copilot.
+#   - Appends the .gitattributes union entry + optional CODEOWNERS block.
+#   - Runs the validation checks (R6) — 48 claude-only, 53 with codex,
+#     58 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -64,7 +65,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (46/51/56-check validation).
+#   --validate-only          Only Stage 11 (48/53/58-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -107,7 +108,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,69p' "$0"
+      sed -n '2,70p' "$0"
       exit 0
       ;;
     *)
@@ -1328,14 +1329,17 @@ stage_gitignore() {
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  # Check count is platform-dependent: 46 base + 5 codex (47-51) + 5 copilot
-  # (52-56). Numbering is FIXED per platform; copilot without codex still
-  # renders 47-51 as skip lines so the sequence stays contiguous.
-  local TOTAL_CHECKS=46
+  # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
+  # 5 copilot (52-56) + 2 unconditional base (57-58 — appended AFTER the
+  # platform blocks so shipped platform IDs stay stable; base numbering is
+  # non-contiguous by design). Numbering is FIXED per platform; copilot
+  # without codex still renders 47-51 as skip lines so the sequence stays
+  # contiguous.
+  local TOTAL_CHECKS=48
   if want_copilot; then
-    TOTAL_CHECKS=56
+    TOTAL_CHECKS=58
   elif want_codex; then
-    TOTAL_CHECKS=51
+    TOTAL_CHECKS=53
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1510,14 +1514,19 @@ stage_validate() {
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
     run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
+  # 57-58: base checks (v0.16.0 multi-dev floor) — run UNCONDITIONALLY,
+  # regardless of --platforms; appended after the platform blocks so the
+  # shipped IDs 47-56 stay stable.
+  run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
+  run_check 58 "canonical-ref-keys"   'grep -qE "^canonical-remote: .+" espalier/.espalier-config && grep -qE "^canonical-branch: .+" espalier/.espalier-config' &
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-51.
+  # must reach stdout, which the run_check harness discards), then 26-58.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-6] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-8] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

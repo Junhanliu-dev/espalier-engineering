@@ -1,8 +1,8 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 46 checks when only claude is targeted, 51 with codex, 56 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 48 checks when only claude is targeted, 53 with codex, 58 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
 >
-> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Claude-only installs still print exactly 46 lines — byte-stable with pre-v0.14 output.
+> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Checks 57-58 are unconditional base checks appended after the platform blocks (base numbering 1-46, 57-58 — non-contiguous so shipped platform IDs stay stable). Claude-only installs print exactly 48 lines.
 
 > **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
@@ -68,8 +68,10 @@ After all generation and wiring is complete, validate end-to-end.
 | 54 | copilot-agents *(copilot only)* | `name: harness-…` present in all three `.github/agents/harness-*.agent.md` | Re-run bootstrap Stage 8d (delete the bad file first — stage is write-if-absent) |
 | 55 | copilot-hooks-json *(copilot only)* | `espalier-gates.json` parses as JSON, references `copilot-hook-adapter`, and the adapter is executable | Re-run bootstrap Stage 8e (delete the bad file first); `chmod +x espalier/hooks/copilot-hook-adapter.sh` |
 | 56 | copilot-instructions *(copilot only)* | `grep -q "## Espalier" .github/copilot-instructions.md` | Re-run bootstrap Stage 7c |
+| 57 | gitattributes-union | `grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes` | Re-run bootstrap Stage 10 (the only shipped union attribute — never add one for .conventions.tsv or .doctor-stamp) |
+| 58 | canonical-ref-keys | `canonical-remote:` + `canonical-branch:` non-empty in `espalier/.espalier-config` | Re-run bootstrap Stage 9 (appends missing keys; preserves present values) |
 
-When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 46 (claude-only) / 51 (+codex) / 56 (+copilot).
+When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 48 (claude-only) / 53 (+codex) / 58 (+copilot); 57-58 run on every platform set.
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),
