@@ -649,6 +649,61 @@ assert "23i development-process template: Maintenance Commits anchor" \
   "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$PLUGIN_DIR/templates/rules/development-process.md'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 24: B-team text + migration v0.16.0 → v0.17.0 fixture ───────────
+echo "Test 24: v0.17.0 gardener/per-key text + migration fixture"
+MIGRATE17="$SCRIPT_DIR/migrate-v0.16.0-to-v0.17.0.sh"
+TMP=$(mktemp -d -t smoke24.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+# B-team generated-text pins (rota, defaults flip, stamp protocol, playbooks).
+assert "24a doctor skill carries the shared-stamp protocol" \
+  "grep -q '.doctor-stamp' '$TMP/espalier/skills/espalier-doctor/SKILL.md' && grep -q 'doctor_stamp_shared' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24b doctor skill states the restamp-clean end-of-session rule" \
+  "grep -qi 're-run' '$TMP/espalier/skills/espalier-doctor/SKILL.md' && grep -q 'clean' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24c stamp-conflict one-liner present (keep the newer line)" \
+  "grep -qi 'keep the newer line' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24d prune skill names the gardener rota" \
+  "grep -qi 'gardener' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "24e same-key observation-append playbook (keep both lines)" \
+  "grep -qi 'keep both lines' '$TMP/espalier/pipeline.md'"
+assert "24f Stage 0 default flips to Proceed with rota pointer (full lane)" \
+  "grep -qi 'gardener rota' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24g Stage 0 default flips to Proceed with rota pointer (fix lane)" \
+  "grep -qi 'gardener rota' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "24h promotion flip text targets the key file" \
+  "grep -q 'conventions/k-' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24i race guard reads the per-key file first" \
+  "grep -q 'FETCH_HEAD:espalier/conventions/k-' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24j tracked stamp not gitignored in a fresh install" \
+  "( cd '$TMP' && ! git check-ignore -q espalier/.doctor-stamp )"
+
+# Migration fixture: regress the v0.17 install to a v0.16 shape.
+for f in pipeline.md skills/espalier/SKILL.md skills/espalier-fix/SKILL.md \
+         skills/espalier-prune/SKILL.md skills/espalier-doctor/SKILL.md hooks/drift-helpers.sh; do
+  echo "# pre-v0.17 stub" > "$TMP/espalier/$f"
+done
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "v0.16 fixture" )
+S24=$(cd "$TMP" && git status --porcelain | sort)
+M17_DRY=$( cd "$TMP" && bash "$MIGRATE17" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+S24B=$(cd "$TMP" && git status --porcelain | sort)
+assert "24k dry-run writes nothing"          "[ \"\$S24\" = \"\$S24B\" ]"
+M17_OUT=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M17_RC=$?
+assert "24l apply exits 0"                   "[ $M17_RC -eq 0 ]"
+assert "24m pure-copy files refreshed to v0.17" \
+  "grep -q 'doctor_stamp_shared' '$TMP/espalier/hooks/drift-helpers.sh' && grep -qi 'gardener' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "24n customised files backed up on diff" "[ -f '$TMP/espalier/pipeline.md.pre-v0.17.bak' ]"
+M17_RERUN=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "24o re-run is a no-op"               "echo \"\$M17_RERUN\" | grep -qi 'nothing to do'"
+# Hand-added ignore line must make the migration fail its gitignore assert.
+echo "espalier/.doctor-stamp" >> "$TMP/.gitignore"
+for f in pipeline.md; do echo "# stub again" > "$TMP/espalier/$f"; done
+M17_BAD=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1; echo "RC=$?" )
+assert "24p ignored .doctor-stamp is refused at run time" \
+  "echo \"\$M17_BAD\" | grep -q 'RC=1' && echo \"\$M17_BAD\" | grep -qi 'doctor-stamp'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"
