@@ -636,8 +636,8 @@ assert "T11b malformed legacy row skipped, not fatal"     "echo \"$F_OUT\" | gre
 assert "T11c legacy status row wins for its key"          \
   "echo \"$F_OUT\" | grep -q \"$(printf 'logging-style\t0\tpromoted')\""
 OBS_OUT=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_observations error-shape)
-assert "T11d conv_observations returns the evidence rows" \
-  "[ \"$(echo \"$OBS_OUT\" | grep -c 'feat/')\" = '3' ]"
+OBS_CNT=$(printf '%s\n' "$OBS_OUT" | grep -c 'feat/')
+assert "T11d conv_observations returns the evidence rows" "[ \"$OBS_CNT\" = '3' ]"
 assert "T11e conv_observations keeps coupled_with column" \
   "echo \"$OBS_OUT\" | grep -q 'logging-style'"
 

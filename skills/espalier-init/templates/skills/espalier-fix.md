@@ -259,8 +259,11 @@ Run this BEFORE Stage 0 Auto-Link Discovery. Source the drift helpers:
 Gather all three signals BEFORE prompting:
 1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
    into fresh / aging / stale / critical / expired.
-2. **CONV** — if `espalier/.conventions.tsv` exists, scan for any `pattern_key`
-   with >= 3 `diverges` rows (promotion candidates).
+2. **CONV** — `conv_fold` (in `drift-helpers.sh`) folds the legacy
+   `espalier/.conventions.tsv` AND any `espalier/conventions/*.tsv` per-key
+   files into `key<TAB>diverges_count<TAB>status` lines; every key with status
+   `diverges` and `diverges_count` >= 3 is a promotion candidate. Do not parse
+   the files yourself.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
 If all three are empty/false → no prompt, continue to Stage 0 Auto-Link Discovery.
@@ -731,7 +734,8 @@ lower-bar Convention Observations (see `harness-reviewer.md`) — one per
 divergence, with NO aggregation key. The orchestrator assigns the key. For each
 Observation in `review-record.md`:
 
-1. Read existing keys: `cut -f3 espalier/.conventions.tsv 2>/dev/null | sort -u`.
+1. Read existing keys: `. espalier/hooks/drift-helpers.sh && conv_fold | cut -f1`
+   (folds the legacy file AND the per-key files — never parse them yourself).
 2. Map the Observation's `description` to an existing `pattern_key`, or mint a
    new kebab-case key.
 3. Append the row:
@@ -742,10 +746,10 @@ append_convention "fix/${SLUG}" "$PATTERN_KEY" "$LOCATION"
 ```
 
 `append_convention` sanitizes every field and de-dupes on
-(change_slug, pattern_key, location). `espalier/.conventions.tsv` is tracked and
-append-only — columns `date · change_slug · pattern_key · location · status`.
-When a `pattern_key` reaches 3 `diverges` rows it is a promotion candidate,
-surfaced at the next Stage 0 pre-flight.
+(change_slug, pattern_key, location). Convention state is tracked and
+row-append-only — columns `date · change_slug · pattern_key · location · status`.
+When a `pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`)
+it is a promotion candidate, surfaced at the next Stage 0 pre-flight.
 
 ## Stage 5: Test Writing
 

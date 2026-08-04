@@ -7,7 +7,8 @@
 _DS_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 DRIFT_STATE="$_DS_ROOT/espalier/.drift-state.tsv"
 DRIFT_LOG="$_DS_ROOT/espalier/.drift.log"
-CONVENTIONS="$_DS_ROOT/espalier/.conventions.tsv"
+CONVENTIONS="$_DS_ROOT/espalier/.conventions.tsv"          # legacy — read forever, written by pre-v0.17 plugins only
+CONVENTIONS_DIR="$_DS_ROOT/espalier/conventions"           # per-key files (k-<slug>.tsv, same row format)
 DOCTOR_CADENCE="$_DS_ROOT/espalier/.doctor-cadence"     # tracked — choice only
 DOCTOR_LASTRUN="$_DS_ROOT/espalier/.doctor-last-run"    # gitignored — stamp
 
@@ -116,6 +117,79 @@ append_convention() {
   else
     printf '%s\t%s\t%s\t%s\t%s\n'     "$date" "$slug" "$key" "$loc" "diverges" >> "$CONVENTIONS"
   fi
+}
+
+# _conv_rows — internal: emit every well-formed convention row from BOTH
+# sources, normalized to 7 tab fields:
+#   source(legacy|perkey) date slug key location status coupled_with
+# Width guard: only NF==5 or NF==6 rows pass; anything else is skipped, never
+# fatal. Empty-glob safe: bash 3.2 iterates the literal *.tsv pattern when the
+# per-key dir has no files — the -f test drops it.
+_conv_rows() {
+  local _cf
+  if [ -f "$CONVENTIONS" ]; then
+    awk -F'\t' 'NF==5 || NF==6 { print "legacy\t" $1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 }' \
+      "$CONVENTIONS"
+  fi
+  if [ -d "$CONVENTIONS_DIR" ]; then
+    for _cf in "$CONVENTIONS_DIR"/*.tsv; do
+      [ -f "$_cf" ] || continue
+      awk -F'\t' 'NF==5 || NF==6 { print "perkey\t" $1 "\t" $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 }' \
+        "$_cf"
+    done
+  fi
+  return 0
+}
+
+# conv_fold — the single source of truth for reading convention state. Folds
+# the legacy espalier/.conventions.tsv AND every espalier/conventions/*.tsv
+# (same 5/6-col row format) and emits, per pattern_key:
+#   key<TAB>diverges_count<TAB>current_status
+# Folding is by COLUMN VALUE (column 3), never by filename — two keys that
+# sanitize to the same per-key filename still fold correctly.
+# - Observation dedupe on (slug,key,location) ACROSS both sources: an
+#   old-plugin branch appending to the legacy file and a new-plugin branch
+#   appending the same observation to the key file must count once.
+# - Status precedence, clock-free: any per-key-file status row (non-diverges)
+#   wins; a legacy status is honored only when the key file has no decision
+#   (v0.17+ writers never touch the legacy file, so its status can only be an
+#   older decision). No rows at all for a key → status reads `diverges`.
+conv_fold() {
+  _conv_rows | awk -F'\t' '
+    {
+      src=$1; slug=$3; key=$4; loc=$5; status=$6
+      if (!(key in known)) { known[key]=1; keys[++nk]=key }
+      if (status == "diverges") {
+        okey = slug SUBSEP key SUBSEP loc
+        if (!(okey in obs)) { obs[okey]=1; dcount[key]++ }
+      } else if (src == "perkey") {
+        pstat[key] = status
+      } else {
+        lstat[key] = status
+      }
+    }
+    END {
+      for (i=1; i<=nk; i++) {
+        k = keys[i]
+        s = (k in pstat) ? pstat[k] : ((k in lstat) ? lstat[k] : "diverges")
+        print k "\t" dcount[k]+0 "\t" s
+      }
+    }'
+}
+
+# conv_observations KEY — print the deduped `diverges` evidence rows for one
+# key (date slug key location status [coupled_with]) — the promotion prompt
+# needs rows, not counts.
+conv_observations() {
+  _conv_rows | awk -F'\t' -v k="$1" '
+    $4 == k && $6 == "diverges" {
+      okey = $3 SUBSEP $4 SUBSEP $5
+      if (okey in seen) next
+      seen[okey] = 1
+      row = $2 "\t" $3 "\t" $4 "\t" $5 "\t" $6
+      if ($7 != "") row = row "\t" $7
+      print row
+    }'
 }
 
 # doctor_due — exit 0 if a doctor scan is due. Cadence from the tracked

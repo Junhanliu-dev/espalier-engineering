@@ -1013,6 +1013,29 @@ COPILOTHOOKS
 
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
+# Canonical integration ref (A3/R3): the remote+branch maintenance discipline
+# targets. Detected once; values land in .espalier-config OUTSIDE the quoted
+# ESPALIERCFG heredoc (no interpolation there — the v0.9 migration extracts its
+# text literally).
+detect_canonical_ref() {
+  CANON_REMOTE=origin
+  git remote 2>/dev/null | grep -qx upstream && CANON_REMOTE=upstream
+  local ref
+  ref=$(git symbolic-ref --short "refs/remotes/$CANON_REMOTE/HEAD" 2>/dev/null)
+  # Strip exactly the remote prefix — a blanket 's|.*/||' would destroy a
+  # branch like release/1.x.
+  CANON_BRANCH=${ref#"$CANON_REMOTE"/}
+  [ -n "$CANON_BRANCH" ] || CANON_BRANCH=main
+}
+
+_append_config_key() {   # KEY VALUE — newline-guarded append-if-missing
+  grep -q "^$1:" espalier/.espalier-config 2>/dev/null && return 0
+  if [ -s espalier/.espalier-config ] && [ -n "$(tail -c1 espalier/.espalier-config)" ]; then
+    printf '\n' >> espalier/.espalier-config
+  fi
+  printf '%s: %s\n' "$1" "$2" >> espalier/.espalier-config
+}
+
 stage_merge_decision() {
   log "Stage 9: persist Phase 0 decisions + post-merge dispatcher"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1020,6 +1043,7 @@ stage_merge_decision() {
     echo "[dry-run] write espalier/.platforms = $PLATFORMS"
     echo "[dry-run] write espalier/.doctor-cadence = $DOCTOR_CADENCE (if absent)"
     echo "[dry-run] write espalier/.espalier-config = review-round caps (if absent)"
+    echo "[dry-run] append canonical-remote/canonical-branch keys to espalier/.espalier-config (if missing)"
     echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
     return
   fi
@@ -1043,8 +1067,11 @@ stage_merge_decision() {
   # espalier/.espalier-config — tracked, review-round escalation caps. Written
   # ONCE; never auto-rewritten, so a user's later tuning survives re-bootstrap.
   # Read at runtime by the orchestrator (grep + integer parse, like pre-push-gate).
+  detect_canonical_ref
   if [ -f espalier/.espalier-config ]; then
-    log "  espalier/.espalier-config already exists — preserving"
+    log "  espalier/.espalier-config already exists — preserving (appending missing canonical-ref keys only)"
+    _append_config_key canonical-remote "$CANON_REMOTE"
+    _append_config_key canonical-branch "$CANON_BRANCH"
   else
     cat > espalier/.espalier-config << 'ESPALIERCFG'
 # Espalier pipeline tuning. Key-value, one per line: `<key>: <integer>`.
@@ -1066,7 +1093,13 @@ max-test-rounds: 3
 # (Separate from the fixed "no more than 3 stages in a single rollback" span guard.)
 max-rollbacks: 3
 ESPALIERCFG
-    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3)"
+    # Canonical-ref keys are DYNAMIC (detected) — appended after the quoted
+    # heredoc, never interpolated into it.
+    printf '\n# Canonical integration ref for team maintenance discipline\n# (detected at init from the remote HEAD; string values — edit if wrong).\n' \
+      >> espalier/.espalier-config
+    _append_config_key canonical-remote "$CANON_REMOTE"
+    _append_config_key canonical-branch "$CANON_BRANCH"
+    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH)"
   fi
 
   # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must
@@ -1342,7 +1375,7 @@ stage_validate() {
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
   run_check 24 "cache-tsv-format"    '[ ! -s espalier/.commit-index.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.commit-index.tsv' &
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
-  run_check 27 "conventions-format"  '[ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv' &
+  run_check 27 "conventions-format"  '{ [ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv; } && { [ ! -d espalier/conventions ] || ! ls espalier/conventions/*.tsv >/dev/null 2>&1 || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/conventions/*.tsv; }' &
   run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
   if want_claude; then
     run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
