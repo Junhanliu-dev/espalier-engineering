@@ -403,6 +403,8 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh' espalier/hooks/copilot-hook-adapter.sh"
   # /espalier-map plan-don't-do guard (inert unless espalier/maps/.active-session exists).
   run "cp '$PLUGIN_DIR/hook-templates/map-guard.sh' espalier/hooks/map-guard.sh"
+  # Read-only lane-quality report (run manually: bash espalier/hooks/espalier-stats.sh).
+  run "cp '$PLUGIN_DIR/hook-templates/espalier-stats.sh' espalier/hooks/espalier-stats.sh"
   # Greenfield Pass 1: no Phase 2 writes exist yet — a placeholder gate keeps
   # check #6 honest and blocks nothing; init Pass 2 overwrites it with the
   # real substituted gate once the decision map clears. Write-if-absent.

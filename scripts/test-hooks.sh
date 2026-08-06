@@ -881,6 +881,66 @@ printf '%s' '{"toolName":"write","toolArgs":{"path":"src/a.ts"}}' \
 assert "16j copilot camelCase payload blocked via adapter" "[ $? -eq 2 ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── T17: espalier-stats.sh — lane-quality report over synthetic audit data ──
+echo "T17: espalier-stats"
+STATS="$HOOKS_SRC/espalier-stats.sh"
+TMP=$(mktemp -d -t hooks-t17.XXXX)
+make_repo "$TMP"
+
+# 17a: no espalier/ → honest no-op.
+OUT=$( cd "$TMP" && bash "$STATS" )
+assert "17a no espalier dir reports nothing-to-report" "echo \"\$OUT\" | grep -q 'nothing to report'"
+
+# Synthetic audit chain: 2 feats (one charted, one not), 1 fix caused_by the
+# uncharted feat, 1 map with mixed tickets/fog/sessions.
+mkdir -p "$TMP/espalier/changes/feat/2026-08-01-alpha" \
+         "$TMP/espalier/changes/feat/2026-08-02-beta" \
+         "$TMP/espalier/changes/fix/2026-08-03-hotfix" \
+         "$TMP/espalier/maps/2026-08-05-epic/tickets"
+printf -- '- Status: COMPLETE\n- Total Rollbacks: 1\n- Review Rounds: req=1/3, code=3/3, test=1/3\n| 1 | PASSED | ts | GRILLED |\n' \
+  > "$TMP/espalier/changes/feat/2026-08-01-alpha/pipeline-state.md"
+printf '# reqs\n' > "$TMP/espalier/changes/feat/2026-08-01-alpha/requirements.md"
+printf -- '- Status: IN_PROGRESS\n- Total Rollbacks: 0\n- Review Rounds: req=1/3, code=1/3, test=0/3\n| 1 | PASSED | ts | SKIPPED: crisp |\n' \
+  > "$TMP/espalier/changes/feat/2026-08-02-beta/pipeline-state.md"
+printf -- '---\ncharted_from: maps/2026-08-05-epic\n---\n' \
+  > "$TMP/espalier/changes/feat/2026-08-02-beta/requirements.md"
+printf -- '- Status: COMPLETE\n- Total Rollbacks: 0\n- Review Rounds: req=1/3, code=1/3, test=1/3\n' \
+  > "$TMP/espalier/changes/fix/2026-08-03-hotfix/pipeline-state.md"
+printf -- '---\ncaused_by: feat/2026-08-01-alpha\n---\n' \
+  > "$TMP/espalier/changes/fix/2026-08-03-hotfix/requirements.md"
+cat > "$TMP/espalier/maps/2026-08-05-epic/map.md" << 'MAPFIX'
+---
+map: 2026-08-05-epic
+status: IN_PROGRESS
+---
+## Not yet specified
+<!-- comment -->
+- auth provider still fuzzy
+## Session log
+| Date | Ticket | Action |
+|------|--------|--------|
+| d1 | 001 | resolved |
+| d2 | 002 | resolved |
+## Spawned Changes
+| Change | Status |
+|--------|--------|
+| feat/2026-08-02-beta | FILED |
+MAPFIX
+printf -- '---\nticket: 001\ntype: grilling\nstatus: closed\n---\n' > "$TMP/espalier/maps/2026-08-05-epic/tickets/001-a.md"
+printf -- '---\nticket: 002\ntype: research\nstatus: closed\n---\n'  > "$TMP/espalier/maps/2026-08-05-epic/tickets/002-b.md"
+printf -- '---\nticket: 003\ntype: task\nstatus: open\n---\n'       > "$TMP/espalier/maps/2026-08-05-epic/tickets/003-c.md"
+
+OUT=$( cd "$TMP" && bash "$STATS" )
+assert "17b lane counts + statuses"      "echo \"\$OUT\" | grep -qF 'feat**: 2' && echo \"\$OUT\" | grep -q 'IN_PROGRESS=1 COMPLETE=1'"
+assert "17c code-round distribution"     "echo \"\$OUT\" | grep -q 'code rounds: n=3 min=1 median=1 mean=1.67 max=3'"
+assert "17d grill verdict mix"           "echo \"\$OUT\" | grep -q 'GRILLED=1  crisp=1  no-grill=0  non-interactive=0'"
+assert "17e cohort split"                "echo \"\$OUT\" | grep -q 'charted feats:   1' && echo \"\$OUT\" | grep -q 'uncharted feats: 1'"
+assert "17f cohort round means differ"   "echo \"\$OUT\" | grep -q 'charted code rounds: n=1 min=1' && echo \"\$OUT\" | grep -q 'uncharted code rounds: n=1 min=3'"
+assert "17g fix echo lands on uncharted" "echo \"\$OUT\" | grep -q 'against-charted=0 against-uncharted=1 unlinked=0'"
+assert "17h map ticket/type/session/fog" "echo \"\$OUT\" | grep -q 'open=1 closed=2 out-of-scope=0 (grilling=1 research=1 prototype=0 task=1) sessions=2 fog-remaining=1 spawned=1'"
+assert "17i read-only (no writes)"       "[ -z \"\$(cd \"$TMP\" && git status --porcelain espalier 2>/dev/null | grep -v '^??')\" ] && [ ! -f '$TMP/espalier/.stats-report.md' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

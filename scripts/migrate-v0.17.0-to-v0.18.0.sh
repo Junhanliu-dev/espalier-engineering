@@ -76,6 +76,8 @@ mark() { missing="$missing
   || mark "espalier-map lane skill"
 [ -x espalier/hooks/map-guard.sh ] \
   || mark "map-guard hook (executable)"
+[ -x espalier/hooks/espalier-stats.sh ] \
+  || mark "espalier-stats report hook"
 grep -qF 'mode=decision' espalier/skills/espalier-grill/SKILL.md 2>/dev/null \
   || mark "grill decision mode"
 grep -qF 'charted_from' espalier/skills/espalier/SKILL.md 2>/dev/null \
@@ -134,6 +136,9 @@ log "installed espalier/skills/espalier-map/SKILL.md"
 cp "$TPL/hook-templates/map-guard.sh" espalier/hooks/map-guard.sh
 chmod +x espalier/hooks/map-guard.sh
 log "installed espalier/hooks/map-guard.sh"
+cp "$TPL/hook-templates/espalier-stats.sh" espalier/hooks/espalier-stats.sh
+chmod +x espalier/hooks/espalier-stats.sh
+log "installed espalier/hooks/espalier-stats.sh"
 
 # --- Symlinks per platform (same relative-target convention as bootstrap) -----
 _safe_ln() {
@@ -335,6 +340,7 @@ check() { if eval "$2" >/dev/null 2>&1; then pass=$((pass+1)); echo "  ✓ $1"; 
 log "verification"
 check "espalier-map skill installed"   "grep -q '^name: espalier-map' espalier/skills/espalier-map/SKILL.md"
 check "map-guard hook executable"      "test -x espalier/hooks/map-guard.sh"
+check "stats hook executable"          "test -x espalier/hooks/espalier-stats.sh"
 check "maps dir"                       "test -d espalier/maps"
 check "grill decision mode"            "grep -qF 'mode=decision' espalier/skills/espalier-grill/SKILL.md"
 check "espalier SKILL slice adoption"  "grep -qF 'charted_from' espalier/skills/espalier/SKILL.md"

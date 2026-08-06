@@ -86,7 +86,7 @@ project-root/
 │   │   └── espalier-map/SKILL.md               # multi-session planning lane (slash: /espalier-map)
 │   ├── agents/                     # harness-coder.md, harness-reviewer.md, harness-security.md (agent names kept for stability)
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
-│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh
+│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh
 │   ├── pipeline.md
 │   ├── maps/                       # decision maps ({slug}/map.md + tickets/ + assets/) — /espalier-map
 │   └── changes/                    # typed: feat/, fix/, refactor/, …

@@ -17,8 +17,10 @@ bash <plugin>/scripts/migrate-v0.17.0-to-v0.18.0.sh --yes       # apply
 
 - **New files:** `espalier/skills/espalier-map/SKILL.md` (+ a symlink for
   every platform recorded in `espalier/.platforms` — `.claude/skills/`,
-  `.agents/skills/`, `.github/skills/`), `espalier/hooks/map-guard.sh`, and
-  the empty `espalier/maps/` dir (it enters git with its first map).
+  `.agents/skills/`, `.github/skills/`), `espalier/hooks/map-guard.sh`,
+  `espalier/hooks/espalier-stats.sh` (read-only lane-quality report — run it
+  manually: `bash espalier/hooks/espalier-stats.sh`), and the empty
+  `espalier/maps/` dir (it enters git with its first map).
 - **Pure-copy refresh** (backup-on-diff → `<file>.pre-v0.18.bak`):
   `espalier/pipeline.md` (lanes note), the `espalier` SKILL (epic router hint,
   map-slice adoption, completion offer) and the `espalier-grill` SKILL
