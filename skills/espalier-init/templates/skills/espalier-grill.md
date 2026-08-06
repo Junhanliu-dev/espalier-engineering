@@ -1,6 +1,6 @@
 ---
 name: espalier-grill
-description: Internal pipeline stage — invoked by /espalier and /espalier-fix Stage 1 with a mode and reqs_path; not for direct user invocation. Stress-test a requirement (spec) or a bug diagnosis before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, missing edge cases, and collisions with the project's own rules/wiki conventions at Stage 1
+description: Internal pipeline stage — invoked by /espalier and /espalier-fix Stage 1 (and by /espalier-map for decision tickets) with a mode and reqs_path; not for direct user invocation. Stress-test a requirement (spec), a bug diagnosis, or an open decision before coding — adaptive sequential interrogation that surfaces ambiguity, false premises, missing edge cases, and collisions with the project's own rules/wiki conventions
 ---
 
 # Espalier Grill
@@ -18,8 +18,9 @@ re-implement something `espalier/wiki/` already documents. That collision is kno
 the repo but unknown to the requester — Step 1.5 cross-references the input against the
 project map and turns it into a question before any code is written.
 
-Grill is invoked BY Stage 1 of `/espalier` and `/espalier-fix`. It is not a slash
-command and is never called directly by the user.
+Grill is invoked BY Stage 1 of `/espalier` and `/espalier-fix`, and by
+`/espalier-map` when resolving a grilling ticket. It is not a slash command and
+is never called directly by the user.
 
 ## Inputs (passed by the invoking stage)
 
@@ -27,8 +28,33 @@ command and is never called directly by the user.
 |-------|--------|
 | `mode` | `spec` (from `/espalier`) — interrogates the requirement |
 | | `diagnosis` (from `/espalier-fix`) — interrogates the bug's root cause |
-| `input_text` | the requirement or bug description |
-| `reqs_path` | path to the change's `requirements.md` |
+| | `decision` (from `/espalier-map`) — settles an open decision ticket |
+| `input_text` | the requirement, bug description, or ticket question (+ map context) |
+| `reqs_path` | path to the change's `requirements.md` (spec/diagnosis) or the ticket file (decision) |
+
+### Decision-mode deltas (`mode=decision`)
+
+A decision ticket inverts grill's usual input: the QUESTION arrives sharp (the
+map already stated it precisely — that is what made it a ticket), and the
+ambiguity lives in the answer space. Everything below applies with these deltas:
+
+- **Step 1 (tiering):** skip the signal count — a decision ticket is never
+  `skip`-crisp (an already-settled question would not be a ticket). Default
+  tier `light` (≤ 3 questions); the user's read of the stakes bumps to `full`.
+- **Step 1.5:** runs unchanged, against the CANDIDATE ANSWERS: before locking
+  a decision, cross-check the leading candidates against `espalier/rules/` and
+  `espalier/wiki/` — a candidate that collides with an encoded convention is
+  surfaced as a citation-carrying question before it can win. Empty rules/wiki
+  (greenfield Pass 1) → skip silently, per the existing contract.
+- **Step 2:** the divergent-interpretations technique becomes divergent
+  CANDIDATES: privately list 3–5 concrete, divergent answers to the ticket,
+  ask the question that eliminates the most. Sequential, HITL — never answer
+  the ticket yourself.
+- **Step 3:** resolved decisions land in the ticket file's `## Resolution` —
+  the answer, its rationale, citations from Step 1.5 — plus a one-line gist
+  the caller appends to the map's Decisions-so-far. A non-answer records the
+  conservative default in `## Resolution` marked `(default — revisit)`.
+- **Verdict:** `GRILLED` or `SKIPPED: non-interactive` only.
 
 ## Process
 
@@ -225,10 +251,10 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
 
 | Verdict | When |
 |---------|------|
-| `GRILLED` | grill ran (`light` or `full`); `requirements.md` updated |
-| `SKIPPED: crisp` | tier was `skip`, input already well-specified, **and** Step 1.5 confirmed zero collisions. A crisp input that collides with a rule/wiki convention returns `GRILLED`, not this. |
+| `GRILLED` | grill ran (`light` or `full`); `requirements.md` (or the decision ticket) updated |
+| `SKIPPED: crisp` | spec/diagnosis only — tier was `skip`, input already well-specified, **and** Step 1.5 confirmed zero collisions. A crisp input that collides with a rule/wiki convention returns `GRILLED`, not this. Decision mode never returns it. |
 | `SKIPPED: non-interactive` | unattended run (Step 0's interactivity_mode check) |
-| `SKIPPED: --no-grill` | the invoking stage passed the opt-out flag |
+| `SKIPPED: --no-grill` | spec/diagnosis only — the invoking stage passed the opt-out flag |
 
 ## Anti-Patterns
 

@@ -205,11 +205,14 @@ unrelated in-flight change into the new request:
    list them and ask which one via `AskUserQuestion`.
 5. Before creating a new folder, also scan
    `espalier/changes/feat/*/pipeline-state.md` for `Status: FILED` skeletons
-   (root-cause feats filed by a fix lane's PARTIAL_FIX exit); if the new
-   requirement's kebab tail OR its text mentions the skeleton's slug stem,
-   ADOPT the skeleton folder instead of creating a new one (set its
-   `- Status: IN_PROGRESS` and start from Stage 1 with its inherited
-   `caused_by` / `filed_from_partial_fix` frontmatter).
+   (root-cause feats filed by a fix lane's PARTIAL_FIX exit, or slices filed
+   by a cleared `/espalier-map` handoff); if the new requirement's kebab tail
+   OR its text mentions the skeleton's slug stem, ADOPT the skeleton folder
+   instead of creating a new one (set its `- Status: IN_PROGRESS` and start
+   from Stage 1 with its inherited `caused_by` / `filed_from_partial_fix` /
+   `charted_from` + `tickets` frontmatter). A map-filed skeleton's
+   requirements.md arrives part-grilled — its decided criteria carry ticket
+   citations; Stage 1's grill covers only what the slice adds.
 
 ### Stage Execution Protocol
 
@@ -530,6 +533,14 @@ here). A typical single-bug fix belongs in `/espalier-fix`, which adds Stage 0
 causal linking; when a `fix:` requirement looks that small, say so in one line
 and suggest the fix lane before proceeding.
 
+The same routing runs upward: a `feat:` that is really an EPIC — several
+distinct features bundled, explicit multi-session scope, or a requirement so
+foggy Stage 1's grill would blow its `full` tier without converging — belongs
+in `/espalier-map` (multi-session planning; it hands back FILED slices this
+lane then runs one at a time). Say so in one line and suggest the map lane
+before proceeding. The split is session count, not project size: whatever
+fits one session stays here.
+
 Then derive `{kebab}` from the remainder of the requirement (kebab-case, max 80
 chars — same truncation rule as the fix lane, so collision tail-matching agrees
 across lanes; strip slashes).
@@ -733,3 +744,8 @@ When Stage 10 passes:
   from a clean tree.
 - Summarize: files changed, tests added, review findings addressed
 - Report total rounds and rollbacks
+- **Map-charted changes:** if this change's `requirements.md` frontmatter has
+  `charted_from: maps/{map-slug}` — update that map's Spawned Changes row to
+  COMPLETE. If EVERY row in the table is now COMPLETE, OFFER (AskUserQuestion
+  — never auto-flip) setting the map's `status: CLEARED → BUILT`. On an
+  unattended run, skip the offer and leave one line in the summary instead.
