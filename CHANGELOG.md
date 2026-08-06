@@ -5,7 +5,7 @@
 Minor: **the map lane** — multi-session planning above the pipeline, and a
 road into greenfield. Concept adapted from Matt Pocock's `wayfinder` skill
 (MIT); the enforcement layer is Espalier's. Suites: bootstrap 197/197, hooks
-137/137; validation is 50/55/60 by platform set (new checks 59-60).
+146/146; validation is 50/55/60 by platform set (new checks 59-60).
 
 - **`/espalier-map` lane** (new pure-copy skill `espalier-map`) — an effort
   too big for one session (epic, greenfield build, product on a boilerplate)
@@ -63,11 +63,32 @@ road into greenfield. Concept adapted from Matt Pocock's `wayfinder` skill
   insert at migration. Platform instruction sections gain the
   `/espalier-map` line. Validation: checks 2/47/52 lists extended, new 59
   (map skill wired) + 60 (map-guard executable + registered).
+- **`espalier-stats.sh`** (new shipped hook — lane-quality Layer 3) — a
+  read-only markdown report over the audit chain, run manually
+  (`bash espalier/hooks/espalier-stats.sh`): per-lane volume + terminal
+  statuses, review-round/rollback distributions (min/median/mean/max),
+  grill verdict mix, **charted-vs-uncharted feat cohorts** (code rounds,
+  rollbacks, and the fix echo via `caused_by` back-links — the lagging
+  measure of whether charting pays), per-map ticket/type/session/fog/
+  spawned-state, and convention-divergence hotspots via `conv_fold`.
+  Writes nothing; every section degrades to "none" on a fresh install.
+- **`eval/map/` harness** (dev/QA, not shipped — lane-quality Layer 2) —
+  the grill-harness pattern applied to the map lane: 8 fixtures with
+  planted decisions/collisions + `answer_script` simulated users
+  (chart coverage ×2, no-fog exit, cap stop, plan-don't-do probe,
+  greenfield shape, work one-ticket + fog graduation, decision-mode
+  collision citations), an LLM judge scored against `eval/map/rubric.md`
+  (coverage / placement / typing / hard contract bar / behavior), verdicts
+  derived from dimensions (never the judge's own verdict string), 0.80
+  catch-rate gate with the shadow-subset discipline, and distinct
+  PASS/FAIL/INCONCLUSIVE exit codes. Judge not yet human-validated — the
+  runner marks every result PROVISIONAL until rubric.md's validation
+  protocol has been run.
 - **`scripts/migrate-v0.17.0-to-v0.18.0.sh`** (new, migration #25) — new
-  files + per-platform symlinks + pure-copy refresh (backup-on-diff
-  `<file>.pre-v0.18.bak`: pipeline.md, espalier, espalier-grill) + hook
-  wiring per `espalier/.platforms` + config append + grep-guarded
-  instruction lines; idempotent re-run exits "nothing to do".
+  files (incl. the stats hook) + per-platform symlinks + pure-copy refresh
+  (backup-on-diff `<file>.pre-v0.18.bak`: pipeline.md, espalier,
+  espalier-grill) + hook wiring per `espalier/.platforms` + config append +
+  grep-guarded instruction lines; idempotent re-run exits "nothing to do".
 
 ## 0.17.0 — 2026-08-04
 
