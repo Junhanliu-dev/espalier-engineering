@@ -830,6 +830,57 @@ assert "T15g keep-both resolution folds decided-plus-one-fresh-observation" \
   "echo \"$FA_FOLD\" | grep -q \"$(printf 'key-a\t1\texception')\""
 [ "$KEEP" != "yes" ] && rm -rf "$BASE"
 
+# ─── T16: map-guard.sh — /espalier-map plan-don't-do write guard ──────────
+echo "T16: map-guard"
+MGUARD="$HOOKS_SRC/map-guard.sh"
+TMP=$(mktemp -d -t hooks-t16.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/maps" "$TMP/src"
+
+# run_mguard NAME JSON EXPECT_RC (env CLAUDE_PROJECT_DIR pins ROOT to the fixture)
+run_mguard() {
+  local name=$1 json=$2 want=$3
+  printf '%s' "$json" | CLAUDE_PROJECT_DIR="$TMP" bash "$MGUARD" >/dev/null 2>"$TMP/mg.err"
+  local rc=$?
+  assert "$name" "[ $rc -eq $want ]"
+}
+
+# 16a: no marker → allow anything.
+run_mguard "16a no marker allows write" '{"tool_input":{"file_path":"src/a.ts"}}' 0
+
+# 16b-d: fresh marker → block outside, allow maps, block by stderr contract.
+printf 'map: t16\nsession_started: now\n' > "$TMP/espalier/maps/.active-session"
+run_mguard "16b marker blocks outside write" '{"tool_input":{"file_path":"src/a.ts"}}' 2
+assert "16c blocked reason on stderr" "grep -q 'BLOCKED by map-guard' '$TMP/mg.err'"
+run_mguard "16d maps-path write allowed" "{\"tool_input\":{\"file_path\":\"$TMP/espalier/maps/x/map.md\"}}" 0
+
+# 16e-f: approved allow-window prefix passes; traversal/absolute prefixes ignored.
+printf 'allow: scaffold/\n' >> "$TMP/espalier/maps/.active-session"
+run_mguard "16e allow-window prefix passes" '{"tool_input":{"file_path":"scaffold/package.json"}}' 0
+printf 'allow: ../\nallow: /etc/\n' >> "$TMP/espalier/maps/.active-session"
+run_mguard "16f escape prefixes ignored (still blocks)" '{"tool_input":{"file_path":"src/b.ts"}}' 2
+
+# 16g: apply_patch body paths are extracted and blocked.
+run_mguard "16g apply_patch body blocked" '{"tool_input":{"command":"*** Update File: src/c.ts\nbody"}}' 2
+
+# 16h: writes outside the repo are out of scope.
+run_mguard "16h outside-repo path allowed" '{"tool_input":{"file_path":"/tmp/elsewhere/x.md"}}' 0
+
+# 16i: stale marker (>12h mtime) reads as inactive.
+touch -t 202601010000 "$TMP/espalier/maps/.active-session"
+run_mguard "16i stale marker allows write" '{"tool_input":{"file_path":"src/a.ts"}}' 0
+
+# 16j: camelCase payload through the copilot adapter still blocks.
+printf 'map: t16\nsession_started: now\n' > "$TMP/espalier/maps/.active-session"
+mkdir -p "$TMP/espalier/hooks"
+cp "$MGUARD" "$TMP/espalier/hooks/map-guard.sh"
+cp "$HOOKS_SRC/copilot-hook-adapter.sh" "$TMP/espalier/hooks/copilot-hook-adapter.sh"
+chmod +x "$TMP/espalier/hooks/"*.sh
+printf '%s' '{"toolName":"write","toolArgs":{"path":"src/a.ts"}}' \
+  | ( cd "$TMP" && CLAUDE_PROJECT_DIR="$TMP" bash espalier/hooks/copilot-hook-adapter.sh map-guard.sh ) >/dev/null 2>&1
+assert "16j copilot camelCase payload blocked via adapter" "[ $? -eq 2 ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"
