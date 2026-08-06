@@ -41,6 +41,24 @@ The gardener's loop:
 4. If the prune fixed everything the scan found, run the doctor once more (it's fast on a clean tree) so the recorded stamp says **clean** — otherwise the team-wide reminder would keep firing about findings you already fixed.
 5. Push one maintenance PR: `docs: weekly espalier maintenance`. It contains the scan stamp and the doc refreshes, nothing else.
 
+In commands — espalier drives this for you when you accept the worktree offer, but expanded it is just:
+
+```bash
+# 1. Temporary worktree of the canonical branch (read from espalier/.espalier-config);
+#    your own checkout and branch are never touched.
+B=$(grep '^canonical-branch:' espalier/.espalier-config | awk '{print $2}')
+WT=$(mktemp -d) && git worktree add "$WT" "$B" && cd "$WT"
+
+# 2. /espalier-doctor          — scan; drifted docs get flagged.
+# 3. /espalier-prune <file>    — regenerate each flagged doc; approve or reject each.
+# 4. All findings cleared? Re-run /espalier-doctor — it restamps espalier/.doctor-stamp
+#    as `clean` and commits the stamp as its own commit.
+
+# 5. One PR, then clean up.
+git push origin HEAD:espalier-maintenance    # PR title: "docs: weekly espalier maintenance"
+cd - && git worktree remove "$WT"
+```
+
 That's it. One scan per team per week instead of ten. One prune sweep instead of ad-hoc pruning from ten different branches. And because the result is a PR, the usual review flow applies — if any rule file changed, GitHub automatically asks the rule owner to review (see "Roles" below); the routine parts just need any teammate's quick approval when the repo requires PR reviews.
 
 Everyone else's experience: when you start a pipeline run, espalier's pre-flight might mention "2 stale docs, doctor due" — and the default answer is now simply **Proceed**, because the weekly maintenance handles it. Nine out of ten people never think about maintenance at all.
