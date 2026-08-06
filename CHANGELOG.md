@@ -1,5 +1,110 @@
 # Changelog
 
+## 0.17.0 — 2026-08-04
+
+Minor: **multi-dev maintenance, Release B-team** — maintenance becomes a
+scheduled singleton with two small shared files, closing G2 (doctor
+diffusion) and G3 (conventions merge unsafety) structurally instead of via
+event-log machinery (design §4, revision 5). Suites: bootstrap 177/177,
+hooks 127/127 (all new assertions red-first, incl. two-clone git sims).
+
+- **`espalier/.doctor-stamp`** (tracked, ONE line: `ts sha writer result`) —
+  written only by the doctor, at the END of the maintenance session, as its
+  own commit in the weekly maintenance PR. `doctor_due()` v2: only a fresh
+  `clean` stamp satisfies team-wide; `dirty:<N>` satisfies just the writing
+  clone (via its gitignored local stamp); a stamp beyond now + 25h skew is
+  rejected with a warning. End-of-session rule: if the session's prune
+  cleared every finding, the doctor re-runs and restamps `clean` — a dirty
+  stamp whose findings were fixed in the same PR would nag the team forever.
+  Last-writer-wins whole-file; deliberately never append-only and never
+  union-merged. Conflict story: keep the newer line (or either `clean`).
+- **Conventions file-per-key** — observations and decisions live in
+  `espalier/conventions/k-<slug>.tsv` (same 5/6-col row format; the `k-`
+  prefix keeps `aux`/`con`/`nul` off Windows-reserved filenames; filename is
+  routing only — `conv_fold` folds by column value). `append_convention` v2
+  targets the key file (created on first write) and dedupes across the key
+  file AND the legacy file; status flips edit the key file IN PLACE — safe
+  now, and a concurrent same-key decision surfaces as an ordinary git
+  conflict in that ~5-line file, which IS the race detection. The legacy
+  `.conventions.tsv` is read forever, written never. Honest costs measured
+  in the two-clone sims: same-key append-vs-append AND append-vs-flip both
+  conflict on current git (the plan's flip-vs-append auto-merge expectation
+  was an empirical claim — measured false; its recorded §7 fallback applies)
+  — playbook: keep both lines, `conv_fold` dedupes at read time.
+- **Weekly gardener rota** — one rotating dev per cadence interval runs the
+  ~15-minute loop (worktree of the canonical branch → doctor → prune →
+  restamp-clean if everything cleared → one `docs: weekly espalier
+  maintenance` PR). Stage 0 pre-flight defaults flip to **Proceed** with a
+  rota pointer in BOTH lanes; "Handle now" stays the default only for your
+  own critical/expired flag. A skipped week self-corrects — the stamp ages
+  out and the pre-rota nagging returns.
+- **Race guard v2** — reads `FETCH_HEAD:espalier/conventions/k-<slug>.tsv`
+  first (single-file read via the same `conv_slug` the writer uses), legacy
+  scan as the pre-conversion fallback.
+- **`scripts/migrate-v0.16.0-to-v0.17.0.sh`** (new, migration #24) —
+  pure-copy refresh only (backup-on-diff `<file>.pre-v0.17.bak`); no config,
+  attribute, or data migration (dir + stamp appear on first write); run-time
+  `git check-ignore` assert that `.doctor-stamp` is not ignored.
+
+## 0.16.0 — 2026-08-04
+
+Minor: **multi-dev maintenance, Release A** — the discipline, guards, and
+compatibility floor that make espalier maintenance team-shaped (design:
+`docs/multi-dev-maintenance-implementation-plan.md`, revision 5). Docs,
+config, and one executable bash helper — no new state files; the tolerant
+reader ships BEFORE the v0.17.0 per-key writer exists (readers-first).
+Binding invariants hold: no hook writes a tracked file, refresh is never
+silent, bash-3.2 safe. Suites: bootstrap 161/161, hooks 99/99 (all new
+assertions red-first); validation is 48/53/58 by platform set.
+
+- **`hook-templates/drift-helpers.sh`** — `conv_fold`, the single executable
+  reader of convention state: folds the legacy `espalier/.conventions.tsv`
+  AND every `espalier/conventions/*.tsv` per-key file (same 5/6-col row
+  format; the dir arrives in v0.17.0) into `key/diverges_count/status` lines.
+  Width-tolerant (malformed rows skipped, never fatal), empty-glob safe,
+  read-time observation dedupe on `(slug,key,location)` across both sources,
+  clock-free status precedence (a per-key decision beats a legacy one; legacy
+  honored when the key file has none). `conv_observations <key>` returns the
+  evidence rows for the promotion prompt. Every call site (Stage 0 scans,
+  promotion, the Stage-4 key reader, check #27) now consumes the helper.
+- **`scripts/bootstrap-espalier.sh`** — Stage 9 detects and appends
+  `canonical-remote`/`canonical-branch` to `.espalier-config` (outside the
+  quoted heredoc; append-missing-key on existing configs). Stage 10 appends
+  the ONE union attribute (`espalier/.ask-gaps.tsv merge=union` — never
+  `.conventions.tsv`, whose in-place status writer would make union resurrect
+  edited rows) and an optional CODEOWNERS marker block
+  (`--codeowners-rules`/`--codeowners-wiki`, GitHub search order,
+  replace-within-markers; advisory until branch protection requires
+  code-owner review). Worktree fix: the post-merge dispatcher lands via
+  `git rev-parse --git-path hooks` and check #20 resolves the same way — a
+  linked-worktree bootstrap now installs AND validates green. Validation
+  gains unconditional base checks 57 (gitattributes-union) + 58
+  (canonical-ref keys); totals 48/53/58, shipped platform IDs 47-56 stable.
+- **Skill text (six insertion points)** — per-mechanism maintenance lanes
+  (doctor: weekly maintenance PR; prune: weekly PR with a critical/expired
+  feature-branch escape hatch; promotion: feature branch fine, own isolated
+  commit + CODEOWNERS merge gate); the temporary-worktree ergonomics flow;
+  the corrected promotion race guard (FETCH_HEAD, fetch-failure skip, width
+  guard); unattended Stage 0 per-lane continuation (`/espalier` → Stage 1,
+  `/espalier-fix` → its own Auto-Link Discovery; report-only, never
+  prune/promote); prune-vs-prune conflict recipe (`checkout --theirs` +
+  re-prune; modify/delete = deletion); cross-branch slug-collision recipe
+  (rename + `rebuild-commit-index.sh` + Follow-up-Fixes rewrite, one
+  commit); `## Maintenance Commits` section (stable
+  `ESPALIER MAINTENANCE COMMITS v1` anchor) in the development-process
+  template.
+- **`skills/espalier-migrate/SKILL.md`** — ENFORCED Step 0 barrier: clean
+  tree, no in-flight change (terminal-status vocabulary reused from
+  `pre-push-gate.sh`, missing status = active, fail closed), canonical-branch
+  check with explicit interactive acknowledgment; `git add -A` replaced by
+  stage-exactly-reported-files. Migration #23 wired (detection, Step 4d
+  CODEOWNERS question, probe bump).
+- **`scripts/migrate-v0.15.0-to-v0.16.0.sh`** (new) — all-marker detection
+  (hardened against `--force` partial-applies); backup-on-diff refresh
+  (`<file>.pre-v0.16.bak`), surgical Maintenance-Commits append (text
+  extracted from the template), `--wire-only` re-wire with the merge decision
+  read back; synthetic-fixture test covers dry-run/apply/re-run/partial-apply.
+
 ## 0.15.0 — 2026-08-03
 
 Minor: **GitHub Copilot platform support** — the wiring layer goes

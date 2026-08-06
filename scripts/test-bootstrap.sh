@@ -299,7 +299,7 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/46\]' | head -3 | sed 's/\[//;s/\/46\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/48\]' | head -3 | sed 's/\[//;s/\/48\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -327,7 +327,7 @@ HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-l
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/46] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/48] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -341,7 +341,7 @@ HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/46] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/48] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Test 13: --lang=unsupported writes a no-op boundary hook ─────────────
@@ -380,8 +380,8 @@ assert "14i coder agent toml"                "grep -q '^name = \"harness-coder\"
 assert "14j reviewer agent toml"             "[ -f '$TMP/.codex/agents/harness-reviewer.toml' ]"
 assert "14k security agent toml"             "[ -f '$TMP/.codex/agents/harness-security.toml' ]"
 assert "14l platforms persisted"             "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
-assert "14m validation total is 51"          "echo \"\$P_OUT\" | grep -q 'Validation: 51/51 passed'"
-assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/51] OK'"
+assert "14m validation total is 51"          "echo \"\$P_OUT\" | grep -q 'Validation: 53/53 passed'"
+assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/53] OK'"
 assert "14o CLAUDE.md section still written" "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 # TOML sanity: python tomllib parses the generated config + agent files.
 assert "14p config.toml parses"              "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
@@ -411,7 +411,7 @@ assert "15b merge decision reused"           "echo \"\$W_OUT\" | grep -q \"reusi
 assert "15c platforms unioned to claude,codex" "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
 assert "15d codex wired"                     "[ -L '$TMP/.agents/skills/espalier' ] && grep -q 'ESPALIER HOOKS' '$TMP/.codex/config.toml'"
 assert "15e claude wiring untouched"         "[ -L '$TMP/.claude/skills/espalier' ] && grep -q 'espalier/hooks' '$TMP/.claude/settings.json'"
-assert "15f validation total is 51"          "echo \"\$W_OUT\" | grep -q 'Validation: 51/51 passed'"
+assert "15f validation total is 51"          "echo \"\$W_OUT\" | grep -q 'Validation: 53/53 passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 16: codex-only install (no .claude litter, claude checks skip) ──
@@ -429,7 +429,7 @@ assert "16b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
 assert "16c no CLAUDE.md section"            "! grep -q '## Espalier' '$TMP/CLAUDE.md' 2>/dev/null"
 assert "16d codex fully wired"               "[ -L '$TMP/.agents/skills/espalier' ] && [ -f '$TMP/.codex/agents/harness-coder.toml' ] && grep -q '## Espalier' '$TMP/AGENTS.md'"
 assert "16e claude checks skipped OK"        "echo \"\$C_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
-assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 51/51 passed'"
+assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 53/53 passed'"
 assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -448,8 +448,8 @@ assert "17e hooks json valid + adapter wired"  "python3 -c 'import json; json.lo
 assert "17f adapter copied + executable"       "[ -x '$TMP/espalier/hooks/copilot-hook-adapter.sh' ]"
 assert "17g copilot-instructions section"      "grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "17h claude + codex wiring intact"      "[ -L '$TMP/.claude/skills/espalier' ] && [ -L '$TMP/.agents/skills/espalier' ]"
-assert "17i validation total is 56"            "echo \"\$A_OUT\" | grep -q 'Validation: 56/56 passed'"
-assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/56] OK'"
+assert "17i validation total is 56"            "echo \"\$A_OUT\" | grep -q 'Validation: 58/58 passed'"
+assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/58] OK'"
 # Idempotent re-run: sections/files not duplicated, user tuning preserved.
 echo "<!-- user tuning marker -->" >> "$TMP/.github/agents/harness-coder.agent.md"
 ( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=all --yes >/dev/null 2>&1 )
@@ -471,8 +471,237 @@ assert "18c no AGENTS.md written"            "[ ! -f '$TMP/AGENTS.md' ]"
 assert "18d copilot fully wired"             "[ -L '$TMP/.github/skills/espalier' ] && [ -f '$TMP/.github/agents/harness-coder.agent.md' ] && grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "18e claude checks skipped OK"        "echo \"\$P_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
 assert "18f codex checks skipped OK"         "echo \"\$P_OUT\" | grep -qF 'OK   codex-skills-load (skipped — codex not targeted)'"
-assert "18g validation total is 56"          "echo \"\$P_OUT\" | grep -q 'Validation: 56/56 passed'"
+assert "18g validation total is 56"          "echo \"\$P_OUT\" | grep -q 'Validation: 58/58 passed'"
 assert "18h platforms = copilot"             "grep -qx 'copilot' '$TMP/espalier/.platforms'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 19: .gitattributes union entry + canonical-ref config keys ──────
+echo "Test 19: gitattributes + canonical config keys"
+TMP=$(mktemp -d -t smoke19.XXXX)
+make_smoke_repo "$TMP"
+echo "*.bin binary" > "$TMP/.gitattributes"   # pre-existing user content
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "19a ask-gaps union attribute appended" \
+  "grep -qxF 'espalier/.ask-gaps.tsv merge=union' '$TMP/.gitattributes'"
+assert "19b pre-existing gitattributes content preserved" \
+  "grep -qxF '*.bin binary' '$TMP/.gitattributes'"
+assert "19c no other union attribute shipped (conventions/doctor-stamp excluded)" \
+  "[ \"\$(grep -c 'merge=union' '$TMP/.gitattributes')\" = '1' ]"
+( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --yes >/dev/null 2>&1 )
+assert "19d re-run adds nothing twice" \
+  "[ \"\$(grep -cxF 'espalier/.ask-gaps.tsv merge=union' '$TMP/.gitattributes')\" = '1' ]"
+assert "19e canonical-remote key written (printf-appended after quoted heredoc)" \
+  "grep -q '^canonical-remote: origin$' '$TMP/espalier/.espalier-config'"
+assert "19f canonical-branch key written (no remote HEAD → main fallback)" \
+  "grep -q '^canonical-branch: main$' '$TMP/espalier/.espalier-config'"
+assert "19g caps heredoc still intact ahead of the appended keys" \
+  "grep -q '^max-code-rounds: 3$' '$TMP/espalier/.espalier-config'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# Preserve-if-exists branch: a pre-existing config keeps its values and gains
+# ONLY the missing canonical keys.
+TMP=$(mktemp -d -t smoke19b.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+mkdir -p "$TMP/espalier"
+printf 'max-code-rounds: 5\ncanonical-remote: upstream\n' > "$TMP/espalier/.espalier-config"
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "19h user-tuned key preserved"                "grep -q '^max-code-rounds: 5$' '$TMP/espalier/.espalier-config'"
+assert "19i present canonical key NOT overwritten"   "grep -q '^canonical-remote: upstream$' '$TMP/espalier/.espalier-config'"
+assert "19j missing canonical key appended"          "grep -q '^canonical-branch: main$' '$TMP/espalier/.espalier-config'"
+assert "19k no duplicate canonical keys"             "[ \"\$(grep -c '^canonical-remote:' '$TMP/espalier/.espalier-config')\" = '1' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 20: CODEOWNERS generation (marker block, GitHub search order) ───
+echo "Test 20: CODEOWNERS generation"
+TMP=$(mktemp -d -t smoke20.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --codeowners-rules=alice --codeowners-wiki=@docs-team --yes --force >/dev/null 2>&1 )
+assert "20a CODEOWNERS created at .github/ (GitHub search order)" \
+  "[ -f '$TMP/.github/CODEOWNERS' ]"
+assert "20b rules handle normalized to @alice" \
+  "grep -q '^espalier/rules/ @alice$' '$TMP/.github/CODEOWNERS'"
+assert "20c wiki handle kept as @docs-team" \
+  "grep -q '^espalier/wiki/ @docs-team$' '$TMP/.github/CODEOWNERS'"
+( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --codeowners-rules=alice --codeowners-wiki=@docs-team --yes >/dev/null 2>&1 )
+assert "20d re-run keeps ONE marker block" \
+  "[ \"\$(grep -c '>>> ESPALIER OWNERS v1 >>>' '$TMP/.github/CODEOWNERS')\" = '1' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# Existing root CODEOWNERS is the target (first in search order when .github/
+# has none) and user lines survive outside the markers.
+TMP=$(mktemp -d -t smoke20b.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+echo "* @global-owner" > "$TMP/CODEOWNERS"
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --codeowners-rules=@alice --yes --force >/dev/null 2>&1 )
+assert "20e existing root CODEOWNERS edited in place"  "grep -q 'ESPALIER OWNERS v1' '$TMP/CODEOWNERS'"
+assert "20f user line outside markers untouched"       "grep -qxF '* @global-owner' '$TMP/CODEOWNERS'"
+assert "20g no .github/CODEOWNERS created over it"     "[ ! -f '$TMP/.github/CODEOWNERS' ]"
+assert "20h unanswered wiki handle → line omitted"     "! grep -q 'espalier/wiki/' '$TMP/CODEOWNERS'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# No handles → sub-step no-ops, nothing written.
+TMP=$(mktemp -d -t smoke20c.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "20i skip path writes no CODEOWNERS" \
+  "[ ! -f '$TMP/.github/CODEOWNERS' ] && [ ! -f '$TMP/CODEOWNERS' ] && [ ! -f '$TMP/docs/CODEOWNERS' ]"
+# Dry-run stays truthful for the new Stage 10 writes.
+TMPD=$(mktemp -d -t smoke20d.XXXX)
+make_smoke_repo "$TMPD"
+( cd "$TMPD" && bash "$BOOTSTRAP" --dry-run --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --codeowners-rules=@alice --yes >/dev/null 2>&1 )
+assert "20j dry-run writes neither gitattributes nor CODEOWNERS" \
+  "[ ! -f '$TMPD/.gitattributes' ] && [ ! -f '$TMPD/.github/CODEOWNERS' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMPD"
+
+# ─── Test 21: linked-worktree install (hooks land in the COMMON git dir) ──
+echo "Test 21: linked worktree bootstrap"
+TMP=$(mktemp -d -t smoke21.XXXX)
+make_smoke_repo "$TMP"
+WT="$TMP-wt"
+( cd "$TMP" && git worktree add -b wt-branch "$WT" >/dev/null 2>&1 )
+simulate_llm_writes "$WT" typescript
+WT_OUT=$( cd "$WT" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force 2>&1 )
+WT_EXIT=$?
+assert "21a bootstrap from linked worktree exits 0"    "[ $WT_EXIT -eq 0 ]"
+assert "21b dispatcher installed in the COMMON hooks dir" \
+  "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
+assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 48/48 passed'"
+assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/48] OK'"
+[ "$KEEP" != "yes" ] && rm -rf "$WT" "$TMP"
+
+# ─── Test 22: migration v0.15.0 → v0.16.0 (synthetic fixture) ─────────────
+echo "Test 22: migrate-v0.15.0-to-v0.16.0.sh fixture"
+MIGRATE="$SCRIPT_DIR/migrate-v0.15.0-to-v0.16.0.sh"
+TMP=$(mktemp -d -t smoke22.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+# Regress the install to a v0.15.0 shape: strip every v0.16 artifact.
+rm -f "$TMP/.gitattributes"
+grep -v '^canonical-' "$TMP/espalier/.espalier-config" | grep -v '^# Canonical' > "$TMP/cfg.tmp" \
+  && mv "$TMP/cfg.tmp" "$TMP/espalier/.espalier-config"
+for f in pipeline.md skills/espalier/SKILL.md skills/espalier-fix/SKILL.md \
+         skills/espalier-prune/SKILL.md skills/espalier-doctor/SKILL.md hooks/drift-helpers.sh; do
+  echo "# pre-v0.16 stub" > "$TMP/espalier/$f"
+done
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "v0.15 fixture" )
+FIX_SNAP=$(cd "$TMP" && git status --porcelain | sort)
+M_DRY=$( cd "$TMP" && bash "$MIGRATE" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+FIX_AFTER=$(cd "$TMP" && git status --porcelain | sort)
+assert "22a dry-run mentions the plan"        "echo \"\$M_DRY\" | grep -qi 'dry'"
+assert "22b dry-run writes nothing"           "[ \"\$FIX_SNAP\" = \"\$FIX_AFTER\" ]"
+M_OUT=$( cd "$TMP" && bash "$MIGRATE" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M_EXIT=$?
+assert "22c apply exits 0"                    "[ $M_EXIT -eq 0 ]"
+assert "22d gitattributes marker landed"      "grep -qxF 'espalier/.ask-gaps.tsv merge=union' '$TMP/.gitattributes'"
+assert "22e canonical keys landed"            "grep -q '^canonical-remote: ' '$TMP/espalier/.espalier-config' && grep -q '^canonical-branch: ' '$TMP/espalier/.espalier-config'"
+assert "22f Maintenance Commits section landed" "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$TMP/espalier/rules/development-process.md'"
+assert "22g pure-copy files refreshed"        "grep -q 'conv_fold' '$TMP/espalier/skills/espalier/SKILL.md' && grep -q 'conv_fold' '$TMP/espalier/hooks/drift-helpers.sh'"
+assert "22h customised files backed up on diff" "[ -f '$TMP/espalier/pipeline.md.pre-v0.16.bak' ]"
+M_RERUN=$( cd "$TMP" && bash "$MIGRATE" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "22i re-run is a no-op"                "echo \"\$M_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# Partial-apply: config keys + attribute pre-seeded (e.g. by an earlier
+# bootstrap --force with the new plugin) — the surgical rule edit must still land.
+TMP=$(mktemp -d -t smoke22b.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+# development-process.md lacks the section (simulate_llm_writes' minimal file),
+# attribute + keys are present from the v0.16 bootstrap — a two-marker detector
+# would falsely report done.
+M_PART=$( cd "$TMP" && bash "$MIGRATE" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "22j partial-apply still applies the surgical edit" \
+  "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$TMP/espalier/rules/development-process.md'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 23: A3/A5 insertion points present in installed skill text ──────
+# Prompt-flow behavior itself can't be unit-tested mechanically (recorded
+# exception) — these greps pin the six insertion points instead.
+echo "Test 23: multi-dev insertion points in generated text"
+TMP=$(mktemp -d -t smoke23.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+assert "23a prune: lane table + worktree flow" \
+  "grep -q 'Multi-Developer Discipline' '$TMP/espalier/skills/espalier-prune/SKILL.md' && grep -q 'git worktree add' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "23b prune: conflict recipe (checkout --theirs)" \
+  "grep -q 'checkout --theirs' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "23c doctor: singleton lane text" \
+  "grep -q 'Multi-Developer Discipline' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "23d espalier: promotion feature-branch lane + race guard" \
+  "grep -q 'Branch lane (multi-dev)' '$TMP/espalier/skills/espalier/SKILL.md' && grep -q 'FETCH_HEAD:espalier/.conventions.tsv' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "23e espalier: unattended Stage 0 continues to Stage 1" \
+  "grep -q 'continue to\\s*$' '$TMP/espalier/skills/espalier/SKILL.md' || grep -q 'continue to Stage 1' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "23f fix lane: unattended Stage 0 continues to Auto-Link Discovery" \
+  "grep -q 'Stage 0 Auto-Link' '$TMP/espalier/skills/espalier-fix/SKILL.md' && grep -q 'not Stage 1' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "23g fix lane: cross-branch slug-collision pointer" \
+  "grep -q 'Slug collisions across branches' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "23h pipeline: maintenance section + slug recipe" \
+  "grep -q 'Multi-Developer Maintenance' '$TMP/espalier/pipeline.md' && grep -q 'rebuild-commit-index.sh' '$TMP/espalier/pipeline.md'"
+assert "23i development-process template: Maintenance Commits anchor" \
+  "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$PLUGIN_DIR/templates/rules/development-process.md'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 24: B-team text + migration v0.16.0 → v0.17.0 fixture ───────────
+echo "Test 24: v0.17.0 gardener/per-key text + migration fixture"
+MIGRATE17="$SCRIPT_DIR/migrate-v0.16.0-to-v0.17.0.sh"
+TMP=$(mktemp -d -t smoke24.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
+# B-team generated-text pins (rota, defaults flip, stamp protocol, playbooks).
+assert "24a doctor skill carries the shared-stamp protocol" \
+  "grep -q '.doctor-stamp' '$TMP/espalier/skills/espalier-doctor/SKILL.md' && grep -q 'doctor_stamp_shared' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24b doctor skill states the restamp-clean end-of-session rule" \
+  "grep -qi 're-run' '$TMP/espalier/skills/espalier-doctor/SKILL.md' && grep -q 'clean' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24c stamp-conflict one-liner present (keep the newer line)" \
+  "grep -qi 'keep the newer line' '$TMP/espalier/skills/espalier-doctor/SKILL.md'"
+assert "24d prune skill names the gardener rota" \
+  "grep -qi 'gardener' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "24e same-key observation-append playbook (keep both lines)" \
+  "grep -qi 'keep both lines' '$TMP/espalier/pipeline.md'"
+assert "24f Stage 0 default flips to Proceed with rota pointer (full lane)" \
+  "grep -qi 'gardener rota' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24g Stage 0 default flips to Proceed with rota pointer (fix lane)" \
+  "grep -qi 'gardener rota' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "24h promotion flip text targets the key file" \
+  "grep -q 'conventions/k-' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24i race guard reads the per-key file first" \
+  "grep -q 'FETCH_HEAD:espalier/conventions/k-' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "24j tracked stamp not gitignored in a fresh install" \
+  "( cd '$TMP' && ! git check-ignore -q espalier/.doctor-stamp )"
+
+# Migration fixture: regress the v0.17 install to a v0.16 shape.
+for f in pipeline.md skills/espalier/SKILL.md skills/espalier-fix/SKILL.md \
+         skills/espalier-prune/SKILL.md skills/espalier-doctor/SKILL.md hooks/drift-helpers.sh; do
+  echo "# pre-v0.17 stub" > "$TMP/espalier/$f"
+done
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "v0.16 fixture" )
+S24=$(cd "$TMP" && git status --porcelain | sort)
+M17_DRY=$( cd "$TMP" && bash "$MIGRATE17" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+S24B=$(cd "$TMP" && git status --porcelain | sort)
+assert "24k dry-run writes nothing"          "[ \"\$S24\" = \"\$S24B\" ]"
+M17_OUT=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M17_RC=$?
+assert "24l apply exits 0"                   "[ $M17_RC -eq 0 ]"
+assert "24m pure-copy files refreshed to v0.17" \
+  "grep -q 'doctor_stamp_shared' '$TMP/espalier/hooks/drift-helpers.sh' && grep -qi 'gardener' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
+assert "24n customised files backed up on diff" "[ -f '$TMP/espalier/pipeline.md.pre-v0.17.bak' ]"
+M17_RERUN=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "24o re-run is a no-op"               "echo \"\$M17_RERUN\" | grep -qi 'nothing to do'"
+# Hand-added ignore line must make the migration fail its gitignore assert.
+echo "espalier/.doctor-stamp" >> "$TMP/.gitignore"
+for f in pipeline.md; do echo "# stub again" > "$TMP/espalier/$f"; done
+M17_BAD=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1; echo "RC=$?" )
+assert "24p ignored .doctor-stamp is refused at run time" \
+  "echo \"\$M17_BAD\" | grep -q 'RC=1' && echo \"\$M17_BAD\" | grep -qi 'doctor-stamp'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

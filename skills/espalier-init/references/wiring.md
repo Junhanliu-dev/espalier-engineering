@@ -161,6 +161,8 @@ State files live at `espalier/changes/{type}/{slug}/pipeline-state.md` (depth 3 
 
 The `{max-req-rounds}` / `{max-code-rounds}` / `{max-test-rounds}` denominators are the review-round escalation caps, read from `espalier/.espalier-config` (a tracked key-value file written once by bootstrap, default `3` each). The orchestrator substitutes them when it instantiates a change's state file, and reads them at the Stage 2/4/6 gates via `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'` (falling back to 3 if absent). The same file also holds `max-rollbacks` (default 3) — the total cross-stage rollbacks allowed before human takeover, read the same way at the rollback gate. `#` comment lines and blanks in the file are ignored. Edit any value to tune; it survives re-bootstrap.
 
+The same file carries two STRING keys, `canonical-remote` and `canonical-branch` — the integration ref the multi-dev maintenance discipline targets (weekly maintenance PRs, the promotion race guard's fetch, the migrate barrier's branch check). Bootstrap detects them once (`upstream` preferred over `origin`; branch from the remote HEAD symbolic ref, `main` fallback) and appends them AFTER the quoted heredoc — they are dynamic, so they never live inside it. On an existing config the two keys are appended only if missing; present values are never overwritten.
+
 ## 10.7 Make Hooks Executable
 
 ```bash

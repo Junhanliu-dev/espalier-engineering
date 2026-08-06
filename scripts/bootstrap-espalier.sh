@@ -27,8 +27,9 @@
 #   - Wires the copilot platform when targeted (.github/skills symlinks,
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
-#   - Runs the validation checks (R6) — 46 claude-only, 51 with codex,
-#     56 with copilot.
+#   - Appends the .gitattributes union entry + optional CODEOWNERS block.
+#   - Runs the validation checks (R6) — 48 claude-only, 53 with codex,
+#     58 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -54,6 +55,9 @@
 #                                      .github/copilot-instructions.md section +
 #                                      .github/agents/*.agent.md +
 #                                      .github/hooks/espalier-gates.json
+#   --codeowners-rules=<h>   GitHub handle/team owning espalier/rules/ (CODEOWNERS
+#                            block, R4). '@' prefixed if missing.
+#   --codeowners-wiki=<h>    Same for espalier/wiki/. Both empty → sub-step no-ops.
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -61,7 +65,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (46/51/56-check validation).
+#   --validate-only          Only Stage 11 (48/53/58-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -81,6 +85,8 @@ IGNORE_DRIFT_REASON=""
 DOCTOR_CADENCE=weekly
 PLATFORMS=""          # resolved after parsing: flag > espalier/.platforms > claude
 PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
+CODEOWNERS_RULES=""   # optional @handle owning espalier/rules/ (A4)
+CODEOWNERS_WIKI=""    # optional @handle owning espalier/wiki/
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -91,6 +97,8 @@ for arg in "$@"; do
     --merge-decision=*)     MERGE_DECISION="${arg#--merge-decision=}" ;;
     --doctor-cadence=*)     DOCTOR_CADENCE="${arg#--doctor-cadence=}" ;;
     --platforms=*)          PLATFORMS_FLAG="${arg#--platforms=}" ;;
+    --codeowners-rules=*)   CODEOWNERS_RULES="${arg#--codeowners-rules=}" ;;
+    --codeowners-wiki=*)    CODEOWNERS_WIKI="${arg#--codeowners-wiki=}" ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -100,7 +108,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,66p' "$0"
+      sed -n '2,70p' "$0"
       exit 0
       ;;
     *)
@@ -1013,6 +1021,29 @@ COPILOTHOOKS
 
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
 
+# Canonical integration ref (A3/R3): the remote+branch maintenance discipline
+# targets. Detected once; values land in .espalier-config OUTSIDE the quoted
+# ESPALIERCFG heredoc (no interpolation there — the v0.9 migration extracts its
+# text literally).
+detect_canonical_ref() {
+  CANON_REMOTE=origin
+  git remote 2>/dev/null | grep -qx upstream && CANON_REMOTE=upstream
+  local ref
+  ref=$(git symbolic-ref --short "refs/remotes/$CANON_REMOTE/HEAD" 2>/dev/null)
+  # Strip exactly the remote prefix — a blanket 's|.*/||' would destroy a
+  # branch like release/1.x.
+  CANON_BRANCH=${ref#"$CANON_REMOTE"/}
+  [ -n "$CANON_BRANCH" ] || CANON_BRANCH=main
+}
+
+_append_config_key() {   # KEY VALUE — newline-guarded append-if-missing
+  grep -q "^$1:" espalier/.espalier-config 2>/dev/null && return 0
+  if [ -s espalier/.espalier-config ] && [ -n "$(tail -c1 espalier/.espalier-config)" ]; then
+    printf '\n' >> espalier/.espalier-config
+  fi
+  printf '%s: %s\n' "$1" "$2" >> espalier/.espalier-config
+}
+
 stage_merge_decision() {
   log "Stage 9: persist Phase 0 decisions + post-merge dispatcher"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1020,6 +1051,7 @@ stage_merge_decision() {
     echo "[dry-run] write espalier/.platforms = $PLATFORMS"
     echo "[dry-run] write espalier/.doctor-cadence = $DOCTOR_CADENCE (if absent)"
     echo "[dry-run] write espalier/.espalier-config = review-round caps (if absent)"
+    echo "[dry-run] append canonical-remote/canonical-branch keys to espalier/.espalier-config (if missing)"
     echo "[dry-run] install post-merge dispatcher (drift-detect every merge; backlink if installed)"
     return
   fi
@@ -1043,8 +1075,11 @@ stage_merge_decision() {
   # espalier/.espalier-config — tracked, review-round escalation caps. Written
   # ONCE; never auto-rewritten, so a user's later tuning survives re-bootstrap.
   # Read at runtime by the orchestrator (grep + integer parse, like pre-push-gate).
+  detect_canonical_ref
   if [ -f espalier/.espalier-config ]; then
-    log "  espalier/.espalier-config already exists — preserving"
+    log "  espalier/.espalier-config already exists — preserving (appending missing canonical-ref keys only)"
+    _append_config_key canonical-remote "$CANON_REMOTE"
+    _append_config_key canonical-branch "$CANON_BRANCH"
   else
     cat > espalier/.espalier-config << 'ESPALIERCFG'
 # Espalier pipeline tuning. Key-value, one per line: `<key>: <integer>`.
@@ -1066,7 +1101,13 @@ max-test-rounds: 3
 # (Separate from the fixed "no more than 3 stages in a single rollback" span guard.)
 max-rollbacks: 3
 ESPALIERCFG
-    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3)"
+    # Canonical-ref keys are DYNAMIC (detected) — appended after the quoted
+    # heredoc, never interpolated into it.
+    printf '\n# Canonical integration ref for team maintenance discipline\n# (detected at init from the remote HEAD; string values — edit if wrong).\n' \
+      >> espalier/.espalier-config
+    _append_config_key canonical-remote "$CANON_REMOTE"
+    _append_config_key canonical-branch "$CANON_BRANCH"
+    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH)"
   fi
 
   # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must
@@ -1094,7 +1135,11 @@ ESPALIERCFG
   else
     HOOKS_PATH_CFG=$(git config core.hooksPath 2>/dev/null || true)
     if [ -z "$HOOKS_PATH_CFG" ]; then
-      HOOK_DST=".git/hooks/post-merge"
+      # Not hardcoded .git/hooks: in a LINKED WORKTREE `.git` is a pointer
+      # file and hooks live in the shared common dir — --git-path resolves
+      # both layouts (and returns .git/hooks in a normal checkout).
+      HOOK_DST="$(git rev-parse --git-path hooks 2>/dev/null)/post-merge"
+      [ "$HOOK_DST" = "/post-merge" ] && HOOK_DST=".git/hooks/post-merge"
     else
       # core.hooksPath is set and husky is not managing it. The dispatcher must
       # land where git reads — and only if that is inside this repo. A hooksPath
@@ -1134,10 +1179,14 @@ ESPALIERCFG
 
   HOOK_DST_PARENT=$(dirname "$HOOK_DST")
   if [ ! -d "$HOOK_DST_PARENT" ]; then
-    if [ "$HOOK_DST_PARENT" = ".git/hooks" ]; then
-      log "  ERROR: .git/hooks does not exist (run 'git init' first?)"
-      return
-    fi
+    case "$HOOK_DST_PARENT" in
+      .git/hooks|*/.git/hooks)
+        # The resolved git hooks dir itself is missing — creating it inside
+        # a broken/absent .git would mask the real problem.
+        log "  ERROR: $HOOK_DST_PARENT does not exist (run 'git init' first?)"
+        return
+        ;;
+    esac
     mkdir -p "$HOOK_DST_PARENT" || { log "  ERROR: cannot create $HOOK_DST_PARENT"; return; }
   fi
 
@@ -1186,12 +1235,64 @@ DISPATCH
   log "  Installed post-merge dispatcher → $HOOK_DST"
 }
 
-# --- Stage 10: .gitignore append --------------------------------------------
+# --- Stage 10: .gitignore/.gitattributes/CODEOWNERS append -------------------
+
+stage_codeowners() {
+  # A4/R4 — CODEOWNERS marker block routing rule/wiki edits to their owners.
+  # Enforcement is ADVISORY until "Require review from Code Owners" branch
+  # protection is on — not verified here.
+  if [ -z "$CODEOWNERS_RULES" ] && [ -z "$CODEOWNERS_WIKI" ]; then
+    log "  CODEOWNERS: no --codeowners-* handle given — skipping"
+    return 0
+  fi
+  # Normalize handles: '@' prefixed if missing; no placeholders — an
+  # unanswered handle's line is omitted entirely.
+  case "$CODEOWNERS_RULES" in ""|@*) ;; *) CODEOWNERS_RULES="@$CODEOWNERS_RULES" ;; esac
+  case "$CODEOWNERS_WIKI"  in ""|@*) ;; *) CODEOWNERS_WIKI="@$CODEOWNERS_WIKI" ;; esac
+  # Target file: GitHub's own search order — first existing wins (root-first
+  # would edit a file GitHub ignores whenever .github/CODEOWNERS exists).
+  local co="" c
+  for c in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
+    [ -f "$c" ] && { co="$c"; break; }
+  done
+  [ -z "$co" ] && co=".github/CODEOWNERS"
+  if [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] write ESPALIER OWNERS block to $co (rules=$CODEOWNERS_RULES wiki=$CODEOWNERS_WIKI)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$co")" 2>/dev/null || true
+  local block tmp
+  block=$(mktemp) || return 1
+  {
+    echo "# >>> ESPALIER OWNERS v1 >>> (managed by espalier bootstrap — do not edit between markers)"
+    [ -n "$CODEOWNERS_RULES" ] && echo "espalier/rules/ $CODEOWNERS_RULES"
+    [ -n "$CODEOWNERS_WIKI" ]  && echo "espalier/wiki/ $CODEOWNERS_WIKI"
+    echo "# <<< ESPALIER OWNERS v1 <<<"
+  } > "$block"
+  if [ -f "$co" ] && grep -qF ">>> ESPALIER OWNERS v1 >>>" "$co"; then
+    # Replace within markers; everything outside them is untouched.
+    tmp=$(mktemp) || { rm -f "$block"; return 1; }
+    awk -v bf="$block" '
+      /^# >>> ESPALIER OWNERS v1 >>>/ { inb=1; while ((getline l < bf) > 0) print l; close(bf); next }
+      /^# <<< ESPALIER OWNERS v1 <<</ { inb=0; next }
+      !inb { print }
+    ' "$co" > "$tmp" && mv "$tmp" "$co"
+  else
+    if [ -s "$co" ] && [ -n "$(tail -c1 "$co")" ]; then
+      printf '\n' >> "$co"
+    fi
+    cat "$block" >> "$co"
+  fi
+  rm -f "$block"
+  log "  CODEOWNERS block written to $co (advisory until branch protection requires code-owner review)"
+}
 
 stage_gitignore() {
-  log "Stage 10: .gitignore append (idempotent + newline guard)"
+  log "Stage 10: .gitignore/.gitattributes/CODEOWNERS append (idempotent + newline guard)"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] append espalier cache + drift-sidecar entries to .gitignore"
+    echo "[dry-run] append 'espalier/.ask-gaps.tsv merge=union' to .gitattributes"
+    stage_codeowners
     return
   fi
   # commit-index cache + the five drift sidecars (.drift-state.tsv* glob also
@@ -1210,19 +1311,35 @@ stage_gitignore() {
       fi
       echo "$entry" >> .gitignore
     done
+  # .gitattributes — the ONE union attribute in scope (A1): .ask-gaps.tsv is
+  # genuinely append-only. Deliberately NOT here: .conventions.tsv (its status
+  # writer edits rows in place — union would resurrect edited rows) and
+  # .doctor-stamp (single-line last-writer-wins — union would corrupt it into
+  # two lines). Never add attributes for either.
+  entry="espalier/.ask-gaps.tsv merge=union"
+  if ! grep -qxF "$entry" .gitattributes 2>/dev/null; then
+    if [ -s .gitattributes ] && [ -n "$(tail -c1 .gitattributes)" ]; then
+      printf '\n' >> .gitattributes
+    fi
+    echo "$entry" >> .gitattributes
+  fi
+  stage_codeowners
 }
 
 # --- Stage 11: Validation (parallel — R6) -----------------------------------
 
 stage_validate() {
-  # Check count is platform-dependent: 46 base + 5 codex (47-51) + 5 copilot
-  # (52-56). Numbering is FIXED per platform; copilot without codex still
-  # renders 47-51 as skip lines so the sequence stays contiguous.
-  local TOTAL_CHECKS=46
+  # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
+  # 5 copilot (52-56) + 2 unconditional base (57-58 — appended AFTER the
+  # platform blocks so shipped platform IDs stay stable; base numbering is
+  # non-contiguous by design). Numbering is FIXED per platform; copilot
+  # without codex still renders 47-51 as skip lines so the sequence stays
+  # contiguous.
+  local TOTAL_CHECKS=48
   if want_copilot; then
-    TOTAL_CHECKS=56
+    TOTAL_CHECKS=58
   elif want_codex; then
-    TOTAL_CHECKS=51
+    TOTAL_CHECKS=53
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1336,13 +1453,13 @@ stage_validate() {
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
-  run_check 20 "post-merge-dispatcher" '_hd=$(git config core.hooksPath 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
+  run_check 20 "post-merge-dispatcher" '_hd=$(git rev-parse --git-path hooks 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
   run_check 21 "rebuild-script"      'test -x espalier/hooks/rebuild-commit-index.sh' &
   run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
   run_check 24 "cache-tsv-format"    '[ ! -s espalier/.commit-index.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.commit-index.tsv' &
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
-  run_check 27 "conventions-format"  '[ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv' &
+  run_check 27 "conventions-format"  '{ [ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv; } && { [ ! -d espalier/conventions ] || ! ls espalier/conventions/*.tsv >/dev/null 2>&1 || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/conventions/*.tsv; }' &
   run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
   if want_claude; then
     run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
@@ -1397,14 +1514,19 @@ stage_validate() {
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
     run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
+  # 57-58: base checks (v0.16.0 multi-dev floor) — run UNCONDITIONALLY,
+  # regardless of --platforms; appended after the platform blocks so the
+  # shipped IDs 47-56 stay stable.
+  run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
+  run_check 58 "canonical-ref-keys"   'grep -qE "^canonical-remote: .+" espalier/.espalier-config && grep -qE "^canonical-branch: .+" espalier/.espalier-config' &
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-51.
+  # must reach stdout, which the run_check harness discards), then 26-58.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-6] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-8] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

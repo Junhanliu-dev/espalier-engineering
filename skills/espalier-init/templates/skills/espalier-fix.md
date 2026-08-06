@@ -210,6 +210,14 @@ Options:
   5. Abort
 ```
 
+**Cross-branch slug collisions (merge-time).** The glob above sees only THIS
+checkout's branch: two branches can mint the same dated slug independently
+and collide only when the second PR merges — git surfaces it as add/add
+conflicts under `espalier/changes/`. The resolution recipe lives in
+`espalier/pipeline.md` → "Slug collisions across branches" (rename one dir to
+the next free `-N` suffix, run `espalier/hooks/rebuild-commit-index.sh`, and
+rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
+
 ### Step 12: Final validation
 - Confirm the dated slug matches `^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]{0,79}$`
   (a `--slug` literal override that omits the date is instead allowed by the
@@ -259,8 +267,11 @@ Run this BEFORE Stage 0 Auto-Link Discovery. Source the drift helpers:
 Gather all three signals BEFORE prompting:
 1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
    into fresh / aging / stale / critical / expired.
-2. **CONV** — if `espalier/.conventions.tsv` exists, scan for any `pattern_key`
-   with >= 3 `diverges` rows (promotion candidates).
+2. **CONV** — `conv_fold` (in `drift-helpers.sh`) folds the legacy
+   `espalier/.conventions.tsv` AND any `espalier/conventions/*.tsv` per-key
+   files into `key<TAB>diverges_count<TAB>status` lines; every key with status
+   `diverges` and `diverges_count` >= 3 is a promotion candidate. Do not parse
+   the files yourself.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
 If all three are empty/false → no prompt, continue to Stage 0 Auto-Link Discovery.
@@ -277,12 +288,28 @@ Options:
   3. Abort
 ```
 
-Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
-If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
+Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
+maintenance handles this (gardener rota — see /espalier-prune's
+Multi-Developer Discipline)". "Handle now" stays available and becomes the
+default ONLY when a critical/expired flag is present — the drift sidecar is
+per-clone, so a critical/expired row here is YOUR OWN flag (the prune
+escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
+signal → treat as empty.
 
-For a `pattern_key` at the promotion threshold (>= 3 `diverges` rows), handle it
-per the `espalier` skill's Convention Promotion section — the same four options
-(promote / reject / exception / wait).
+**Unattended runs (never prompt here):** when `interactivity_mode` (in
+`drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
+question. Write the three-signal summary to `espalier/.drift-report.md`,
+print ONE line, and continue to THIS LANE's own **Stage 0 Auto-Link
+Discovery** below (not Stage 1 — that is the full pipeline's next stage, not
+the fix lane's). Never prune, never promote, never run a doctor scan
+unattended.
+
+For a `pattern_key` at the promotion threshold (>= 3 deduped `diverges`
+observations per `conv_fold`), handle it per the `espalier` skill's Convention
+Promotion section — the same four options (promote / reject / exception /
+wait), the same branch lane (deciding on your feature branch is fine, as its
+own isolated `docs:` commit — CODEOWNERS routes the rules PR to the owner at
+merge), and the same fetch race guard run before the prompt.
 
 ## Stage 0: Auto-Link Discovery (NEW)
 
@@ -731,7 +758,8 @@ lower-bar Convention Observations (see `harness-reviewer.md`) — one per
 divergence, with NO aggregation key. The orchestrator assigns the key. For each
 Observation in `review-record.md`:
 
-1. Read existing keys: `cut -f3 espalier/.conventions.tsv 2>/dev/null | sort -u`.
+1. Read existing keys: `. espalier/hooks/drift-helpers.sh && conv_fold | cut -f1`
+   (folds the legacy file AND the per-key files — never parse them yourself).
 2. Map the Observation's `description` to an existing `pattern_key`, or mint a
    new kebab-case key.
 3. Append the row:
@@ -742,10 +770,10 @@ append_convention "fix/${SLUG}" "$PATTERN_KEY" "$LOCATION"
 ```
 
 `append_convention` sanitizes every field and de-dupes on
-(change_slug, pattern_key, location). `espalier/.conventions.tsv` is tracked and
-append-only — columns `date · change_slug · pattern_key · location · status`.
-When a `pattern_key` reaches 3 `diverges` rows it is a promotion candidate,
-surfaced at the next Stage 0 pre-flight.
+(change_slug, pattern_key, location). Convention state is tracked and
+row-append-only — columns `date · change_slug · pattern_key · location · status`.
+When a `pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`)
+it is a promotion candidate, surfaced at the next Stage 0 pre-flight.
 
 ## Stage 5: Test Writing
 
@@ -953,13 +981,16 @@ tests; the push gate compares against this.
 
 ### 7.0 Stage the convention index
 
-If this run appended to `espalier/.conventions.tsv` (Stage 4) or flipped a
-row's status, stage it BEFORE the push commit so the tracked file lands in this
-fix's commit and the Stage 7 clean-tree gate stays green:
+If this run appended an observation (Stage 4) or flipped a status, stage the
+per-key files BEFORE the push commit so the tracked state lands in this fix's
+commit and the Stage 7 clean-tree gate stays green:
 
 ```bash
-git add espalier/.conventions.tsv
+[ -d espalier/conventions ] && git add espalier/conventions/
 ```
+
+(The legacy `espalier/.conventions.tsv` is read-only to this plugin version —
+never written, nothing to stage.)
 
 Standard push. Then:
 

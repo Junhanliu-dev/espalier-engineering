@@ -85,6 +85,93 @@ If genuinely unattended with `--all-stale`: do NOT prompt. Write the proposed
 diffs to `espalier/.drift-report.md` and exit, leaving every sidecar row in
 place. Refresh is never silent.
 
+## Multi-Developer Discipline (Maintenance Lanes)
+
+With several developers on one repo, each maintenance mechanism has its own
+lane — the failure mode each lane prevents is different:
+
+| Mechanism | Lane | Why |
+|---|---|---|
+| Doctor scan | Weekly maintenance PR on the canonical branch (the gardener's run) | The scan result is team visibility; a scan stranded on a feature branch helps nobody until merge. |
+| Prune refresh | Weekly maintenance PR by default; **feature-branch escape hatch** when YOUR OWN flag is critical/expired — as its own isolated `docs:` commit, covered by the conflict recipe below | One prune sweep per interval makes cross-branch prune conflicts ~impossible by scheduling; the escape hatch keeps a blocked dev unblocked, and the recipe makes the residual recoverable. |
+| Convention promotion | Feature branch is fine — own isolated commit; CODEOWNERS routes the rules-touching PR to the rule owner at merge either way | The deciding dev has the context; the ownership gate binds at merge regardless of source branch. |
+
+The canonical branch is `canonical-branch` in `espalier/.espalier-config`
+(remote: `canonical-remote`) — detected at init, edit if wrong.
+
+**The weekly gardener rota (social, documented — what makes the lanes
+sufficient).** One rotating dev per cadence interval is the gardener; the
+rota names WHO, which is what kills "someone else surely ran it". The
+gardener's loop, ~15 minutes:
+
+1. Open a temporary worktree of the canonical branch (flow below).
+2. `/espalier-doctor` — the weekly scan.
+3. `/espalier-prune` over the flagged files (normal per-file gates).
+4. **If the prune cleared every finding, re-run `/espalier-doctor`** so the
+   shared stamp says `clean` (the doctor skill's end-of-session rule — a
+   dirty stamp whose findings were fixed in the same PR would nag the whole
+   team forever).
+5. One maintenance PR — `docs: weekly espalier maintenance` — containing the
+   stamp commit plus the refresh commits. CODEOWNERS routes any
+   rules-touching part to the rule owner automatically. On a protected
+   integration branch (assume protected at team scale) the PR IS the lane —
+   any teammate approves the routine parts (~1 min of someone's week); with
+   direct-push rights the worktree flow pushes straight.
+
+A skipped gardener week self-corrects: the shared stamp ages out,
+`doctor_due()` starts nagging everyone again — the pre-rota behavior is the
+fallback, not a new failure.
+
+Payoff: most devs stop seeing maintenance pressure entirely; exactly one
+scan and at most one prune sweep per interval.
+
+**Worktree flow — do the discipline FOR the user, not BY the user.** When a
+maintenance-lane action should land on the canonical branch while the user
+sits on a feature branch, offer: *"run this in a temporary worktree of the
+canonical branch and push the maintenance commit?"* Mechanically:
+
+```bash
+R=$(grep '^canonical-remote:' espalier/.espalier-config | awk '{print $2}')
+B=$(grep '^canonical-branch:' espalier/.espalier-config | awk '{print $2}')
+WT=$(mktemp -d) && git worktree add "$WT" "$B"
+# run the doctor/prune flow inside $WT (normal gates apply), commit there:
+#   docs: weekly espalier maintenance
+# push directly with push rights, or push a PR branch when the canonical
+# branch is protected (at team scale assume it is) — the maintenance PR IS
+# the lane. Then:
+git worktree remove "$WT"
+```
+
+No stash, no branch switch — the feature checkout is untouched; suggest
+`git rebase` afterwards when the user wants the fresh doc on their branch.
+Contributors without push access use the same flow with a fork/PR branch —
+the weekly maintenance PR is still the destination.
+
+## Maintenance-Commit Conflict Recipe (prune vs prune)
+
+Two refreshes of the same doc on different branches conflict at merge. Never
+hand-merge scout prose:
+
+1. **Inspect both sides** — diff the conflicting doc against each merge
+   parent to see which refresh is newer/fuller.
+2. **Take the newer refresh wholesale** — `git checkout --theirs -- <doc>`
+   (or `--ours` when yours is newer) and commit the merge.
+3. **Re-run `/espalier-prune <doc>` on the merged tree** — if the union of
+   both branches' code drifted the doc further, the scout diff shows it; an
+   empty diff confirms the kept side is current.
+
+A modify/delete conflict on an espalier doc resolves as DELETION — the other
+side retired the doc; run `/espalier-doctor` afterwards if in doubt.
+
+**Per-key convention files (`espalier/conventions/k-*.tsv`):** a same-key
+conflict is the race DETECTION, not a breakage. Two decisions (both sides
+flipped statuses) → pick the decision that should win, exactly like any
+5-line conflict. An observation append against another append or against a
+status flip → **keep both lines** (the decided rows AND every fresh
+observation row) — nothing is ever lost, and `conv_fold` dedupes repeated
+observations at read time. The shared `espalier/.doctor-stamp` is one line:
+keep the newer line (or either `clean`).
+
 ## Scout Mapping
 
 | Artifact | Scout(s) |
@@ -101,6 +188,11 @@ place. Refresh is never silent.
 | `skills/espalier-coding/specs/{layer}.md` | per-layer spec scout |
 | `hooks/check-layer-boundaries.sh` | 1.2 → regenerate the `case` block |
 | `hooks/pre-push-gate.sh` | 1.5 → re-substitute build/lint/test commands |
+
+`development-process.md` is a mixed file too: its `## Maintenance Commits`
+section (the `ESPALIER MAINTENANCE COMMITS v1` marker) is fixed policy text —
+scout 1.5 regenerates the discovered sections ONLY, and the two-way diff must
+show the marker section unchanged.
 
 The two always-loaded standards rules are MIXED files — universal seed text
 plus discovered cells. A refresh regenerates ONLY the discovered parts:

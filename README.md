@@ -8,6 +8,12 @@
 /espalier-init
 ```
 
+> **v0.17.0 — the gardener takes over (multi-dev maintenance, Release B-team).** Maintenance becomes a **scheduled singleton**: one rotating gardener runs doctor + prune once per interval in a single weekly maintenance PR, and everyone else's pre-flight defaults to "Proceed". Two small shared files carry the facts that matter through git: the tracked one-line **`espalier/.doctor-stamp`** (only a `clean` stamp satisfies the team; a `dirty:N` stamp satisfies just its writer; skewed stamps rejected; the doctor restamps `clean` when the session's prune cleared everything) and **conventions file-per-key** under `espalier/conventions/` (the towncrier trick: different keys can't conflict at all; a same-key double decision surfaces as an ordinary 5-line git conflict — the conflict *is* the race detection; append collisions resolve by keeping both lines, deduped at read time). No event logs, no fold algorithms, no format markers. Migration #24 is pure-copy only. Suites: bootstrap 177/177, hooks 127/127 with two-clone git sims. Plain-language tour: [`docs/multi-dev-maintenance-how-it-works.md`](./docs/multi-dev-maintenance-how-it-works.md); migration: [`docs/migrating-v0.16-to-v0.17.md`](./docs/migrating-v0.16-to-v0.17.md).
+
+> **v0.16.0 — maintenance goes team-shaped (Release A: the compatibility floor).** With several developers on one repo, the single-dev maintenance loop breaks four ways: every clone sees a different staleness picture, nobody owns the shared upkeep, the bookkeeping files merge with conflicts, and rule changes diverge silently across branches. v0.16.0 ships the floor that fixes the last two and prepares the first two: an executable conventions reader (`conv_fold` — folds the legacy `.conventions.tsv` and the upcoming per-key `espalier/conventions/` files, width-tolerant, deduped, with clock-free status precedence), per-mechanism **maintenance lanes** (doctor and routine prunes ride one weekly maintenance PR; promotions ride the deciding feature branch as their own isolated commit behind a CODEOWNERS merge gate), a corrected promotion **race guard**, canonical-ref config keys, the one `.gitattributes` union entry (`.ask-gaps.tsv`), optional **CODEOWNERS generation**, worktree-correct hook install, an enforced migrate barrier, and conflict/slug-collision recipes. Validation grows to 48/53/58 checks (57-58). Suites: bootstrap 161/161, hooks 99/99. Design: [`docs/multi-dev-maintenance-implementation-plan.md`](./docs/multi-dev-maintenance-implementation-plan.md); plain-language tour: [`docs/multi-dev-maintenance-how-it-works.md`](./docs/multi-dev-maintenance-how-it-works.md).
+>
+> **Existing users:** run `/espalier-migrate` — the v0.16 step refreshes the pipeline files, appends the Maintenance Commits policy, and re-wires (optionally asking for CODEOWNERS handles). See [`docs/migrating-v0.15-to-v0.16.md`](./docs/migrating-v0.15-to-v0.16.md).
+
 > **v0.15.0 — Espalier learns Copilot; the wiring layer goes three-platform.** `/espalier-init` now targets any subset of **Claude Code, Codex, and GitHub Copilot**. For Copilot the same `espalier/` tree wires through Copilot-native surfaces: the 12 skills as **Agent Skills** in `.github/skills/` (read by VS Code, Copilot CLI, and the cloud coding agent; invoked `/espalier…`), the always-loaded rules via a generated `.github/copilot-instructions.md` section, coder/reviewer/security separation as `@harness-*` **custom agents** (`.github/agents/*.agent.md`), and the two quality gates as **Copilot hooks** (`.github/hooks/espalier-gates.json`) — a small adapter translates Copilot's camelCase hook payload into the Claude/Codex shape, so the *same* two wrapper scripts now gate all three platforms (Copilot fails non-zero `preToolUse` exits closed, matching the exit-2 contract). Wiring stays additive (`espalier/.platforms` unions; nothing ever unwires) and claude-only output stays byte-stable. Suites: bootstrap 117/117, hooks 86/86; validation is 46/51/56 checks by platform set. Setup guide: [`docs/copilot-integration.md`](./docs/copilot-integration.md).
 >
 > **Existing users:** run `/espalier-migrate` — the v0.15 step installs the one new adapter file and asks whether to wire Copilot. See [`docs/migrating-v0.14-to-v0.15.md`](./docs/migrating-v0.14-to-v0.15.md).
@@ -97,6 +103,34 @@ The Stage 4 security audit is change-scoped: it guards code the pipeline writes,
 ### Keeping the guardrails in sync
 
 The artifacts `/espalier-init` generates describe your codebase on init day. As the code evolves, Espalier keeps them honest (since v0.5.0): a post-merge hook flags drifted docs into a gitignored sidecar, the reviewer reports convention shifts a file diff cannot see, and the pipeline surfaces all of it in one Stage 0 pre-flight. `/espalier-ask` (v0.7.0) chips in opportunistically — a stale doc it trips over while answering a question gets flagged the same way, and a question the docs can't answer is logged to `espalier/.ask-gaps.tsv` as a wiki-gap backlog. To refresh a flagged artifact, run `/espalier-prune <path>`; to scan for drift no diff caught, run `/espalier-doctor`. Nothing is ever auto-overwritten — every refresh is gated.
+
+### Multi-developer maintenance (v0.16–v0.17): the weekly gardener
+
+On a team, that upkeep loop stops being everyone's job-in-theory and becomes **one rotating person's ~15-minute job per week** — the gardener. Everyone else answers "Proceed" at the Stage 0 pre-flight and never thinks about maintenance; two small tracked files carry the team-wide facts through git:
+
+- `espalier/.doctor-stamp` — one line, written only by the doctor: when the last scan ran and whether it was `clean` or `dirty:N`. Only a `clean` stamp silences the team-wide "doctor due" reminder; a `dirty` stamp satisfies nobody but its writer.
+- `espalier/conventions/k-<key>.tsv` — one tiny file per convention pattern (the towncrier trick). Observations about *different* patterns touch *different* files, so they merge without a human; a same-key double decision surfaces as an ordinary five-line git conflict, which *is* the race detection.
+
+The gardener's week, end to end (espalier runs these for you — shown expanded so you can see there's no magic):
+
+```bash
+# 1. Temporary worktree of the canonical branch — your feature branch stays untouched.
+B=$(grep '^canonical-branch:' espalier/.espalier-config | awk '{print $2}')
+WT=$(mktemp -d) && git worktree add "$WT" "$B" && cd "$WT"
+
+# 2. /espalier-doctor         — the weekly scan; flags drifted docs.
+# 3. /espalier-prune <file>   — regenerate each flagged doc; you approve/reject each one.
+# 4. If the prune cleared every finding: re-run /espalier-doctor (fast on a clean
+#    tree) so the shared stamp records `clean` — a dirty stamp whose findings were
+#    fixed in the same PR would keep nagging the whole team forever.
+#    The doctor writes + commits espalier/.doctor-stamp as its own commit.
+
+# 5. One PR carrying the stamp + the refreshes, nothing else.
+git push origin HEAD:espalier-maintenance   # then open PR: "docs: weekly espalier maintenance"
+cd - && git worktree remove "$WT"
+```
+
+A skipped week self-corrects: the stamp ages out and `doctor_due()` starts nagging everyone again — the rota is a convenience, not a single point of failure. Promotions (rule changes) stay on the deciding feature branch as their own isolated commit; the generated CODEOWNERS block routes any `espalier/rules/` PR to the rule owner (enforced once "Require review from Code Owners" branch protection is on). Full plain-language tour, conflict playbook included: [`docs/multi-dev-maintenance-how-it-works.md`](./docs/multi-dev-maintenance-how-it-works.md).
 
 ## Install
 
@@ -208,7 +242,7 @@ On a fresh repo (~150 source files, medium size), expect **10-15 minutes**. It's
 - **Phase 0 (front-loaded prompts)** — one `AskUserQuestion` captures squash-merge strategy, sub-agent tool scope, and doctor-scan cadence.
 - **Phase 1 (parallel discovery)** — single message fires ~11 concurrent tool calls: bash batch (tldr / manifests / git log), 6 scouts (architecture, coding patterns, testing, git+CI, unwritten rules, security surface), 1 oracle (ctx7 + WebSearch in parallel), 3 wiki scouts (data models, critical paths, external services).
 - **Phase 2 (parallel writes)** — one Write batch produces ~14 substitution files from the in-context DISCOVERY blob.
-- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + copilot wiring when targeted (`.github/copilot-instructions.md` section, `.github/skills/` links, `.github/agents/*.agent.md`, `.github/hooks/espalier-gates.json`) + squash-merge decision + post-merge dispatcher install + .gitignore + 46 validation checks (51 with codex, 56 with copilot).
+- **Phase 3 (bootstrap)** — `scripts/bootstrap-espalier.sh` runs as one bash invocation: mkdir + copies + chmod + safe symlinks + atomic `.claude/settings.json` merge (preserves user hooks) + codex wiring when targeted (AGENTS.md section, `.codex/config.toml` hooks, `.codex/agents/*.toml`) + copilot wiring when targeted (`.github/copilot-instructions.md` section, `.github/skills/` links, `.github/agents/*.agent.md`, `.github/hooks/espalier-gates.json`) + squash-merge decision + post-merge dispatcher install + .gitignore/.gitattributes/CODEOWNERS + 48 validation checks (53 with codex, 58 with copilot).
 
 Total: ~5-7 batched turns, ~25-35 raw tool calls.
 
@@ -226,7 +260,7 @@ The skill never modifies its own source — it only writes content into the proj
 ```bash
 bash scripts/bootstrap-espalier.sh --copy-only      # Stages 1-4 only (dirs + cp templates + hooks)
 bash scripts/bootstrap-espalier.sh --wire-only      # Stages 5-11 only (symlinks + wiring + validation)
-bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (46/51/56 checks by platform set — no changes)
+bash scripts/bootstrap-espalier.sh --validate-only  # Stage 11 only (48/53/58 checks by platform set — no changes)
 bash scripts/bootstrap-espalier.sh --dry-run        # Print actions without executing
 ```
 

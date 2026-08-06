@@ -606,6 +606,230 @@ assert "T10g2 BLOCKED reason on stderr" "grep -q 'BLOCKED' '$TMP/a_err.txt'"
 
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── T11: conv_fold / conv_observations (drift-helpers) ───────────────────
+# The executable conventions reader: folds the legacy espalier/.conventions.tsv
+# AND every espalier/conventions/*.tsv per-key file (same 5/6-col row format)
+# into `key<TAB>diverges_count<TAB>status` lines. Width-tolerant (malformed
+# rows skipped, never fatal), empty-glob safe (bash 3.2), read-time observation
+# dedupe on (slug,key,location) ACROSS both sources, status precedence:
+# a per-key-file status beats a legacy status; legacy honored when the key
+# file has no decision.
+echo "T11: conv_fold / conv_observations"
+TMP=$(mktemp -d -t hooks-t11.XXXX)
+make_repo "$TMP"
+install_hooks "$TMP"
+printf '%s\n' \
+  "$(printf '2026-01-01\tfeat/a\terror-shape\tsrc/x.ts:1\tdiverges')" \
+  "$(printf '2026-01-02\tfeat/b\terror-shape\tsrc/y.ts:2\tdiverges')" \
+  "$(printf '2026-01-03\tfeat/c\terror-shape\tsrc/z.ts:3\tdiverges\tlogging-style')" \
+  "malformed row with no tabs" \
+  "$(printf '2026-01-04\tfeat/d\tlogging-style\tsrc/l.ts:4\tpromoted')" \
+  "$(printf '2026-01-05\tfeat/e\tnaming\tsrc/n.ts:5\tdiverges')" \
+  "$(printf '2026-01-08\tfeat/h\tretry-style\tsrc/r.ts:8\texception')" \
+  > "$TMP/espalier/.conventions.tsv"
+
+# Legacy-only folding (no per-key dir yet — the Release A shape).
+F_OUT=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11a legacy 5+6-col diverges rows fold (count 3)" \
+  "echo \"$F_OUT\" | grep -q \"$(printf 'error-shape\t3\tdiverges')\""
+assert "T11b malformed legacy row skipped, not fatal"     "echo \"$F_OUT\" | grep -q 'RC=0'"
+assert "T11c legacy status row wins for its key"          \
+  "echo \"$F_OUT\" | grep -q \"$(printf 'logging-style\t0\tpromoted')\""
+OBS_OUT=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_observations error-shape)
+OBS_CNT=$(printf '%s\n' "$OBS_OUT" | grep -c 'feat/')
+assert "T11d conv_observations returns the evidence rows" "[ \"$OBS_CNT\" = '3' ]"
+assert "T11e conv_observations keeps coupled_with column" \
+  "echo \"$OBS_OUT\" | grep -q 'logging-style'"
+
+# Empty per-key dir: bash 3.2 iterates the literal *.tsv pattern — must not die.
+mkdir -p "$TMP/espalier/conventions"
+F_EMPTY=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11f empty per-key dir is glob-safe"              "echo \"$F_EMPTY\" | grep -q 'RC=0'"
+assert "T11g empty dir leaves legacy counts intact"       \
+  "echo \"$F_EMPTY\" | grep -q \"$(printf 'error-shape\t3\tdiverges')\""
+
+# Per-key files alongside the legacy file (the B-team shape; A's reader must
+# already understand it — readers-first contract).
+printf '2026-01-06\tfeat/f\terror-shape\tsrc/w.ts:6\tdiverges\n2026-01-01\tfeat/a\terror-shape\tsrc/x.ts:1\tdiverges\nbad row\n' \
+  > "$TMP/espalier/conventions/k-error-shape.tsv"
+printf '2026-01-07\tfeat/g\tnaming\tsrc/n2.ts:7\trejected\n' \
+  > "$TMP/espalier/conventions/k-naming.tsv"
+printf '2026-01-09\tfeat/i\tretry-style\tsrc/r2.ts:9\tpromoted\n' \
+  > "$TMP/espalier/conventions/k-retry-style.tsv"
+F_MIX=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11h cross-source duplicate observation counted once (3+1 new = 4)" \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'error-shape\t4\tdiverges')\""
+assert "T11i key-file status beats legacy diverges"       \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'naming\t1\trejected')\""
+assert "T11j key-file status beats legacy status"         \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'retry-style\t0\tpromoted')\""
+assert "T11k legacy status honored when key file has none" \
+  "echo \"$F_MIX\" | grep -q \"$(printf 'logging-style\t0\tpromoted')\""
+assert "T11l malformed key-file row skipped, not fatal"   "echo \"$F_MIX\" | grep -q 'RC=0'"
+
+# Dir-only folding (legacy file absent — a fresh v0.17+ repo).
+rm -f "$TMP/espalier/.conventions.tsv"
+F_DIR=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold; echo "RC=$?")
+assert "T11m dir-only folding works without a legacy file" \
+  "echo \"$F_DIR\" | grep -q \"$(printf 'error-shape\t2\tdiverges')\" && echo \"$F_DIR\" | grep -q 'RC=0'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T12: doctor_due v2 — tracked shared stamp (clean/dirty semantics) ────
+# Only a fresh `clean` shared stamp satisfies team-wide; a `dirty` stamp
+# satisfies only the writing clone (via its gitignored local stamp, which the
+# doctor keeps writing). A stamp beyond now+25h skew is rejected (reads as
+# absent → due). Restamp-clean: a session that scans dirty, prunes all, and
+# re-scans ends with a clean stamp — no team-wide nag deadlock.
+echo "T12: doctor_due v2 (shared .doctor-stamp)"
+TMP=$(mktemp -d -t hooks-t12.XXXX)
+make_repo "$TMP"
+install_hooks "$TMP"
+echo "cadence: weekly" > "$TMP/espalier/.doctor-cadence"
+
+d_due() { ( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_due 2>/dev/null && echo DUE || echo NOT_DUE ); }
+now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+assert "T12a no stamp at all → due" "[ \"$(d_due)\" = 'DUE' ]"
+( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared deadbeef clean )
+assert "T12b fresh clean shared stamp satisfies team-wide" "[ \"$(d_due)\" = 'NOT_DUE' ]"
+( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared deadbeef dirty:3 )
+assert "T12c fresh dirty shared stamp does NOT satisfy a non-writer clone" "[ \"$(d_due)\" = 'DUE' ]"
+# The writing clone is satisfied via its LOCAL stamp (doctor keeps writing it).
+( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp deadbeef )
+assert "T12d dirty shared + fresh local stamp satisfies the writer clone" "[ \"$(d_due)\" = 'NOT_DUE' ]"
+rm -f "$TMP/espalier/.doctor-last-run"
+# Future-dated clean stamp (now + 2 days) must be REJECTED, not honored.
+if [ "$(uname)" = "Darwin" ]; then FUT=$(date -u -v+2d +%Y-%m-%dT%H:%M:%SZ); else FUT=$(date -u -d '+2 days' +%Y-%m-%dT%H:%M:%SZ); fi
+printf '%s\tdeadbeef\tt@t\tclean\n' "$FUT" > "$TMP/espalier/.doctor-stamp"
+assert "T12e future-skewed clean stamp rejected (reads as absent → due)" "[ \"$(d_due)\" = 'DUE' ]"
+D_WARN=$( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_due 2>&1 >/dev/null; true )
+assert "T12f skew rejection warns on stderr" "echo \"$D_WARN\" | grep -qi 'future'"
+# Malformed stamp → due, never fatal.
+echo "not a stamp" > "$TMP/espalier/.doctor-stamp"
+assert "T12g malformed stamp reads as absent (due)" "[ \"$(d_due)\" = 'DUE' ]"
+# Restamp-clean flow: dirty stamp then (after prune cleared all) clean stamp.
+( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared aaa dirty:2 && doctor_stamp_shared bbb clean )
+assert "T12h restamp-clean ends NOT due (deadlock case closed)" "[ \"$(d_due)\" = 'NOT_DUE' ]"
+STAMP_LINES=$(wc -l < "$TMP/espalier/.doctor-stamp" | tr -d ' ')
+assert "T12i stamp stays ONE line (last-writer-wins, never append)" "[ \"$STAMP_LINES\" = '1' ]"
+D_BAD=$( cd "$TMP" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared ccc bogus 2>&1; echo "RC=$?" )
+assert "T12j invalid result vocabulary refused" "echo \"$D_BAD\" | grep -q 'RC=1'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T13: conv_slug — per-key filename stem ───────────────────────────────
+echo "T13: conv_slug"
+TMP=$(mktemp -d -t hooks-t13.XXXX)
+make_repo "$TMP"
+install_hooks "$TMP"
+c_slug() { ( cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_slug "$1" ); }
+assert "T13a plain key passes through"        "[ \"$(c_slug error-shape)\" = 'error-shape' ]"
+assert "T13b slash + space map to underscore" "[ \"$(c_slug 'api/v2 retry')\" = 'api_v2_retry' ]"
+SLUG_UTF=$(c_slug 'Näming.stylé')
+assert "T13c UTF-8 maps into the safe charset" \
+  "case \"$SLUG_UTF\" in *[!A-Za-z0-9._-]*) false ;; N*g.styl*) true ;; *) false ;; esac"
+assert "T13d empty key becomes underscore"    "[ \"$(c_slug '')\" = '_' ]"
+# Reserved names are made safe by the fixed k- FILE prefix, not by the slug:
+# aux → k-aux.tsv can never collide with Windows' reserved 'aux'.
+KF=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && append_convention feat/x aux src/a.ts:1 && ls espalier/conventions)
+assert "T13e reserved key writes k-prefixed file" "[ \"$KF\" = 'k-aux.tsv' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T14: append_convention v2 — per-key writer ───────────────────────────
+echo "T14: append_convention v2 (file-per-key)"
+TMP=$(mktemp -d -t hooks-t14.XXXX)
+make_repo "$TMP"
+install_hooks "$TMP"
+# Legacy row exists for the same observation — cross-file dedupe must hold.
+printf '2026-01-01\tfeat/a\terror-shape\tsrc/x.ts:1\tdiverges\n' > "$TMP/espalier/.conventions.tsv"
+( cd "$TMP" && . espalier/hooks/drift-helpers.sh && \
+  append_convention feat/a error-shape src/x.ts:1 && \
+  append_convention feat/b error-shape src/y.ts:2 && \
+  append_convention feat/b error-shape src/y.ts:2 && \
+  append_convention feat/c logging-style src/l.ts:3 coupling-key )
+assert "T14a key file created under espalier/conventions/" \
+  "[ -f '$TMP/espalier/conventions/k-error-shape.tsv' ]"
+assert "T14b duplicate-vs-legacy observation NOT re-appended" \
+  "! grep -q 'src/x.ts:1' '$TMP/espalier/conventions/k-error-shape.tsv'"
+Y_CNT=$(grep -c 'src/y.ts:2' "$TMP/espalier/conventions/k-error-shape.tsv" 2>/dev/null)
+assert "T14c writer-side dedupe within the key file" "[ \"$Y_CNT\" = '1' ]"
+assert "T14d coupled_with lands as 6th column" \
+  "grep -q 'coupling-key' '$TMP/espalier/conventions/k-logging-style.tsv'"
+LEG_LINES=$(wc -l < "$TMP/espalier/.conventions.tsv" | tr -d ' ')
+assert "T14e v0.17 writer NEVER touches the legacy file" "[ \"$LEG_LINES\" = '1' ]"
+# In-place status flip in the key file — conv_fold sees the decision.
+sed_flip() { if [ "$(uname)" = "Darwin" ]; then sed -i '' "$@"; else sed -i "$@"; fi; }
+sed_flip 's/\tdiverges$/\tpromoted/' "$TMP/espalier/conventions/k-error-shape.tsv"
+F14=$(cd "$TMP" && . espalier/hooks/drift-helpers.sh && conv_fold)
+assert "T14f in-place flip in key file wins over legacy diverges row" \
+  "echo \"$F14\" | grep -q \"$(printf 'error-shape\t1\tpromoted')\""
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T15: two-clone sims — shared stamp + per-key merge behavior ──────────
+echo "T15: two-clone sims (stamp semantics, per-key conflicts)"
+BASE=$(mktemp -d -t hooks-t15.XXXX)
+ORIGIN="$BASE/origin.git"
+A="$BASE/cloneA"; B="$BASE/cloneB"
+git init -q --bare --initial-branch=main "$ORIGIN"
+git clone -q "$ORIGIN" "$A" 2>/dev/null
+( cd "$A" && git checkout -qb main 2>/dev/null; true )
+install_hooks "$A"
+mkdir -p "$A/espalier/conventions"
+echo "cadence: weekly" > "$A/espalier/.doctor-cadence"
+printf '2026-01-01\tfeat/1\tkey-x\tsrc/a.ts:1\tdiverges\n2026-01-02\tfeat/2\tkey-x\tsrc/b.ts:2\tdiverges\n2026-01-03\tfeat/3\tkey-x\tsrc/c.ts:3\tdiverges\n' > "$A/espalier/conventions/k-key-x.tsv"
+( cd "$A" && git add -A && git -c user.email=a@t -c user.name=a commit -qm base && git push -q origin main )
+git clone -q "$ORIGIN" "$B" 2>/dev/null
+
+# a) dirty stamp from clone A does not satisfy clone B; clean does.
+( cd "$A" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared s1 dirty:2 && git add espalier/.doctor-stamp && git -c user.email=a@t -c user.name=a commit -qm "doctor: dirty" && git push -q origin main )
+( cd "$B" && git pull -q origin main )
+B_DUE=$( cd "$B" && . espalier/hooks/drift-helpers.sh && doctor_due 2>/dev/null && echo DUE || echo NOT_DUE )
+assert "T15a clone A's dirty stamp leaves clone B due" "[ \"$B_DUE\" = 'DUE' ]"
+( cd "$A" && . espalier/hooks/drift-helpers.sh && doctor_stamp_shared s2 clean && git add espalier/.doctor-stamp && git -c user.email=a@t -c user.name=a commit -qm "doctor: clean" && git push -q origin main )
+( cd "$B" && git pull -q origin main )
+B_DUE2=$( cd "$B" && . espalier/hooks/drift-helpers.sh && doctor_due 2>/dev/null && echo DUE || echo NOT_DUE )
+assert "T15b clone A's clean stamp satisfies clone B" "[ \"$B_DUE2\" = 'NOT_DUE' ]"
+
+# b) same-key promotion race → git conflict in EXACTLY that key file.
+( cd "$A" && if [ "$(uname)" = "Darwin" ]; then sed -i '' 's/\tdiverges$/\tpromoted/' espalier/conventions/k-key-x.tsv; else sed -i 's/\tdiverges$/\tpromoted/' espalier/conventions/k-key-x.tsv; fi \
+  && git add -A && git -c user.email=a@t -c user.name=a commit -qm "promote key-x" && git push -q origin main )
+( cd "$B" && if [ "$(uname)" = "Darwin" ]; then sed -i '' 's/\tdiverges$/\trejected/' espalier/conventions/k-key-x.tsv; else sed -i 's/\tdiverges$/\trejected/' espalier/conventions/k-key-x.tsv; fi \
+  && git add -A && git -c user.email=b@t -c user.name=b commit -qm "reject key-x" )
+MERGE_OUT=$( cd "$B" && git pull --no-rebase -q origin main 2>&1; echo "RC=$?" )
+CONFLICTS=$( cd "$B" && git diff --name-only --diff-filter=U )
+assert "T15c same-key double decision CONFLICTS (structural race detection)" "echo \"$MERGE_OUT\" | grep -q 'RC=1'"
+assert "T15d conflict confined to exactly that key file" "[ \"$CONFLICTS\" = 'espalier/conventions/k-key-x.tsv' ]"
+( cd "$B" && git checkout --theirs espalier/conventions/k-key-x.tsv 2>/dev/null && git add -A && git -c user.email=b@t -c user.name=b commit -qm "resolve: keep promoted" )
+
+# c) different-key concurrent writes merge clean.
+( cd "$A" && git pull -q origin main 2>/dev/null; . espalier/hooks/drift-helpers.sh && append_convention feat/4 key-a src/d.ts:4 && git add -A && git -c user.email=a@t -c user.name=a commit -qm "obs key-a" && git push -q origin main )
+( cd "$B" && . espalier/hooks/drift-helpers.sh && append_convention feat/5 key-b src/e.ts:5 && git add -A && git -c user.email=b@t -c user.name=b commit -qm "obs key-b" )
+DK_OUT=$( cd "$B" && git pull --no-rebase -q origin main 2>&1; echo "RC=$?" )
+assert "T15e different-key concurrent writes merge clean" "echo \"$DK_OUT\" | grep -q 'RC=0'"
+( cd "$B" && git push -q origin main )
+
+# d) flip-vs-append on ONE key. The plan's auto-merge expectation was an
+# EMPIRICAL hunk-adjacency claim (§7) — measured here: git's xdiff treats a
+# tail-modify and an EOF-append as overlapping and CONFLICTS. Per §7 the case
+# degrades to the keep-both playbook (flipped rows + appended observation),
+# never to data loss — this sim asserts that contract.
+( cd "$A" && git pull -q origin main )
+( cd "$A" && if [ "$(uname)" = "Darwin" ]; then sed -i '' 's/\tdiverges$/\texception/' espalier/conventions/k-key-a.tsv; else sed -i 's/\tdiverges$/\texception/' espalier/conventions/k-key-a.tsv; fi \
+  && git add -A && git -c user.email=a@t -c user.name=a commit -qm "exception key-a" && git push -q origin main )
+( cd "$B" && . espalier/hooks/drift-helpers.sh && append_convention feat/6 key-a src/f.ts:6 && git add -A && git -c user.email=b@t -c user.name=b commit -qm "obs2 key-a" )
+FA_OUT=$( cd "$B" && git pull --no-rebase -q origin main 2>&1; echo "RC=$?" )
+FA_CONFLICTS=$( cd "$B" && git diff --name-only --diff-filter=U )
+assert "T15f flip-vs-append conflicts confined to that key file (playbook case)" \
+  "echo \"$FA_OUT\" | grep -q 'RC=1' && [ \"$FA_CONFLICTS\" = 'espalier/conventions/k-key-a.tsv' ]"
+# Keep-both resolution: the decided (flipped) rows AND the fresh observation.
+( cd "$B" && printf '' > espalier/conventions/k-key-a.tsv \
+  && git show MERGE_HEAD:espalier/conventions/k-key-a.tsv >> espalier/conventions/k-key-a.tsv \
+  && git show HEAD:espalier/conventions/k-key-a.tsv | grep 'src/f.ts:6' >> espalier/conventions/k-key-a.tsv \
+  && git add -A && git -c user.email=b@t -c user.name=b commit -qm "resolve: keep decided rows + fresh observation" )
+FA_FOLD=$( cd "$B" && . espalier/hooks/drift-helpers.sh && conv_fold | grep '^key-a' )
+assert "T15g keep-both resolution folds decided-plus-one-fresh-observation" \
+  "echo \"$FA_FOLD\" | grep -q \"$(printf 'key-a\t1\texception')\""
+[ "$KEEP" != "yes" ] && rm -rf "$BASE"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

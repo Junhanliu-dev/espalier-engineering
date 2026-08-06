@@ -57,8 +57,12 @@ doctor_stamp "$(git rev-parse HEAD)"
 ```
 
 `doctor_stamp` records the run in the gitignored `espalier/.doctor-last-run`, so
-`doctor_due()` resets. Write a timestamped human summary to the gitignored
-`espalier/.drift-report.md`: artifacts scanned, flagged, confirmed-current.
+`doctor_due()` resets for THIS clone. When the scan runs in the weekly
+maintenance lane, ALSO write the tracked shared stamp at session end —
+`doctor_stamp_shared` under Multi-Developer Discipline below (clean/dirty
+semantics; the end-of-session restamp rule applies). Write a timestamped human
+summary to the gitignored `espalier/.drift-report.md`: artifacts scanned,
+flagged, confirmed-current.
 
 The doctor never edits an artifact. To apply a refresh, run `/espalier-prune`.
 
@@ -80,6 +84,48 @@ repo never triggers a scan (no commits = no drift). It is checked at the
 `/espalier` and `/espalier-fix` Stage 0 pre-flights and as a non-blocking
 reminder in `pre-push-gate.sh`. To change the cadence, edit `.doctor-cadence`
 directly — bootstrap writes it once and never auto-rewrites it.
+
+## Multi-Developer Discipline
+
+On a multi-developer repo the doctor is a **scheduled singleton, not a
+concurrent free-for-all**: run it as part of the weekly maintenance flow on
+the canonical branch (`canonical-branch` in `espalier/.espalier-config`),
+via the temporary-worktree flow described in `/espalier-prune`'s
+Multi-Developer Discipline section — one scan per interval, one maintenance
+PR carrying the scan's prune refreshes. Prune and promotion have their own
+lanes (see that section's per-mechanism table); the doctor's lane is the
+weekly maintenance PR only — a scan result stranded on a feature branch
+helps nobody until merge.
+
+**The shared stamp (tracked `espalier/.doctor-stamp`).** The doctor is the
+stamp's ONLY writer. At the END of the maintenance session, write it and
+commit it as its own commit in the weekly maintenance PR:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+N=$(stale_files | grep -c . || true)
+if [ "$N" -eq 0 ]; then
+  doctor_stamp_shared "$(git rev-parse HEAD)" clean
+else
+  doctor_stamp_shared "$(git rev-parse HEAD)" "dirty:$N"
+fi
+git add espalier/.doctor-stamp
+git commit -m "docs: espalier doctor stamp ($( [ "$N" -eq 0 ] && echo clean || echo "dirty:$N" ))"
+```
+
+Semantics `doctor_due()` enforces team-wide: only a `clean` stamp satisfies
+everyone; a `dirty:<N>` stamp satisfies ONLY this clone (via the local stamp
+the doctor keeps writing) — a shared stamp must never mean "scan complete"
+while the findings sit unrefreshed. **End-of-session rule:** the stamp records
+the state at the end of the maintenance session, not the first scan — if the
+same session's prune cleared every finding, RE-RUN the doctor (fast on a
+now-clean tree) so the PR carries a `clean` stamp; otherwise a `dirty:N`
+stamp whose findings were already fixed in the same PR would keep
+`doctor_due()` firing team-wide forever. The file is ONE line, whole-file
+last-writer-wins — never append, never union-merge it (no `.gitattributes`
+entry may ever be added for it). Two doctors in one interval is a rota
+failure; if their stamps conflict, the resolution is one line vs one line:
+**keep the newer line** (or either `clean`).
 
 ## Scout Mapping
 

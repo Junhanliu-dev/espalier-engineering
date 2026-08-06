@@ -51,8 +51,12 @@ Run this BEFORE Stage 1. Source the drift helpers:
 Gather all three signals BEFORE prompting:
 1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
    into fresh / aging / stale / critical / expired.
-2. **CONV** — if `espalier/.conventions.tsv` exists, scan for any `pattern_key`
-   with >= 3 `diverges` rows (promotion candidates).
+2. **CONV** — `conv_fold` (in `drift-helpers.sh`) folds the legacy
+   `espalier/.conventions.tsv` AND any `espalier/conventions/*.tsv` per-key
+   files into `key<TAB>diverges_count<TAB>status` lines; every key with status
+   `diverges` and `diverges_count` >= 3 is a promotion candidate. Do not parse
+   the files yourself — the helper owns width tolerance, cross-source
+   observation dedupe, and status precedence.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
 If all three are empty/false → no prompt, proceed to Stage 1.
@@ -69,14 +73,29 @@ Options:
   3. Abort
 ```
 
-Default: "Handle now" if any stale doc is critical/expired, else "Proceed".
-If only fresh (<14d) stale docs and no conv/doctor signal → treat as empty.
+Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
+maintenance handles this (gardener rota — see /espalier-prune's
+Multi-Developer Discipline)". "Handle now" stays available and becomes the
+default ONLY when a critical/expired flag is present — the drift sidecar is
+per-clone, so a critical/expired row here is YOUR OWN flag (the prune
+escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
+signal → treat as empty.
+
+**Unattended runs (never prompt here):** when `interactivity_mode` (in
+`drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
+question. Write the three-signal summary to `espalier/.drift-report.md`,
+print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
+{due|not due} — recorded to espalier/.drift-report.md`), and continue to
+Stage 1. Never prune, never promote, never run a doctor scan unattended.
 
 ### Convention Promotion
 
-When the Stage 0 pre-flight reports a `pattern_key` with >= 3 `diverges` rows in
-`espalier/.conventions.tsv` and the user picks "Handle now", surface the
-candidate with `AskUserQuestion`:
+When the Stage 0 pre-flight reports a `pattern_key` with >= 3 deduped
+`diverges` observations (from `conv_fold`) and the user picks "Handle now",
+fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (rows, not
+counts — it folds the legacy file and the per-key files and dedupes across
+both), run the race guard below, and surface the candidate with
+`AskUserQuestion`:
 
 ```
 Convention "{pattern_key}" has diverged in {N} changes:
@@ -98,10 +117,60 @@ Options:
 - **Exception** — append under the rule's "## Exceptions"; flip rows → `exception`.
 - **Wait** — leave rows `diverges`.
 
-Flip a row's status by editing `espalier/.conventions.tsv` — change the 5th tab
-field (`status`) of every matching row. The edit is committed by the same
-Stage 0 → Stage 7 run (the orchestrator stages `.conventions.tsv` at Stage 7).
-`coupled_with` candidates are surfaced together — promote/reject them as a set.
+Flip a row's status by editing the KEY'S FILE —
+`espalier/conventions/k-$(conv_slug "$KEY").tsv` — change the 5th tab field
+(`status`) of every matching row IN PLACE. That is safe here: the file is
+small, single-concern, and ordinary 3-way merged; a concurrent same-key
+decision on another branch surfaces as a visible git conflict in that ~5-line
+file, which IS the race detection. **Never write the legacy
+`espalier/.conventions.tsv`** — v0.17+ writers treat it as read-only. For a
+pre-conversion key whose rows live only in the legacy file, record the
+decision as ONE status row appended to the key's file (same columns; use the
+deciding change's slug and the rule file as the location) — the legacy rows
+stay untouched and `conv_fold`'s precedence rule (a key-file status beats any
+legacy status) retires the candidacy. The edit is committed by the same
+Stage 0 → Stage 7 run (the orchestrator stages `espalier/conventions/` at
+Stage 7). `coupled_with` candidates are surfaced together — promote/reject
+them as a set.
+
+**Branch lane (multi-dev).** Deciding a promotion on your FEATURE BRANCH is
+fine — make the rule edit + status flip their own isolated commit
+(`docs: promote convention {pattern_key}`), never folded into a feature
+commit, so it can be reviewed, cherry-picked, or reverted independently.
+CODEOWNERS routes the rules-touching PR to the rule owner at merge either way
+(advisory until "Require review from Code Owners" branch protection is on).
+
+**Race guard (courtesy pre-check — run before the promotion prompt).** A
+teammate may have already decided this key on the canonical branch:
+
+```bash
+. espalier/hooks/drift-helpers.sh   # for conv_slug
+R=$(grep '^canonical-remote:' espalier/.espalier-config | awk '{print $2}')
+B=$(grep '^canonical-branch:' espalier/.espalier-config | awk '{print $2}')
+if git fetch --quiet "$R" "$B" 2>/dev/null; then
+  DECIDED=no
+  # Per-key file first — a single-file read via the same conv_slug the
+  # writer uses; the legacy scan is only the pre-conversion fallback.
+  git show "FETCH_HEAD:espalier/conventions/k-$(conv_slug "$KEY").tsv" 2>/dev/null \
+    | awk -F'\t' -v k="$KEY" '(NF==5||NF==6) && $3==k && $5!="diverges" {found=1} END{exit !found}' \
+    && DECIDED=yes
+  if [ "$DECIDED" = no ]; then
+    git show "FETCH_HEAD:espalier/.conventions.tsv" 2>/dev/null \
+      | awk -F'\t' -v k="$KEY" '(NF==5||NF==6) && $3==k && $5!="diverges" {found=1} END{exit !found}' \
+      && DECIDED=yes
+  fi
+  [ "$DECIDED" = yes ] && SKIP_PROMPT=yes   # surface the existing canon decision instead of prompting
+else
+  echo "WARN: cannot fetch $R/$B — race guard skipped"   # do NOT read a stale tracking ref
+fi
+```
+
+(FETCH_HEAD, not `$R/$B` — a source-only fetch doesn't update the tracking
+ref, and a fetch failure must SKIP the check rather than consult stale state.
+The width guard keeps a malformed row from vacuously satisfying
+`$5!="diverges"`.) The guard is a courtesy, not the race defense — two
+same-key decisions on different branches surface as an ordinary git conflict
+at merge, which is the structural detection.
 
 ### Session Resumption
 
@@ -426,7 +495,8 @@ isolated reviewer cannot (three reviews of one pattern would coin three keys and
 the count would never reach the threshold). For each Observation in
 `review-record.md`:
 
-1. Read existing keys: `cut -f3 espalier/.conventions.tsv 2>/dev/null | sort -u`.
+1. Read existing keys: `. espalier/hooks/drift-helpers.sh && conv_fold | cut -f1`
+   (folds the legacy file AND the per-key files — never parse them yourself).
 2. Map the Observation's `description` to an existing `pattern_key`, or mint a
    new kebab-case key.
 3. Append the row:
@@ -438,11 +508,12 @@ append_convention "${TYPE}/${SLUG}" "$PATTERN_KEY" "$LOCATION"
 
 `append_convention` sanitizes every field and de-dupes on
 (change_slug, pattern_key, location), so re-running Stage 4 never inflates the
-count. `espalier/.conventions.tsv` is tracked and append-only — columns
+count. Convention state is tracked and row-append-only — columns
 `date · change_slug · pattern_key · location · status` (+ optional 6th
 `coupled_with`); `status` ∈ `diverges | promoted | rejected | exception`. When a
-`pattern_key` reaches 3 `diverges` rows it is a promotion candidate, surfaced at
-the next Stage 0 pre-flight (see Convention Promotion).
+`pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`) it is
+a promotion candidate, surfaced at the next Stage 0 pre-flight (see Convention
+Promotion).
 
 ### State File Format
 
@@ -506,16 +577,18 @@ back to 3 per key if the file or key is missing) — alongside the `{requirement
 
 ### Stage 7: Stage the Convention Index
 
-If this run appended to `espalier/.conventions.tsv` (Stage 4) or flipped a
-row's status (Convention Promotion), stage the file into the Stage 7 commit
+If this run appended an observation (Stage 4) or flipped a status
+(Convention Promotion), stage the per-key files into the Stage 7 commit
 alongside `espalier/changes/{type}/{slug}/*`:
 
 ```bash
-git add espalier/.conventions.tsv
+[ -d espalier/conventions ] && git add espalier/conventions/
 ```
 
-`.conventions.tsv` is tracked; staging it here keeps the working tree clean for
-the Stage 7 gate and never leaves an automation-written file uncommitted.
+The per-key files are tracked; staging them here keeps the working tree
+clean for the Stage 7 gate and never leaves an automation-written file
+uncommitted. (The legacy `espalier/.conventions.tsv` is read-only to this
+plugin version — it is never written, so there is nothing of it to stage.)
 
 ### Stage 7 Commit Recording
 

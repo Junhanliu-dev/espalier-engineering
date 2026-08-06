@@ -222,6 +222,30 @@ Copilot reviews → suggest adding copilot; RUNNING inside Codex/Copilot →
 include that platform. The espalier/ content is identical regardless — only
 the wiring differs, and later additions are one `--wire-only` run.
 
+### Q5 — CODEOWNERS ownership routing (separate, skippable question)
+
+AskUserQuestion caps one call at four questions, so ask this as its OWN quick
+question after Q1-Q4 (skip it entirely for a solo repo — no teammates means no
+review routing):
+
+```
+Should rule/wiki changes be routed to owners for review via CODEOWNERS?
+(Team repos: promotion PRs touching espalier/rules/ then auto-request the rule
+owner's review — the rule-canon gate once branch protection requires
+code-owner review. Solo repos: skip.)
+
+  1. Skip (default)            → no CODEOWNERS block; add later via --wire-only
+  2. Yes — I'll give handles   → collect TWO GitHub handles (user or team),
+       one owning espalier/rules/, one owning espalier/wiki/ (either may be
+       blank; blank → that line omitted). Free text via Other, e.g.
+       "@platform-team @docs-team".
+```
+
+Cache the answers as `CODEOWNERS_RULES` / `CODEOWNERS_WIKI` (empty when
+skipped). Bootstrap normalizes a missing `@` prefix; both empty → the
+CODEOWNERS sub-step no-ops. The generated block is advisory until the repo
+turns on "Require review from Code Owners" branch protection.
+
 > Why agent identifiers stay `harness-coder` / `harness-reviewer`: these are internal sub-agent names baked into pipeline orchestration. Renaming them mid-pipeline would break any in-flight changes. The plugin name and slash commands rebranded to Espalier in v0.4.0; agent identifiers remain frozen.
 
 Note the answers; you will substitute them literally in Phase 3 — shell
@@ -329,6 +353,8 @@ bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
   --merge-decision=<answer from Q1> \
   --doctor-cadence=<answer from Q3> \
   --platforms=<answer from Q4: comma list of claude|codex|copilot>
+# Append ONLY when Q5 collected handles (omit the flags entirely when skipped):
+#   --codeowners-rules=<Q5 rules handle> --codeowners-wiki=<Q5 wiki handle>
 ```
 
 Shell variables do NOT persist between Bash calls — substitute literal values
@@ -353,8 +379,8 @@ Bootstrap runs all 11 internal stages in one shell process:
 - **Stage 7:** append `## Espalier` to `CLAUDE.md` (grep-guarded).
 - **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup).
 - **Stage 9:** persist the merge decision (the literal Q1 answer passed via `--merge-decision`) to `espalier/.merge-hook-decision` and the Phase 0 Q3 cadence to `espalier/.doctor-cadence` (written once, never auto-rewritten). Install the post-merge dispatcher (`.husky/post-merge` or `.git/hooks/post-merge`) unconditionally — it runs `drift-detect.sh` on every merge and `post-merge-backlink.sh` only when the decision is `installed`.
-- **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) to `.gitignore` (newline-guarded).
-- **Stage 11:** run the validation checks — 46 when only claude is targeted, 51 with codex, 56 with copilot (all but #25 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
+- **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) to `.gitignore`; append `espalier/.ask-gaps.tsv merge=union` to `.gitattributes` (the one union attribute); write the CODEOWNERS marker block when Q5 supplied handles (GitHub search order; replace-within-markers on re-run). All newline-guarded.
+- **Stage 11:** run the validation checks — 48 when only claude is targeted, 53 with codex, 58 with copilot (all but #25 in parallel, #25 serial for its tier table); print sorted output; non-zero exit if any failed.
 
 **Re-run safety:** if `espalier/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
 

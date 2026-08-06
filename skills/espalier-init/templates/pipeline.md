@@ -223,3 +223,48 @@ to 3 if the file or key is missing.
 | Requirements | `max-req-rounds` | 3 | Human decision |
 | Code | `max-code-rounds` | 3 | Human decision |
 | Test | `max-test-rounds` | 3 | Human decision |
+
+## Multi-Developer Maintenance
+
+Maintenance follows per-mechanism lanes (full table in `/espalier-prune` →
+Multi-Developer Discipline): doctor scans and routine prune refreshes ride
+ONE weekly maintenance PR on the canonical branch (`canonical-branch` in
+`espalier/.espalier-config`); a prune for your OWN critical/expired flag and
+convention promotions may ride a feature branch as their own isolated `docs:`
+commits. Two recipes for the residual conflicts:
+
+### Maintenance-commit conflicts (prune vs prune)
+
+1. Inspect both sides — diff the conflicting doc against each merge parent.
+2. Take the newer refresh wholesale: `git checkout --theirs -- <doc>` (or
+   `--ours` when yours is newer), commit the merge.
+3. Re-run `/espalier-prune <doc>` on the merged tree — an empty scout diff
+   confirms the kept side; a non-empty one shows what the union of both
+   branches' code changed.
+
+A modify/delete conflict on an espalier doc resolves as DELETION (the other
+side retired the doc).
+
+### Per-key convention conflicts (`espalier/conventions/k-*.tsv`)
+
+A same-key conflict is the promotion race DETECTION, not a breakage. Two
+decisions (both sides flipped statuses) → pick the winning decision like any
+5-line conflict. An observation append against another append or against a
+status flip → **keep both lines** — every decided row AND every fresh
+observation row survive; `conv_fold` dedupes repeated observations at read time,
+so nothing double-counts. The shared `espalier/.doctor-stamp` is one line:
+keep the newer line (or either `clean`).
+
+### Slug collisions across branches
+
+Two branches can mint the same `espalier/changes/{type}/{slug}/` folder on
+the same day; the merge shows add/add conflicts inside it. All in ONE commit:
+
+1. Rename the later-merging change's dir to the next free suffix:
+   `git mv espalier/changes/{type}/{slug} espalier/changes/{type}/{slug}-2`.
+2. Rebuild the reverse-lookup cache:
+   `bash espalier/hooks/rebuild-commit-index.sh`.
+3. Rewrite the old slug in every back-link that points at the renamed change:
+   `grep -l "{type}/{slug}" espalier/changes/*/*/pipeline-state.md`, then fix
+   each `## Follow-up Fixes` row from `{type}/{slug}` to `{type}/{slug}-2` —
+   otherwise those back-links point at the other branch's change.

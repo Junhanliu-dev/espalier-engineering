@@ -26,7 +26,7 @@ following the Espalier structure below.
 | Grill | espalier/skills/espalier-grill/ | Stage 1 requirement/diagnosis interrogation | Analysis phase |
 | Wiki | espalier/wiki/ | Business context | On demand |
 | Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
-| Config | espalier/.espalier-config | Escalation caps: review-round (max-req/code/test-rounds) + max-rollbacks, default 3 | Stage 2/4/6 gates + rollback |
+| Config | espalier/.espalier-config | Escalation caps: review-round (max-req/code/test-rounds) + max-rollbacks, default 3; canonical-remote/canonical-branch (integration ref for maintenance discipline + race guard) | Stage 2/4/6 gates + rollback + maintenance |
 | Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator, 7 stages (0–7, no Stage 2) | Via /espalier-fix |
 | Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
 | Audit    | espalier/skills/espalier-audit/ | Repo-wide security audit → wiki/security-audit.md | Via /espalier-audit |
