@@ -250,23 +250,23 @@ version. Up to TWENTY-FOUR migrations may apply, always in this order:
    `scripts/migrate-v0.16.0-to-v0.17.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL TWENTY-THREE; a v0.3.x
-install needs the last twenty-two; a v0.4.x install needs the last twenty-one; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.16.0; a
-v0.5.3–v0.5.x install needs v0.6 … v0.16.0; a v0.6.x install needs
-v0.7 … v0.16.0; a v0.7.x install needs v0.8 … v0.16.0; a v0.8.0 install needs
-v0.8.1 … v0.16.0; a v0.8.1 install needs v0.8.2 … v0.16.0; a v0.8.2 install
-needs v0.9.0 … v0.16.0; a v0.9.0 install needs v0.9.1 … v0.16.0; a v0.9.1
-install needs v0.9.2 … v0.16.0; a v0.9.2 install needs v0.9.3, v0.9.4,
-v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.9.3 install
-needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a
+confirmation, apply in order. A v0.1.x install needs ALL TWENTY-FOUR; a v0.3.x
+install needs the last twenty-three; a v0.4.x install needs the last twenty-two; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.17.0; a
+v0.5.3–v0.5.x install needs v0.6 … v0.17.0; a v0.6.x install needs
+v0.7 … v0.17.0; a v0.7.x install needs v0.8 … v0.17.0; a v0.8.0 install needs
+v0.8.1 … v0.17.0; a v0.8.1 install needs v0.8.2 … v0.17.0; a v0.8.2 install
+needs v0.9.0 … v0.17.0; a v0.9.0 install needs v0.9.1 … v0.17.0; a v0.9.1
+install needs v0.9.2 … v0.17.0; a v0.9.2 install needs v0.9.3, v0.9.4,
+v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.9.3 install
+needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a
 v0.9.4, v0.9.5, or v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
-v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
-then v0.16.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.13.1
-install needs v0.13.2, v0.14.0, v0.15.0, then v0.16.0; a v0.13.2 install needs v0.14.0,
-v0.15.0, then v0.16.0; a v0.14.0 install needs v0.15.0,
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
+v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
+v0.16.0, then v0.17.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.13.1
+install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, then v0.17.0; a v0.13.2 install needs v0.14.0,
+v0.15.0, v0.16.0, then v0.17.0; a v0.14.0 install needs v0.15.0,
 v0.16.0, then v0.17.0; a v0.15.0 install needs v0.16.0 then v0.17.0; a
 v0.16.0 install needs only v0.17.0.
 
