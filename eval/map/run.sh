@@ -222,8 +222,17 @@ if [ "$judge_verdict_mismatches" -gt 0 ]; then
   echo "         verdict on $judge_verdict_mismatches fixture(s). Sharpen the rubric anchors and re-validate."
 fi
 
-echo "NOTE: the map judge has NOT yet been validated against hand scores"
-echo "      (rubric.md 'Judge validation') — every result is PROVISIONAL until it is."
+# Judge-validation state: a handscore.tsv with derived verdict rows means the
+# validate-judge.sh generate→rollup→compare cycle has been completed at least once.
+if [ -f "$HERE/judge-validation/handscore.tsv" ] \
+   && awk -F'\t' '$2=="verdict" && ($3=="PASS" || $3=="FAIL") {found=1} END{exit !found}' \
+        "$HERE/judge-validation/handscore.tsv"; then
+  echo "NOTE: judge validated against hand scores (eval/map/judge-validation/ —"
+  echo "      see README 'Judge validation' for the run record and its caveats)."
+else
+  echo "NOTE: the map judge has NOT yet been validated against hand scores"
+  echo "      (rubric.md 'Judge validation') — every result is PROVISIONAL until it is."
+fi
 
 pass="$(awk "BEGIN{print ($catch_rate >= $GATE_CATCH_RATE) ? 1 : 0}")"
 

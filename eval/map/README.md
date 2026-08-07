@@ -84,6 +84,13 @@ all seed fixtures with clean PASSes — the judge has not yet been validated
 on a disagreement-rich or shadow case. Re-run with a human scorer and
 shadow fixtures before treating the gate as release-grade.
 
+## Run record
+
+2026-08-07, full 8-fixture run: **PASS, catch-rate 1.00** (gate ≥ 0.80),
+0 fixture failures, 0 infra failures, judge self-reported verdicts matched
+the rubric-derived verdicts on every fixture. All fixtures non-shadow, so
+the gate remains PROVISIONAL until shadow fixtures land.
+
 ## Cost note
 
 One full run = 2 claude calls per fixture (skill + judge) × 8 fixtures, with
