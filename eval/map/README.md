@@ -68,9 +68,13 @@ and let them plant decisions from a real past epic.
 
 The judge must be trusted before its scores are (rubric.md "Judge
 validation"): hand-score a subset, require ≥ 75% dimension-level agreement,
-sharpen anchors, repeat. This has NOT yet been run for the map rubric — the
-runner prints a PROVISIONAL note until it has. The grill harness's
-`validate-judge.sh` is the working template for wiring that step.
+sharpen anchors, repeat. `validate-judge.sh` wires that step (modeled on the
+grill harness's validator): `generate` runs map+judge on a 5-fixture core
+(plus any shadow fixtures) and emits a blank `handscore.tsv`; you score the
+five dimensions per fixture by reading the transcripts; `rollup` derives
+each human verdict from rubric.md "Per-fixture pass"; `compare` gates
+agreement at ≥ 0.75. This has NOT yet been run to completion for the map
+rubric — the runner prints a PROVISIONAL note until it has.
 
 ## Cost note
 
