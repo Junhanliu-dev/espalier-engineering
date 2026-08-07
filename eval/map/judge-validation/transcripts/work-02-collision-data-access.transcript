@@ -1,110 +1,80 @@
-Marker up.
+Work session, map `2026-08-06-usage-metering`, ticket 004. Transcript below — every artifact stated, nothing executed.
+
+---
+
+## 1. Marker up
+
+Would run:
 
 ```bash
 mkdir -p espalier/maps
-printf 'map: %s\nsession_started: %s\n' "2026-08-06-usage-metering" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+printf 'map: %s\nsession_started: %s\n' "2026-08-06-usage-metering" "2026-08-07T00:00:00Z" \
   > espalier/maps/.active-session
 ```
 
-Marker contents written:
+## 2. Load map.md, choose ticket
 
-```
-map: 2026-08-06-usage-metering
-session_started: 2026-08-07T00:00:00Z
-```
+Load `map.md` only. User named ticket 004. Frontier check from frontmatter: `status: open`, `blocked_by: [003]` — 003 closed, `claimed_by` empty. Takeable.
 
-Load `espalier/maps/2026-08-06-usage-metering/map.md` only. Destination: locked spec for per-account usage metering + monthly billing export.
+Claim — would edit `tickets/004-storage-approach.md` frontmatter:
 
-Ticket named by user: **How metering data is stored and accessed**. Frontier check — `blocked_by: [003]`, Metering granularity is `closed`, `claimed_by` empty. Takeable. Claim it:
-
-```bash
-git config user.email   # -> junhanliu.dev@gmail.com
+```yaml
+claimed_by: junhanliu.dev@gmail.com
+claimed_at: 2026-08-07T00:00:00Z
 ```
 
-Frontmatter set to `claimed_by: junhanliu.dev@gmail.com`, `claimed_at: 2026-08-07T00:00:00Z`.
+## 3. Resolve — espalier-grill `mode=decision`
 
-Type `grilling` → invoke espalier-grill `mode=decision`, `reqs_path=espalier/maps/2026-08-06-usage-metering/tickets/004-storage-approach.md`.
+`input_text` = ticket 004 Question + Destination ("locked spec for per-account usage metering with monthly billing export") + Decision 003 (per API call, aggregated hourly).
 
----
+**Step 0:** interactive (answer_script is human). No unattended signal.
 
-# Grill — mode=decision
+**Step 1:** decision mode — no signal count, never `skip`. Tier: `light` (≤ 3 questions).
 
-**Step 0 — environment**
+Stated to user: "Decision ticket — light grill, ≤ 3 questions."
 
-```bash
-. espalier/hooks/drift-helpers.sh
-interactivity_mode        # -> interactive
-```
+**Step 1.5 — blind-spot pass against candidate answers.**
 
-Interactive. Grill runs.
+Candidates (private): (a) Prisma, calls from route handlers directly — team's stated instinct; (b) Prisma behind repository layer; (c) new table on existing pg pool via repository; (d) faster store (Redis/timeseries).
 
-**Step 1 — tier**
+Read `espalier/rules/engineering-structure.md`, `espalier/wiki/external-services.md`. Two collisions on candidate (a):
 
-Decision mode: no signal count. Default tier `light` (≤ 3 questions).
+1. **Rule collision** — `rules/engineering-structure.md#data-access`: all persistence through repository class in `src/repositories/`; handlers NEVER touch DB client directly. Candidate (a) violates directly.
+2. **Wiki duplication** — `wiki/external-services.md#postgres`: access through `src/db/index.ts` pg Pool wrapper (retry + slow-query logging); "nothing else opens connections." Prisma = second client bypassing documented module.
 
-> Tier: light — decision ticket, ≤ 3 questions. Say if the stakes warrant full.
+Verify before raising: would read `src/repositories/` and `src/db/index.ts` (2 of ≤ 8 code-read budget) to confirm docs not stale. Eval mode — mock context is entire project map, no contradicting code; both collisions confirmed. 2 confirmed collisions; tier stays `light`.
 
-**Step 1.5 — blind-spot pass, against the candidate answers**
+**Step 2 — grill loop, sequential.**
 
-Candidate answers listed privately before reading the map:
+**Q1** (kills most candidates — the rule collision, with citation):
 
-1. Prisma models, queried straight from route handlers (team's stated instinct)
-2. Prisma, but confined inside repository classes
-3. Existing `pg` pool via a `UsageRepository` — plain SQL, new `usage_hourly` table
-4. Separate time-series store (Timescale/ClickHouse) with its own client
-5. In-memory write-behind buffer, flushed hourly to Postgres
+> Ticket's instinct is Prisma calls from route handlers directly — but `rules/engineering-structure.md#data-access` says all persistence goes through a repository class in `src/repositories/`; handlers never touch the DB client, and the post-edit hook enforces this boundary. Reconcile to repositories, or is direct handler access intended here (and why)?
 
-Read the project map (not source):
+*answer_script match:* `repository rule vs direct ORM calls in handlers — reconcile`
+**Reply:** "follow the repo's rule — repositories it is; I didn't know that convention existed"
 
-- `espalier/rules/engineering-structure.md` — §Data access
-- `espalier/wiki/external-services.md` — §Postgres
+Candidate (a) dead. Now (b) vs (c): client choice.
 
-Two collisions found against the leading candidate (#1):
+**Q2** (wiki duplication, with citation):
 
-| Class | Doc | Collision |
-|---|---|---|
-| Rule collision | `rules/engineering-structure.md#data-access` | All persistence goes through a repository class in `src/repositories/`; route handlers never touch the DB client. Candidate 1 puts Prisma calls in handlers — direct contradiction. |
-| Wiki duplication | `wiki/external-services.md#postgres` | `src/db/index.ts` is the documented pg `Pool` wrapper (retry + slow-query logging); "nothing else opens connections". Prisma opens its own pool — a second client. |
+> `wiki/external-services.md#postgres` documents `src/db/index.ts` — pg Pool wrapper with retry + slow-query logging; every repository imports it, nothing else opens connections. Adding Prisma introduces second client bypassing that. New `UsageRepository` on the existing pool, or Prisma — and if Prisma, what happens to the documented pool contract?
 
-Verify before raising (draws from the ≤ 8 code-read budget):
+*answer_script match:* `existing db module vs introducing Prisma`
+**Reply:** "keep the existing pg pool for v1 — revisit an ORM only if repository code gets unwieldy"
 
-```bash
-ls src/repositories/          # confirm the layer exists as documented
-```
-Read `src/db/index.ts` — confirm the Pool wrapper is live, not vestigial.
-Read one existing repository (e.g. `src/repositories/account-repository.ts`) — confirm handlers call it, not the client.
+Candidate (c) wins the access question. One counted piece of the ticket question remains: WHERE rows live — new Postgres table, or faster store?
 
-Both docs confirmed current by those reads → real collisions, raise as questions with citations. (Had a read contradicted the doc, the move is `mark_stale "espalier/rules/engineering-structure.md" "$(git rev-parse HEAD)" "grill-verify: <mismatch>"`, not a question.)
+**Q3:**
 
-Tier already `light`; collisions floor it there. Two collision questions.
+> Hourly usage rows: new table in the existing Postgres instance, or a faster store (Redis / timeseries DB)?
 
-**Step 2 — grill loop, sequential**
+No answer_script entry matches. Human unavailable → Open Question, conservative default named: **new table in existing Postgres** — single documented instance, no new infrastructure, hourly aggregation (per ticket 003) keeps write volume modest. Marked `(default — revisit)`.
 
-**Q1** (eliminates candidates 1 and 5-as-handler-writes; carries citation):
+Verdict: `GRILLED`.
 
-> The ticket's stated instinct is Prisma calls written from the route handlers. `espalier/rules/engineering-structure.md#data-access` says all persistence goes through a repository class in `src/repositories/` and that handlers never touch the DB client directly — the post-edit hook enforces that boundary. Reconcile metering writes to a `UsageRepository`, or is handler-direct access intended here (and what justifies breaking the layer)?
+## 4. Record — ticket 004 written in full
 
-*(answer_script — asks_about: "repository rule vs direct ORM calls in handlers — reconcile")*
-
-**A1:** "follow the repo's rule — repositories it is; I didn't know that convention existed"
-
-**Q2** (now eliminates 2 vs 3 vs 4):
-
-> Then the remaining fork is what the repository talks to. `espalier/wiki/external-services.md#postgres` documents `src/db/index.ts` — a pg `Pool` wrapper with retry + slow-query logging — and states every repository imports it and nothing else opens connections. Adding Prisma means a second client and a second pool. Keep hourly usage rows on the existing pool with plain SQL, or introduce Prisma and decide its relationship to that pool?
-
-*(answer_script — asks_about: "existing db module vs introducing Prisma")*
-
-**A2:** "keep the existing pg pool for v1 — revisit an ORM only if repository code gets unwieldy"
-
-Stop early — both collisions resolved, candidates 1/2/4/5 eliminated, candidate 3 stands. A third question would not change the implementation.
-
-One point the exchange did not settle: the column shape and retention of the hourly rows. Not asked (would exceed nothing, but the human is unavailable for it in this run) → recorded as an Open Question with a named conservative default, and carried forward as its own ticket rather than left dangling.
-
-**Verdict: `GRILLED`**
-
----
-
-## Artifact — `espalier/maps/2026-08-06-usage-metering/tickets/004-storage-approach.md` (full, rewritten)
+`espalier/maps/2026-08-06-usage-metering/tickets/004-storage-approach.md`:
 
 ```markdown
 ---
@@ -125,79 +95,34 @@ to add Prisma and write from the route handlers directly.
 
 ## Resolution
 
-Hourly usage rows live in the existing Postgres instance, in a new table,
-reached through a `UsageRepository` class in `src/repositories/`. The
-repository imports the documented `src/db/index.ts` pool wrapper and issues
-plain SQL. No ORM for v1. Route handlers and services call repository
-methods; they never touch the database client.
+All metering persistence goes through a `UsageRepository` class in
+`src/repositories/` — route handlers and services never touch the database
+client directly, per `rules/engineering-structure.md#data-access` (the layer
+boundary the post-edit hook enforces). The direct-from-handlers instinct is
+rejected; the user confirmed the convention on being shown it.
 
-Rationale — the ticket's initial instinct (Prisma queried from route
-handlers) collided with two conventions this repo already encodes, both
-confirmed against current code before being raised:
-
-- **Rule collision — `rules/engineering-structure.md#data-access`.** All
-  persistence goes through a repository class in `src/repositories/` (one
-  per aggregate); route handlers and services never touch the database
-  client directly, and the post-edit hook enforces that layer boundary.
-  Decision: follow the convention — metering persistence is a
-  `UsageRepository`. (The convention was not known to the requester; it is
-  not an intentional deviation.)
-- **Wiki duplication — `wiki/external-services.md#postgres`.** Access to the
-  single Postgres instance is through `src/db/index.ts`, a pg `Pool` wrapper
-  with retry and slow-query logging; every repository imports it and nothing
-  else opens connections. Prisma would introduce a second client and a
-  second pool. Decision: keep the existing pg pool for v1; the
-  `UsageRepository` imports `src/db/index.ts` like every other repository.
-
-Revisit trigger: an ORM is reconsidered only if hand-written repository SQL
-for metering becomes unwieldy — that is a later decision, not a v1 one, and
-it would have to state its relationship to the documented pool.
-
-## Convention Notes
-
-| Path consulted | Verdict |
-|----------------|---------|
-| `espalier/rules/engineering-structure.md#data-access` | collision raised → resolved to follow the convention (repository layer) |
-| `espalier/wiki/external-services.md#postgres` | collision raised → resolved to reuse the documented `src/db/index.ts` pool; no second client |
+No new client/ORM for v1: the repository uses the existing pg `Pool` wrapper
+at `src/db/index.ts` (retry + slow-query logging), per
+`wiki/external-services.md#postgres` ("every repository imports this module;
+nothing else opens connections"). Prisma is deferred — revisit an ORM only
+if repository code gets unwieldy; any future adoption must first decide its
+relationship to the documented pool.
 
 ## Open Questions
 
-- Column shape and retention of the hourly usage table (account id, metric,
-  bucket start, count, plus indexes; how long rows are kept before rollup or
-  purge). Not settled in this session. Conservative default until decided:
-  keep every hourly row indefinitely with no purge job, and index on
-  `(account_id, bucket_start)`. *(default — revisit)* Carried forward as
-  [005 — Hourly usage table shape and retention](005-usage-table-shape.md).
+- Row store: new Postgres table vs a faster store (Redis/timeseries) — user
+  unavailable. Default: **new table in the existing Postgres instance**
+  (default — revisit). Why: single documented instance
+  (`wiki/external-services.md#postgres`), no new infrastructure, and hourly
+  aggregation (ticket 003) keeps write volume modest.
+
+## Convention Notes
+
+- `rules/engineering-structure.md#data-access` — collision raised, resolved: follow convention (repositories).
+- `wiki/external-services.md#postgres` — duplication raised, resolved: reuse existing pool, no second client.
 ```
 
-## Artifact — `espalier/maps/2026-08-06-usage-metering/tickets/005-usage-table-shape.md` (new, full)
-
-```markdown
----
-ticket: 005
-title: Hourly usage table shape and retention
-type: grilling
-status: open
-blocked_by: []
-claimed_by:
-claimed_at:
----
-
-## Question
-
-What columns does the hourly usage table carry, and how long are rows kept?
-Storage and access are settled (Postgres via `UsageRepository` on the
-existing `src/db/index.ts` pool — see ticket 004); the row shape is not.
-Covers: the key (account, metric, bucket start), what is counted, indexes,
-and whether hourly rows are purged, rolled up into monthly aggregates, or
-retained indefinitely — which the monthly billing export depends on.
-
-## Resolution
-```
-
-Cap check before creating: open tickets after closing 004 = 0; creating 005 makes 1, against `max-open-tickets: 9`. Clear.
-
-## Artifact — `espalier/maps/2026-08-06-usage-metering/map.md` (full, rewritten)
+## 5. map.md updated in full
 
 ```markdown
 ---
@@ -218,9 +143,8 @@ TypeScript service. Consult espalier-grill for grilling tickets.
 
 ## Decisions so far
 
-<!-- the index — one line per closed ticket; the detail lives in the ticket -->
 - [003 — Metering granularity](tickets/003-granularity.md) — per API call, aggregated hourly
-- [004 — How metering data is stored and accessed](tickets/004-storage-approach.md) — Postgres via a `UsageRepository` on the existing `src/db/index.ts` pool, plain SQL, no ORM for v1 (`rules/engineering-structure.md#data-access`, `wiki/external-services.md#postgres`)
+- [004 — How metering data is stored and accessed](tickets/004-storage-approach.md) — UsageRepository in src/repositories/ on the existing src/db/index.ts pg pool; no Prisma for v1; new-PG-table default pending (revisit)
 
 ## Not yet specified
 
@@ -233,33 +157,31 @@ TypeScript service. Consult espalier-grill for grilling tickets.
 | Date | Ticket | Action |
 |------|--------|--------|
 | 2026-08-06 | 003 | resolved |
-| 2026-08-07 | 004 | resolved; 005 opened |
+| 2026-08-07 | 004 | resolved |
 
 ## Spawned Changes
 
-<!-- filled at handoff: one row per FILED slice -->
 | Change | Status |
 |--------|--------|
 ```
 
-Fog re-read: "export file format for the billing system" — the storage answer did not sharpen it (format is a billing-system-facing question, untouched by where rows live). Stays fog, not pre-sliced. No existing open ticket invalidated. No research tickets to fire.
+## 6. Fog graduation
 
-Cleared check: ticket 005 open, fog non-empty → not cleared. No handoff this session.
+Re-read Not-yet-specified: "export file format for the billing system" — resolution touched storage/access, not export format. Not sharpened. Stays fog. No existing ticket invalidated. No new tickets (open count 0 ≤ cap 9 anyway).
 
-Marker down, commit.
+## 7. Cleared check
+
+No open tickets, BUT fog non-empty. Not CLEARED. No handoff.
+
+## 8. Marker down, commit, stop
+
+Would run:
 
 ```bash
 rm espalier/maps/.active-session
-git add espalier/maps
-git commit -m 'chore(espalier): map 2026-08-06-usage-metering — ticket 004 resolved'
+git add espalier/maps && git commit -m 'chore(espalier): map 2026-08-06-usage-metering — ticket 004 resolved'
 ```
 
 ---
 
-Session result:
-
-- **Resolved:** *How metering data is stored and accessed* — hourly rows in Postgres, written and read through a `UsageRepository` on the existing `src/db/index.ts` pool, plain SQL, no ORM for v1. The team's Prisma-in-handlers instinct hit two encoded conventions; both surfaced with citations before the decision locked, both resolved toward the convention.
-- **Graduated:** nothing from the fog — the export-format line is untouched.
-- **New:** *Hourly usage table shape and retention* (opened from the one point the session could not settle; its conservative default is recorded and marked revisit).
-- **Next frontier:** *Hourly usage table shape and retention* — `/espalier-map 2026-08-06-usage-metering`.
-- No code written; one non-research ticket resolved.
+**Report:** Ticket "How metering data is stored and accessed" resolved — repository class on existing pg pool, both convention collisions surfaced with citations before lock; row-store choice recorded as conservative default (revisit). Nothing graduated. Frontier empty; remaining fog: export file format. Next: sharpen that fog into a ticket via `/espalier-map 2026-08-06-usage-metering`. One ticket resolved, no code written.

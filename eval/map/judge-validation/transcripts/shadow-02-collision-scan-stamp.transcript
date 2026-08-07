@@ -1,0 +1,194 @@
+Work session, ticket 003. Transcript below — nothing actually run/written (eval mode).
+
+---
+
+## 1. Marker up
+
+Would run:
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-maintenance-model" "2026-08-07T10:00:00Z" \
+  > espalier/maps/.active-session
+```
+
+## 2. Load map.md, choose + claim ticket
+
+Load `map.md` only. Frontier check for **How a completed scan is recorded for the team** (003): `status: open`, `blocked_by: [002]` — 002 closed, `claimed_by` empty. Takeable.
+
+Claim — would edit ticket frontmatter:
+
+```yaml
+claimed_by: junhanliu.dev@gmail.com
+claimed_at: 2026-08-07T10:01:00Z
+```
+
+## 3. Resolve — espalier-grill, mode=decision
+
+**Step 0:** interactive (answer_script = human). No unattended signal.
+
+**Step 1:** decision mode — never skip-crisp. Default tier `light` (≤3 questions). Stated to user: "Decision ticket — light grill, ≤3 questions."
+
+**Step 1.5 — blind-spot pass.** Candidate answers listed privately:
+
+1. Post-merge hook appends row to tracked `scan-log.tsv` (team's instinct)
+2. Scan step itself writes/commits a tracked stamp as deliberate step
+3. Reuse/extend existing `tooling/state/.docscan-last-run`, make it tracked
+4. External record (CI artifact / issue comment), nothing in repo
+
+Cross-check vs rules/wiki:
+
+- Candidate 1 collides with `rules/automation-boundaries.md#tracked-writes` — "No hook or background automation ever writes a tracked file." **Rule collision.**
+- Candidates 1–3 all touch `wiki/dev-tooling.md#scan-stamps` — gitignored per-clone `.docscan-last-run` already exists, reminder logic reads it, "nothing else writes it." New team record must define relationship to it, not silently duplicate. **Wiki duplication.**
+
+Verify-before-raise: eval mode has no codebase to read against; mock rules/wiki are the entire project map and fixture supplies no contradicting code — treat docs as current, no `mark_stale`. Two confirmed collisions. Tier already `light`; floor satisfied.
+
+**Step 2 — sequential questions.**
+
+**Q1 (rule collision, citation-carrying):**
+> Team instinct is post-merge hook appends to tracked `scan-log.tsv`, but `rules/automation-boundaries.md#tracked-writes` says no hook or automation ever writes a tracked file — tracked files change only via deliberate human-gated steps committing their own work. Reconcile to the rule (scan step writes its own record), or intentional deviation here (and why)?
+
+Matched answer_script entry: *hook-appends-tracked-log vs the automation-boundaries rule — reconcile*
+Reply: **"keep the rule — the scan step itself writes a one-line tracked stamp as its own commit; hooks stay read-only on tracked files."**
+
+**Q2 (wiki duplication, citation-carrying):**
+> `wiki/dev-tooling.md#scan-stamps` documents a gitignored per-clone stamp `tooling/state/.docscan-last-run` that reminder logic already reads. Does the new tracked team stamp replace it, or do both live on — and if both, which fact does each carry?
+
+Matched answer_script entry: *relationship to the existing per-clone stamp*
+Reply: **"keep both — the tracked stamp is the team-wide fact and the gitignored stamp stays per-clone; a scan that ends with unresolved findings satisfies only the clone that ran it."**
+
+**Q3 (within cap):**
+> Exact path + content format of the tracked team stamp — where does it live, what does the line carry?
+
+No answer_script entry matches. Human unavailable — record as Open Question with named conservative default (below). Never invent answer.
+
+Both counted collision signals covered. Stop.
+
+**Step 3:** write Resolution into ticket file (below). Verdict: `GRILLED`.
+
+## 4. Record — ticket 003 in full
+
+`espalier/maps/2026-08-07-maintenance-model/tickets/003-scan-record.md`:
+
+```markdown
+---
+ticket: 003
+title: How a completed scan is recorded for the team
+type: grilling
+status: closed
+blocked_by: [002]
+claimed_by: junhanliu.dev@gmail.com
+claimed_at: 2026-08-07T10:01:00Z
+---
+
+## Question
+
+Teammates currently can't see that this week's scan happened, so the
+reminder nags everyone anyway. Where does the "a scan ran, and was the
+tree clean" fact live? The team's first instinct: have the post-merge
+hook append a row to a tracked `scan-log.tsv` so the record propagates
+to every clone automatically.
+
+## Resolution
+
+The team-wide scan record is a one-line tracked stamp written by the
+deliberate scan step itself, committed as its own commit by the week's
+rotating owner. The post-merge-hook instinct is rejected: it collides
+with `rules/automation-boundaries.md#tracked-writes` — no hook or
+background automation ever writes a tracked file; tracked files change
+only through a deliberate, human-gated step that commits its own work.
+Hooks stay read-only on tracked files.
+
+Relationship to the existing per-clone stamp
+(`wiki/dev-tooling.md#scan-stamps`): keep both, distinct facts. The
+tracked stamp carries the team-wide fact — this week's scan ran and the
+tree was clean. The gitignored `tooling/state/.docscan-last-run` stays
+the per-clone fact that reminder logic reads. A scan that ends with
+unresolved findings satisfies only the clone that ran it: it updates the
+per-clone stamp but does not produce the team-wide clean stamp, so the
+team record never silently duplicates or overstates the per-clone one.
+
+Citations:
+- `rules/automation-boundaries.md#tracked-writes` — rule collision,
+  resolved: follow the rule; scan step commits its own stamp, hooks
+  never write tracked files.
+- `wiki/dev-tooling.md#scan-stamps` — wiki duplication, resolved: keep
+  both stamps with defined roles (team fact vs per-clone fact); do not
+  replace or re-implement the documented per-clone stamp.
+
+Open question (default — revisit): exact path and line format of the
+tracked stamp. Conservative default: a single tracked one-line file
+(e.g. `tooling/scan-stamp`) overwritten by each weekly scan commit,
+carrying date, owner, and clean status. Human was unavailable for this
+naming detail; it does not change the decision above.
+```
+
+## 5. Map bookkeeping — map.md in full
+
+```markdown
+---
+map: 2026-08-07-maintenance-model
+status: IN_PROGRESS
+started: 2026-08-07T09:00:00Z
+---
+
+# Map: Team maintenance model for the docs garden
+
+## Destination
+
+A locked spec for how the generated docs dir stays correct under ~10
+concurrent devs — cadence, ownership, and run-recording decided.
+
+## Notes
+
+TypeScript monorepo. Consult espalier-grill for grilling tickets.
+
+## Decisions so far
+
+- [001 — Scan cadence](tickets/001-scan-cadence.md) — weekly
+- [002 — Who runs the scan](tickets/002-scan-owner.md) — one rotating owner per week
+- [003 — How a completed scan is recorded for the team](tickets/003-scan-record.md) — scan step commits a one-line tracked team stamp itself (hooks never write tracked files, per rules); gitignored per-clone stamp kept alongside as the per-clone fact
+
+## Not yet specified
+
+- whether rule edits need an owner/review gate
+
+## Out of scope
+
+- rewriting the doc-generation pipeline itself
+
+## Session log
+
+| Date | Ticket | Action |
+|------|--------|--------|
+| 2026-08-07 | 001 | resolved |
+| 2026-08-07 | 002 | resolved |
+| 2026-08-07 | 003 | resolved |
+
+## Spawned Changes
+
+| Change | Status |
+|--------|--------|
+```
+
+## 6. Graduate fog
+
+Re-read Not-yet-specified: "whether rule edits need an owner/review gate" — 003's answer did not sharpen it. Stays as fog. No new tickets, no invalidated tickets. Cap fine (0 open).
+
+## 7. Cleared check
+
+No open tickets, but fog non-empty — map NOT cleared. No handoff.
+
+## 8. Marker down, commit, stop
+
+Would run:
+
+```bash
+rm espalier/maps/.active-session
+git add espalier/maps
+git commit -m 'chore(espalier): map 2026-08-07-maintenance-model — ticket 003 resolved'
+```
+
+---
+
+**Report:** Resolved **How a completed scan is recorded for the team** — scan step commits its own one-line tracked team stamp (rule: hooks never write tracked files, cited); per-clone gitignored stamp kept, distinct fact (wiki citation). One open question recorded with default (stamp path/format). Nothing graduated from fog. Frontier now empty; one fog line remains ("rule edits owner/review gate") — map continues, not cleared. One ticket resolved, zero code written. Next: sharpen the fog line into a ticket in a future session via `/espalier-map 2026-08-07-maintenance-model`.

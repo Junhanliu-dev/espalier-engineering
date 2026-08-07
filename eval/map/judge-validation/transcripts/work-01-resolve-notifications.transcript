@@ -1,90 +1,81 @@
-# Session — map `2026-08-05-notifications`, ticket 002
+Work session, map `2026-08-05-notifications`, ticket 002. Transcript below — every artifact verbatim, nothing executed.
+
+---
 
 ## 1. Marker up
 
+Would run:
+
 ```bash
 mkdir -p espalier/maps
-printf 'map: %s\nsession_started: %s\n' "2026-08-05-notifications" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+printf 'map: %s\nsession_started: %s\n' "2026-08-05-notifications" "2026-08-07T00:00:00Z" \
   > espalier/maps/.active-session
 ```
 
-Marker contents written:
+Marker file contents:
 
 ```
 map: 2026-08-05-notifications
 session_started: 2026-08-07T00:00:00Z
 ```
 
-No `allow:` lines — no task ticket this session, no write window.
+Load map.md only (given in fixture). No bulk ticket reads.
 
-## 2. Load map.md only
+## 2. Choose + claim ticket
 
-Read `espalier/maps/2026-08-05-notifications/map.md`. Did NOT bulk-read tickets.
+User named ticket 002. Frontier check: `status: open`, `blocked_by: [001]` — 001 closed — `claimed_by` empty. Takeable.
 
-Frontier derivation:
+Claim edit to `tickets/002-channel.md` frontmatter before any work:
 
-```bash
-grep -l '^status: open' espalier/maps/2026-08-05-notifications/tickets/*.md
+```yaml
+claimed_by: junhanliu.dev@gmail.com
+claimed_at: 2026-08-07T00:01:00Z
 ```
 
-- **Which delivery channel ships first** — open, `blocked_by: [001]`, 001 closed, unclaimed → **on frontier**
-- **Preference model shape** — open, `blocked_by: [002]`, 002 open → **blocked**
+## 3. Resolve — espalier-grill `mode=decision`
 
-User named ticket 002. It is on frontier and unclaimed. Claim it:
+**Inputs:** `input_text` = ticket 002 Question + Destination ("locked spec for notification system v1 — channels, triggering events, preference model") + Decisions-so-far line for 001 (events: task assigned, comment on your task, due-date within 24h). `reqs_path` = `tickets/002-channel.md`.
 
-```bash
-git config user.email   # -> junhanliu.dev@gmail.com
-```
+**Step 0:** interactive — answer_script is the human. Grill normally.
 
-Ticket 002 frontmatter set to `claimed_by: junhanliu.dev@gmail.com`, `claimed_at: 2026-08-07T00:01:00Z` before any work.
+**Step 1:** decision mode — no signal count, never skip-crisp. Tier: **light** (≤ 3 questions). Stated to user: "Decision ticket — light tier, up to 3 questions."
 
-## 3. Resolve — type `grilling` → espalier-grill `mode=decision`
+**Step 1.5:** no MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty. Skip silently, per contract. No collision signals.
 
-Invoked with:
-- `mode=decision`
-- `reqs_path=espalier/maps/2026-08-05-notifications/tickets/002-channel.md`
-- `input_text` = ticket Question + Destination + Decisions-so-far line 001
+**Step 2 — sequential loop.**
 
-**Step 0** — `espalier/hooks/drift-helpers.sh` not present in this fixture. Degrade: skip helper sourcing, treat as interactive (orchestrator can ask).
+Private divergent candidates:
+1. In-app only, v1 and beyond
+2. Email only (users live in inbox, no new surface)
+3. Both from day one, in-app source of truth
+4. Both from day one, email source of truth
+5. In-app first, email added later as digest
 
-**Step 1** — decision mode: no signal count. Tier `light` (≤ 3 questions).
+**Q1** (eliminates most — splits single-channel vs dual, and which ships first):
 
-> Tier: light — decision ticket, ≤ 3 questions.
+> For v1 launch: in-app only, email only, or both at once? If both, which one is the record the other mirrors?
 
-**Step 1.5** — `espalier/rules/` and `espalier/wiki/` absent (no MOCK CONTEXT block). Nothing to cross-check. Skipped silently, per contract. No Convention Notes block.
+Answer_script match: `channel choice / in-app vs email vs both` →
 
-**Step 2 — grill loop, sequential.**
+> "in-app first — email becomes a daily digest later, never per-event email"
 
-Private candidate list (divergent answers):
-1. In-app only, v1 and forever
-2. Email only (per-event sends)
-3. Both, in-app source of truth, email mirrors per-event
-4. Both, email source of truth, in-app is a convenience view
-5. In-app v1, email later as a batched digest
+Kills candidates 2, 3, 4. Candidate 5 wins, with constraint: email when added is digest-only, never per-event.
 
-Discriminating question — separates 1/2/3/4/5 in one cut:
+**Q2** (rationale — "never per-event email" is a hard constraint on future work; why it holds decides how strongly the eventual digest ticket must respect it):
 
-> **Q1:** In-app only for v1, email only, or both? And if email is in the picture at all, is it per-event sends mirroring each in-app notification, or a batched digest?
+> What rules out per-event email even later — deliverability cost, or user reaction?
 
-*(answer_script match: `channel choice / in-app vs email vs both`)*
+Answer_script match: `why not per-event email / rationale` →
 
-> **Human:** in-app first — email becomes a daily digest later, never per-event email
+> "our users already complain about email volume from the old system; that complaint is the whole reason this epic exists"
 
-Eliminates 1, 2, 3, 4. Candidate 5 wins. Next question — the "never per-event" is a hard constraint stated without a reason, and the reason decides whether it is a v1 convenience or a permanent architectural rule:
+**Stop early.** Third question would not change the decision — channel order locked, constraint motivated. 2 of 3 questions used.
 
-> **Q2:** "Never per-event email" — is that a v1 sequencing call, or a standing product rule the digest design has to hold to permanently? What is driving it?
+**Step 3:** write Resolution (below). Verdict: **GRILLED**.
 
-*(answer_script match: `why not per-event email / rationale`)*
+## 4. Record — ticket 002 closed
 
-> **Human:** our users already complain about email volume from the old system; that complaint is the whole reason this epic exists
-
-Standing rule, not sequencing. Stop early — a third question would not change the spec. 2 of 3 questions used.
-
-**Step 3** — write into the ticket's `## Resolution`.
-
-## 4. Artifacts
-
-### `espalier/maps/2026-08-05-notifications/tickets/002-channel.md` (rewritten in full)
+Full `tickets/002-channel.md` after session:
 
 ```markdown
 ---
@@ -103,39 +94,24 @@ In-app only, email only, or both — and if both, which is the source of truth?
 
 ## Resolution
 
-**In-app is the v1 channel and the permanent source of truth.** Every
-notification from the three triggering events settled in
-[001 — Which events trigger notifications](001-triggering-events.md) is
-delivered in-app. Email is not in v1.
+In-app ships first and is the only v1 channel. Email arrives later as a daily
+digest only — per-event email is ruled out permanently, not merely deferred.
 
-**Email ships later, and only as a batched daily digest.** Per-event email —
-one send per notification, mirroring the in-app feed — is ruled out
-permanently, not deferred. Any later email work must be a digest that
-aggregates; a design that emits one email per event contradicts this
-resolution and needs a new ticket to overturn it.
+Rationale: users already complain about email volume from the old system, and
+that complaint is the founding motivation for this epic. Any per-event email
+would reproduce the problem the system exists to solve. In-app is therefore
+the source of truth; the future digest is a summary view over it, never a
+parallel delivery path.
 
-### Rationale
-
-Users of the system being replaced already complain about its email volume,
-and that complaint is the originating reason this epic exists. Mirroring
-every in-app notification to email would reproduce the exact failure the
-effort is meant to fix. Batching to a daily digest caps email volume at one
-message per user per day regardless of event count, which is the property
-that makes email safe to add at all.
-
-Making in-app the source of truth (rather than a convenience view over an
-email pipeline) keeps the digest a downstream read of notification state —
-so digest behaviour can change without touching delivery.
-
-### Citations
-
-None — `espalier/rules/` and `espalier/wiki/` are empty in this repo, so the
-grill's convention cross-check (Step 1.5) had nothing to check against and
-skipped. This decision is not backed by an encoded convention; it is
-user-stated product intent.
+Rules/wiki cross-check: `espalier/rules/` and `espalier/wiki/` are empty —
+Step 1.5 skipped per contract; no citations.
 ```
 
-### `espalier/maps/2026-08-05-notifications/tickets/004-digest-cadence.md` (new — graduated fog)
+## 5. Graduate the fog
+
+Re-read Not-yet-specified: "digest cadence + unsubscribe granularity — can't be phrased until the channel question settles." Channel settled — question now sharp. Graduates to new ticket, removed from fog. Cap check: open tickets after creation = 003 + 004 = 2 ≤ 9. OK.
+
+New file `tickets/004-digest-cadence-unsubscribe.md`, full:
 
 ```markdown
 ---
@@ -143,26 +119,24 @@ ticket: 004
 title: Digest cadence and unsubscribe granularity
 type: grilling
 status: open
-blocked_by: [003]
+blocked_by: [002]
 claimed_by:
 claimed_at:
 ---
 
 ## Question
 
-For the later email digest: what is its send cadence and cutoff (fixed
-wall-clock hour per user timezone, rolling 24h, or user-chosen), what happens
-on a day with zero notifications (skip vs send an empty digest), and at what
-granularity can a user unsubscribe from the digest — all-or-nothing, or
-per-event-type in line with the in-app preference model?
-
-Blocked on [003 — Preference model shape](003-preference-model.md): digest
-opt-out granularity cannot be settled before the preference model's shape is
-decided, since a per-event-type digest opt-out only exists if the preference
-model is per-event-type.
+The future email digest is daily-only in spirit (per ticket 002: never
+per-event email). What exact cadence and send-time model does it use (fixed
+hour? recipient timezone?), and what unsubscribe granularity do users get —
+whole-digest on/off, or per-event-type within the digest?
 ```
 
-### `espalier/maps/2026-08-05-notifications/map.md` (rewritten in full)
+(`blocked_by: [002]` documents the dependency; 002 is closed, so the ticket is on the frontier.)
+
+Answer invalidates no open ticket — 003's question stands as written.
+
+## 6. Updated map.md — full
 
 ```markdown
 ---
@@ -185,11 +159,9 @@ Domain: B2B project-management SaaS. Consult espalier-grill for grilling tickets
 ## Decisions so far
 
 - [001 — Which events trigger notifications](tickets/001-triggering-events.md) — task assigned, comment on your task, due-date within 24h; nothing else in v1
-- [002 — Which delivery channel ships first](tickets/002-channel.md) — in-app only in v1 and the permanent source of truth; email lands later as a batched daily digest, never per-event
+- [002 — Which delivery channel ships first](tickets/002-channel.md) — in-app only in v1; email later as daily digest only, per-event email permanently ruled out
 
 ## Not yet specified
-
-<!-- empty -->
 
 ## Out of scope
 
@@ -200,7 +172,8 @@ Domain: B2B project-management SaaS. Consult espalier-grill for grilling tickets
 | Date | Ticket | Action |
 |------|--------|--------|
 | 2026-08-05 | 001 | resolved |
-| 2026-08-07 | 002 | resolved; fog patch graduated to 004 |
+| 2026-08-07 | 002 | resolved |
+| 2026-08-07 | 004 | created (graduated from fog) |
 
 ## Spawned Changes
 
@@ -208,25 +181,15 @@ Domain: B2B project-management SaaS. Consult espalier-grill for grilling tickets
 |--------|--------|
 ```
 
-## 5. Fog graduation
+## 7. Cleared check
 
-Fog patch was: *"digest cadence + unsubscribe granularity — can't be phrased until the channel question settles."*
+Open tickets remain (Preference model shape, Digest cadence and unsubscribe granularity). Not cleared. No handoff.
 
-Channel now settled and the patch is phrasable → became [004 — Digest cadence and unsubscribe granularity](tickets/004-digest-cadence.md), and is **removed** from Not-yet-specified. Not-yet-specified is now empty.
+**One-ticket rule:** Preference model shape is now unblocked — NOT touched this session. One non-research ticket per session; 002 was it.
 
-Cap check: open tickets after creation = **Preference model shape**, **Digest cadence and unsubscribe granularity** = 2. Under the cap of 9. No config read needed to clear it, but for the record:
+## 8. Marker down, commit, stop
 
-```bash
-grep '^max-open-tickets:' espalier/.espalier-config   # -> absent, fall back to 9
-```
-
-No existing open ticket invalidated. **Preference model shape** stands unchanged — 002's answer scopes it to in-app preferences, and 004 defers digest opt-out to it rather than duplicating it.
-
-## 6. Cleared check
-
-Open tickets remain (2). Map stays `IN_PROGRESS`. No handoff, no slicing this session.
-
-## 7. Marker down, commit, stop
+Would run:
 
 ```bash
 rm espalier/maps/.active-session
@@ -234,14 +197,6 @@ git add espalier/maps
 git commit -m 'chore(espalier): map 2026-08-05-notifications — ticket 002 resolved'
 ```
 
-## Report
+---
 
-Resolved **Which delivery channel ships first**: in-app only in v1, in-app is the permanent source of truth; email later as a batched daily digest, per-event email ruled out permanently because email volume from the old system is what triggered this epic.
-
-Graduated fog into **Digest cadence and unsubscribe granularity**, blocked on the preference model.
-
-Did NOT touch **Preference model shape** — one non-research ticket per session, even though closing 002 unblocked it.
-
-Frontier now: **Preference model shape** (unblocked, unclaimed). **Digest cadence and unsubscribe granularity** blocked behind it.
-
-Next: `/espalier-map 2026-08-05-notifications`
+**Session report.** Resolved *Which delivery channel ships first*: in-app only in v1; email later as daily digest only, never per-event — grounded in existing user complaints about email volume. Graduated fog patch into new ticket *Digest cadence and unsubscribe granularity*; fog section now empty. Frontier next session: *Preference model shape* (first by ordinal) and *Digest cadence and unsubscribe granularity*. Next command: `/espalier-map 2026-08-05-notifications`.

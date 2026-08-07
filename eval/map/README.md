@@ -58,11 +58,12 @@ if any user reply was fabricated beyond the `answer_script`.
 Same discipline as `eval/grill`: fixtures written alongside the skill
 (`shadow: false`) can be unconsciously tuned for; the trustworthy number is
 the catch-rate over `shadow: true` fixtures contributed WITHOUT reading the
-skill's exact wording. The entire current set is non-shadow (seed set), so
-the gate is **PROVISIONAL** — the runner says so on every run. Before
-trusting a PASS for release purposes, add shadow fixtures: hand a colleague
-(or a fresh session with only this README + the rubric) the fixture format
-and let them plant decisions from a real past epic.
+skill's exact wording. Two shadow fixtures landed 2026-08-07 (`shadow-01-team-doc-garden`,
+`shadow-02-collision-scan-stamp`), authored by a fresh session that read
+only this README, the rubric, and existing fixtures for format — never the
+skill wording — planting decisions from the real multi-dev-maintenance
+epic (docs/multi-dev-maintenance-research.md + implementation plan). The
+shadow catch-rate line is live; see "Run record".
 
 ## Judge validation
 
@@ -75,21 +76,32 @@ five dimensions per fixture by reading the transcripts; `rollup` derives
 each human verdict from rubric.md "Per-fixture pass"; `compare` gates
 agreement at ≥ 0.75.
 
-Run 2026-08-07 over the 5-fixture core: **30/30 cells, agreement 1.00 —
-JUDGE: VALIDATED** (`judge-validation/`). Caveat: the "human" side was
-dual-LLM proxy scoring (Claude + Codex gpt-5.6-sol xhigh, independently,
-Codex blinded to judge-scores.tsv; all 25 dimension cells agreed with zero
-reconciliation). No human eye has scored the transcripts, and the core is
-all seed fixtures with clean PASSes — the judge has not yet been validated
-on a disagreement-rich or shadow case. Re-run with a human scorer and
-shadow fixtures before treating the gate as release-grade.
+Run 1, 2026-08-07, 5-fixture core: 30/30 cells, agreement 1.00.
+
+Run 2, 2026-08-07, core + both shadow fixtures: **42/42 cells, agreement
+1.00 — JUDGE: VALIDATED** (`judge-validation/`; Codex's blinded sheet
+preserved as `codex-scores.tsv`). The "human" side was again dual-LLM
+proxy scoring (Claude + Codex gpt-5.6-sol xhigh, independently; Codex saw
+only rubric + fixture + transcript — never judge-scores.tsv or Claude's
+scores; all 35 dimension cells matched with zero reconciliation).
+
+Remaining caveats: no actual human eye has scored a transcript, and every
+fixture to date passes cleanly — the judge has never been exercised on a
+disagreement-rich case (a run that genuinely misses decisions or breaks a
+contract), so its FAIL-side calibration is untested. A deliberate
+bad-transcript fixture or a real human scorer would close that.
 
 ## Run record
 
-2026-08-07, full 8-fixture run: **PASS, catch-rate 1.00** (gate ≥ 0.80),
-0 fixture failures, 0 infra failures, judge self-reported verdicts matched
-the rubric-derived verdicts on every fixture. All fixtures non-shadow, so
-the gate remains PROVISIONAL until shadow fixtures land.
+2026-08-07, full 8-fixture run (pre-shadow): **PASS, catch-rate 1.00**
+(gate ≥ 0.80), 0 fixture failures, 0 infra failures, judge self-reported
+verdicts matched the rubric-derived verdicts on every fixture.
+
+2026-08-07, full 10-fixture run (with both shadow fixtures): **PASS,
+catch-rate 1.00 all / 1.00 shadow / 1.00 non-shadow**, 0 fixture
+failures, 0 infra failures, judge verdicts matched derived verdicts
+everywhere. The shadow subset — the trustworthy number — is live and
+green; the PROVISIONAL warning no longer applies.
 
 ## Cost note
 

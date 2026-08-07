@@ -1,0 +1,263 @@
+# EVAL TRANSCRIPT — shadow-01-team-doc-garden (chart)
+
+## 1. Marker up
+
+Would run:
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-doc-dir-maintenance-model" "2026-08-07T00:00:00Z" \
+  > espalier/maps/.active-session
+```
+
+## 2. Name destination — espalier-grill mode=decision
+
+Input: "what does DONE look like for this effort?" + idea text.
+
+**Step 0:** answer_script = human present. Interactive.
+**Step 1:** decision mode — never skip. Tier `light` (≤ 3 questions). Stated to user: "Open decision — light grill, ≤ 3 questions."
+**Step 1.5:** no MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty. Skip silently, per contract.
+**Step 2 — sequential:**
+
+**Q1.** Private divergent candidates for DONE: {patch append-conflicts only · redesign doc-generation pipeline for multi-dev · lock a maintenance *model* (ownership/state/merge), tooling comes after · move docs off git to hosted wiki · full product including drift-detection tooling}. Discriminating question: "DONE = decisions locked and ready to slice into tooling changes, or DONE = tooling built? And is the generation pipeline itself in scope?"
+→ **answer_script `destination`:** "a locked maintenance model for the shared docs dir under ~10 concurrent devs — ownership, shared-vs-local state, and merge behavior decided, ready to slice into tooling changes; rewriting the doc-generation pipeline itself is explicitly out of scope."
+
+**Q2.** Candidates for what merge-behavior decisions must survive: {3 devs long-lived branches · ~10 trunk-based short branches · everyone rebases, no merge commits · hooks guaranteed installed everywhere}. Question: "team size and branch workflow — and can we assume repo git hooks are installed on every clone?"
+→ **answer_script `team size / workflow`:** "about 10 devs, trunk-based with short feature branches; a mix of merge-based and rebase pulls; a couple of teammates never installed the repo's git hooks."
+
+**Q3.** Candidates for state-write mechanism (gates every later ticket): {automation auto-commits shared state · CI commits it · humans commit via deliberate step, automation never commits · shared state lives outside git}. Question: "may automation or hooks ever commit shared state, or must every git-shared write be human-gated?"
+→ **answer_script `what state may be committed`:** "hard constraint — automation and hooks never commit; anything shared through git must be written by a deliberate, human-gated step."
+
+Stop — next question (who runs the scan, which state is shared) is ticket material, not destination material. Charting hand-resolves nothing.
+
+**Verdict: GRILLED.** Destination locked, constraints land in map Notes.
+
+Note: answer_script entry "who should run the scan" exists but NOT used here — that is planted ticket work for a later session. Asking it now would pre-resolve a ticket during charting.
+
+## 3. Breadth-first frontier
+
+Sharp now (4 tickets): scan ownership (grilling) · shared-vs-per-clone state (grilling) · append-file merge behavior (research) · branch-protection availability (task — prerequisite fact, platform setting, nothing to decide).
+
+Fog (not sharply phrasable yet): deterministic drift anchors · doc lifecycle hygiene · review-gate/rule-ownership design (depends on task ticket's platform facts).
+
+While drafting the task ticket, the question "should shared-doc changes require a review gate / who owns rules" arises. **No answer_script entry matches.** Human unavailable → recorded as Open Question with named conservative default inside ticket 004. Never invented an answer.
+
+**Cap check:** 4 open tickets ≤ max-open-tickets 7. OK.
+
+No-fog exit not taken — fog exists, multi-session confirmed.
+
+## 4. Artifact: `espalier/maps/2026-08-07-doc-dir-maintenance-model/map.md`
+
+```markdown
+---
+map: 2026-08-07-doc-dir-maintenance-model
+status: IN_PROGRESS
+started: 2026-08-07T00:00:00Z
+---
+
+# Map: Multi-dev maintenance model for the generated docs directory
+
+## Destination
+
+A locked maintenance model for the shared generated-docs directory (rules, wiki,
+machine-appended conventions log) under ~10 concurrent devs: scan ownership,
+shared-vs-per-clone state, and merge behavior for machine-appended files decided,
+ready to slice into tooling changes. Rewriting the doc-generation pipeline itself
+is explicitly out of scope.
+
+## Notes
+
+- Hard constraint: automation and hooks never commit. Anything shared through git
+  must be written by a deliberate, human-gated step.
+- Team: ~10 devs, trunk-based, short feature branches, mixed merge-based and
+  rebase pulls. A couple of teammates never installed the repo's git hooks —
+  every candidate design must survive hook-less clones.
+- The pipeline was designed for a single developer; decisions here retrofit it
+  for concurrency, they do not redesign it.
+
+## Decisions so far
+
+<!-- the index — one line per closed ticket; the detail lives in the ticket -->
+
+## Not yet specified
+
+- Deterministic content-anchoring of docs to the source they describe (hash-based
+  drift detection instead of LLM re-reads) — suspected necessary for silent drift,
+  but not phrasable sharply until scan ownership and shared-vs-per-clone state land.
+- Long-horizon doc lifecycle hygiene — superseding rather than deleting rules,
+  freshness metadata, retiring doc-demand once coverage lands — wanted, but nobody
+  can yet say what it needs.
+- Review-gate / rule-ownership design for shared-doc changes — cannot be judged
+  until the branch-protection prerequisite ticket returns platform facts.
+
+## Out of scope
+
+- Rewriting the doc-generation pipeline itself — destination is the maintenance
+  model around it, per the destination grill.
+
+## Session log
+
+| Date | Ticket | Action |
+|------|--------|--------|
+| 2026-08-07 | — | Charted: destination locked (3-question grill), 4 tickets opened, research fired |
+
+## Spawned Changes
+
+| Change | Status |
+|--------|--------|
+```
+
+## 5. Artifact: tickets (created first, blocked_by wired second pass — all four independent, all `[]`)
+
+### `tickets/001-scan-ownership.md`
+
+```markdown
+---
+ticket: 001
+title: Who runs the periodic doc-health scan
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Who runs the periodic doc-health scan — every dev redundantly, a shared run-record
+any dev can satisfy, or one named rotating owner? Today nobody runs it because
+everyone assumes someone else did; the answer decides whether the backstop ever
+actually runs. Must respect the Notes constraint: automation and hooks never
+commit, so any shared run-record needs a human-gated write.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+### `tickets/002-shared-vs-per-clone-state.md`
+
+```markdown
+---
+ticket: 002
+title: Which maintenance state is shared through git vs kept per-clone
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Which staleness/maintenance state is shared through git and which stays per-clone?
+Today a fresh clone starts blind, and the same doc reads fresh on one machine and
+expired on another. Constraint from the map Notes: anything shared through git is
+written only by a deliberate, human-gated step — never by automation or hooks.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+### `tickets/003-append-log-merge-behavior.md`
+
+```markdown
+---
+ticket: 003
+title: Merge behavior of tracked machine-appended log files
+type: research
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+How do tracked machine-appended log files actually behave under concurrent-branch
+merges? Facts needed from outside this repo:
+
+- `.gitattributes` `merge=union` driver semantics: line ordering, duplicate
+  handling, and the cases where it silently does not apply (web-UI merges,
+  rebase pulls, clones missing the attributes or hooks — both present on this
+  team per map Notes).
+- How GitHub/GitLab web merge UIs handle conflicts in union-merge-attributed files.
+- Prior art that sidesteps append-conflicts entirely: changelog-fragment tools
+  (towncrier, changesets, reno) using file-per-entry with a later assembly step.
+
+## Resolution
+
+<!-- findings land in assets/ + here; written by the research subagent pass -->
+```
+
+### `tickets/004-branch-protection-prereq.md`
+
+```markdown
+---
+ticket: 004
+title: Confirm branch protection with required reviewers is available
+type: task
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Before any rule-ownership / review-gate design can even be judged, confirm whether
+the host repo has — or can get — branch protection with required reviewers. This is
+a platform setting no repo file can enforce.
+
+Checklist (human or agent, read-only — no write window needed):
+- [ ] Query current protection: `gh api repos/{owner}/{repo}/branches/{default}/protection`
+- [ ] If absent: confirm the hosting plan allows it (e.g. GitHub private repos
+      require a paid plan for required reviewers) and whether org policy permits
+      enabling it.
+- [ ] Record: available now / available after plan or org change / not available.
+
+## Open Questions
+
+- Should shared-doc changes require a review gate, and who owns the rules docs?
+  Human unavailable for this during charting. **Conservative default (revisit):
+  design assumes NO enforced review gate exists** — no decision may depend on
+  branch protection until this ticket confirms availability; fallback is the
+  convention-only, human-gated commit step already fixed in map Notes.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+## 6. Fire research (ticket 003)
+
+Would spawn now, parallel, AFK (research exempt from one-ticket-per-session):
+
+- **Agent:** oracle (external research — ctx7 + web), prompt = ticket 003 Question verbatim + "write findings as `espalier/maps/2026-08-07-doc-dir-maintenance-model/assets/003-append-merge-findings.md`; cover union-merge semantics + silent-misapply cases, web-UI conflict handling per forge, and file-per-entry prior art with tradeoffs."
+
+Eval mode: subagent not actually run, so no findings invented. Real run: findings land in `assets/003-append-merge-findings.md`, ticket 003 `## Resolution` written with citation links, `status: closed`, one-line gist appended to Decisions-so-far. Here ticket 003 stays `open`, spawn recorded.
+
+## 7. Marker down, commit, stop
+
+Would run:
+
+```bash
+rm espalier/maps/.active-session
+git add espalier/maps
+git commit -m 'chore(espalier): map 2026-08-07-doc-dir-maintenance-model — charted'
+```
+
+## Report
+
+Map charted at `espalier/maps/2026-08-07-doc-dir-maintenance-model/`.
+
+Frontier (all unblocked, unclaimed):
+- **Who runs the periodic doc-health scan** (grilling)
+- **Which maintenance state is shared through git vs kept per-clone** (grilling)
+- **Merge behavior of tracked machine-appended log files** (research — already fired)
+- **Confirm branch protection with required reviewers is available** (task)
+
+One open question parked with conservative default (review gate — assume none until platform facts land). Fog holds drift-anchoring and lifecycle hygiene — not yet sharp.
+
+Next: `/espalier-map 2026-08-07-doc-dir-maintenance-model`

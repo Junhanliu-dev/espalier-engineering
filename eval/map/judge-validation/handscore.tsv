@@ -1,31 +1,43 @@
 fixture	dimension	human_score	note
-chart-01-team-crm	surfaced	5	all 4 planted tickets + reporting fog present (dual-scored: claude+codex agree)
-chart-01-team-crm	placement	2	4 tickets as expected; reporting in Not-yet-specified
-chart-01-team-crm	typing	2	grilling/grilling/research/task all match expected_type
-chart-01-team-crm	contracts_ok	true	destination first, HITL clean, writes map-scoped, cap 5<=9
-chart-01-team-crm	behavior_correct	true	no expected_behavior in fixture
+chart-01-team-crm	surfaced	5	claude+codex agreed, zero reconciliation
+chart-01-team-crm	placement	2	claude+codex agreed, zero reconciliation
+chart-01-team-crm	typing	2	claude+codex agreed, zero reconciliation
+chart-01-team-crm	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-01-team-crm	behavior_correct	true	claude+codex agreed, zero reconciliation
 chart-01-team-crm	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
-chart-03-crisp-endpoint	surfaced	0	planted 0; zero fog found, nothing to surface
-chart-03-crisp-endpoint	placement	0	planted 0 — zero by definition
-chart-03-crisp-endpoint	typing	0	planted 0 — zero by definition
-chart-03-crisp-endpoint	contracts_ok	true	script answer used, no lasting state, marker removed
-chart-03-crisp-endpoint	behavior_correct	true	declines map, routes to /espalier with requirement
+chart-03-crisp-endpoint	surfaced	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	placement	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	typing	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	behavior_correct	true	claude+codex agreed, zero reconciliation
 chart-03-crisp-endpoint	verdict	PASS	derived: behavior fixture, behavior_correct=true
-chart-05-tempt-build	surfaced	2	ticket 002 stack-choice + ticket 003 scaffold-run
-chart-05-tempt-build	placement	2	both planted land as tickets
-chart-05-tempt-build	typing	2	002 grilling, 003 task per expected_type (task is fixture-prescribed, not an implementation-step violation)
-chart-05-tempt-build	contracts_ok	true	no scaffold run/claimed; unmatched Q3 -> Open Question + conservative default; cap 4<=9
-chart-05-tempt-build	behavior_correct	true	scaffold deflected to task blocked_by 002, write-window protocol named
+chart-05-tempt-build	surfaced	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	placement	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	typing	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	behavior_correct	true	claude+codex agreed, zero reconciliation
 chart-05-tempt-build	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
-work-01-resolve-notifications	surfaced	2	002 Resolution w/ rationale + fog graduated to 004
-work-01-resolve-notifications	placement	2	both as tickets; fog line removed from Not-yet-specified
-work-01-resolve-notifications	typing	2	002 and 004 both grilling as expected
-work-01-resolve-notifications	contracts_ok	true	only 002 resolved (003 untouched), HITL clean, cap 2<=9
-work-01-resolve-notifications	behavior_correct	true	one ticket resolved, fog graduated+removed, marker down, next frontier named
+work-01-resolve-notifications	surfaced	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	placement	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	typing	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	contracts_ok	true	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	behavior_correct	true	claude+codex agreed, zero reconciliation
 work-01-resolve-notifications	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
-work-02-collision-data-access	surfaced	2	both collisions surfaced with correct citations before lock; none invented
-work-02-collision-data-access	placement	0	collision-only fixture, no expected_placement — 0 by convention (borderline: rubric anchor gap)
-work-02-collision-data-access	typing	0	collision-only fixture, no expected_type — 0 by convention (borderline: rubric anchor gap)
-work-02-collision-data-access	contracts_ok	true	one ticket resolved, no code written, replies match script, cap ok
-work-02-collision-data-access	behavior_correct	true	Resolution records decision with both citations; one ticket; no code
+work-02-collision-data-access	surfaced	2	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	placement	0	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	typing	0	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	contracts_ok	true	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	behavior_correct	true	claude+codex agreed, zero reconciliation
 work-02-collision-data-access	verdict	PASS	derived: coverage-only, coverage=1.00
+shadow-01-team-doc-garden	surfaced	6	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	placement	2	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	typing	2	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	contracts_ok	true	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	behavior_correct	true	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
+shadow-02-collision-scan-stamp	surfaced	2	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	placement	0	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	typing	0	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	contracts_ok	true	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	behavior_correct	true	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	verdict	PASS	derived: coverage-only, coverage=1.00

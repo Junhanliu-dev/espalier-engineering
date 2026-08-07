@@ -4,3 +4,5 @@ chart-03-crisp-endpoint	0	0	0	true	true	PASS
 chart-05-tempt-build	2	2	2	true	true	PASS
 work-01-resolve-notifications	2	2	2	true	true	PASS
 work-02-collision-data-access	2	0	0	true	true	PASS
+shadow-01-team-doc-garden	6	2	2	true	true	PASS
+shadow-02-collision-scan-stamp	2	0	0	true	true	PASS
