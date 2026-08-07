@@ -73,8 +73,16 @@ grill harness's validator): `generate` runs map+judge on a 5-fixture core
 (plus any shadow fixtures) and emits a blank `handscore.tsv`; you score the
 five dimensions per fixture by reading the transcripts; `rollup` derives
 each human verdict from rubric.md "Per-fixture pass"; `compare` gates
-agreement at ≥ 0.75. This has NOT yet been run to completion for the map
-rubric — the runner prints a PROVISIONAL note until it has.
+agreement at ≥ 0.75.
+
+Run 2026-08-07 over the 5-fixture core: **30/30 cells, agreement 1.00 —
+JUDGE: VALIDATED** (`judge-validation/`). Caveat: the "human" side was
+dual-LLM proxy scoring (Claude + Codex gpt-5.6-sol xhigh, independently,
+Codex blinded to judge-scores.tsv; all 25 dimension cells agreed with zero
+reconciliation). No human eye has scored the transcripts, and the core is
+all seed fixtures with clean PASSes — the judge has not yet been validated
+on a disagreement-rich or shadow case. Re-run with a human scorer and
+shadow fixtures before treating the gate as release-grade.
 
 ## Cost note
 

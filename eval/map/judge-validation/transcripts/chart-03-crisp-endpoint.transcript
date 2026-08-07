@@ -1,0 +1,68 @@
+# Chart session — transcript (EVAL MODE, nothing executed)
+
+## 1. Marker up
+
+Would run:
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-admin-recent-signups" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  > espalier/maps/.active-session
+```
+
+## 2. Name destination — grill `mode=decision` on "what does DONE look like?"
+
+- **Step 0:** eval harness interactive (answer_script present). Proceed.
+- **Step 1:** decision mode — no skip tier. Default `light` (≤3 questions).
+- **Step 1.5:** no MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty. Skip silently, per contract.
+- **Step 2:** divergent candidates for scope, listed privately:
+  1. Exactly one endpoint, done.
+  2. Seed of admin dashboard — more admin analytics endpoints coming.
+  3. Signups feature area — pagination, filters, export later.
+  4. Needs new admin-auth infrastructure first.
+
+  Discriminating question (asked to human):
+
+  > **Q1:** Is this exactly one endpoint — GET /admin/recent-signups, 20 rows, email + created_at, reusing existing /admin auth — or first piece of bigger admin-reporting effort?
+
+  **Answer used:** answer_script entry `asks_about: destination / scope confirmation` — *"exactly what it says — one endpoint, admin-only, JSON list of the 20 most recent signups with email + created_at; nothing else planned around it."*
+
+  Answer eliminates candidates 2–4. Stop early — next question would not change anything.
+
+## 3. Breadth-first frontier pass
+
+Fan out over decision space:
+
+- **Scope:** locked — one endpoint, fixed fields, fixed limit 20. No decision open.
+- **Auth:** "admin-authenticated like every other /admin route" — follow existing pattern. No decision.
+- **Data shape:** JSON list, email + created_at. Stated. No decision.
+- **Ordering:** "most recent" = created_at descending. Implied, single reading. No decision.
+- **Fog:** none. User confirmed nothing planned around it.
+
+**Zero fog. Zero multi-session decisions. Effort fits one session.**
+
+## 4. No-fog exit (skill step 3)
+
+Route is clear — write **no map.md, no tickets, no map directory**. Charting here would be the failure mode.
+
+## 5. Marker down
+
+Would run:
+
+```bash
+rm espalier/maps/.active-session
+```
+
+No map bookkeeping to commit — nothing charted, no lasting state.
+
+## Report to user
+
+No map needed. Effort fits one session: single endpoint, fixed scope, existing auth pattern, no open decisions. Map lane is for multi-session efforts — session count, not project size, is the split.
+
+Run instead:
+
+```
+/espalier add GET /admin/recent-signups endpoint: JSON list of 20 most recent signups (email + created_at), sorted created_at descending, authenticated like existing /admin routes
+```
+
+Stage 1 grill there covers remaining details (empty-result shape, field naming) — that lane's job, not this one's.

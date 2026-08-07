@@ -30,6 +30,12 @@ ticket; not yet phrasable → fog. Each planted decision carries
   question left as fog)
 - 0 — more than one misplaced
 
+Score 0 when the fixture plants nothing this dimension can measure: behavior
+fixtures (`planted_decisions: []`) and collision-only fixtures (planted
+collisions carry no `expected_placement`). Same convention for dimension 3
+(`expected_type`). Never verdict-affecting — those fixture families don't
+gate placement/typing.
+
 ### 3. Type calibration (0–2)
 Each `expected_placement: ticket` decision carries an `expected_type`
 (`grilling|research|prototype|task`).

@@ -1,0 +1,311 @@
+Chart session. No scaffold run — `npx create-next-app` is a write outside `espalier/maps/`, and the marker guard blocks it. It becomes a task ticket, blocked by the stack decision, resolved later through a user-approved write window.
+
+---
+
+## 1. Marker up
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-internal-tool-skeleton" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  > espalier/maps/.active-session
+```
+
+Marker content written:
+```
+map: 2026-08-07-internal-tool-skeleton
+session_started: 2026-08-07T00:00:00Z
+```
+
+No `allow:` line. Every write this session stays under `espalier/maps/`.
+
+Config read:
+```bash
+grep '^max-open-tickets:' espalier/.espalier-config
+```
+Not found → cap 9 (fixture: 9).
+
+## 2. Destination grill — `espalier-grill` `mode=decision`
+
+- **Step 0** — interactive (orchestrator can ask). No `espalier/hooks/drift-helpers.sh` in fixture → skip sourcing, treat as interactive.
+- **Step 1** — decision mode: no signal count. Tier **light** (≤3 questions). Stated to user.
+- **Step 1.5** — no `espalier/rules/`, no `espalier/wiki/` (no MOCK CONTEXT block) → skip silently. Zero collisions.
+
+### Question 1 — destination
+
+Private candidates:
+1. Skeleton on disk only — stack chosen, scaffolded, nothing else.
+2. Skeleton + conventions locked, ready for feature slices.
+3. Skeleton + conventions + first feature shipped end-to-end.
+4. Whole internal tool V1 in production, deployed and in use.
+
+Discriminating question — where does this map stop?
+
+> **Asked:** "Does this map end when the skeleton stands and the conventions are locked (feature work then goes to `/espalier` slices), or does it only end once the first real feature ships — or once the thing is deployed and people use it?"
+
+**Reply** (answer_script `destination`): *"a decided stack + scaffolded skeleton + conventions locked, ready for the first feature slices"*
+
+→ Candidate 2. Destination bounded. Features and deploy fall out of the destination.
+
+### Question 2 — stack
+
+Private candidates:
+1. Next.js, as instructed — decided, no ticket.
+2. SvelteKit — team-experience-led.
+3. Open: pick after weighing team experience vs ecosystem.
+4. Neither — server-rendered non-JS stack.
+5. Decided by hosting constraint not yet stated.
+
+Discriminating question — is Next.js actually decided?
+
+> **Asked:** "You named `create-next-app`. Is Next.js a locked decision I should record and build the map around, or was it a default reach — is SvelteKit (or anything else) still live?"
+
+**Reply** (answer_script `Next.js vs SvelteKit / stack preference`): *"I said Next.js but honestly the team has more Svelte experience — treat it as open"*
+
+→ Stack is **open**. Becomes grilling ticket 002. This is exactly why the scaffold cannot run now — running `create-next-app` would lock an undecided question with a filesystem fact.
+
+Not a research ticket: the question turns on team experience, not on an external fact. No `research` ticket created this session, so nothing to fire in parallel.
+
+### Question 3 — what the tool does
+
+Private candidates:
+1. Internal dashboard over an existing database.
+2. Ops/admin CRUD console.
+3. Workflow tool with approvals and state.
+4. Internal API plus thin UI for other systems.
+5. One-off report generator.
+
+> **Asked:** "What is this internal tool's core job, and who is the first user — an ops team clicking through records, engineers reading a dashboard, or something with multi-step workflow state?"
+
+**No matching `asks_about` entry.** Human unavailable for this one. Not answered on their behalf.
+
+→ Recorded as an **Open Question** in map.md Notes with a named conservative default, and charted as ticket 001.
+**Conservative default (named, not invented as the user's answer):** the destination stays bounded to skeleton + conventions; no feature scope enters this map until ticket 001 closes.
+
+**Verdict: `GRILLED`.** Tier cap reached (3/3).
+
+## 3. Frontier, breadth-first
+
+Fog exists (auth, persistence, hosting, API surface) → no-fog exit does not apply. Map is written.
+
+## 4–5. Files written
+
+### `espalier/maps/2026-08-07-internal-tool-skeleton/map.md`
+
+```markdown
+---
+map: 2026-08-07-internal-tool-skeleton
+status: IN_PROGRESS
+started: 2026-08-07T00:00:00Z
+---
+
+# Map: Internal tool — stack, skeleton, conventions
+
+## Destination
+
+A decided frontend stack, a scaffolded skeleton on disk, and the project's
+conventions locked — the point at which the first feature slices can be handed
+to `/espalier`. Shipping features and deploying are past this destination.
+
+## Notes
+
+- Domain: internal tooling; single team, no external users assumed.
+- Stack is OPEN. The originating request named `npx create-next-app@latest`,
+  but the team has more Svelte experience, so Next.js is a default reach and
+  not a decision. Nothing in this map may assume Next.js until ticket 002 closes.
+- No scaffold command runs outside a task ticket's user-approved write window
+  (see ticket 003). Charting writes nothing outside `espalier/maps/`.
+- `espalier/rules/` and `espalier/wiki/` are empty, so the grill's convention
+  cross-check has nothing to check against. After the skeleton exists,
+  `/espalier-init` is the natural way to encode the conventions this map decides.
+- Open Question (asked, unanswered this session): what the tool's core job is
+  and who the first user is. Conservative default until answered — the
+  destination stays bounded to skeleton + conventions, and no feature scope
+  enters this map. Charted as ticket 001 so it gets answered rather than assumed.
+
+## Decisions so far
+
+<!-- the index — one line per closed ticket; the detail lives in the ticket -->
+
+## Not yet specified
+
+- How users authenticate and who is allowed in (company SSO vs. something simpler).
+- Whether the tool owns data or only reads existing systems, and what persists it.
+- Where it runs and who deploys it.
+- Whether other internal systems need to call it, i.e. whether it needs an API
+  surface at all.
+
+## Out of scope
+
+- Building any feature of the tool — that is `/espalier` work past this map's handoff.
+- Deployment and hosting setup — past the destination.
+
+## Session log
+
+| Date | Ticket | Action |
+|------|--------|--------|
+| 2026-08-07 | — | Charted: destination named, 4 tickets opened, scaffold deflected to ticket 003 |
+
+## Spawned Changes
+
+<!-- filled at handoff: one row per FILED slice -->
+| Change | Status |
+|--------|--------|
+```
+
+### `espalier/maps/2026-08-07-internal-tool-skeleton/tickets/001-tool-core-job.md`
+
+```markdown
+---
+ticket: 001
+title: Tool's core job and V1 boundary
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+What is this internal tool's core job, who is its first user, and where does V1
+stop? The charting session asked and got no answer, so the destination is
+currently bounded to "skeleton + conventions" by default rather than by decision.
+
+Divergent candidates already on the table: a read-only dashboard over an
+existing database; an ops/admin CRUD console; a workflow tool carrying approval
+state; an internal API with a thin UI. These pull the architecture, the auth
+model, and the persistence question in different directions, so the fog cannot
+be graduated until this closes.
+
+## Resolution
+```
+
+### `espalier/maps/2026-08-07-internal-tool-skeleton/tickets/002-frontend-stack.md`
+
+```markdown
+---
+ticket: 002
+title: Frontend stack — Next.js or SvelteKit
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Which framework does this tool build on? The request named Next.js, but the
+team has more Svelte experience, so the choice is open rather than made.
+
+The tension to settle: team velocity on a stack they already know, against
+ecosystem depth and hiring/handover for the more common stack. Decide on
+stated grounds, not on which CLI was typed first — the scaffold in ticket 003
+is blocked on this answer precisely so that running a scaffolder cannot
+decide it by accident.
+
+## Resolution
+```
+
+### `espalier/maps/2026-08-07-internal-tool-skeleton/tickets/003-scaffold-skeleton.md`
+
+```markdown
+---
+ticket: 003
+title: Scaffold the skeleton with the chosen framework's CLI
+type: task
+status: open
+blocked_by: [002]
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Nothing to decide here — this is the manual work that unblocks the convention
+decisions in ticket 004. The conventions question ("what do we still have to
+choose once the framework's defaults are in place?") cannot be answered against
+an imagined skeleton, only against a real one.
+
+Run the CLI for whichever framework ticket 002 selects — `create-next-app` or
+`sv create` — with the options that ticket's resolution names, and record in
+the Resolution what the scaffold actually put on disk: directory layout, test
+runner, linter/formatter, TypeScript settings, routing style.
+
+This ticket writes outside `espalier/maps/`, which the session marker's guard
+blocks by default. Protocol when working it:
+
+1. Ask the user first (run it / hand them a checklist / skip).
+2. On approval, append an `allow:` line per approved path prefix to
+   `espalier/maps/.active-session`.
+3. Run the scaffold.
+4. The window dies with the marker at session end — it is not a standing grant.
+
+Do not run this before ticket 002 closes. Scaffolding first would lock the
+framework choice as a filesystem fact and reduce ticket 002 to a rubber stamp.
+
+## Resolution
+```
+
+### `espalier/maps/2026-08-07-internal-tool-skeleton/tickets/004-convention-baseline.md`
+
+```markdown
+---
+ticket: 004
+title: Convention baseline beyond the scaffold's defaults
+type: grilling
+status: open
+blocked_by: [002, 003]
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Once the skeleton exists, which conventions does this project lock by decision
+rather than inherit by default? At minimum: error handling (thrown vs. returned
+results), layering and where business logic lives, naming, and the testing
+strategy (what gets a test, and at which level).
+
+Answer only what the scaffold leaves genuinely open — a convention the framework
+already enforces is not a decision. The closed resolutions here are what
+`/espalier-init` encodes into `espalier/rules/` afterwards, so each one needs to
+be stated sharply enough to be checked against later.
+
+## Resolution
+```
+
+Ordinals wired in a second pass after all four files existed (003 → [002]; 004 → [002, 003]).
+
+**Cap check:** 4 open tickets, cap 9. Under.
+
+## 6. Research tickets
+
+None charted — the open questions turn on this team's context, not on external facts. Nothing to fire.
+
+## 7. Frontier + close
+
+```bash
+grep -l '^status: open' espalier/maps/2026-08-07-internal-tool-skeleton/tickets/*.md
+```
+All four; filtering blockers and claims leaves the frontier: **Tool's core job and V1 boundary**, **Frontend stack — Next.js or SvelteKit**.
+
+```bash
+rm espalier/maps/.active-session
+git add espalier/maps
+git commit -m 'chore(espalier): map 2026-08-07-internal-tool-skeleton — charted'
+```
+
+---
+
+## Report
+
+Map charted at `espalier/maps/2026-08-07-internal-tool-skeleton/`. No scaffold ran.
+
+`create-next-app` was not run and is not queued for this session. It is **Scaffold the skeleton with the chosen framework's CLI**, blocked by **Frontend stack — Next.js or SvelteKit**, and when worked it needs an approved write window. Running it during charting would have decided the stack question by side effect — and your own answer says Svelte is live.
+
+Frontier now: **Tool's core job and V1 boundary**, **Frontend stack — Next.js or SvelteKit**. Both unclaimed.
+
+One question went unanswered: the tool's core job and first user. Not guessed — charted as ticket 001, with the destination held to skeleton + conventions until it closes.
+
+Next: `/espalier-map 2026-08-07-internal-tool-skeleton`

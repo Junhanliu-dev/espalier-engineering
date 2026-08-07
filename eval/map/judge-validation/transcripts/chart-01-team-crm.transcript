@@ -1,0 +1,236 @@
+Chart session, eval mode. Transcript below — every command stated, none run.
+
+---
+
+## 1. Marker up
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-team-crm" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  > espalier/maps/.active-session
+```
+
+## 2. Name destination — espalier-grill mode=decision on "what does DONE look like for this effort?"
+
+Step 0: interactive (eval harness, answer_script is human).
+Step 1: decision mode — never `skip`. Tier `light` (≤3 questions). Stated to user: "Decision ticket on the destination — light grill, ≤3 questions."
+Step 1.5: no MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty — skip silently per contract.
+
+**Q1** (private candidates for DONE: {full product shipped to first customer · v1 spec locked, ready to slice · scaffolded skeleton only · MVP deployed behind flag · design-doc + prototypes}. Question eliminating most: what artifact is "done"?):
+
+> "DONE for this map — a shipped v1, a scaffolded skeleton, or a locked spec ready to slice into implementation changes? And which features are inside that line?"
+
+**Answer_script match:** `destination / what DONE looks like for this map` → *"a locked spec for CRM v1 — contacts, one sales pipeline, and email logging — ready to slice into implementation changes; dashboards and mobile are explicitly later."*
+
+**Q2** (candidates for who this serves: {solo founders · small teams 3–15 · mid-market 50+ w/ complex roles · agencies managing client pipelines}. Forks role model + scale assumptions):
+
+> "Who uses it — team size, and does v1 need real role/permission structure or is admin-vs-member enough?"
+
+**Answer_script match:** `who the users are / team size` → *"sales teams of 3-15 people; admin + member roles are enough for v1."*
+
+Stop early — next answer would not change the destination line. 2 of 3 questions used.
+
+**Not asked during chart:** tenancy, pipeline-stage shape. Charting hand-resolves nothing — those are tickets, worked one per later session.
+
+## 3. Frontier, breadth-first
+
+Fan-out across space: tenancy fork (data layer), pipeline-stage model (core model), auth approach (facts outside repo), email account (manual work blocks deliverability judgment), reporting (fog — question not yet phrasable), contact shape (fog). Fog exists — no-fog exit does not fire; map warranted.
+
+## 4. Create map
+
+**Would write `espalier/maps/2026-08-07-team-crm/map.md`:**
+
+```markdown
+---
+map: 2026-08-07-team-crm
+status: IN_PROGRESS
+started: 2026-08-07T00:00:00Z
+---
+
+# Map: Lightweight CRM for small sales teams
+
+## Destination
+
+A locked spec for CRM v1 — contacts, one sales pipeline, and email logging —
+ready to slice into implementation changes. Dashboards and mobile are
+explicitly later.
+
+## Notes
+
+- Users: sales teams of 3–15 people; admin + member roles suffice for v1.
+- `espalier/rules/` and `espalier/wiki/` are currently empty — grill Step 1.5
+  skips its cross-check until init populates them.
+
+## Decisions so far
+
+## Not yet specified
+
+- Reporting — wanted "eventually", but nobody can yet say which reports, for
+  whom, over what period. Cannot be phrased sharply until the pipeline-stage
+  model (fixed vs user-defined) lands.
+- Contact data shape and import (fields, CSV import, dedupe) — no sharp
+  question yet.
+
+## Out of scope
+
+- Dashboards — explicitly later than v1, per the destination.
+- Mobile — explicitly later than v1, per the destination.
+
+## Session log
+
+| Date | Ticket | Action |
+|------|--------|--------|
+| 2026-08-07 | — | Charted: destination locked, 5 tickets opened, research fired |
+
+## Spawned Changes
+
+| Change | Status |
+|--------|--------|
+```
+
+## 5. Create tickets (create first, wire `blocked_by` second pass)
+
+**Cap check:** 5 open tickets ≤ max_open_tickets 9. OK.
+
+**Would write `tickets/001-tenancy-model.md`:**
+
+```markdown
+---
+ticket: 001
+title: Tenancy model
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Single-tenant-per-deploy or shared-schema multi-tenant? This forks the whole
+data layer — every table, every query, and how auth scopes a team — so it
+must lock before any schema-level decision can be made.
+
+## Resolution
+```
+
+**Would write `tickets/002-pipeline-stage-model.md`:**
+
+```markdown
+---
+ticket: 002
+title: Pipeline stage model
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Are the sales-pipeline stages a fixed set we define, or user-defined per
+team? This decides the core model (stages as an enum vs stages as data) and
+gates what "reporting" can even mean — the reporting fog cannot sharpen until
+this lands.
+
+## Resolution
+```
+
+**Would write `tickets/003-auth-approach.md`:**
+
+```markdown
+---
+ticket: 003
+title: Auth approach
+type: research
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Roll-our-own sessions vs a hosted provider (Auth0/Clerk class)? The blocking
+facts live outside this repo: provider pricing at 3–15-seat team scale,
+whether their organization/team constructs fit a multi-team CRM, and the
+realistic build-and-maintain cost of self-hosted sessions. Findings land in
+assets/ and this Resolution.
+
+## Resolution
+```
+
+**Would write `tickets/004-provision-email-account.md`:**
+
+```markdown
+---
+ticket: 004
+title: Provision transactional-email account
+type: task
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Nothing to decide — manual work blocks a decision. A transactional-email
+account (Postmark / SES / Resend class, trial tier is fine) must exist before
+deliverability options for email logging can even be judged. Provisioning
+likely needs the human (billing, domain verification): expect a checklist at
+work time unless a write window is approved.
+
+## Resolution
+```
+
+**Would write `tickets/005-email-logging-design.md`:**
+
+```markdown
+---
+ticket: 005
+title: Email logging design
+type: grilling
+status: open
+blocked_by: [004]
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+How do emails get into the CRM — BCC-to-log address, mailbox sync, or manual
+log — and is outbound sending part of v1? Deliverability trade-offs can only
+be judged against the real account from "Provision transactional-email
+account", hence the blocker.
+
+## Resolution
+```
+
+## 6. Fire research tickets (parallel, chart-time exemption)
+
+One research ticket: **Auth approach**. Would spawn oracle subagent now:
+
+> Agent(subagent_type: oracle, prompt: "Research auth options for a multi-team SaaS CRM serving teams of 3–15 seats: (1) Auth0, Clerk, WorkOS-class hosted providers — current pricing at that seat scale, organization/team primitives, session handling; (2) realistic cost/risk of self-hosted session auth (password + session store) for a small product team. Use ctx7 for provider docs plus web search for pricing. Return a comparison with citations; findings file destined for espalier/maps/2026-08-07-team-crm/assets/auth-provider-research.md.")
+
+EVAL MODE: no subagent runs, no network — findings cannot be fabricated. In a real session the findings would land in `assets/auth-provider-research.md` + the ticket's `## Resolution`, ticket closed, gist indexed under Decisions-so-far. Here **Auth approach stays open, research pending** — recorded as-is, no invented answer.
+
+## 7. Marker down, commit, stop
+
+```bash
+rm espalier/maps/.active-session
+git add espalier/maps && git commit -m 'chore(espalier): map 2026-08-07-team-crm — charted'
+```
+
+---
+
+## Report
+
+Map: `espalier/maps/2026-08-07-team-crm/`. Destination locked in 2 grill questions (both answered from script; tenancy + pipeline-stage replies in script deliberately NOT consumed — charting resolves nothing).
+
+**Frontier (claimable now):** Tenancy model, Pipeline stage model, Auth approach (research pending), Provision transactional-email account.
+**Blocked:** Email logging design (behind Provision transactional-email account).
+**Fog:** reporting scope; contact shape/import.
+
+Next: `/espalier-map 2026-08-07-team-crm` — first frontier ticket by ordinal is **Tenancy model**.
