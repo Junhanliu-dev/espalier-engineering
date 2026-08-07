@@ -206,7 +206,7 @@ case "$cmd" in
             v = (cov >= gcov+0) ? "PASS" : "FAIL"
             note = sprintf("derived: coverage-only, coverage=%.2f", cov)
           } else {
-            cov = sur[f] / p
+            cov = sur[f] / ps
             ok = (cov >= gcov+0) && (pl[f]+0 >= 1) && (ty[f]+0 >= 1)
             v = ok ? "PASS" : "FAIL"
             note = sprintf("derived: coverage=%.2f placement=%s typing=%s", cov, pl[f], ty[f])
