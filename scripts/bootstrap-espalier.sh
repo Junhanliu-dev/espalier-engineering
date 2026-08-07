@@ -15,7 +15,7 @@
 #   - Creates remaining directories (idempotent against existing).
 #   - Copies pure-copy templates (pipeline.md, espalier, espalier-fix,
 #     espalier-requirements, espalier-grill, espalier-prune, espalier-doctor,
-#     espalier-ask, espalier-audit SKILL.md + hooks).
+#     espalier-ask, espalier-audit, espalier-map SKILL.md + hooks).
 #   - chmod +x every espalier/hooks/*.sh (catches LLM-written hooks too — R10).
 #   - Creates symlinks via portable abspath helper (R-extra).
 #   - Appends CLAUDE.md Espalier section (idempotent grep-guard).
@@ -28,8 +28,8 @@
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
 #   - Appends the .gitattributes union entry + optional CODEOWNERS block.
-#   - Runs the validation checks (R6) — 48 claude-only, 53 with codex,
-#     58 with copilot.
+#   - Runs the validation checks (R6) — 50 claude-only, 55 with codex,
+#     60 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -58,6 +58,12 @@
 #   --codeowners-rules=<h>   GitHub handle/team owning espalier/rules/ (CODEOWNERS
 #                            block, R4). '@' prefixed if missing.
 #   --codeowners-wiki=<h>    Same for espalier/wiki/. Both empty → sub-step no-ops.
+#   --greenfield             Greenfield Pass 1 (near-empty repo): full wiring, but
+#                            writes a placeholder pre-push-gate.sh, records
+#                            espalier/.greenfield, and validation renders every
+#                            Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36,
+#                            38-45) as a pending-skip. Cleared by init Pass 2
+#                            after the decision map clears.
 #   --dry-run                Print actions without executing.
 #   --yes                    Non-interactive (used by tests + CI smoke).
 #   --force                  Override re-run safety check on existing espalier/.
@@ -87,6 +93,7 @@ PLATFORMS=""          # resolved after parsing: flag > espalier/.platforms > cla
 PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
 CODEOWNERS_RULES=""   # optional @handle owning espalier/rules/ (A4)
 CODEOWNERS_WIKI=""    # optional @handle owning espalier/wiki/
+GREENFIELD=no         # greenfield Pass 1 (placeholder gate + .greenfield marker)
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -99,6 +106,7 @@ for arg in "$@"; do
     --platforms=*)          PLATFORMS_FLAG="${arg#--platforms=}" ;;
     --codeowners-rules=*)   CODEOWNERS_RULES="${arg#--codeowners-rules=}" ;;
     --codeowners-wiki=*)    CODEOWNERS_WIKI="${arg#--codeowners-wiki=}" ;;
+    --greenfield)           GREENFIELD=yes ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -108,7 +116,7 @@ for arg in "$@"; do
     --wire-only)            MODE="wire-only" ;;
     --validate-only)        MODE="validate-only" ;;
     -h|--help)
-      sed -n '2,70p' "$0"
+      sed -n '2,76p' "$0"
       exit 0
       ;;
     *)
@@ -332,6 +340,8 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-doctor"
   run "mkdir -p espalier/skills/espalier-ask"
   run "mkdir -p espalier/skills/espalier-audit"
+  run "mkdir -p espalier/skills/espalier-map"
+  run "mkdir -p espalier/maps"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/hooks"
   run "mkdir -p espalier/wiki"
@@ -370,6 +380,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-doctor.md' espalier/skills/espalier-doctor/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-ask.md' espalier/skills/espalier-ask/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-audit.md' espalier/skills/espalier-audit/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-map.md' espalier/skills/espalier-map/SKILL.md"
   # Shared shipped scout prompts — read by /espalier-prune AND /espalier-doctor
   # (single source of truth; a dotfile so it stays out of the way).
   run "cp '$PLUGIN_DIR/templates/scout-prompts.md' espalier/.scout-prompts.md"
@@ -390,6 +401,24 @@ stage_hooks() {
   # Copilot camelCase→snake_case hook shim (pure copy; inert unless
   # .github/hooks/espalier-gates.json references it — Stage 8e, copilot only).
   run "cp '$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh' espalier/hooks/copilot-hook-adapter.sh"
+  # /espalier-map plan-don't-do guard (inert unless espalier/maps/.active-session exists).
+  run "cp '$PLUGIN_DIR/hook-templates/map-guard.sh' espalier/hooks/map-guard.sh"
+  # Read-only lane-quality report (run manually: bash espalier/hooks/espalier-stats.sh).
+  run "cp '$PLUGIN_DIR/hook-templates/espalier-stats.sh' espalier/hooks/espalier-stats.sh"
+  # Greenfield Pass 1: no Phase 2 writes exist yet — a placeholder gate keeps
+  # check #6 honest and blocks nothing; init Pass 2 overwrites it with the
+  # real substituted gate once the decision map clears. Write-if-absent.
+  if [ "$GREENFIELD" = "yes" ]; then
+    if [ "$DRY_RUN" = "yes" ]; then
+      echo "[dry-run] write placeholder espalier/hooks/pre-push-gate.sh + espalier/.greenfield"
+    else
+      if [ ! -f espalier/hooks/pre-push-gate.sh ]; then
+        printf '#!/bin/bash\n# greenfield placeholder — real gate is written by /espalier-init Pass 2\n# (after the /espalier-map greenfield map clears). Blocks nothing until then.\nexit 0\n' \
+          > espalier/hooks/pre-push-gate.sh
+      fi
+      [ -f espalier/.greenfield ] || printf 'pass1: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > espalier/.greenfield
+    fi
+  fi
   # --lang=unsupported: guarantee post-edit-wrapper never execs a missing file.
   # Write-if-absent ONLY — never clobber a Phase-2-adapted hook.
   if [ "$LANG_VARIANT" = "unsupported" ] && [ ! -f espalier/hooks/check-layer-boundaries.sh ]; then
@@ -413,7 +442,7 @@ stage_hooks() {
 
 # --- Stage 5: Symlinks ------------------------------------------------------
 
-ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit"
+ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit espalier-map"
 
 stage_symlinks() {
   log "Stage 5: platform wiring symlinks ($PLATFORMS)"
@@ -541,6 +570,8 @@ This project uses Espalier for AI code quality — auto-discovered, project-spec
 
 **For a repo-wide security audit**, use `/espalier-audit` — inventories trust-boundary defects in the existing code to `espalier/wiki/security-audit.md`; dispatch fixes via `/espalier-fix`.
 
+**For multi-session planning** (an epic, a greenfield build — anything too big for one session), use `/espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `/espalier`. It plans only, never codes.
+
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
 **Key principle:** The coder agent and reviewer agent are ALWAYS separate.
@@ -594,6 +625,14 @@ ESPALIER_HOOKS = {
                 "type": "command",
                 "command": 'bash "$CLAUDE_PROJECT_DIR/espalier/hooks/pre-push-gate-wrapper.sh"',
                 "timeout": 30
+            }]
+        },
+        {
+            "matcher": "Write|Edit",
+            "hooks": [{
+                "type": "command",
+                "command": 'bash "$CLAUDE_PROJECT_DIR/espalier/hooks/map-guard.sh"',
+                "timeout": 5
             }]
         }
     ]
@@ -687,6 +726,8 @@ directory — this instruction IS the load mechanism; do not skip it.
 
 **For a repo-wide security audit**, invoke `$espalier-audit` — inventories trust-boundary defects in the existing code to `espalier/wiki/security-audit.md`; dispatch fixes via `$espalier-fix`.
 
+**For multi-session planning** (an epic, a greenfield build — anything too big for one session), invoke `$espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `$espalier`. It plans only, never codes.
+
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
 **Key principle:** The coder agent and reviewer agent are ALWAYS separate.
@@ -720,12 +761,41 @@ stage_codex_config() {
     return
   fi
   log "Stage 8b: .codex/config.toml hooks merge (marker-guarded)"
+  # The map-guard block has its OWN marker so a pre-v0.18 install (whose
+  # ESPALIER HOOKS v1 block already exists) still receives it on re-run.
+  _codex_map_guard_block() {
+    if grep -q "ESPALIER MAP GUARD" .codex/config.toml 2>/dev/null; then
+      return 0
+    fi
+    if [ "$DRY_RUN" = "yes" ]; then
+      echo "[dry-run] append Espalier map-guard block to .codex/config.toml"
+      return 0
+    fi
+    [ -s .codex/config.toml ] && printf '\n' >> .codex/config.toml
+    cat >> .codex/config.toml << 'CODEXMAPGUARD'
+# >>> ESPALIER MAP GUARD v1 >>> (managed by espalier bootstrap — do not edit between markers)
+# Blocks writes outside espalier/maps/ while a /espalier-map session marker is
+# active (plan, don't do). Inert otherwise. Exit 2 + stderr blocks.
+[[hooks.PreToolUse]]
+matcher = "^(apply_patch|Edit|Write)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "bash espalier/hooks/map-guard.sh"
+statusMessage = "Espalier map-session write guard"
+timeout = 5
+# <<< ESPALIER MAP GUARD v1 <<<
+CODEXMAPGUARD
+    log "  .codex/config.toml: map-guard block appended"
+  }
   if [ -f .codex/config.toml ] && grep -q "ESPALIER HOOKS" .codex/config.toml 2>/dev/null; then
     log "  .codex/config.toml already has Espalier hook block — skipping"
+    _codex_map_guard_block
     return
   fi
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] append Espalier hook block to .codex/config.toml"
+    _codex_map_guard_block
     return
   fi
   mkdir -p .codex
@@ -760,6 +830,7 @@ timeout = 30
 # <<< ESPALIER HOOKS v1 <<<
 CODEXHOOKS
   log "  .codex/config.toml: Espalier hook block appended"
+  _codex_map_guard_block
 }
 
 # --- Stage 8c: .codex/agents/*.toml sub-agents (codex) ------------------------
@@ -868,6 +939,8 @@ section, it is the same contract — follow it once.)
 **For questions** ("how does X work", "where is Y"), invoke `/espalier-ask <question>` — read-only, answers from espalier/ docs first.
 
 **For a repo-wide security audit**, invoke `/espalier-audit` — inventories trust-boundary defects to `espalier/wiki/security-audit.md`; dispatch fixes via `/espalier-fix`.
+
+**For multi-session planning** (an epic, a greenfield build — anything too big for one session), invoke `/espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `/espalier`. It plans only, never codes.
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
@@ -1003,6 +1076,12 @@ stage_copilot_hooks() {
         "matcher": "bash|shell",
         "bash": "bash espalier/hooks/copilot-hook-adapter.sh pre-push-gate-wrapper.sh",
         "timeoutSec": 30
+      },
+      {
+        "type": "command",
+        "matcher": "edit|write|create|apply_patch|str_replace_editor",
+        "bash": "bash espalier/hooks/copilot-hook-adapter.sh map-guard.sh",
+        "timeoutSec": 5
       }
     ],
     "postToolUse": [
@@ -1077,9 +1156,10 @@ stage_merge_decision() {
   # Read at runtime by the orchestrator (grep + integer parse, like pre-push-gate).
   detect_canonical_ref
   if [ -f espalier/.espalier-config ]; then
-    log "  espalier/.espalier-config already exists — preserving (appending missing canonical-ref keys only)"
+    log "  espalier/.espalier-config already exists — preserving (appending missing keys only)"
     _append_config_key canonical-remote "$CANON_REMOTE"
     _append_config_key canonical-branch "$CANON_BRANCH"
+    _append_config_key max-open-tickets 9
   else
     cat > espalier/.espalier-config << 'ESPALIERCFG'
 # Espalier pipeline tuning. Key-value, one per line: `<key>: <integer>`.
@@ -1100,6 +1180,10 @@ max-test-rounds: 3
 # Whole-pipeline safety: total cross-stage rollbacks allowed before human takeover.
 # (Separate from the fixed "no more than 3 stages in a single rollback" span guard.)
 max-rollbacks: 3
+
+# /espalier-map anti-waterfall cap: max OPEN decision tickets per map before
+# charting must narrow the destination, split the map, or raise this value.
+max-open-tickets: 9
 ESPALIERCFG
     # Canonical-ref keys are DYNAMIC (detected) — appended after the quoted
     # heredoc, never interpolated into it.
@@ -1330,16 +1414,19 @@ stage_gitignore() {
 
 stage_validate() {
   # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
-  # 5 copilot (52-56) + 2 unconditional base (57-58 — appended AFTER the
+  # 5 copilot (52-56) + 4 unconditional base (57-60 — appended AFTER the
   # platform blocks so shipped platform IDs stay stable; base numbering is
-  # non-contiguous by design). Numbering is FIXED per platform; copilot
-  # without codex still renders 47-51 as skip lines so the sequence stays
-  # contiguous.
-  local TOTAL_CHECKS=48
+  # non-contiguous by design; 57-58 landed in v0.16, 59-60 in v0.18).
+  # Numbering is FIXED per platform; copilot without codex still renders
+  # 47-51 as skip lines so the sequence stays contiguous. A greenfield
+  # Pass 1 (espalier/.greenfield present) renders every Phase-2-artifact
+  # check (5, 9, 15-16, 30-32, 34-36, 38-45) as a pending-skip — count and
+  # numbering unchanged.
+  local TOTAL_CHECKS=50
   if want_copilot; then
-    TOTAL_CHECKS=58
+    TOTAL_CHECKS=60
   elif want_codex; then
-    TOTAL_CHECKS=53
+    TOTAL_CHECKS=55
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1376,6 +1463,12 @@ stage_validate() {
     idx=$(printf '%02d' "$n")
     echo "[$n/$TOTAL_CHECKS] OK   $check_name (skipped — $why)" > "$tmpdir/$idx"
   }
+
+  # Greenfield Pass 1 (espalier/.greenfield present): every Phase-2-written
+  # artifact (rules, agent.md, sub-agents, substituted skills, wiki) does not
+  # exist yet — Pass 2 binds them from the decision map. Those checks render
+  # as pending-skips; wiring/pure-copy checks stay live.
+  gf() { [ -f espalier/.greenfield ]; }
 
   # Check #25 — invoked DIRECTLY (not via run_check): the run_check harness
   # discards stdout, which would swallow #25's per-tier table.
@@ -1419,10 +1512,14 @@ stage_validate() {
 
   if want_claude; then
     run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit' &
+    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit .claude/skills/espalier-map' &
     run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
     run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
-    run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
+    if gf; then
+      skip_check 5 "symlinks-valid" "pending greenfield Pass 2"
+    else
+      run_check  5 "symlinks-valid"      '[ -L .claude/rules/espalier-structure.md ] && [ -e .claude/rules/espalier-structure.md ]' &
+    fi
   else
     skip_check 1 "rules-load"       "claude not targeted"
     skip_check 2 "skills-load"      "claude not targeted"
@@ -1437,7 +1534,11 @@ stage_validate() {
   else
     skip_check 8 "claudemd-updated" "claude not targeted"
   fi
-  run_check  9 "espalier-agent-md"   'test -f espalier/agent.md' &
+  if gf; then
+    skip_check 9 "espalier-agent-md" "pending greenfield Pass 2"
+  else
+    run_check  9 "espalier-agent-md"   'test -f espalier/agent.md' &
+  fi
   run_check 10 "espalier-pipeline-md" 'test -f espalier/pipeline.md' &
   run_check 11 "skill-name-parity"   'for f in espalier/skills/*/SKILL.md; do dir=$(basename $(dirname "$f")); name=$(grep "^name:" "$f" | awk "{print \$2}"); [ "$dir" = "$name" ] || exit 1; done' &
   run_check 12 "typed-changes-dirs"  '[ -d espalier/changes/feat ] && [ -d espalier/changes/fix ] && [ -d espalier/changes/refactor ]' &
@@ -1448,8 +1549,13 @@ stage_validate() {
     run_check 13 "espalier-fix-skill"  'test -f espalier/skills/espalier-fix/SKILL.md' &
     run_check 14 "espalier-fix-name"   'grep -q "^name: espalier-fix" espalier/skills/espalier-fix/SKILL.md' &
   fi
-  run_check 15 "rules-engineering"   'test -f espalier/rules/engineering-structure.md' &
-  run_check 16 "rules-standards"     'test -f espalier/rules/coding-standards.md' &
+  if gf; then
+    skip_check 15 "rules-engineering" "pending greenfield Pass 2"
+    skip_check 16 "rules-standards"   "pending greenfield Pass 2"
+  else
+    run_check 15 "rules-engineering"   'test -f espalier/rules/engineering-structure.md' &
+    run_check 16 "rules-standards"     'test -f espalier/rules/coding-standards.md' &
+  fi
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
@@ -1461,40 +1567,68 @@ stage_validate() {
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
   run_check 27 "conventions-format"  '{ [ ! -s espalier/.conventions.tsv ] || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/.conventions.tsv; } && { [ ! -d espalier/conventions ] || ! ls espalier/conventions/*.tsv >/dev/null 2>&1 || awk -F"\t" "NF != 5 && NF != 6 { exit 1 }" espalier/conventions/*.tsv; }' &
   run_check 28 "doctor-cadence"      '[ ! -f espalier/.doctor-cadence ] || grep -qE "^cadence: (every-change|weekly|monthly|manual)$" espalier/.doctor-cadence' &
-  if want_claude; then
+  if gf; then
+    # 29/33 stay live (pure-copy skills exist even in Pass 1); the security/
+    # production artifacts are Phase 2 writes.
+    skip_check 30 "security-rule"    "pending greenfield Pass 2"
+    skip_check 31 "security-agent"   "pending greenfield Pass 2"
+    skip_check 32 "security-skill"   "pending greenfield Pass 2"
+    skip_check 34 "audit-mode"       "pending greenfield Pass 2"
+    skip_check 35 "production-rule"  "pending greenfield Pass 2"
+    skip_check 36 "production-file"  "pending greenfield Pass 2"
+    if want_claude; then
+      run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
+      run_check 33 "audit-skill"         'test -f .claude/skills/espalier-audit/SKILL.md' &
+    else
+      run_check 29 "espalier-ask-skill"  'test -f espalier/skills/espalier-ask/SKILL.md' &
+      run_check 33 "audit-skill"         'test -f espalier/skills/espalier-audit/SKILL.md' &
+    fi
+  elif want_claude; then
     run_check 29 "espalier-ask-skill"  'test -f .claude/skills/espalier-ask/SKILL.md' &
     run_check 30 "security-rule"       '[ -L .claude/rules/espalier-security.md ] && [ -e .claude/rules/espalier-security.md ]' &
     run_check 31 "security-agent"      'test -f .claude/agents/harness-security.md' &
     run_check 32 "security-skill"      'test -f .claude/skills/espalier-security/SKILL.md' &
     run_check 33 "audit-skill"         'test -f .claude/skills/espalier-audit/SKILL.md' &
+    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
+    run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
+    run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   else
     run_check 29 "espalier-ask-skill"  'test -f espalier/skills/espalier-ask/SKILL.md' &
     run_check 30 "security-rule"       'test -f espalier/rules/security-standards.md' &
     run_check 31 "security-agent"      'test -f espalier/agents/harness-security.md' &
     run_check 32 "security-skill"      'test -f espalier/skills/espalier-security/SKILL.md' &
     run_check 33 "audit-skill"         'test -f espalier/skills/espalier-audit/SKILL.md' &
-  fi
-  run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
-  if want_claude; then
-    run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
-  else
+    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
     run_check 35 "production-rule"     'test -f espalier/rules/production-standards.md' &
+    run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   fi
-  run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   run_check 37 "scout-prompts"      'test -f espalier/.scout-prompts.md' &
   # 38-46: LLM-written artifacts (Phase 2) — existence checks with fix hints.
-  run_check 38 "phase2-coding-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-coding/SKILL.md' &
-  run_check 39 "phase2-review-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-review/SKILL.md' &
-  run_check 40 "phase2-testing-skill (fix: re-run espalier-init Phase 2)"  'test -f espalier/skills/espalier-testing/SKILL.md' &
-  run_check 41 "wiki-architecture (fix: re-run espalier-init Phase 2)"     'test -f espalier/wiki/architecture.md' &
-  run_check 42 "wiki-data-models (fix: re-run espalier-init Phase 2)"      'test -f espalier/wiki/data-models.md' &
-  run_check 43 "wiki-critical-paths (fix: re-run espalier-init Phase 2)"   'test -f espalier/wiki/critical-paths.md' &
-  run_check 44 "wiki-external-services (fix: re-run espalier-init Phase 2)" 'test -f espalier/wiki/external-services.md' &
-  run_check 45 "rules-development-process (fix: re-run espalier-init Phase 2)" 'test -f espalier/rules/development-process.md' &
+  # Greenfield Pass 1: Phase 2 has not run yet (it binds the decision map in
+  # Pass 2), so 38-45 render as pending-skips instead of failures.
+  if [ -f espalier/.greenfield ]; then
+    skip_check 38 "phase2-coding-skill"       "pending greenfield Pass 2"
+    skip_check 39 "phase2-review-skill"       "pending greenfield Pass 2"
+    skip_check 40 "phase2-testing-skill"      "pending greenfield Pass 2"
+    skip_check 41 "wiki-architecture"         "pending greenfield Pass 2"
+    skip_check 42 "wiki-data-models"          "pending greenfield Pass 2"
+    skip_check 43 "wiki-critical-paths"       "pending greenfield Pass 2"
+    skip_check 44 "wiki-external-services"    "pending greenfield Pass 2"
+    skip_check 45 "rules-development-process" "pending greenfield Pass 2"
+  else
+    run_check 38 "phase2-coding-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-coding/SKILL.md' &
+    run_check 39 "phase2-review-skill (fix: re-run espalier-init Phase 2)"   'test -f espalier/skills/espalier-review/SKILL.md' &
+    run_check 40 "phase2-testing-skill (fix: re-run espalier-init Phase 2)"  'test -f espalier/skills/espalier-testing/SKILL.md' &
+    run_check 41 "wiki-architecture (fix: re-run espalier-init Phase 2)"     'test -f espalier/wiki/architecture.md' &
+    run_check 42 "wiki-data-models (fix: re-run espalier-init Phase 2)"      'test -f espalier/wiki/data-models.md' &
+    run_check 43 "wiki-critical-paths (fix: re-run espalier-init Phase 2)"   'test -f espalier/wiki/critical-paths.md' &
+    run_check 44 "wiki-external-services (fix: re-run espalier-init Phase 2)" 'test -f espalier/wiki/external-services.md' &
+    run_check 45 "rules-development-process (fix: re-run espalier-init Phase 2)" 'test -f espalier/rules/development-process.md' &
+  fi
   run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
   # 47-51: codex wiring (skip-rendered when copilot alone keeps numbering contiguous).
   if want_codex; then
-    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit' &
+    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit .agents/skills/espalier-map' &
     run_check 48 "codex-symlinks-valid" '[ -L .agents/skills/espalier ] && [ -e .agents/skills/espalier ]' &
     run_check 49 "codex-agents-toml"   'grep -q "^name = \"harness-coder\"" .codex/agents/harness-coder.toml && grep -q "^name = \"harness-reviewer\"" .codex/agents/harness-reviewer.toml && grep -q "^name = \"harness-security\"" .codex/agents/harness-security.toml' &
     run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
@@ -1508,25 +1642,32 @@ stage_validate() {
   fi
   # 52-56: copilot wiring (only when copilot is a target platform).
   if want_copilot; then
-    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit' &
+    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit .github/skills/espalier-map' &
     run_check 53 "copilot-symlinks-valid" '[ -L .github/skills/espalier ] && [ -e .github/skills/espalier ]' &
     run_check 54 "copilot-agents"       'grep -q "^name: harness-coder" .github/agents/harness-coder.agent.md && grep -q "^name: harness-reviewer" .github/agents/harness-reviewer.agent.md && grep -q "^name: harness-security" .github/agents/harness-security.agent.md' &
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
     run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
-  # 57-58: base checks (v0.16.0 multi-dev floor) — run UNCONDITIONALLY,
-  # regardless of --platforms; appended after the platform blocks so the
-  # shipped IDs 47-56 stay stable.
+  # 57-60: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
+  # lane) — run UNCONDITIONALLY, regardless of --platforms; appended after
+  # the platform blocks so the shipped IDs 47-56 stay stable.
   run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
   run_check 58 "canonical-ref-keys"   'grep -qE "^canonical-remote: .+" espalier/.espalier-config && grep -qE "^canonical-branch: .+" espalier/.espalier-config' &
+  if want_claude; then
+    run_check 59 "map-skill"          'test -f .claude/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" .claude/skills/espalier-map/SKILL.md' &
+    run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh && grep -q "map-guard" .claude/settings.json' &
+  else
+    run_check 59 "map-skill"          'test -f espalier/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" espalier/skills/espalier-map/SKILL.md' &
+    run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh' &
+  fi
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-58.
+  # must reach stdout, which the run_check harness discards), then 26-60.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-8] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/60 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

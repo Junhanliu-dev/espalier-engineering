@@ -299,7 +299,7 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/48\]' | head -3 | sed 's/\[//;s/\/48\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/50\]' | head -3 | sed 's/\[//;s/\/50\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -327,7 +327,7 @@ HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-l
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/48] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/50] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -341,7 +341,7 @@ HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/48] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/50] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Test 13: --lang=unsupported writes a no-op boundary hook ─────────────
@@ -380,8 +380,8 @@ assert "14i coder agent toml"                "grep -q '^name = \"harness-coder\"
 assert "14j reviewer agent toml"             "[ -f '$TMP/.codex/agents/harness-reviewer.toml' ]"
 assert "14k security agent toml"             "[ -f '$TMP/.codex/agents/harness-security.toml' ]"
 assert "14l platforms persisted"             "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
-assert "14m validation total is 51"          "echo \"\$P_OUT\" | grep -q 'Validation: 53/53 passed'"
-assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/53] OK'"
+assert "14m validation total is 55"          "echo \"\$P_OUT\" | grep -q 'Validation: 55/55 passed'"
+assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/55] OK'"
 assert "14o CLAUDE.md section still written" "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 # TOML sanity: python tomllib parses the generated config + agent files.
 assert "14p config.toml parses"              "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
@@ -411,7 +411,7 @@ assert "15b merge decision reused"           "echo \"\$W_OUT\" | grep -q \"reusi
 assert "15c platforms unioned to claude,codex" "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
 assert "15d codex wired"                     "[ -L '$TMP/.agents/skills/espalier' ] && grep -q 'ESPALIER HOOKS' '$TMP/.codex/config.toml'"
 assert "15e claude wiring untouched"         "[ -L '$TMP/.claude/skills/espalier' ] && grep -q 'espalier/hooks' '$TMP/.claude/settings.json'"
-assert "15f validation total is 51"          "echo \"\$W_OUT\" | grep -q 'Validation: 53/53 passed'"
+assert "15f validation total is 55"          "echo \"\$W_OUT\" | grep -q 'Validation: 55/55 passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 16: codex-only install (no .claude litter, claude checks skip) ──
@@ -429,7 +429,7 @@ assert "16b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
 assert "16c no CLAUDE.md section"            "! grep -q '## Espalier' '$TMP/CLAUDE.md' 2>/dev/null"
 assert "16d codex fully wired"               "[ -L '$TMP/.agents/skills/espalier' ] && [ -f '$TMP/.codex/agents/harness-coder.toml' ] && grep -q '## Espalier' '$TMP/AGENTS.md'"
 assert "16e claude checks skipped OK"        "echo \"\$C_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
-assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 53/53 passed'"
+assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 55/55 passed'"
 assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -448,8 +448,8 @@ assert "17e hooks json valid + adapter wired"  "python3 -c 'import json; json.lo
 assert "17f adapter copied + executable"       "[ -x '$TMP/espalier/hooks/copilot-hook-adapter.sh' ]"
 assert "17g copilot-instructions section"      "grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "17h claude + codex wiring intact"      "[ -L '$TMP/.claude/skills/espalier' ] && [ -L '$TMP/.agents/skills/espalier' ]"
-assert "17i validation total is 56"            "echo \"\$A_OUT\" | grep -q 'Validation: 58/58 passed'"
-assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/58] OK'"
+assert "17i validation total is 60"            "echo \"\$A_OUT\" | grep -q 'Validation: 60/60 passed'"
+assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/60] OK'"
 # Idempotent re-run: sections/files not duplicated, user tuning preserved.
 echo "<!-- user tuning marker -->" >> "$TMP/.github/agents/harness-coder.agent.md"
 ( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=all --yes >/dev/null 2>&1 )
@@ -471,7 +471,7 @@ assert "18c no AGENTS.md written"            "[ ! -f '$TMP/AGENTS.md' ]"
 assert "18d copilot fully wired"             "[ -L '$TMP/.github/skills/espalier' ] && [ -f '$TMP/.github/agents/harness-coder.agent.md' ] && grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "18e claude checks skipped OK"        "echo \"\$P_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
 assert "18f codex checks skipped OK"         "echo \"\$P_OUT\" | grep -qF 'OK   codex-skills-load (skipped — codex not targeted)'"
-assert "18g validation total is 56"          "echo \"\$P_OUT\" | grep -q 'Validation: 58/58 passed'"
+assert "18g validation total is 60"          "echo \"\$P_OUT\" | grep -q 'Validation: 60/60 passed'"
 assert "18h platforms = copilot"             "grep -qx 'copilot' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -570,8 +570,8 @@ WT_EXIT=$?
 assert "21a bootstrap from linked worktree exits 0"    "[ $WT_EXIT -eq 0 ]"
 assert "21b dispatcher installed in the COMMON hooks dir" \
   "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
-assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 48/48 passed'"
-assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/48] OK'"
+assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 50/50 passed'"
+assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/50] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$WT" "$TMP"
 
 # ─── Test 22: migration v0.15.0 → v0.16.0 (synthetic fixture) ─────────────
@@ -702,6 +702,60 @@ for f in pipeline.md; do echo "# stub again" > "$TMP/espalier/$f"; done
 M17_BAD=$( cd "$TMP" && bash "$MIGRATE17" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1; echo "RC=$?" )
 assert "24p ignored .doctor-stamp is refused at run time" \
   "echo \"\$M17_BAD\" | grep -q 'RC=1' && echo \"\$M17_BAD\" | grep -qi 'doctor-stamp'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 25: v0.18.0 map lane — wiring, greenfield, migration ────────────
+echo "Test 25: v0.18.0 map lane (wiring + greenfield + migration)"
+MIGRATE18="$SCRIPT_DIR/migrate-v0.17.0-to-v0.18.0.sh"
+
+# 25a-h: fresh full install (all platforms) carries the map lane end to end.
+TMP=$(mktemp -d -t smoke25.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+M25_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=all --yes --force 2>&1 )
+assert "25a map skill copied"            "grep -q '^name: espalier-map' '$TMP/espalier/skills/espalier-map/SKILL.md'"
+assert "25b map skill linked (all three)" "[ -L '$TMP/.claude/skills/espalier-map' ] && [ -L '$TMP/.agents/skills/espalier-map' ] && [ -L '$TMP/.github/skills/espalier-map' ]"
+assert "25c map-guard executable"        "[ -x '$TMP/espalier/hooks/map-guard.sh' ]"
+assert "25d settings.json map-guard entry" "grep -q 'map-guard' '$TMP/.claude/settings.json'"
+assert "25e codex map-guard block"       "grep -q 'ESPALIER MAP GUARD v1' '$TMP/.codex/config.toml' && python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
+assert "25f copilot gates map-guard"     "grep -q 'map-guard' '$TMP/.github/hooks/espalier-gates.json' && python3 -c 'import json; json.load(open(\"$TMP/.github/hooks/espalier-gates.json\"))'"
+assert "25g max-open-tickets key"        "grep -q '^max-open-tickets: 9' '$TMP/espalier/.espalier-config'"
+assert "25h checks 59+60 pass"           "echo \"\$M25_OUT\" | grep -qF '[59/60] OK' && echo \"\$M25_OUT\" | grep -qF '[60/60] OK'"
+assert "25i maps dir created"            "[ -d '$TMP/espalier/maps' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 25j-n: greenfield Pass 1 — no Phase 2 writes; placeholder gate; skips render.
+TMP=$(mktemp -d -t smoke25g.XXXX)
+make_smoke_repo "$TMP"
+G25_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=unsupported --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --greenfield --yes --force 2>&1 )
+G25_RC=$?
+assert "25j greenfield bootstrap exits 0"  "[ $G25_RC -eq 0 ]"
+assert "25k .greenfield marker recorded"   "[ -f '$TMP/espalier/.greenfield' ]"
+assert "25l placeholder gate present"      "grep -q 'greenfield placeholder' '$TMP/espalier/hooks/pre-push-gate.sh'"
+assert "25m phase2 checks render as skips" "echo \"\$G25_OUT\" | grep -qF 'phase2-coding-skill (skipped — pending greenfield Pass 2)'"
+assert "25n greenfield validation passes"  "echo \"\$G25_OUT\" | grep -q 'Validation: 50/50 passed'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 25o-t: migration v0.17.0 → v0.18.0 fixture — strip v0.18 bits from a fresh
+# install, migrate, verify, re-run is a no-op.
+TMP=$(mktemp -d -t smoke25m.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+( cd "$TMP" \
+  && rm -rf espalier/skills/espalier-map espalier/hooks/map-guard.sh espalier/maps .claude/skills/espalier-map \
+  && grep -v 'mode=decision' espalier/skills/espalier-grill/SKILL.md > g.tmp && mv g.tmp espalier/skills/espalier-grill/SKILL.md \
+  && grep -v '^max-open-tickets' espalier/.espalier-config > c.tmp && mv c.tmp espalier/.espalier-config )
+M18_DRY=$( cd "$TMP" && bash "$MIGRATE18" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "25o dry-run lists missing markers"  "echo \"\$M18_DRY\" | grep -q 'espalier-map lane skill'"
+assert "25p dry-run creates nothing"        "[ ! -f '$TMP/espalier/hooks/map-guard.sh' ]"
+M18_OUT=$( cd "$TMP" && bash "$MIGRATE18" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M18_RC=$?
+assert "25q apply exits 0"                  "[ $M18_RC -eq 0 ]"
+assert "25r skill + guard + link installed" "grep -q '^name: espalier-map' '$TMP/espalier/skills/espalier-map/SKILL.md' && [ -x '$TMP/espalier/hooks/map-guard.sh' ] && [ -L '$TMP/.claude/skills/espalier-map' ]"
+assert "25s config + settings wired"        "grep -q '^max-open-tickets:' '$TMP/espalier/.espalier-config' && grep -q 'map-guard' '$TMP/.claude/settings.json'"
+M18_RERUN=$( cd "$TMP" && bash "$MIGRATE18" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "25t re-run is a no-op"              "echo \"\$M18_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

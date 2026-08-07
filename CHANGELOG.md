@@ -1,5 +1,95 @@
 # Changelog
 
+## 0.18.0 — 2026-08-06
+
+Minor: **the map lane** — multi-session planning above the pipeline, and a
+road into greenfield. Concept adapted from Matt Pocock's `wayfinder` skill
+(MIT); the enforcement layer is Espalier's. Suites: bootstrap 197/197, hooks
+146/146; validation is 50/55/60 by platform set (new checks 59-60).
+
+- **`/espalier-map` lane** (new pure-copy skill `espalier-map`) — an effort
+  too big for one session (epic, greenfield build, product on a boilerplate)
+  is charted as a **decision map** under `espalier/maps/{date}-{slug}/`:
+  `map.md` (index, not store — Destination / Notes / Decisions-so-far /
+  Not-yet-specified fog / Out-of-scope / Session log / Spawned Changes) +
+  one file per ticket (`tickets/NNN-{kebab}.md`, frontmatter
+  `type: grilling|prototype|research|task`, `status`, `blocked_by`,
+  `claimed_by`) + `assets/`. File-per-ticket = no cross-ticket merge
+  conflicts (the v0.17 file-per-key argument); claims are the lock. The
+  frontier (open ∧ blockers-closed ∧ unclaimed) is grep-derivable — no
+  tracker dependency. Chart mode names the destination FIRST (grilled),
+  fans out breadth-first, exits with no map when no fog surfaces ("the
+  split is session count, not project size"), and fires research tickets as
+  parallel scouts. Work mode resolves ONE non-research ticket per session,
+  graduates fog into fresh tickets, and stops. A cleared map hands off as
+  `Status: FILED` change skeletons with `charted_from:` + `tickets:`
+  frontmatter — adopted by the EXISTING FILED-skeleton scan, so the audit
+  chain reads decision → ticket → change → commit. Completion offers (never
+  auto-flips) map `CLEARED → BUILT` when every spawned change is COMPLETE.
+- **`map-guard.sh`** (new hook, all three platforms) — plan-don't-do,
+  machine-verified: while `espalier/maps/.active-session` exists and is
+  fresher than 12h, Write/Edit outside `espalier/maps/` is blocked (exit 2 +
+  stderr; same JSON extraction as post-edit-wrapper, so Claude `file_path`,
+  Codex `apply_patch` bodies, and Copilot camelCase-via-adapter all guard).
+  Task-ticket write windows are user-approved `allow: <prefix>` marker lines;
+  absolute/traversal prefixes are ignored. Stale markers self-expire so a
+  crashed session never bricks the repo. Upstream wayfinder's most-reported
+  failure (production code written mid-map, Notes self-licensing) is closed
+  structurally — there is no Notes execution override at all.
+- **Grill `mode=decision`** — grilling tickets resolve through the existing
+  grill machinery inverted for sharp questions: no signal-count tier
+  (default `light`), divergent CANDIDATE ANSWERS instead of divergent
+  interpretations, Step 1.5 cross-checks the candidates against `rules/` +
+  `wiki/` before a decision locks, resolutions land in the ticket's
+  `## Resolution` with citations.
+- **`max-open-tickets: 9`** (`espalier/.espalier-config`) — the
+  anti-waterfall cap: charting past it forces narrow / split / raise.
+- **Greenfield decide-then-bind** (`/espalier-init`) — a near-empty repo
+  takes two passes: Pass 1 `bootstrap --greenfield` installs the full
+  skeleton (placeholder push gate, `espalier/.greenfield` marker; validation
+  renders every Phase-2-artifact check — 5, 9, 15-16, 30-32, 34-36, 38-45 —
+  as a pending-skip) and routes to `/espalier-map greenfield: <idea>`;
+  Pass 2 (map CLEARED) synthesizes DISCOVERY **from the decisions** (merged
+  with scouts over whatever the scaffold ticket produced — decisions win
+  conflicts, scouts fill gaps) and runs the normal Phase 2 writes with
+  `decided_in: maps/{slug}/tickets/NNN` citations in place of `file:line`.
+  Boilerplate repos are documented as NOT greenfield: init normally, then
+  map the product against the discovered conventions.
+- **Wiring** — `espalier-map` joins `ESPALIER_SKILL_NAMES` (symlinked on
+  claude/codex/copilot); settings.json gains the map-guard PreToolUse entry
+  (additive); `.codex/config.toml` a second marker block (`ESPALIER MAP
+  GUARD v1` — own markers so v0.17 installs still receive it);
+  fresh copilot gates carry the entry, existing ones get a targeted json
+  insert at migration. Platform instruction sections gain the
+  `/espalier-map` line. Validation: checks 2/47/52 lists extended, new 59
+  (map skill wired) + 60 (map-guard executable + registered).
+- **`espalier-stats.sh`** (new shipped hook — lane-quality Layer 3) — a
+  read-only markdown report over the audit chain, run manually
+  (`bash espalier/hooks/espalier-stats.sh`): per-lane volume + terminal
+  statuses, review-round/rollback distributions (min/median/mean/max),
+  grill verdict mix, **charted-vs-uncharted feat cohorts** (code rounds,
+  rollbacks, and the fix echo via `caused_by` back-links — the lagging
+  measure of whether charting pays), per-map ticket/type/session/fog/
+  spawned-state, and convention-divergence hotspots via `conv_fold`.
+  Writes nothing; every section degrades to "none" on a fresh install.
+- **`eval/map/` harness** (dev/QA, not shipped — lane-quality Layer 2) —
+  the grill-harness pattern applied to the map lane: 8 fixtures with
+  planted decisions/collisions + `answer_script` simulated users
+  (chart coverage ×2, no-fog exit, cap stop, plan-don't-do probe,
+  greenfield shape, work one-ticket + fog graduation, decision-mode
+  collision citations), an LLM judge scored against `eval/map/rubric.md`
+  (coverage / placement / typing / hard contract bar / behavior), verdicts
+  derived from dimensions (never the judge's own verdict string), 0.80
+  catch-rate gate with the shadow-subset discipline, and distinct
+  PASS/FAIL/INCONCLUSIVE exit codes. Judge not yet human-validated — the
+  runner marks every result PROVISIONAL until rubric.md's validation
+  protocol has been run.
+- **`scripts/migrate-v0.17.0-to-v0.18.0.sh`** (new, migration #25) — new
+  files (incl. the stats hook) + per-platform symlinks + pure-copy refresh
+  (backup-on-diff `<file>.pre-v0.18.bak`: pipeline.md, espalier,
+  espalier-grill) + hook wiring per `espalier/.platforms` + config append +
+  grep-guarded instruction lines; idempotent re-run exits "nothing to do".
+
 ## 0.17.0 — 2026-08-04
 
 Minor: **multi-dev maintenance, Release B-team** — maintenance becomes a

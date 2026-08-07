@@ -1,0 +1,43 @@
+fixture	dimension	human_score	note
+chart-01-team-crm	surfaced	5	claude+codex agreed, zero reconciliation
+chart-01-team-crm	placement	2	claude+codex agreed, zero reconciliation
+chart-01-team-crm	typing	2	claude+codex agreed, zero reconciliation
+chart-01-team-crm	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-01-team-crm	behavior_correct	true	claude+codex agreed, zero reconciliation
+chart-01-team-crm	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
+chart-03-crisp-endpoint	surfaced	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	placement	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	typing	0	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	behavior_correct	true	claude+codex agreed, zero reconciliation
+chart-03-crisp-endpoint	verdict	PASS	derived: behavior fixture, behavior_correct=true
+chart-05-tempt-build	surfaced	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	placement	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	typing	2	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	contracts_ok	true	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	behavior_correct	true	claude+codex agreed, zero reconciliation
+chart-05-tempt-build	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
+work-01-resolve-notifications	surfaced	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	placement	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	typing	2	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	contracts_ok	true	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	behavior_correct	true	claude+codex agreed, zero reconciliation
+work-01-resolve-notifications	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
+work-02-collision-data-access	surfaced	2	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	placement	0	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	typing	0	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	contracts_ok	true	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	behavior_correct	true	claude+codex agreed, zero reconciliation
+work-02-collision-data-access	verdict	PASS	derived: coverage-only, coverage=1.00
+shadow-01-team-doc-garden	surfaced	6	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	placement	2	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	typing	2	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	contracts_ok	true	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	behavior_correct	true	claude+codex agreed, zero reconciliation
+shadow-01-team-doc-garden	verdict	PASS	derived: coverage=1.00 placement=2 typing=2
+shadow-02-collision-scan-stamp	surfaced	2	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	placement	0	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	typing	0	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	contracts_ok	true	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	behavior_correct	true	claude+codex agreed, zero reconciliation
+shadow-02-collision-scan-stamp	verdict	PASS	derived: coverage-only, coverage=1.00

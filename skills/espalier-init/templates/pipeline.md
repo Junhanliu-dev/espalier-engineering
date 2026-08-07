@@ -1,5 +1,17 @@
 # Development Pipeline
 
+## Lanes above and beside this pipeline
+
+This file defines the FULL pipeline (`/espalier`, 10 stages). Two related
+lanes route into it rather than through it:
+
+- `/espalier-fix` — the slim bug lane (7 stages, no Stage 2).
+- `/espalier-map` — multi-session planning for efforts too big for one
+  session (epics, greenfield). It plans only — a cleared map hands off
+  `Status: FILED` change skeletons under `espalier/changes/feat/`, each with
+  `charted_from:` frontmatter, and THIS pipeline adopts and runs them one at
+  a time from Stage 1. See `espalier/skills/espalier-map/SKILL.md`.
+
 ## Stages
 
 ### 1. Requirements Analysis

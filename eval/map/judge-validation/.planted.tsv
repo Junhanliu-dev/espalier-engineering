@@ -1,0 +1,8 @@
+fixture	planted	coverage_only
+chart-01-team-crm	5	false
+chart-03-crisp-endpoint	0	false
+chart-05-tempt-build	2	false
+work-01-resolve-notifications	2	false
+work-02-collision-data-access	2	true
+shadow-01-team-doc-garden	6	false
+shadow-02-collision-scan-stamp	2	true

@@ -1,0 +1,61 @@
+EVAL MODE transcript — fixture `chart-03-crisp-endpoint`, mode=chart.
+
+---
+
+**Step 1 — Marker up.** Would run:
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-admin-recent-signups" "2026-08-07T00:00:00Z" \
+  > espalier/maps/.active-session
+```
+
+**Step 2 — Name destination (grill mode=decision on "what does DONE look like?").**
+
+No MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty — Step 1.5 skips silently, per contract.
+
+Tier: decision mode never `skip`; default `light`. Divergent candidates (private): {endpoint alone, done · endpoint + admin UI page consuming it · first slice of bigger admin-dashboard effort · pagination/filtering roadmap behind it}. Discriminating question:
+
+> **Q1:** Is DONE just this one endpoint — GET /admin/recent-signups, 20 most recent, email + created_at, admin auth like other /admin routes — or is it the first piece of something bigger (admin dashboard, more signup analytics)?
+
+**Answer** (answer_script: "destination / scope confirmation"): "exactly what it says — one endpoint, admin-only, JSON list of the 20 most recent signups with email + created_at; nothing else planned around it."
+
+Stop early — next question would not change anything.
+
+**Step 3 — Breadth-first frontier pass.** Fan out for fog:
+
+- Auth: settled — "like every other /admin route", existing pattern.
+- Shape: settled — JSON list, email + created_at, fixed 20.
+- Pagination/filtering: user says nothing planned around it — out of question space.
+- Data source: signups table already exists (endpoint reads existing data); query is one ORDER BY created_at DESC LIMIT 20.
+- No external research, no prototype, no provisioning needed.
+
+Zero fog. Zero decisions left. One endpoint, one session of work.
+
+**No-fog exit triggers.** Effort fits one session — write NO map, NO map.md, NO tickets.
+
+**Step 4 — Marker down.** Would run:
+
+```bash
+rm espalier/maps/.active-session
+```
+
+No map created, so nothing to commit — no lasting state.
+
+---
+
+**Report to user:**
+
+No map. Route already clear: one endpoint, admin auth pattern exists, shape confirmed. Fits single session — map lane is for multi-session efforts. Run:
+
+```
+/espalier add GET /admin/recent-signups endpoint: JSON list of 20 most recent signups (email + created_at), admin-authenticated like other /admin routes
+```
+
+Stage 1 grill there covers rest (error shape, empty-list case, tests).
+
+---
+
+**Answer_script usage:** 1 reply used — "destination / scope confirmation" for Q1. No unmatched questions, no Open Questions.
+
+**Artifacts written:** none (marker written then removed). Matches expected_behavior: declined to chart, routed to /espalier.

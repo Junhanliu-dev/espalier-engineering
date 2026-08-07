@@ -8,6 +8,8 @@
 /espalier-init
 ```
 
+> **v0.18.0 — the map lane: planning above one session, and a road into greenfield.** Espalier gains a third altitude. `/espalier <feature>` plans one session's work; **`/espalier-map <idea>`** now plans the work *above* that — an epic, a product on a boilerplate, a greenfield build — as a **decision map** under `espalier/maps/`: a named destination, decision tickets (grilling / research / prototype / task), a fog-of-war section for what can't be phrased yet, and a frontier you work **one ticket per session**. Adapted from Matt Pocock's `wayfinder` (MIT) with Espalier-grade enforcement bolted on: a **map-guard hook** machine-blocks writes outside the map while a session is active (the "agent started building mid-plan" failure structurally removed), a `max-open-tickets` cap stops waterfall over-charting, and every decision runs the grill's rules/wiki cross-check before it locks. A cleared map hands back FILED change skeletons the normal pipeline adopts one at a time — decision → ticket → change → commit stays one audit chain. And `/espalier-init` learns **greenfield**: a near-empty repo takes the two-pass *Decide, Then Bind* path (skeleton install → chart the conventions as decisions → init binds them as rules citing `decided_in:` tickets); boilerplate repos run init first, then map the product against the discovered conventions. Lane quality is measured, not asserted: a shipped read-only **stats hook** (`bash espalier/hooks/espalier-stats.sh`) reports review-round/rollback distributions, the grill-verdict mix, per-map ticket/fog state, and the charted-vs-uncharted cohort comparison (including the fix echo via `caused_by` links), while a new **`eval/map/` harness** (grill-harness pattern: planted decisions, simulated users, LLM judge, 0.80 catch-rate gate) validates the lane itself before release. Validation grows to 50/55/60; migration #25. Suites: bootstrap 197/197, hooks 146/146. Design: [`docs/map-lane-plan.md`](./docs/map-lane-plan.md); migration: [`docs/migrating-v0.17-to-v0.18.md`](./docs/migrating-v0.17-to-v0.18.md).
+
 > **v0.17.0 — the gardener takes over (multi-dev maintenance, Release B-team).** Maintenance becomes a **scheduled singleton**: one rotating gardener runs doctor + prune once per interval in a single weekly maintenance PR, and everyone else's pre-flight defaults to "Proceed". Two small shared files carry the facts that matter through git: the tracked one-line **`espalier/.doctor-stamp`** (only a `clean` stamp satisfies the team; a `dirty:N` stamp satisfies just its writer; skewed stamps rejected; the doctor restamps `clean` when the session's prune cleared everything) and **conventions file-per-key** under `espalier/conventions/` (the towncrier trick: different keys can't conflict at all; a same-key double decision surfaces as an ordinary 5-line git conflict — the conflict *is* the race detection; append collisions resolve by keeping both lines, deduped at read time). No event logs, no fold algorithms, no format markers. Migration #24 is pure-copy only. Suites: bootstrap 177/177, hooks 127/127 with two-clone git sims. Plain-language tour: [`docs/multi-dev-maintenance-how-it-works.md`](./docs/multi-dev-maintenance-how-it-works.md); migration: [`docs/migrating-v0.16-to-v0.17.md`](./docs/migrating-v0.16-to-v0.17.md).
 
 > **v0.16.0 — maintenance goes team-shaped (Release A: the compatibility floor).** With several developers on one repo, the single-dev maintenance loop breaks four ways: every clone sees a different staleness picture, nobody owns the shared upkeep, the bookkeeping files merge with conflicts, and rule changes diverge silently across branches. v0.16.0 ships the floor that fixes the last two and prepares the first two: an executable conventions reader (`conv_fold` — folds the legacy `.conventions.tsv` and the upcoming per-key `espalier/conventions/` files, width-tolerant, deduped, with clock-free status precedence), per-mechanism **maintenance lanes** (doctor and routine prunes ride one weekly maintenance PR; promotions ride the deciding feature branch as their own isolated commit behind a CODEOWNERS merge gate), a corrected promotion **race guard**, canonical-ref config keys, the one `.gitattributes` union entry (`.ask-gaps.tsv`), optional **CODEOWNERS generation**, worktree-correct hook install, an enforced migrate barrier, and conflict/slug-collision recipes. Validation grows to 48/53/58 checks (57-58). Suites: bootstrap 161/161, hooks 99/99. Design: [`docs/multi-dev-maintenance-implementation-plan.md`](./docs/multi-dev-maintenance-implementation-plan.md); plain-language tour: [`docs/multi-dev-maintenance-how-it-works.md`](./docs/multi-dev-maintenance-how-it-works.md).
@@ -47,11 +49,12 @@ After running `/espalier-init` on any repo, you get a per-project `espalier/` di
 ```
 espalier/
 ├── rules/                  # always-loaded: engineering structure, coding standards, dev process, security standards, production standards
-├── skills/                 # phase-loaded: coding, review, security, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask, /espalier-audit
+├── skills/                 # phase-loaded: coding, review, security, testing, requirements, grill, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask, /espalier-audit, /espalier-map
 ├── agents/                 # delegated: harness-coder, harness-reviewer, harness-security (separate tool sets)
 ├── wiki/                   # on-demand: architecture, data models, critical paths, external services
-├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink
+├── hooks/                  # programmatic gates: layer boundary check, pre-push gate, post-merge drift detect + backlink, map-guard
 ├── pipeline.md             # 10-stage workflow with explicit gates and rollback rules
+├── maps/                   # decision maps (v0.18.0): multi-session planning — /espalier-map
 └── changes/                # typed audit trail: feat/, fix/, refactor/, docs/ — one dir per requirement
 ```
 
@@ -99,6 +102,41 @@ It is strictly read-only and not a pipeline lane — no stages, no gates, no `ch
 ### `/espalier-audit` — repo-wide security audit (v0.9.0)
 
 The Stage 4 security audit is change-scoped: it guards code the pipeline writes, not the code you already had. `/espalier-audit` closes that gap — it enumerates the project's security surface (from the discovered trust boundary + wiki critical paths), runs `harness-security` in repo-audit mode over the **existing** handlers/consumers, and writes a point-in-time findings inventory to `espalier/wiki/security-audit.md` (priority, defect, required control, abuse test — per finding). It never edits code and never blocks anything; for each P0/P1 you select, it dispatches a `/espalier-fix` run, so every fix still gets its own approval gate, review panel (with a fresh security re-audit), and contracted abuse test. Optional `scope-path` argument bounds the audit on large repos. Typical uses: baselining a codebase that predates v0.9.0, or a periodic sweep.
+
+### `/espalier-map <idea>` — multi-session planning lane (v0.18.0)
+
+The split is **session count, not project size**: whatever fits one session goes
+straight to `/espalier` (Stage 1 grill is the single-session planner). An
+effort too big for that — an epic, a greenfield build, a product on a
+boilerplate — gets charted as a **decision map** under `espalier/maps/`: a
+named destination, decision tickets (`grilling` / `research` / `prototype` /
+`task`), a fog-of-war section for what can't be phrased sharply yet, and a
+frontier worked **one ticket per session** until nothing is left to decide.
+Concept adapted from [Matt Pocock's `wayfinder`](https://github.com/mattpocock/skills)
+(MIT), with the enforcement his field reports asked for: the **map-guard
+hook** blocks writes outside `espalier/maps/` while a map session is active
+(plan-don't-do, machine-verified), `max-open-tickets` caps waterfall
+over-charting, and grilling tickets run `espalier-grill` in `decision` mode —
+so every decision is cross-checked against your own `rules/` and `wiki/`
+before it locks. A cleared map hands back `Status: FILED` change skeletons
+(with `charted_from:` frontmatter) that `/espalier` adopts one at a time —
+the audit chain reads decision → ticket → change → commit. It plans only; it
+never writes product code.
+
+### Greenfield & boilerplate (v0.18.0)
+
+Brownfield espalier discovers rules from code. A **greenfield** repo has no
+code to discover — so `/espalier-init` takes the two-pass *Decide, Then Bind*
+path: Pass 1 installs the espalier skeleton (`--greenfield` — validation
+renders the not-yet-bindable checks as pending-skips) and routes you to
+`/espalier-map greenfield: <idea>` to DECIDE stack, architecture, and
+conventions as tickets; once the map clears, Pass 2 re-runs init and binds
+the decisions as rules — each citing `decided_in: maps/…/tickets/NNN` where a
+brownfield rule would cite `file:line`. A **boilerplate** repo is not
+greenfield: it has code, so run init normally (the scouts discover the
+boilerplate's real conventions), *then* map the product — init-first makes the
+grill's cross-check live, so product decisions collide with the boilerplate's
+own documented capabilities instead of being decided blind.
 
 ### Keeping the guardrails in sync
 
@@ -340,6 +378,7 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 | `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
 | `/espalier-ask <question>` (read-only Q&A) | LIGHT — reads a few docs + verifies against code; no sub-agents |
 | `/espalier-audit [path]` (repo-wide security audit) | LIGHT-MEDIUM — 1-4 read-only auditors over the security surface + one wiki write |
+| `/espalier-map` (chart or one-ticket session) | LIGHT-MEDIUM — one grill conversation or a few research scouts per session; no coding agents |
 | `/espalier-migrate` | LIGHT — script-driven, low LLM usage |
 | Re-run `/espalier-init` (already bootstrapped) | TRIVIAL — validate-only, ~few K tokens |
 

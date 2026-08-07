@@ -1,0 +1,277 @@
+Eval run, chart mode, fixture chart-01-team-crm. Transcript follows — every artifact stated verbatim, nothing executed.
+
+---
+
+## 1. Marker up
+
+Would run:
+
+```bash
+mkdir -p espalier/maps
+printf 'map: %s\nsession_started: %s\n' "2026-08-07-team-crm-v1" "2026-08-07T00:00:00Z" \
+  > espalier/maps/.active-session
+```
+
+Marker file `espalier/maps/.active-session` would contain:
+
+```
+map: 2026-08-07-team-crm-v1
+session_started: 2026-08-07T00:00:00Z
+```
+
+## 2. Name destination — espalier-grill mode=decision
+
+Input: "what does DONE look like for this effort?" + idea text.
+
+- **Step 0:** interactive (answer_script is human).
+- **Step 1:** decision mode — no skip tier. Tier `light` (≤3 questions).
+- **Step 1.5:** no MOCK CONTEXT block, so `espalier/rules/` + `espalier/wiki/` empty. Skip silently, per contract.
+- **Step 2:** private divergent candidates for DONE: {full product spec incl. reporting + dashboards · V1 slice spec (contacts/pipeline/email) only · scaffolded skeleton, no spec · architecture decisions only, features later}. Question eliminating most:
+
+**Q1:** "What does DONE look like for this map — full product spec including reporting and dashboards, a V1-slice spec, a scaffolded skeleton, or architecture decisions only?"
+
+**A1** (answer_script: *destination / what DONE looks like*): "a locked spec for CRM v1 — contacts, one sales pipeline, and email logging — ready to slice into implementation changes; dashboards and mobile are explicitly later"
+
+Candidates now: {spec for solo salespeople · small teams w/ roles · large orgs w/ permission matrix}. One more question sharpens scope line:
+
+**Q2:** "Who uses it — team size, and what roles does v1 need?"
+
+**A2** (answer_script: *who the users are / team size*): "sales teams of 3-15 people; admin + member roles are enough for v1"
+
+Stop — next question (tenancy, stages) belongs to tickets, not charter. Charting hand-resolves nothing.
+
+## 3. Frontier, breadth-first
+
+Fan-out finds:
+
+| Decision | Placement | Why |
+|---|---|---|
+| Tenancy model (single-tenant-per-deploy vs shared-schema) | ticket, `grilling` | question sharp now; forks whole data layer |
+| Pipeline stages shape (fixed vs user-defined) | ticket, `grilling` | sharp now; decides core model |
+| Auth approach (roll-own vs Auth0/Clerk-class) | ticket, `research` | blocked on facts outside repo (capability, pricing) |
+| Transactional-email account provisioning | ticket, `task` | manual work; unblocks email-integration decision |
+| Email integration mechanism (logging + sending) | ticket, `grilling`, blocked by task | sharp question, but needs account first |
+| Reporting | **fog** | wanted, but nobody can say which reports / for whom / what period until pipeline model lands — question not phrasable sharply |
+
+Fog exists — no-fog exit not taken. 5 tickets < cap 9. OK.
+
+## 4. Artifact: `espalier/maps/2026-08-07-team-crm-v1/map.md`
+
+```markdown
+---
+map: 2026-08-07-team-crm-v1
+status: IN_PROGRESS
+started: 2026-08-07T00:00:00Z
+---
+
+# Map: Team CRM v1
+
+## Destination
+
+A locked spec for CRM v1 — contacts, one sales pipeline, and email logging —
+ready to slice into implementation changes. Dashboards and mobile are
+explicitly later.
+
+## Notes
+
+- Audience: sales teams of 3–15 people. Admin + member roles are enough for v1.
+- Repo has no espalier/rules/ or espalier/wiki/ yet — grill Step 1.5 skips
+  until they exist.
+- Research tickets fire as parallel subagents on every map touch (the
+  one-ticket-per-session exemption).
+
+## Decisions so far
+
+## Not yet specified
+
+- Reporting: wanted eventually, but which reports, for whom, and over what
+  period cannot be phrased sharply until the pipeline model
+  ([002 — Pipeline stages: fixed set or user-defined?](tickets/002-pipeline-stages-shape.md))
+  lands.
+
+## Out of scope
+
+- Dashboards — destination names them "explicitly later"; revisit after v1.
+- Mobile — same; destination excludes it from v1.
+
+## Session log
+
+| Date | Ticket | Action |
+|------|--------|--------|
+| 2026-08-07 | — | Charted: destination locked, 5 tickets opened, research fired |
+
+## Spawned Changes
+
+| Change | Status |
+|--------|--------|
+```
+
+## 5. Artifacts: tickets (created first, `blocked_by` wired second pass)
+
+### `tickets/001-tenancy-model.md`
+
+```markdown
+---
+ticket: 001
+title: Tenancy model
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Single-tenant-per-deploy or shared-schema multi-tenant? This forks the whole
+data layer (every table's key shape, every query's scoping, backup/isolation
+story), so it must lock before any schema-shaped decision. Candidate answers
+diverge hard: one deploy per customer team vs one shared schema with a
+team/org discriminator column.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+### `tickets/002-pipeline-stages-shape.md`
+
+```markdown
+---
+ticket: 002
+title: Pipeline stages — fixed set or user-defined?
+type: grilling
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+What ARE the sales-pipeline stages: a fixed built-in set, or user-defined per
+team (with or without a default set)? This decides the core model — whether
+stages are an enum or a first-class table, how deals reference them, and what
+"move a deal" means. The reporting fog also waits on this answer.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+### `tickets/003-auth-provider.md`
+
+```markdown
+---
+ticket: 003
+title: Auth approach — roll-own sessions vs hosted provider
+type: research
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+Roll our own session auth, or use an Auth0/Clerk-class hosted provider? The
+decision is blocked on facts outside this repo: provider capabilities
+(team/organization support, role handling for admin + member), pricing at
+3–15-seat team scale, and integration cost. Gather the facts; the pick itself
+is recorded here once the findings make it clear-cut, or escalates to a
+grilling ticket if it stays a judgment call.
+
+## Resolution
+
+<!-- written on close: findings in assets/, cited here -->
+```
+
+### `tickets/004-email-sending-account.md`
+
+```markdown
+---
+ticket: 004
+title: Provision transactional-email account
+type: task
+status: open
+blocked_by: []
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+A transactional-email account (Postmark/SendGrid/SES-class) must exist before
+deliverability options can even be judged. Nothing to decide here — this task
+unblocks the email-integration decision
+([005](005-email-integration-mechanism.md)). Likely human checklist: pick a
+provider account to trial, sign up, verify a sending domain (DNS records),
+capture API credentials into the team secret store.
+
+## Resolution
+
+<!-- written on close -->
+```
+
+### `tickets/005-email-integration-mechanism.md`
+
+```markdown
+---
+ticket: 005
+title: Email integration mechanism
+type: grilling
+status: open
+blocked_by: [004]
+claimed_by:
+claimed_at:
+---
+
+## Question
+
+How do emails get logged into the CRM (BCC-in address, mailbox sync, manual
+paste, provider inbound webhook?) and what sends outbound transactional mail?
+Candidates can't be judged for deliverability until a real sending account
+exists ([004](004-email-sending-account.md)).
+
+## Resolution
+
+<!-- written on close -->
+```
+
+**Cap check:** 5 open tickets, cap 9. Pass.
+
+## 6. Fire research tickets
+
+Ticket 003 only. Would spawn oracle subagent now, in parallel with nothing else pending:
+
+> **Subagent prompt (oracle):** "Research auth options for a multi-user SaaS CRM serving teams of 3–15 (admin + member roles). Compare: roll-own session auth vs Auth0 vs Clerk vs WorkOS-class providers. For each: organization/team support, role support, pricing at 5–50 total seats across customers, self-host constraints, integration effort. Use ctx7 for SDK docs + web for pricing. Return findings as a structured brief."
+
+Findings would land in `espalier/maps/2026-08-07-team-crm-v1/assets/auth-provider-research.md`, Resolution written, ticket closed, gist added to Decisions-so-far.
+
+**Eval mode:** no execution possible, no answer_script entry covers research findings — inventing them would fabricate. Ticket 003 stays `open` on frontier; Resolution notes nothing yet. Session log already reads "research fired"; in real session close happens same session on subagent return.
+
+## 7. Marker down, commit, stop
+
+Would run:
+
+```bash
+rm espalier/maps/.active-session
+git add espalier/maps
+git commit -m 'chore(espalier): map 2026-08-07-team-crm-v1 — charted'
+```
+
+(No co-author trailer — user rule.)
+
+---
+
+## Report
+
+Map charted at `espalier/maps/2026-08-07-team-crm-v1/`.
+
+**Destination:** locked spec for CRM v1 — contacts, one pipeline, email logging. Dashboards + mobile out of scope.
+
+**Frontier (takeable now):** *Tenancy model* · *Pipeline stages — fixed set or user-defined?* · *Auth approach* (research, fired) · *Provision transactional-email account* (task). *Email integration mechanism* waits on the email-account task.
+
+**Fog:** reporting — not phrasable until pipeline model lands.
+
+Next: `/espalier-map 2026-08-07-team-crm-v1` — one ticket per session.
