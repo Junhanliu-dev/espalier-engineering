@@ -1,5 +1,90 @@
 # Changelog
 
+## 0.19.0 — 2026-08-11
+
+Minor: **the run lane** — a cleared map executes itself, survivably. The lane
+was field-built inside a production repo (a 14-slice Keystone schema map)
+before being generalized here. Suites: bootstrap 225/225, hooks 146/146;
+eval/maprun 6/6 fixtures, catch-rate 1.00, zero judge-verdict mismatches
+(provisional until judge validation + shadow fixtures); validation is
+52/57/62 by platform set (new checks 61-62); migration #26.
+
+- **`/espalier-maprun` lane** (new pure-copy skill `espalier-maprun`) — drives a
+  CLEARED map's FILED slices to completion over hours and days. Three moving
+  parts: an interactive **master** pass (reap → halt-on-escalation → relay
+  parked questions → merge → grill-then-dispatch → verify → report, then
+  STOP), up to N headless **workers** (`claude -p` / `codex exec`, one per
+  isolated git worktree, stages 1–6 only, push blocked at git config level),
+  and disk **state** (`plan.json` + `state.json` beside the map — the master
+  holds nothing in context, so a master killed at any instant loses at most
+  the pass it was in). A `plan` step authors the execution config from the
+  cleared map (ticket deps confirmed by the human; workspaces/verify/env
+  seeded from what init discovered).
+- **Survival model** — pass-per-fresh-session master ("status output is the
+  only memory"); supervisor-owned heartbeats with pid-identity + staleness
+  cross-checks (a recycled pid is a SUSPECT, not a worker); death diagnosis
+  (usage-limit log signatures → resumable `QUOTA`; git-state check catches a
+  state file claiming work the worktree cannot show, and clears the false
+  stage claim); resume-safe dispatch (checkpoints uncommitted work, merges
+  the integration branch into the reused worktree so relayed answers reach
+  the resumed worker, deletes stale outcome sentinels, refuses to dispatch
+  over an unanswered question).
+- **Context hygiene** — workers get no access to the master's `plan/` dir:
+  questions park into the worker's OWN change folder (`.maprun-question.md`)
+  and reap carries them over; the contract scopes what a worker may read
+  (never sibling slices); `worker_mode: staged` bounds worker context with
+  one fresh session per stage group (wrapper-owned loop, no-progress
+  escalation); optional `worker_setting_sources` strips user-level config
+  from workers; the master reads escalation records only through subagent
+  excerpts.
+- **Engine** (`hook-templates/maprun.py` + `maprun-{dispatch,merge,
+  integration,verify}.sh`) — stdlib-only state machine (init/status/frontier/
+  reap/tail/mark/graph + optional ClickUp/Harvest sync that no-ops without
+  config and never blocks the build); dependency-graph validation at init;
+  atomic state writes; stream-json worker logs summarized by `tail`.
+  Bootstrap installs engine files **write-if-absent** so a locally-adapted
+  engine survives re-runs and migration.
+- **`eval/maprun/` harness** (grill-harness pattern) — six fixtures plant the
+  lane's designed-against failures (merging/dispatching past an escalation,
+  answering a parked question instead of relaying, skipping the pre-dispatch
+  grill, trusting state over the worktree, treating QUOTA as an error,
+  resolving a merge conflict — including a human "just fix it yourself"
+  bait); mock command scripts stand in for the repo; LLM judge, derived
+  verdicts, 0.80 catch-rate gate, judge-validation harness.
+- **Field-hardened during a live production run** (three fixes/features born
+  from the lane driving a real 14-slice map the day of release): the push
+  block is **worktree-scoped** (`extensions.worktreeConfig` + `--worktree` —
+  a plain `git config` in a worktree writes the SHARED config and had blocked
+  the operator's own checkout); **durable dispatch pause** (`maprun.py pause
+  [reason]` / `resume` — `dispatch_paused` in state.json empties the
+  frontier, in-flight workers finish and merge, the instruction survives
+  every session boundary); Harvest **`"mode": "record_only"`** (hours
+  recorded in state.json, never posted — for operators running their own
+  timer) plus tracker-ref note prefixes.
+- **Operator observability** (`maprun.py watch` / `feed`): headless workers
+  were invisible without asking the master. `watch [sec] [--once]` is a
+  read-only live dashboard (state, live stage from the worktree's
+  pipeline-state.md, process-alive check, heartbeat age, waiting
+  outcome/question sentinels, last visible worker action) safe to leave
+  running beside a live master; `feed <key> [--follow]` renders a worker's
+  stream-json log as greppable `THINK`/`SAY`/`TOOL`/`RES` lines — the
+  worker's whole thought process, live. Codex/plain logs pass through raw.
+  On a TTY, `watch` is a full-screen tabbed TUI (stdlib curses): Overview
+  plus one tab per active worker (←/→ switch) with job detail, live
+  commits/changed-files, and the worker's feed streaming terminal-style;
+  `--plain`/`--once`/non-TTY keep the text frames. `clickup-stages` mirrors
+  each DISPATCHED ticket's LIVE stage to ClickUp — a "Pipeline: stage N —
+  <label>" subtask under the ticket's task, renamed as stages advance and
+  finalized at rest states, plus stage comments; sidecar-deduped and
+  state.json-untouched so it is cron-safe beside a live master.
+- **Fix (eval/map):** `validate-judge.sh` rollup used an undefined variable
+  (`ps` for `p`) in the non-coverage-only verdict derivation — divide-by-zero
+  on that path.
+- Wiring: skill symlinks on all three platforms; `/espalier-maprun` line in the
+  CLAUDE.md / AGENTS.md / copilot-instructions Espalier sections;
+  `pipeline.md` + map-SKILL handoff name the batch executor. Migration #26
+  (`scripts/migrate-v0.18.0-to-v0.19.0.sh`) is additive + backup-on-diff.
+
 ## 0.18.0 — 2026-08-06
 
 Minor: **the map lane** — multi-session planning above the pipeline, and a

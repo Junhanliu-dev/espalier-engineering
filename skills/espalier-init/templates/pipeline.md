@@ -11,6 +11,12 @@ lanes route into it rather than through it:
   `Status: FILED` change skeletons under `espalier/changes/feat/`, each with
   `charted_from:` frontmatter, and THIS pipeline adopts and runs them one at
   a time from Stage 1. See `espalier/skills/espalier-map/SKILL.md`.
+- `/espalier-maprun` — the batch executor for a CLEARED map: an interactive
+  master dispatches headless `/espalier` workers (stages 1–6, isolated
+  worktrees, push-blocked) over hours/days, merges what passes into an
+  integration branch, and relays worker questions to the human. Stages 7–10
+  remain a deliberate human act on the assembled branch. See
+  `espalier/skills/espalier-maprun/SKILL.md`.
 
 ## Stages
 

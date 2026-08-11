@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS), the v0.16.0→v0.17.0 B-team release (weekly gardener rota + tracked single-line .doctor-stamp with clean/dirty semantics + conventions file-per-key), and the v0.17.0→v0.18.0 map-lane release (/espalier-map multi-session planning + map-guard plan-don't-do hook + grill decision mode + greenfield decide-then-bind init) you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS), the v0.16.0→v0.17.0 B-team release (weekly gardener rota + tracked single-line .doctor-stamp with clean/dirty semantics + conventions file-per-key), the v0.17.0→v0.18.0 map-lane release (/espalier-map multi-session planning + map-guard plan-don't-do hook + grill decision mode + greenfield decide-then-bind init), and the v0.18.0→v0.19.0 run-lane release (/espalier-maprun map executor — interactive master + headless stage-1–6 workers in push-blocked worktrees + the maprun state engine) you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -260,28 +260,41 @@ version. Up to TWENTY-FIVE migrations may apply, always in this order:
    `max-open-tickets: 9`. One grep-guarded `/espalier-map` line lands in each
    platform instruction file's existing `## Espalier` section. Mechanical:
    `scripts/migrate-v0.17.0-to-v0.18.0.sh`.
+26. **v0.18.0 → v0.19.0** — run-lane release. New files: the `espalier-maprun`
+   lane skill (batch executor for a CLEARED map — interactive master +
+   headless stage-1–6 workers in isolated push-blocked worktrees) + symlinks
+   on every platform in `espalier/.platforms`, and the run engine
+   `espalier/hooks/maprun.py` + `maprun-{dispatch,merge,integration,verify}.sh`.
+   Engine files are WRITE-IF-ABSENT — a repo already carrying a
+   locally-adapted engine keeps it. Refreshes `pipeline.md` and the
+   espalier-map SKILL (handoff now names the batch executor) with
+   backup-on-diff (`<file>.pre-v0.19.bak`). One grep-guarded `/espalier-maprun`
+   line lands in each platform instruction file's existing `## Espalier`
+   section. No config keys, no hook wiring. Mechanical:
+   `scripts/migrate-v0.18.0-to-v0.19.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL TWENTY-FIVE; a v0.3.x
-install needs the last twenty-four; a v0.4.x install needs the last twenty-three; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.18.0; a
-v0.5.3–v0.5.x install needs v0.6 … v0.18.0; a v0.6.x install needs
-v0.7 … v0.18.0; a v0.7.x install needs v0.8 … v0.18.0; a v0.8.0 install needs
-v0.8.1 … v0.18.0; a v0.8.1 install needs v0.8.2 … v0.18.0; a v0.8.2 install
-needs v0.9.0 … v0.18.0; a v0.9.0 install needs v0.9.1 … v0.18.0; a v0.9.1
-install needs v0.9.2 … v0.18.0; a v0.9.2 install needs v0.9.3, v0.9.4,
-v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.9.3 install
-needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a
+confirmation, apply in order. A v0.1.x install needs ALL TWENTY-SIX; a v0.3.x
+install needs the last twenty-five; a v0.4.x install needs the last twenty-four; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.19.0; a
+v0.5.3–v0.5.x install needs v0.6 … v0.19.0; a v0.6.x install needs
+v0.7 … v0.19.0; a v0.7.x install needs v0.8 … v0.19.0; a v0.8.0 install needs
+v0.8.1 … v0.19.0; a v0.8.1 install needs v0.8.2 … v0.19.0; a v0.8.2 install
+needs v0.9.0 … v0.19.0; a v0.9.0 install needs v0.9.1 … v0.19.0; a v0.9.1
+install needs v0.9.2 … v0.19.0; a v0.9.2 install needs v0.9.3, v0.9.4,
+v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.9.3 install
+needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a
 v0.9.4, v0.9.5, or v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
-v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
-v0.16.0, v0.17.0, then v0.18.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.13.1
-install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.13.2 install needs v0.14.0,
-v0.15.0, v0.16.0, v0.17.0, then v0.18.0; a v0.14.0 install needs v0.15.0,
-v0.16.0, v0.17.0, then v0.18.0; a v0.15.0 install needs v0.16.0, v0.17.0, then
-v0.18.0; a v0.16.0 install needs v0.17.0 then v0.18.0; a v0.17.0 install needs
-only v0.18.0.
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
+v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.13.1
+install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.13.2 install needs v0.14.0,
+v0.15.0, v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.14.0 install needs v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, then v0.19.0; a v0.15.0 install needs v0.16.0, v0.17.0, v0.18.0,
+then v0.19.0; a v0.16.0 install needs v0.17.0, v0.18.0, then v0.19.0; a
+v0.17.0 install needs v0.18.0 then v0.19.0; a v0.18.0 install needs only
+v0.19.0.
 
 Two gaps in the script names are deliberate, not missing steps: there is no
 v0.2→v0.3 script because v0.2/v0.3 detection is lumped — the v0.3→v0.4 step

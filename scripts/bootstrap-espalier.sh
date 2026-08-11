@@ -28,8 +28,8 @@
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
 #   - Appends the .gitattributes union entry + optional CODEOWNERS block.
-#   - Runs the validation checks (R6) — 50 claude-only, 55 with codex,
-#     60 with copilot.
+#   - Runs the validation checks (R6) — 52 claude-only, 57 with codex,
+#     62 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -71,7 +71,7 @@
 # Debug flags (not used by normal /espalier-init flow):
 #   --copy-only              Only Stages 1-4 (mkdir + pure-copy + hooks).
 #   --wire-only              Only Stages 5-11 (symlinks + wiring + validation).
-#   --validate-only          Only Stage 11 (48/53/58-check validation).
+#   --validate-only          Only Stage 11 (52/57/62-check validation).
 #   --ignore-drift           Skip check #25's hard fail on expired (>90d) drift.
 #   --ignore-drift-reason=<s> Audit reason recorded with --ignore-drift.
 
@@ -341,6 +341,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-ask"
   run "mkdir -p espalier/skills/espalier-audit"
   run "mkdir -p espalier/skills/espalier-map"
+  run "mkdir -p espalier/skills/espalier-maprun"
   run "mkdir -p espalier/maps"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/hooks"
@@ -381,6 +382,7 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-ask.md' espalier/skills/espalier-ask/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-audit.md' espalier/skills/espalier-audit/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-map.md' espalier/skills/espalier-map/SKILL.md"
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-maprun.md' espalier/skills/espalier-maprun/SKILL.md"
   # Shared shipped scout prompts — read by /espalier-prune AND /espalier-doctor
   # (single source of truth; a dotfile so it stays out of the way).
   run "cp '$PLUGIN_DIR/templates/scout-prompts.md' espalier/.scout-prompts.md"
@@ -405,6 +407,15 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/map-guard.sh' espalier/hooks/map-guard.sh"
   # Read-only lane-quality report (run manually: bash espalier/hooks/espalier-stats.sh).
   run "cp '$PLUGIN_DIR/hook-templates/espalier-stats.sh' espalier/hooks/espalier-stats.sh"
+  # /espalier-maprun engine (write-if-absent: a repo carrying a locally-adapted
+  # engine — the lane's field origin — keeps its version on re-runs).
+  for mr in maprun.py maprun-dispatch.sh maprun-merge.sh maprun-integration.sh maprun-verify.sh; do
+    if [ -f "espalier/hooks/$mr" ]; then
+      log "  espalier/hooks/$mr exists — preserving"
+    else
+      run "cp '$PLUGIN_DIR/hook-templates/$mr' 'espalier/hooks/$mr'"
+    fi
+  done
   # Greenfield Pass 1: no Phase 2 writes exist yet — a placeholder gate keeps
   # check #6 honest and blocks nothing; init Pass 2 overwrites it with the
   # real substituted gate once the decision map clears. Write-if-absent.
@@ -442,7 +453,7 @@ stage_hooks() {
 
 # --- Stage 5: Symlinks ------------------------------------------------------
 
-ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit espalier-map"
+ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit espalier-map espalier-maprun"
 
 stage_symlinks() {
   log "Stage 5: platform wiring symlinks ($PLATFORMS)"
@@ -571,6 +582,8 @@ This project uses Espalier for AI code quality — auto-discovered, project-spec
 **For a repo-wide security audit**, use `/espalier-audit` — inventories trust-boundary defects in the existing code to `espalier/wiki/security-audit.md`; dispatch fixes via `/espalier-fix`.
 
 **For multi-session planning** (an epic, a greenfield build — anything too big for one session), use `/espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `/espalier`. It plans only, never codes.
+
+**To execute a whole cleared map** over hours/days, use `/espalier-maprun <map-slug>` — one interactive master pass dispatches headless pipeline workers in isolated worktrees, merges what passes, and relays worker questions; run one pass per fresh session.
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
@@ -727,6 +740,8 @@ directory — this instruction IS the load mechanism; do not skip it.
 **For a repo-wide security audit**, invoke `$espalier-audit` — inventories trust-boundary defects in the existing code to `espalier/wiki/security-audit.md`; dispatch fixes via `$espalier-fix`.
 
 **For multi-session planning** (an epic, a greenfield build — anything too big for one session), invoke `$espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `$espalier`. It plans only, never codes.
+
+**To execute a whole cleared map** over hours/days, invoke `$espalier-maprun <map-slug>` — one interactive master pass dispatches headless pipeline workers in isolated worktrees, merges what passes, and relays worker questions; run one pass per fresh session.
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
@@ -941,6 +956,8 @@ section, it is the same contract — follow it once.)
 **For a repo-wide security audit**, invoke `/espalier-audit` — inventories trust-boundary defects to `espalier/wiki/security-audit.md`; dispatch fixes via `/espalier-fix`.
 
 **For multi-session planning** (an epic, a greenfield build — anything too big for one session), invoke `/espalier-map <idea>` — charts a decision map under `espalier/maps/`, one ticket per session; a cleared map hands back FILED slices for `/espalier`. It plans only, never codes.
+
+**To execute a whole cleared map** over hours/days, invoke `/espalier-maprun <map-slug>` — one interactive master pass dispatches headless pipeline workers in isolated worktrees, merges what passes, and relays worker questions (requires a local Claude Code or Codex CLI for the workers).
 
 **Agent definition:** Read `espalier/agent.md` for your operating instructions.
 
@@ -1414,19 +1431,19 @@ stage_gitignore() {
 
 stage_validate() {
   # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
-  # 5 copilot (52-56) + 4 unconditional base (57-60 — appended AFTER the
+  # 5 copilot (52-56) + 6 unconditional base (57-62 — appended AFTER the
   # platform blocks so shipped platform IDs stay stable; base numbering is
-  # non-contiguous by design; 57-58 landed in v0.16, 59-60 in v0.18).
-  # Numbering is FIXED per platform; copilot without codex still renders
-  # 47-51 as skip lines so the sequence stays contiguous. A greenfield
-  # Pass 1 (espalier/.greenfield present) renders every Phase-2-artifact
-  # check (5, 9, 15-16, 30-32, 34-36, 38-45) as a pending-skip — count and
-  # numbering unchanged.
-  local TOTAL_CHECKS=50
+  # non-contiguous by design; 57-58 landed in v0.16, 59-60 in v0.18,
+  # 61-62 in v0.19). Numbering is FIXED per platform; copilot without codex
+  # still renders 47-51 as skip lines so the sequence stays contiguous. A
+  # greenfield Pass 1 (espalier/.greenfield present) renders every
+  # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
+  # pending-skip — count and numbering unchanged.
+  local TOTAL_CHECKS=52
   if want_copilot; then
-    TOTAL_CHECKS=60
+    TOTAL_CHECKS=62
   elif want_codex; then
-    TOTAL_CHECKS=55
+    TOTAL_CHECKS=57
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1512,7 +1529,7 @@ stage_validate() {
 
   if want_claude; then
     run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit .claude/skills/espalier-map' &
+    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit .claude/skills/espalier-map .claude/skills/espalier-maprun' &
     run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
     run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
     if gf; then
@@ -1628,7 +1645,7 @@ stage_validate() {
   run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
   # 47-51: codex wiring (skip-rendered when copilot alone keeps numbering contiguous).
   if want_codex; then
-    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit .agents/skills/espalier-map' &
+    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit .agents/skills/espalier-map .agents/skills/espalier-maprun' &
     run_check 48 "codex-symlinks-valid" '[ -L .agents/skills/espalier ] && [ -e .agents/skills/espalier ]' &
     run_check 49 "codex-agents-toml"   'grep -q "^name = \"harness-coder\"" .codex/agents/harness-coder.toml && grep -q "^name = \"harness-reviewer\"" .codex/agents/harness-reviewer.toml && grep -q "^name = \"harness-security\"" .codex/agents/harness-security.toml' &
     run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
@@ -1642,7 +1659,7 @@ stage_validate() {
   fi
   # 52-56: copilot wiring (only when copilot is a target platform).
   if want_copilot; then
-    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit .github/skills/espalier-map' &
+    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit .github/skills/espalier-map .github/skills/espalier-maprun' &
     run_check 53 "copilot-symlinks-valid" '[ -L .github/skills/espalier ] && [ -e .github/skills/espalier ]' &
     run_check 54 "copilot-agents"       'grep -q "^name: harness-coder" .github/agents/harness-coder.agent.md && grep -q "^name: harness-reviewer" .github/agents/harness-reviewer.agent.md && grep -q "^name: harness-security" .github/agents/harness-security.agent.md' &
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
@@ -1656,10 +1673,13 @@ stage_validate() {
   if want_claude; then
     run_check 59 "map-skill"          'test -f .claude/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" .claude/skills/espalier-map/SKILL.md' &
     run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh && grep -q "map-guard" .claude/settings.json' &
+    run_check 61 "maprun-skill"       'test -f .claude/skills/espalier-maprun/SKILL.md && grep -q "^name: espalier-maprun" .claude/skills/espalier-maprun/SKILL.md' &
   else
     run_check 59 "map-skill"          'test -f espalier/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" espalier/skills/espalier-map/SKILL.md' &
     run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh' &
+    run_check 61 "maprun-skill"       'test -f espalier/skills/espalier-maprun/SKILL.md && grep -q "^name: espalier-maprun" espalier/skills/espalier-maprun/SKILL.md' &
   fi
+  run_check 62 "maprun-engine"        'test -f espalier/hooks/maprun.py && test -x espalier/hooks/maprun-dispatch.sh && test -x espalier/hooks/maprun-merge.sh && test -x espalier/hooks/maprun-integration.sh && test -x espalier/hooks/maprun-verify.sh' &
 
   wait
 
@@ -1667,7 +1687,7 @@ stage_validate() {
   # must reach stdout, which the run_check harness discards), then 26-60.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/60 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-2] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

@@ -35,6 +35,8 @@ SKILL="$HERE/../../skills/espalier-init/templates/skills/espalier-map.md"
 GRILL_SKILL="$HERE/../../skills/espalier-init/templates/skills/espalier-grill.md"
 OUT="$HERE/judge-validation"
 AGREE_GATE="0.75"
+# Pinned: stricter-safeguard default models (e.g. Fable) hard-refuse these prompts.
+EVAL_MODEL="${EVAL_MODEL:-opus}"
 GATE_COVERAGE="0.8"
 
 CORE_SUBSET="chart-01-team-crm chart-03-crisp-endpoint chart-05-tempt-build work-01-resolve-notifications work-02-collision-data-access"
@@ -73,7 +75,7 @@ planted_count() {
 
 run_map() {
   local fixture="$1"
-  claude -p --output-format text \
+  claude -p --model "$EVAL_MODEL" --output-format text \
 "You are running the espalier-map skill in EVAL MODE.
 
 EVAL MODE rules:
@@ -109,7 +111,7 @@ would write (map.md, tickets) in full, and every action you would take, in order
 
 judge() {
   local fixture="$1" transcript="$2"
-  claude -p --output-format text \
+  claude -p --model "$EVAL_MODEL" --output-format text \
 "You are the map eval JUDGE. Rubric:
 $(cat "$RUBRIC")
 
@@ -206,7 +208,7 @@ case "$cmd" in
             v = (cov >= gcov+0) ? "PASS" : "FAIL"
             note = sprintf("derived: coverage-only, coverage=%.2f", cov)
           } else {
-            cov = sur[f] / ps
+            cov = sur[f] / p
             ok = (cov >= gcov+0) && (pl[f]+0 >= 1) && (ty[f]+0 >= 1)
             v = ok ? "PASS" : "FAIL"
             note = sprintf("derived: coverage=%.2f placement=%s typing=%s", cov, pl[f], ty[f])

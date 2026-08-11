@@ -16,6 +16,9 @@
 
 set -u
 
+# dispatch pops a live watch TUI window on real runs — never during tests
+export MAPRUN_NO_DASHBOARD=1
+
 KEEP=no
 VERBOSE=no
 for arg in "$@"; do
@@ -299,7 +302,7 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/50\]' | head -3 | sed 's/\[//;s/\/50\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/52\]' | head -3 | sed 's/\[//;s/\/52\]//' | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -327,7 +330,7 @@ HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-l
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/50] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/52] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -341,7 +344,7 @@ HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/50] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/52] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Test 13: --lang=unsupported writes a no-op boundary hook ─────────────
@@ -380,8 +383,8 @@ assert "14i coder agent toml"                "grep -q '^name = \"harness-coder\"
 assert "14j reviewer agent toml"             "[ -f '$TMP/.codex/agents/harness-reviewer.toml' ]"
 assert "14k security agent toml"             "[ -f '$TMP/.codex/agents/harness-security.toml' ]"
 assert "14l platforms persisted"             "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
-assert "14m validation total is 55"          "echo \"\$P_OUT\" | grep -q 'Validation: 55/55 passed'"
-assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/55] OK'"
+assert "14m validation total is 57"          "echo \"\$P_OUT\" | grep -q 'Validation: 57/57 passed'"
+assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/57] OK'"
 assert "14o CLAUDE.md section still written" "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 # TOML sanity: python tomllib parses the generated config + agent files.
 assert "14p config.toml parses"              "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
@@ -411,7 +414,7 @@ assert "15b merge decision reused"           "echo \"\$W_OUT\" | grep -q \"reusi
 assert "15c platforms unioned to claude,codex" "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
 assert "15d codex wired"                     "[ -L '$TMP/.agents/skills/espalier' ] && grep -q 'ESPALIER HOOKS' '$TMP/.codex/config.toml'"
 assert "15e claude wiring untouched"         "[ -L '$TMP/.claude/skills/espalier' ] && grep -q 'espalier/hooks' '$TMP/.claude/settings.json'"
-assert "15f validation total is 55"          "echo \"\$W_OUT\" | grep -q 'Validation: 55/55 passed'"
+assert "15f validation total is 57"          "echo \"\$W_OUT\" | grep -q 'Validation: 57/57 passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 16: codex-only install (no .claude litter, claude checks skip) ──
@@ -429,7 +432,7 @@ assert "16b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
 assert "16c no CLAUDE.md section"            "! grep -q '## Espalier' '$TMP/CLAUDE.md' 2>/dev/null"
 assert "16d codex fully wired"               "[ -L '$TMP/.agents/skills/espalier' ] && [ -f '$TMP/.codex/agents/harness-coder.toml' ] && grep -q '## Espalier' '$TMP/AGENTS.md'"
 assert "16e claude checks skipped OK"        "echo \"\$C_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
-assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 55/55 passed'"
+assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 57/57 passed'"
 assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -448,8 +451,8 @@ assert "17e hooks json valid + adapter wired"  "python3 -c 'import json; json.lo
 assert "17f adapter copied + executable"       "[ -x '$TMP/espalier/hooks/copilot-hook-adapter.sh' ]"
 assert "17g copilot-instructions section"      "grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "17h claude + codex wiring intact"      "[ -L '$TMP/.claude/skills/espalier' ] && [ -L '$TMP/.agents/skills/espalier' ]"
-assert "17i validation total is 60"            "echo \"\$A_OUT\" | grep -q 'Validation: 60/60 passed'"
-assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/60] OK'"
+assert "17i validation total is 62"            "echo \"\$A_OUT\" | grep -q 'Validation: 62/62 passed'"
+assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/62] OK'"
 # Idempotent re-run: sections/files not duplicated, user tuning preserved.
 echo "<!-- user tuning marker -->" >> "$TMP/.github/agents/harness-coder.agent.md"
 ( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=all --yes >/dev/null 2>&1 )
@@ -471,7 +474,7 @@ assert "18c no AGENTS.md written"            "[ ! -f '$TMP/AGENTS.md' ]"
 assert "18d copilot fully wired"             "[ -L '$TMP/.github/skills/espalier' ] && [ -f '$TMP/.github/agents/harness-coder.agent.md' ] && grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "18e claude checks skipped OK"        "echo \"\$P_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
 assert "18f codex checks skipped OK"         "echo \"\$P_OUT\" | grep -qF 'OK   codex-skills-load (skipped — codex not targeted)'"
-assert "18g validation total is 60"          "echo \"\$P_OUT\" | grep -q 'Validation: 60/60 passed'"
+assert "18g validation total is 62"          "echo \"\$P_OUT\" | grep -q 'Validation: 62/62 passed'"
 assert "18h platforms = copilot"             "grep -qx 'copilot' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -570,8 +573,8 @@ WT_EXIT=$?
 assert "21a bootstrap from linked worktree exits 0"    "[ $WT_EXIT -eq 0 ]"
 assert "21b dispatcher installed in the COMMON hooks dir" \
   "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
-assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 50/50 passed'"
-assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/50] OK'"
+assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 52/52 passed'"
+assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/52] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$WT" "$TMP"
 
 # ─── Test 22: migration v0.15.0 → v0.16.0 (synthetic fixture) ─────────────
@@ -720,7 +723,7 @@ assert "25d settings.json map-guard entry" "grep -q 'map-guard' '$TMP/.claude/se
 assert "25e codex map-guard block"       "grep -q 'ESPALIER MAP GUARD v1' '$TMP/.codex/config.toml' && python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
 assert "25f copilot gates map-guard"     "grep -q 'map-guard' '$TMP/.github/hooks/espalier-gates.json' && python3 -c 'import json; json.load(open(\"$TMP/.github/hooks/espalier-gates.json\"))'"
 assert "25g max-open-tickets key"        "grep -q '^max-open-tickets: 9' '$TMP/espalier/.espalier-config'"
-assert "25h checks 59+60 pass"           "echo \"\$M25_OUT\" | grep -qF '[59/60] OK' && echo \"\$M25_OUT\" | grep -qF '[60/60] OK'"
+assert "25h checks 59+60 pass"           "echo \"\$M25_OUT\" | grep -qF '[59/62] OK' && echo \"\$M25_OUT\" | grep -qF '[60/62] OK'"
 assert "25i maps dir created"            "[ -d '$TMP/espalier/maps' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -733,7 +736,7 @@ assert "25j greenfield bootstrap exits 0"  "[ $G25_RC -eq 0 ]"
 assert "25k .greenfield marker recorded"   "[ -f '$TMP/espalier/.greenfield' ]"
 assert "25l placeholder gate present"      "grep -q 'greenfield placeholder' '$TMP/espalier/hooks/pre-push-gate.sh'"
 assert "25m phase2 checks render as skips" "echo \"\$G25_OUT\" | grep -qF 'phase2-coding-skill (skipped — pending greenfield Pass 2)'"
-assert "25n greenfield validation passes"  "echo \"\$G25_OUT\" | grep -q 'Validation: 50/50 passed'"
+assert "25n greenfield validation passes"  "echo \"\$G25_OUT\" | grep -q 'Validation: 52/52 passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 25o-t: migration v0.17.0 → v0.18.0 fixture — strip v0.18 bits from a fresh
@@ -756,6 +759,197 @@ assert "25r skill + guard + link installed" "grep -q '^name: espalier-map' '$TMP
 assert "25s config + settings wired"        "grep -q '^max-open-tickets:' '$TMP/espalier/.espalier-config' && grep -q 'map-guard' '$TMP/.claude/settings.json'"
 M18_RERUN=$( cd "$TMP" && bash "$MIGRATE18" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "25t re-run is a no-op"              "echo \"\$M18_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 26: v0.19.0 run lane — wiring, engine, dispatch e2e, migration ──
+echo "Test 26: v0.19.0 run lane (wiring + engine + stub-CLI dispatch + migration)"
+MIGRATE19="$SCRIPT_DIR/migrate-v0.18.0-to-v0.19.0.sh"
+TMP=$(mktemp -d -t smoke26.XXXX)
+rm -rf "$TMP/../wt26"   # stale worktrees from an aborted prior run poison the resume path
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+assert "26a run skill copied + linked" \
+  "grep -q '^name: espalier-maprun' '$TMP/espalier/skills/espalier-maprun/SKILL.md' && [ -L '$TMP/.claude/skills/espalier-maprun' ]"
+assert "26b maprun engine present + executable" \
+  "[ -f '$TMP/espalier/hooks/maprun.py' ] && [ -x '$TMP/espalier/hooks/maprun-dispatch.sh' ] && [ -x '$TMP/espalier/hooks/maprun-verify.sh' ]"
+
+# Stub CLI: a fake `claude` that reads the outcome path out of the -p prompt
+# and writes the sentinel the mode asks for. Dispatch runs it via PATH.
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/claude" << 'FAKECLI'
+#!/bin/bash
+PROMPT="${2:-}"
+OUT=$(printf '%s' "$PROMPT" | grep -o 'espalier/changes/[^ ]*\.maprun-outcome' | head -1)
+sleep "${FAKE_CLAUDE_SLEEP:-1}"
+echo '{"type":"result","subtype":"success","is_error":false,"num_turns":1}'
+[ -z "$OUT" ] && exit 0
+case "${FAKE_CLAUDE_MODE:-pass}" in
+  park)
+    printf 'Q: which index?\n' > "$(dirname "$OUT")/.maprun-question.md"
+    printf 'PARKED\n' > "$OUT" ;;
+  *)
+    # Commit real work like a real worker would — merge/verify need commits.
+    echo "stub work $$" > "stub-work.txt"
+    git add -A >/dev/null 2>&1
+    git -c user.email=w@t -c user.name=w commit -qm "feat: stub work" >/dev/null 2>&1
+    printf 'PASSED\n' > "$OUT" ;;
+esac
+FAKECLI
+chmod +x "$TMP/bin/claude"
+
+# Map fixture: two tickets, FILED skeletons committed on main (the base branch).
+mkdir -p "$TMP/espalier/maps/m26/plan" \
+         "$TMP/espalier/changes/feat/2026-01-01-alpha" "$TMP/espalier/changes/feat/2026-01-01-beta"
+for s in alpha beta; do
+  printf -- '---\ncharted_from: maps/m26\n---\n# req %s\n' "$s" > "$TMP/espalier/changes/feat/2026-01-01-$s/requirements.md"
+  printf '# Pipeline State\n\n## Status\n- Current Stage: 0\n- Status: FILED\n' > "$TMP/espalier/changes/feat/2026-01-01-$s/pipeline-state.md"
+done
+cat > "$TMP/espalier/maps/m26/plan/plan.json" << 'PLAN26'
+{
+  "map": "m26", "integration_branch": "feat/m26", "base_branch": "main",
+  "concurrency": 2, "worktree_root": "../wt26",
+  "worker_platform": "claude", "worker_mode": "session", "model": "opus",
+  "workspaces": [], "union_merge": [], "worker_env": {"CI": "1"},
+  "verify": {"commands": [{"name": "smoke", "dir": ".", "run": "true"}]},
+  "tickets": [
+    {"key": "a", "slug": "2026-01-01-alpha", "name": "Alpha", "deps": [], "requirement": "feat: alpha"},
+    {"key": "b", "slug": "2026-01-01-beta", "name": "Beta", "deps": ["a"], "requirement": "feat: beta"}
+  ]
+}
+PLAN26
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "m26 fixture" )
+MP="$TMP/espalier/maps/m26"
+assert "26c init + frontier" \
+  "( cd '$TMP' && python3 espalier/hooks/maprun.py '$MP' init >/dev/null && [ \"\$(python3 espalier/hooks/maprun.py '$MP' frontier)\" = 'a' ] )"
+assert "26d invalid mark rejected" \
+  "! ( cd '$TMP' && python3 espalier/hooks/maprun.py '$MP' mark a BOGUS >/dev/null 2>&1 )"
+assert "26d2 pause empties frontier; resume restores it" \
+  "( cd '$TMP' && python3 espalier/hooks/maprun.py '$MP' pause hold >/dev/null && [ -z \"\$(python3 espalier/hooks/maprun.py '$MP' frontier)\" ] && python3 espalier/hooks/maprun.py '$MP' status | grep -q PAUSED && python3 espalier/hooks/maprun.py '$MP' resume >/dev/null && [ \"\$(python3 espalier/hooks/maprun.py '$MP' frontier)\" = 'a' ] )"
+
+# 26e-i: session-mode dispatch end to end with the stub CLI.
+D26=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-dispatch.sh "$MP" a 2>&1 )
+assert "26e dispatch records DISPATCHED + pid + worktree" \
+  "python3 -c \"import json;s=json.load(open('$MP/plan/state.json'))['tickets']['a'];assert s['status']=='DISPATCHED' and s['pid'] and s['worktree']\""
+SENT="$TMP/../wt26/m26/a/espalier/changes/feat/2026-01-01-alpha/.maprun-outcome"
+for i in $(seq 1 20); do [ -f "$SENT" ] && break; sleep 1; done
+assert "26f stub worker wrote PASSED sentinel"  "grep -q PASSED '$SENT'"
+assert "26g heartbeat written by supervisor"    "[ -s '$MP/plan/logs/a.heartbeat' ]"
+assert "26g2 push block is worktree-scoped (shared config untouched)" \
+  "[ -z \"\$(git -C '$TMP' config remote.origin.pushurl 2>/dev/null)\" ] && [ \"\$(git -C '$TMP/../wt26/m26/a' config remote.origin.pushurl)\" = 'blocked://maprun-forbids-push' ]"
+R26=$( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP" reap 2>&1 )
+assert "26h reap classifies PASSED"             "echo \"\$R26\" | grep -q 'a: → PASSED'"
+assert "26i merge + verify pass" \
+  "( cd '$TMP' && bash espalier/hooks/maprun-merge.sh '$MP' a >/dev/null 2>&1 && python3 espalier/hooks/maprun.py '$MP' mark a MERGED >/dev/null && bash espalier/hooks/maprun-verify.sh '$MP' >/dev/null 2>&1 )"
+
+# 26j-l: resume path — stale sentinel removed, uncommitted work checkpointed.
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP" mark a TODO >/dev/null )
+echo "half-written" > "$TMP/../wt26/m26/a/scratch.txt"
+printf 'STALE\n' > "$SENT"   # distinct stale verdict; dispatch must remove it
+D26B=$( cd "$TMP" && PATH="$TMP/bin:$PATH" FAKE_CLAUDE_SLEEP=4 bash espalier/hooks/maprun-dispatch.sh "$MP" a 2>&1 )
+assert "26j stale sentinel cleared on re-dispatch"  "! grep -q STALE '$SENT' 2>/dev/null"
+assert "26k uncommitted work auto-checkpointed" \
+  "( cd '$TMP/../wt26/m26/a' && git log --oneline -3 | grep -q 'wip(maprun)' )"
+for i in $(seq 1 20); do [ -f "$SENT" ] && break; sleep 1; done
+assert "26l re-dispatched worker completed"         "grep -q PASSED '$SENT'"
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP" reap >/dev/null 2>&1 && python3 espalier/hooks/maprun.py "$MP" mark a MERGED >/dev/null )
+
+# 26m-o: question channel — worker parks in ITS worktree; reap collects.
+D26C=$( cd "$TMP" && PATH="$TMP/bin:$PATH" FAKE_CLAUDE_MODE=park bash espalier/hooks/maprun-dispatch.sh "$MP" b 2>&1 )
+BSENT="$TMP/../wt26/m26/b/espalier/changes/feat/2026-01-01-beta/.maprun-outcome"
+for i in $(seq 1 20); do [ -f "$BSENT" ] && break; sleep 1; done
+R26C=$( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP" reap 2>&1 )
+assert "26m reap parks the ticket"          "echo \"\$R26C\" | grep -q 'b: → PARKED'"
+assert "26n question collected master-side" \
+  "[ -f '$MP/plan/questions/b.md' ] && [ ! -f '$TMP/../wt26/m26/b/espalier/changes/feat/2026-01-01-beta/.maprun-question.md' ]"
+D26D=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-dispatch.sh "$MP" b 2>&1; echo "RC=$?" )
+assert "26o dispatch refuses while question unanswered (exit 4)" \
+  "echo \"\$D26D\" | grep -q 'RC=4'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP/../wt26" "$TMP"   # worktrees FIRST — $TMP/.. is unresolvable once $TMP is gone
+
+# 26u-w: staged worker mode — the wrapper loops one session per stage group.
+TMP=$(mktemp -d -t smoke26s.XXXX)
+rm -rf "$TMP/../wt26s"   # stale worktrees from an aborted prior run poison the resume path
+make_smoke_repo "$TMP"
+mkdir -p "$TMP/espalier/hooks" "$TMP/espalier/maps/sm/plan" "$TMP/espalier/changes/feat/2026-01-02-gamma" "$TMP/bin"
+cp "$PLUGIN_DIR/hook-templates/"maprun*.* "$TMP/espalier/hooks/"
+chmod +x "$TMP/espalier/hooks/"*.sh
+printf -- '---\ncharted_from: maps/sm\n---\n# req gamma\n' > "$TMP/espalier/changes/feat/2026-01-02-gamma/requirements.md"
+printf '# Pipeline State\n\n## Status\n- Current Stage: 0\n- Status: FILED\n' > "$TMP/espalier/changes/feat/2026-01-02-gamma/pipeline-state.md"
+cat > "$TMP/espalier/maps/sm/plan/plan.json" << 'PLAN26S'
+{"map":"sm","integration_branch":"feat/sm","base_branch":"main","concurrency":1,
+ "worktree_root":"../wt26s","worker_platform":"claude","worker_mode":"staged",
+ "model":"opus","workspaces":[],"union_merge":[],"worker_env":{"CI":"1"},
+ "tickets":[{"key":"g","slug":"2026-01-02-gamma","name":"Gamma","deps":[],"requirement":"feat: gamma"}]}
+PLAN26S
+cat > "$TMP/bin/claude" << 'FAKECLI2'
+#!/bin/bash
+# staged stub: leg 1 advances the stage to 3 (no sentinel); leg 2 writes PASSED
+PROMPT="${2:-}"
+OUT=$(printf '%s' "$PROMPT" | grep -o 'espalier/changes/[^ ]*\.maprun-outcome' | head -1)
+STATE="$(dirname "$OUT")/pipeline-state.md"
+sleep 1
+CUR=$(grep -m1 '^- Current Stage:' "$STATE" | grep -o '[0-9][0-9]*' | head -1)
+echo "leg saw stage=$CUR"
+if [ "${CUR:-0}" -lt 3 ]; then
+  sed -i '' 's/^- Current Stage:.*/- Current Stage: 3/' "$STATE" 2>/dev/null \
+    || sed -i 's/^- Current Stage:.*/- Current Stage: 3/' "$STATE"
+else
+  printf 'PASSED\n' > "$OUT"
+fi
+FAKECLI2
+chmod +x "$TMP/bin/claude"
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "staged fixture" )
+MPS="$TMP/espalier/maps/sm"
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MPS" init >/dev/null 2>&1 )
+( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-dispatch.sh "$MPS" g >/dev/null 2>&1 )
+GSENT="$TMP/../wt26s/sm/g/espalier/changes/feat/2026-01-02-gamma/.maprun-outcome"
+for i in $(seq 1 25); do [ -f "$GSENT" ] && break; sleep 1; done
+assert "26u staged wrapper reached the sentinel"   "grep -q PASSED '$GSENT'"
+assert "26v staged wrapper ran two legs"           "[ \"\$(grep -c 'leg saw stage=' '$MPS/plan/logs/g.log')\" = '2' ]"
+R26S=$( cd "$TMP" && python3 espalier/hooks/maprun.py "$MPS" reap 2>&1 )
+assert "26w staged outcome reaped as PASSED"       "echo \"\$R26S\" | grep -q 'g: → PASSED'"
+
+# 26x-z: observability — feed renders stream-json human-readable; watch is read-only
+cat >> "$MPS/plan/logs/g.log" << 'OBSLOG'
+{"type":"system","subtype":"init","model":"claude-opus-5"}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"plan the gamma work"},{"type":"tool_use","name":"Bash","input":{"command":"npm test"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","content":[{"type":"text","text":"2 passing"}],"is_error":false}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":3,"total_cost_usd":0.42}
+OBSLOG
+F26=$( cd "$TMP" && python3 espalier/hooks/maprun.py "$MPS" feed g 2>&1 )
+assert "26x feed renders THINK/TOOL/RES lines" \
+  "echo \"\$F26\" | grep -q 'THINK plan the gamma work' && echo \"\$F26\" | grep -q 'TOOL  Bash: npm test' && echo \"\$F26\" | grep -q 'RES  2 passing'"
+S26_BEFORE=$(cat "$MPS/plan/state.json")
+W26=$( cd "$TMP" && python3 espalier/hooks/maprun.py "$MPS" watch --once 2>&1 )
+assert "26y watch --once renders a frame" \
+  "echo \"\$W26\" | grep -q 'read-only view' && echo \"\$W26\" | grep -q 'PASSED     g'"
+assert "26z watch mutates nothing" \
+  "[ \"\$(cat '$MPS/plan/state.json')\" = \"\$S26_BEFORE\" ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP/../wt26s" "$TMP"   # worktrees FIRST — $TMP/.. is unresolvable once $TMP is gone
+
+# 26p-t: migration v0.18.0 → v0.19.0 fixture.
+TMP=$(mktemp -d -t smoke26m.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+( cd "$TMP" \
+  && rm -rf espalier/skills/espalier-maprun .claude/skills/espalier-maprun \
+            espalier/hooks/maprun-dispatch.sh espalier/hooks/maprun-merge.sh \
+            espalier/hooks/maprun-integration.sh espalier/hooks/maprun-verify.sh \
+  && echo "# LOCAL ENGINE" > espalier/hooks/maprun.py \
+  && grep -v espalier-maprun CLAUDE.md > c.tmp && mv c.tmp CLAUDE.md )
+M19_DRY=$( cd "$TMP" && bash "$MIGRATE19" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "26p dry-run lists missing markers"  "echo \"\$M19_DRY\" | grep -q 'espalier-maprun lane skill'"
+assert "26q dry-run creates nothing"        "[ ! -f '$TMP/espalier/hooks/maprun-dispatch.sh' ]"
+M19_OUT=$( cd "$TMP" && bash "$MIGRATE19" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M19_RC=$?
+assert "26r apply exits 0 + wires the lane" \
+  "[ $M19_RC -eq 0 ] && grep -q '^name: espalier-maprun' '$TMP/espalier/skills/espalier-maprun/SKILL.md' && [ -L '$TMP/.claude/skills/espalier-maprun' ] && [ -x '$TMP/espalier/hooks/maprun-dispatch.sh' ]"
+assert "26s locally-adapted engine preserved" \
+  "grep -q 'LOCAL ENGINE' '$TMP/espalier/hooks/maprun.py'"
+M19_RERUN=$( cd "$TMP" && bash "$MIGRATE19" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "26t re-run is a no-op"              "echo \"\$M19_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

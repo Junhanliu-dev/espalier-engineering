@@ -288,13 +288,16 @@ knows how to adopt:
    - `pipeline-state.md` from `espalier/changes/_template/pipeline-state.md`
      with `- Status: FILED` added under `## Status`.
 4. Add every slice to the map's Spawned Changes table (`FILED`).
-5. Tell the user the run order: `/espalier <slice 1 requirement>` … — the
-   pipeline's FILED-skeleton scan adopts each folder, and Stage 1 starts from
-   the drafted requirements (already part-grilled by the map; Stage 1 grill
-   then covers only what the slice adds).
-6. When later `/espalier` runs complete a spawned change, they may offer to
-   flip this map's status to `BUILT` once every row is COMPLETE. (Offer —
-   never auto-flip.)
+5. Tell the user BOTH run options: one at a time — `/espalier <slice 1
+   requirement>` … (the pipeline's FILED-skeleton scan adopts each folder,
+   and Stage 1 starts from the drafted requirements, already part-grilled by
+   the map) — or the whole map at once with `/espalier-maprun <map-slug> plan`
+   then `/espalier-maprun <map-slug>` passes (headless workers drive every
+   slice through stages 1–6 in isolated worktrees; see
+   `espalier/skills/espalier-maprun/SKILL.md`).
+6. When later `/espalier` runs (or an `/espalier-maprun` completion) complete a
+   spawned change, they may offer to flip this map's status to `BUILT` once
+   every row is COMPLETE. (Offer — never auto-flip.)
 
 Skip the slicing ONLY when the cleared map turned out genuinely small (one
 slice): file the one skeleton and say so.
