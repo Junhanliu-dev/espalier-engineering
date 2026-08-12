@@ -952,6 +952,182 @@ M19_RERUN=$( cd "$TMP" && bash "$MIGRATE19" --yes --plugin-dir="$SCRIPT_DIR/.." 
 assert "26t re-run is a no-op"              "echo \"\$M19_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 27: v0.20.0 slice PRs — engine, config hygiene, stub-gh e2e, migration ──
+echo "Test 27: v0.20.0 slice PRs (maprun-pr + config hygiene + stub-gh e2e + migration)"
+MIGRATE20="$SCRIPT_DIR/migrate-v0.19.0-to-v0.20.0.sh"
+TMP=$(mktemp -d -t smoke27.XXXX)
+rm -rf "$TMP/../wt27"   # stale worktrees from an aborted prior run poison the resume path
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+assert "27a maprun-pr.sh shipped + executable" \
+  "[ -x '$TMP/espalier/hooks/maprun-pr.sh' ]"
+
+# Bare origin + stub gh: pushes are real (file remote), the forge is faked.
+git init --bare -q "$TMP/.origin.git"
+( cd "$TMP" && git remote add origin "$TMP/.origin.git" )
+mkdir -p "$TMP/bin"
+cat > "$TMP/bin/gh" << 'FAKEGH'
+#!/bin/bash
+echo "gh $*" >> "${GH_LOG:?}"
+case "$1" in
+  auth) exit 0 ;;
+  api)  echo "true" ;;
+  pr)
+    case "$2" in
+      list)   ;;                                        # no existing PR
+      create) echo "https://github.com/x/y/pull/7" ;;
+    esac ;;
+esac
+exit 0
+FAKEGH
+chmod +x "$TMP/bin/gh"
+export GH_LOG="$TMP/gh.log"; : > "$GH_LOG"
+
+cat > "$TMP/bin/claude" << 'FAKECLI'
+#!/bin/bash
+PROMPT="${2:-}"
+OUT=$(printf '%s' "$PROMPT" | grep -o 'espalier/changes/[^ ]*\.maprun-outcome' | head -1)
+sleep 1
+echo '{"type":"result","subtype":"success","is_error":false,"num_turns":1}'
+[ -z "$OUT" ] && exit 0
+echo "stub work $$" > "stub-work.txt"
+git add -A >/dev/null 2>&1
+git -c user.email=w@t -c user.name=w commit -qm "feat: stub work" >/dev/null 2>&1
+printf 'PASSED\n' > "$OUT"
+FAKECLI
+chmod +x "$TMP/bin/claude"
+
+mkdir -p "$TMP/espalier/maps/m27/plan" "$TMP/espalier/changes/feat/2026-01-03-delta"
+printf -- '---\ncharted_from: maps/m27\n---\n# req delta\n' > "$TMP/espalier/changes/feat/2026-01-03-delta/requirements.md"
+printf '# Pipeline State\n\n## Status\n- Current Stage: 0\n- Status: FILED\n' > "$TMP/espalier/changes/feat/2026-01-03-delta/pipeline-state.md"
+cat > "$TMP/espalier/maps/m27/plan/plan.json" << 'PLAN27'
+{
+  "map": "m27", "integration_branch": "feat/m27", "base_branch": "main",
+  "concurrency": 1, "worktree_root": "../wt27",
+  "worker_platform": "claude", "worker_mode": "session", "model": "opus",
+  "workspaces": [], "union_merge": [], "worker_env": {"CI": "1"},
+  "pr": { "remote": "origin", "draft": false, "labels": [] },
+  "verify": {"commands": [{"name": "smoke", "dir": ".", "run": "true"}]},
+  "tickets": [
+    {"key": "d", "slug": "2026-01-03-delta", "name": "Delta", "deps": [], "requirement": "feat: delta"}
+  ]
+}
+PLAN27
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "m27 fixture" )
+MP27="$TMP/espalier/maps/m27"
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP27" init >/dev/null 2>&1 )
+
+# setup: creates + pushes the integration branch before any dispatch exists
+S27=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-pr.sh "$MP27" setup 2>&1 )
+assert "27b setup pushes the integration branch to origin" \
+  "git -C '$TMP/.origin.git' show-ref --verify --quiet refs/heads/feat/m27"
+
+( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-dispatch.sh "$MP27" d >/dev/null 2>&1 )
+DSENT="$TMP/../wt27/m27/d/espalier/changes/feat/2026-01-03-delta/.maprun-outcome"
+for i in $(seq 1 20); do [ -f "$DSENT" ] && break; sleep 1; done
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP27" reap >/dev/null 2>&1 )
+
+# open BEFORE merge: pushes the ticket branch, opens + records the slice PR
+O27=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-pr.sh "$MP27" open d 2>&1 )
+assert "27c open pushes the ticket branch to origin" \
+  "git -C '$TMP/.origin.git' show-ref --verify --quiet refs/heads/espalier/2026-01-03-delta"
+assert "27d open records the slice PR in state" \
+  "python3 -c \"import json;s=json.load(open('$MP27/plan/state.json'))['tickets']['d'];assert s['pr_number']==7 and 'pull/7' in s['pr_url']\""
+assert "27e status shows the PR number" \
+  "( cd '$TMP' && python3 espalier/hooks/maprun.py '$MP27' status | grep -q 'PR#7' )"
+
+( cd "$TMP" && bash espalier/hooks/maprun-merge.sh "$MP27" d >/dev/null 2>&1 \
+  && python3 espalier/hooks/maprun.py "$MP27" mark d MERGED >/dev/null 2>&1 )
+SY27=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-pr.sh "$MP27" sync 2>&1 )
+assert "27f sync pushes the merged integration branch (slice branch contained)" \
+  "[ \"\$(git -C '$TMP/.origin.git' rev-list --count 'espalier/2026-01-03-delta..feat/m27')\" -ge 1 ] \
+   && [ \"\$(git -C '$TMP/.origin.git' merge-base espalier/2026-01-03-delta feat/m27)\" = \"\$(git -C '$TMP/.origin.git' rev-parse espalier/2026-01-03-delta)\" ]"
+
+# F6 regression: creating the integration worktree (merge above) must NOT
+# poison the shared git config — the master's own pushes depend on it.
+assert "27g shared config never poisoned by the integration worktree" \
+  "[ -z \"\$(git -C '$TMP' config remote.origin.pushurl 2>/dev/null)\" ]"
+# ...and a config poisoned by a pre-v0.20 engine is healed on the next run.
+( cd "$TMP" && git config remote.origin.pushurl "blocked://maprun-forbids-push" )
+( cd "$TMP" && bash espalier/hooks/maprun-integration.sh "$MP27" >/dev/null 2>&1 )
+assert "27h poisoned shared pushurl healed by maprun-integration.sh" \
+  "[ -z \"\$(git -C '$TMP' config remote.origin.pushurl 2>/dev/null)\" ]"
+
+F27=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-pr.sh "$MP27" final 2>&1 )
+assert "27i final opens the assembly PR against the base branch" \
+  "grep -q 'pr create' '$GH_LOG' && grep -q -- '--base main' '$GH_LOG' && grep -q 'map(m27)' '$GH_LOG'"
+
+# Opt-in gate: without a `pr` key every subcommand is a silent no-op.
+python3 - << PYSTRIP
+import json
+p = json.load(open("$MP27/plan/plan.json"))
+p.pop("pr", None)
+json.dump(p, open("$MP27/plan/plan.json", "w"), indent=2)
+PYSTRIP
+N27=$( cd "$TMP" && PATH="$TMP/bin:$PATH" bash espalier/hooks/maprun-pr.sh "$MP27" open d 2>&1; echo "RC=$?" )
+assert "27j no pr config → no-op exit 0" \
+  "echo \"\$N27\" | grep -q 'flow disabled' && echo \"\$N27\" | grep -q 'RC=0'"
+unset GH_LOG
+
+# 27p-r: inline worker mode — dispatch prepares the worktree, spawns NOTHING.
+mkdir -p "$TMP/espalier/maps/m27i/plan" "$TMP/espalier/changes/feat/2026-01-04-echo"
+printf -- '---\ncharted_from: maps/m27i\n---\n# req echo\n' > "$TMP/espalier/changes/feat/2026-01-04-echo/requirements.md"
+printf '# Pipeline State\n\n## Status\n- Current Stage: 0\n- Status: FILED\n' > "$TMP/espalier/changes/feat/2026-01-04-echo/pipeline-state.md"
+cat > "$TMP/espalier/maps/m27i/plan/plan.json" << 'PLAN27I'
+{"map":"m27i","integration_branch":"feat/m27i","base_branch":"main","concurrency":1,
+ "worktree_root":"../wt27","worker_platform":"claude","worker_mode":"inline",
+ "model":"opus","workspaces":[],"union_merge":[],
+ "tickets":[{"key":"e","slug":"2026-01-04-echo","name":"Echo","deps":[],"requirement":"feat: echo"}]}
+PLAN27I
+( cd "$TMP" && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm "m27i fixture" )
+MP27I="$TMP/espalier/maps/m27i"
+( cd "$TMP" && python3 espalier/hooks/maprun.py "$MP27I" init >/dev/null 2>&1 )
+I27=$( cd "$TMP" && bash espalier/hooks/maprun-dispatch.sh "$MP27I" e 2>&1; echo "RC=$?" )
+assert "27p inline dispatch prepares worktree without spawning" \
+  "echo \"\$I27\" | grep -q 'RC=0' && echo \"\$I27\" | grep -q 'no worker spawned' \
+   && [ -d '$TMP/../wt27/m27i/e' ] && [ ! -f '$MP27I/plan/logs/e.spawn.sh' ] && [ ! -f '$MP27I/plan/logs/e.pid' ]"
+assert "27q inline dispatch marks DISPATCHED pid-less" \
+  "python3 -c \"import json;s=json.load(open('$MP27I/plan/state.json'))['tickets']['e'];assert s['status']=='DISPATCHED' and not s['pid'] and s['worktree']\""
+assert "27r inline worktree push-blocked, branch off integration" \
+  "[ \"\$(git -C '$TMP/../wt27/m27i/e' config remote.origin.pushurl)\" = 'blocked://maprun-forbids-push' ] \
+   && [ \"\$(git -C '$TMP/../wt27/m27i/e' branch --show-current)\" = 'espalier/2026-01-04-echo' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP/../wt27" "$TMP"   # worktrees FIRST — $TMP/.. is unresolvable once $TMP is gone
+
+# 27k-n: migration v0.19.0 → v0.20.0 fixture.
+TMP=$(mktemp -d -t smoke27m.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+# Rewind to a v0.19 install: no maprun-pr.sh, a pre-slice-PR SKILL, and the
+# stock v0.19 unscoped push block in maprun-integration.sh.
+( cd "$TMP" \
+  && rm -f espalier/hooks/maprun-pr.sh \
+  && printf -- '---\nname: espalier-maprun\n---\n# v0.19 lane doc (no slice PRs)\n' > espalier/skills/espalier-maprun/SKILL.md )
+cat > "$TMP/espalier/hooks/maprun-integration.sh" << 'OLDMI'
+#!/usr/bin/env bash
+# stock v0.19 excerpt — the unscoped push block the migration must patch
+if [ ! -d "$IWT" ]; then
+  git -C "$REPO" worktree add "$IWT" "$INTEGRATION" >&2
+  git -C "$IWT" config remote.origin.pushurl "blocked://maprun-forbids-push" || true
+  git -C "$IWT" config push.default nothing || true
+fi
+OLDMI
+M20_DRY=$( cd "$TMP" && bash "$MIGRATE20" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "27k dry-run lists missing markers + patch"  \
+  "echo \"\$M20_DRY\" | grep -q 'maprun-pr.sh' && echo \"\$M20_DRY\" | grep -q 'worktree scope'"
+assert "27l dry-run creates nothing"        "[ ! -f '$TMP/espalier/hooks/maprun-pr.sh' ]"
+M20_OUT=$( cd "$TMP" && bash "$MIGRATE20" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M20_RC=$?
+assert "27m apply installs engine + patches the push block to worktree scope" \
+  "[ $M20_RC -eq 0 ] && [ -x '$TMP/espalier/hooks/maprun-pr.sh' ] \
+   && grep -qF 'maprun-pr.sh' '$TMP/espalier/skills/espalier-maprun/SKILL.md' \
+   && grep -q -- '--worktree' '$TMP/espalier/hooks/maprun-integration.sh' \
+   && [ -f '$TMP/espalier/hooks/maprun-integration.sh.pre-v0.20.bak' ]"
+M20_RERUN=$( cd "$TMP" && bash "$MIGRATE20" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "27n re-run is a no-op"              "echo \"\$M20_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

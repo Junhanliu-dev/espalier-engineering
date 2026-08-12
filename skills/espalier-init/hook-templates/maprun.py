@@ -31,6 +31,8 @@ Usage:
                                         THINK / SAY / TOOL / RES lines. --follow
                                         streams as the worker writes.
     maprun.py <map-dir> mark <k> <s>    force a ticket's status
+    maprun.py <map-dir> set-pr <k> <n> <url>   record a ticket's slice PR
+                                        (written by maprun-pr.sh open)
     maprun.py <map-dir> clickup <k>     push status + comment to ClickUp (optional config)
     maprun.py <map-dir> clickup-stages [<k>…]  mirror live pipeline stage to ClickUp:
                                         a "Pipeline: stage N — <label>" subtask under
@@ -249,6 +251,8 @@ class Run:
                     "last_error": None,
                     "harvest_entry_id": None,
                     "clickup_status": None,
+                    "pr_number": None,
+                    "pr_url": None,
                 }
                 for t in self.tickets
             },
@@ -868,6 +872,8 @@ class Run:
             extra = ""
             if st.get("stage"):
                 extra += f" stage={st['stage']}"
+            if st.get("pr_number"):
+                extra += f" PR#{st['pr_number']}"
             if st.get("last_error"):
                 extra += f"  ({st['last_error']})"
             out.append(f"  L{depth[t['key']]} {st['status']:<10} {t['key']:<14} "
@@ -1502,6 +1508,14 @@ def main(argv):
             run.state["halt_reason"] = None
         run.save()
         print(f"{key} → {status}")
+    elif cmd == "set-pr":
+        if len(rest) < 3:
+            die("set-pr <ticket> <number> <url>")
+        st = run.ts(rest[0])
+        st["pr_number"] = int(rest[1])
+        st["pr_url"] = rest[2]
+        run.save()
+        print(f"{rest[0]}: PR #{rest[1]} recorded")
     elif cmd == "clickup":
         if not rest:
             die("clickup <ticket> [note]")

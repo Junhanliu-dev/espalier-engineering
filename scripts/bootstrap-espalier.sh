@@ -409,7 +409,7 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/espalier-stats.sh' espalier/hooks/espalier-stats.sh"
   # /espalier-maprun engine (write-if-absent: a repo carrying a locally-adapted
   # engine — the lane's field origin — keeps its version on re-runs).
-  for mr in maprun.py maprun-dispatch.sh maprun-merge.sh maprun-integration.sh maprun-verify.sh; do
+  for mr in maprun.py maprun-dispatch.sh maprun-merge.sh maprun-integration.sh maprun-verify.sh maprun-pr.sh; do
     if [ -f "espalier/hooks/$mr" ]; then
       log "  espalier/hooks/$mr exists — preserving"
     else

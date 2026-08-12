@@ -43,11 +43,24 @@ if ! git -C "$REPO" show-ref --verify --quiet "refs/heads/$INTEGRATION"; then
   echo "created branch $INTEGRATION from $BASE" >&2
 fi
 
+# Self-heal: earlier versions applied the push block below WITHOUT --worktree,
+# poisoning the SHARED .git/config — which blocks the operator's own checkout
+# (and the master's PR pushes). Only maprun ever writes this value, so unset
+# on sight.
+if [ "$(git -C "$REPO" config remote.origin.pushurl 2>/dev/null)" = "blocked://maprun-forbids-push" ]; then
+  git -C "$REPO" config --unset remote.origin.pushurl || true
+  echo "healed: removed maprun push block from the SHARED git config" >&2
+fi
+
 if [ ! -d "$IWT" ]; then
   mkdir -p "$(dirname "$IWT")"
   git -C "$REPO" worktree add "$IWT" "$INTEGRATION" >&2
-  git -C "$IWT" config remote.origin.pushurl "blocked://maprun-forbids-push" || true
-  git -C "$IWT" config push.default nothing || true
+  # MUST be --worktree scoped (needs extensions.worktreeConfig): a plain
+  # `git config` here writes the SHARED .git/config and blocks the operator's
+  # checkout too — see the identical note in maprun-dispatch.sh.
+  git -C "$REPO" config extensions.worktreeConfig true
+  git -C "$IWT" config --worktree remote.origin.pushurl "blocked://maprun-forbids-push" || true
+  git -C "$IWT" config --worktree push.default nothing || true
   # Workspace deps: clone from the main checkout (verify has to build here).
   # Symlinks unsupported — bundlers reject out-of-root node_modules links.
   rows workspaces dir,deps,deps_dir,install_cmd | while IFS=$'\t' read -r wsdir wsdeps wsddir wscmd; do
