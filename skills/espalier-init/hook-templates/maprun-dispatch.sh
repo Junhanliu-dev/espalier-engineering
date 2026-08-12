@@ -201,6 +201,22 @@ rows workspaces dir,deps,deps_dir,install_cmd | while IFS=$'\t' read -r wsdir ws
   esac
 done
 
+# ── inline mode stops here: worktree prepared, nothing spawned ───────────────
+# worker_mode=inline means the MASTER runs the ticket's pipeline itself,
+# in-session, spawning the stage agents directly (see SKILL step 5-inline).
+# This script only prepares the isolated workspace: worktree, branch off the
+# integration branch, push block, dependencies. No prompt, no process, no
+# heartbeat — the master marks DISPATCHED (pid-less) and works the ticket;
+# a session that dies mid-ticket leaves DISPATCHED with no live pid, which
+# the next session's reap correctly retries as TODO.
+if [ "$WMODE" = "inline" ]; then
+  echo "  inline mode — worktree prepared, no worker spawned"
+  echo "  work the ticket IN THIS SESSION per the SKILL's inline step, in: $WT"
+  python3 "$HOOKS/maprun.py" "$MAP_DIR" mark "$KEY" DISPATCHED \
+    --worktree "$WT" --branch "$BRANCH" >/dev/null
+  exit 0
+fi
+
 # ── the worker contract ──────────────────────────────────────────────────────
 PROMPT_FILE="$LOGDIR/$KEY.prompt.txt"
 cat > "$PROMPT_FILE" << EOF

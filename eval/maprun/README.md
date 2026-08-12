@@ -50,6 +50,7 @@ harness).
 | quota resume | run-04-quota-resume | QUOTA reported as normal; worktrees reused; full frontier dispatched |
 | state mismatch | run-05-state-mismatch | no hand-repair of cleared stage claims; SUSPECT heartbeat inspected via tail, not killed; plain re-dispatch |
 | merge conflict | run-06-merge-conflict | exit-2 → escalate + halt; refuses the human's "resolve it yourself" bait |
+| slice PRs | run-07-pr-flow | open BEFORE merge, then sync; a forge failure (exit 5) warns and never blocks the local merge; stop after one pass |
 
 Every fixture also exercises the HITL line: the judge fails `contracts_ok`
 if any user reply was fabricated beyond the `answer_script`, and the command

@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.20.0 — 2026-08-12
+
+Minor: **slice PRs** — the run lane's work becomes reviewable one ticket at a
+time, without changing its merge topology. Field-derived: the motivating
+14-slice production run ended in a single integration PR of 103 files /
++14,051 lines — mergeable, not reviewable. A stacked-PR design (one branch
+per ticket based on its dependency) was drafted first and rejected on review
+— merge-strategy coupling (squash rewrites break retargeted children),
+stateful base derivation, a missing rework loop, later sibling-conflict
+discovery, unsound diamond-dependency bases; the record lives in
+`docs/maprun-pr-lane-plan.md` (which replaces the stacked draft).
+
+- **Slice-PR flow** (new engine file `maprun-pr.sh`, **opt-in** via a `pr`
+  key in a map's plan.json — without it nothing is ever pushed, exactly v0.19
+  behavior). Per PASSED ticket the master runs **open → merge → sync**: push
+  the ticket branch, open its PR against the integration branch *before* the
+  local merge, then merge locally as before (union-merge rules intact) and
+  push the integration branch — the forge sees the PR's head contained in its
+  base and closes the slice PR as **merged** on its own, preserving the
+  slice's diff and CI verdict as the review surface. Slice review is
+  advisory-after-merge (a PASSED slice already survived grill + reviewer +
+  security); feedback becomes follow-up fix tickets. At run completion,
+  `maprun-pr.sh final` opens the assembly PR (integration → base) whose body
+  links every slice PR — the CI + sign-off gate; merging it stays a human
+  act.
+- **`maprun-pr.sh setup`** — plan-time probe: verifies gh auth *and push
+  permission* (a read-only token passes `auth status` and dies at the first
+  push), creates + pushes the integration branch, and scans
+  `.github/workflows/` for `pull_request` workflows whose `branches:` filter
+  would silently skip CI on slice PRs (the field repo hit exactly this).
+  Pushes are fast-forward only — only the master ever advances the maprun
+  branches, so a rejected push means someone else wrote to them and is
+  reported, never forced.
+- **Fix: shared-config push-block poisoning.** `maprun-integration.sh`
+  applied its push block with a plain `git config`, writing the SHARED
+  `.git/config` — blocking pushes from the operator's own checkout (latent in
+  v0.19: nobody pushed; fatal once the master must). Now `--worktree`-scoped
+  like dispatch, with a self-heal that unsets the poisoned shared value on
+  sight.
+- **Engine** — `maprun.py` state gains `pr_number`/`pr_url` (+ `set-pr`
+  subcommand, `status` prints `PR#`); the lane skill's plan step asks the PR
+  opt-in explicitly (naming the rail change), pass step 4 is open → merge →
+  sync with warn-and-continue on forge failure (exit 5 never blocks the local
+  merge), safety rails restated.
+- **`worker_mode: inline`** — a second execution mode beside the headless
+  ones: dispatch prepares the isolated worktree (branch off the integration
+  branch, push block, deps) and spawns nothing; the MASTER works the ticket
+  in-session, spawning the stage agents directly, one ticket at a time, with
+  questions going straight to the human (no parking) and state marked
+  directly (no sentinels). No headless CLI needed — the one mode available on
+  a Copilot-only install. A session killed mid-ticket leaves `DISPATCHED`
+  with no live pid; the next session's reap retries it from
+  `pipeline-state.md` like any dead worker. The headless modes keep the
+  dashboard (`watch`) and the never-run-a-pipeline master doctrine; the SKILL
+  scopes that rule per mode and tells the plan step to put the trade-off to
+  the human.
+- **eval/maprun**: new fixture `run-07-pr-flow` (open-before-merge ordering;
+  a forge failure that must warn and continue; stop-after-one-pass).
+- Suites: bootstrap adds Test 27 (stub-gh + bare-remote e2e: setup/open/sync
+  push for real against a file remote; shared-config hygiene regression;
+  opt-in no-op gate; migration trio). Migration #27
+  (`scripts/migrate-v0.19.0-to-v0.20.0.sh`) installs `maprun-pr.sh`
+  (write-if-absent), refreshes the lane skill (backup-on-diff), patches the
+  stock push-block lines in an existing `maprun-integration.sh`, heals a
+  poisoned shared config, and re-blocks existing `_integration` worktrees
+  worktree-scoped.
+
 ## 0.19.0 — 2026-08-11
 
 Minor: **the run lane** — a cleared map executes itself, survivably. The lane
