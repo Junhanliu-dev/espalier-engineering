@@ -306,9 +306,10 @@ Fix cell (no nameable rewrite → not a finding):
 - `magic:` an unexplained literal on a decision path. Replacement: the named
   constant, per the project's constants convention.
 - `comments:` violates the project's discovered comment convention —
-  narrating noise where the project comments sparsely, or a missing
-  constraint note where the project documents constraints. Cite the
-  convention.
+  narrating noise where the project comments sparsely, an OVERLONG comment
+  (a paragraph where one plain line would carry the constraint — name the
+  one-line replacement), or a missing constraint note where the project
+  documents constraints. Cite the convention.
 
 **The one P1 — a cryptic PUBLIC name:** an EXPORTED/public symbol (exported
 function/class, endpoint path, DB column, event field, config key) whose name

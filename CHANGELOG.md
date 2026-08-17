@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.21.1 — 2026-08-17
+
+Patch: **comment brevity** — field feedback: the generated coder agents write
+comments that run too long. Three per-project files gain a short-comments
+default, always subordinate to the project's own discovered convention (a
+codebase that mandates fuller docstrings, e.g. JSDoc on exports, keeps them):
+
+- `harness-coder.md` — new constraint bullet: comments are SHORT, clear, and
+  few — one plain line stating the non-obvious constraint or the why; never a
+  paragraph, never narration, never reviewer-directed commentary; multi-
+  sentence explanations belong in the change's docs, not the code.
+- `coding-standards.md` — "Keep comments SHORT" bullet under
+  `## Comments & Docstrings`: one plain line beats a paragraph.
+- `harness-reviewer.md` — the Readability `comments:` tag now also flags an
+  OVERLONG comment (a paragraph where one line would carry the constraint),
+  with the one-line replacement named in the Fix cell.
+- Migration #29: `scripts/migrate-v0.21.0-to-v0.21.1.sh` — anchored edits to
+  the 3 per-project files (backups `.pre-v0.21.1.bak`, once per file);
+  customised files skip-with-record. Suites: bootstrap 257/257 (new Test 29),
+  hooks 146/146.
+
 ## 0.21.0 — 2026-08-17
 
 Minor: **pipeline speed** — the same gates, round caps, and review contract,

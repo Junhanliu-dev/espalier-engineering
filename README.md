@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.21.0-2ea44f" alt="version v0.21.0"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.21.1-2ea44f" alt="version v0.21.1"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>

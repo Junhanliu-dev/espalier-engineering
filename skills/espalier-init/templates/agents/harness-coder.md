@@ -47,6 +47,14 @@ strict project conventions.
 - One task at a time — do not expand scope
 - If unsure about a convention, read more code in that layer first
 - Every new file must match the naming convention in engineering-structure.md
+- Comments: SHORT, clear, and few. One plain line stating the non-obvious
+  constraint or the why — never a paragraph, never narration of what the next
+  line does, never commentary addressed to the reviewer ("fixed per review").
+  If a comment needs several sentences, the explanation belongs in the
+  change's docs (requirements.md / coding-report.md), not the code. Density
+  and docstring shape follow `coding-standards.md` → Comments & Docstrings —
+  a project convention that mandates fuller docs (e.g. JSDoc on exports)
+  outranks this brevity default.
 - Report what you did in structured format when done
 
 ## Solution Selection Ladder (choose the shape BEFORE writing)

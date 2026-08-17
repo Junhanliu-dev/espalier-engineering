@@ -1,6 +1,6 @@
 ---
 name: espalier-migrate
-description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS), the v0.16.0→v0.17.0 B-team release (weekly gardener rota + tracked single-line .doctor-stamp with clean/dirty semantics + conventions file-per-key), the v0.17.0→v0.18.0 map-lane release (/espalier-map multi-session planning + map-guard plan-don't-do hook + grill decision mode + greenfield decide-then-bind init), the v0.18.0→v0.19.0 run-lane release (/espalier-maprun map executor — interactive master + headless stage-1–6 workers in push-blocked worktrees + the maprun state engine), the v0.19.0→v0.20.0 slice-PR release (opt-in maprun-pr.sh forge surface — one reviewable slice PR per ticket + final assembly PR + the worktree-scoped push-block fix), and the v0.20.0→v0.21.0 pipeline-speed release (per-change context pack reused by every spawn + delta-scoped re-review rounds + parallel disjoint sub-tasks + push-target pre-authorization + light-tier grill batching — same gates, fewer redundant reads and waits) you need and applies them in order.
+description: Migrate an existing harness/espalier install to the current Espalier version — auto-detects which of v0.1→v0.2, v0.3→v0.4, v0.4→v0.5, the v0.5.3 coder-agent patch, v0.5→v0.6 (Stage 1 grill), v0.6→v0.7 (read-only /espalier-ask lane), v0.7→v0.8 (requirements approval gate), the v0.8.1 impact-analysis agent patch, the v0.8.2 re-review fixpoint loop, the v0.9.0 security audit, the v0.9.1 configurable escalation caps, the v0.9.2 correctness patch, the v0.9.3 skill-clarity patch, the v0.9.4 security-skill patch, the v0.9.6→v0.10.0 push-gate reshape, the v0.10.0→v0.11.0 hook exit-code release, the v0.11.0→v0.12.0 grill blind-spot pass (Stage 1 rules/wiki cross-check), the v0.12.0→v0.13.0 minimalism release (coder Solution Selection Ladder + reviewer advisory Minimalism Review), the v0.13.0→v0.13.1 polish patch (stage-conditional coding guidance + reviewer step-7 abuse-test duty + code-review gate line), the v0.13.1→v0.13.2 readability release (coder clarity-then-brevity tie-break + comment-convention discovery + reviewer advisory Readability Review with the cryptic-public-name P1), the v0.13.2→v0.14.0 Codex platform release (platform-neutral hook wrappers + optional .agents/skills + AGENTS.md + .codex wiring), the v0.14.0→v0.15.0 Copilot platform release (camelCase hook adapter + optional .github/skills + copilot-instructions + .github/agents + .github/hooks wiring), the v0.15.0→v0.16.0 multi-dev maintenance floor (conv_fold conventions reader + maintenance lanes + canonical-ref keys + .gitattributes union entry + optional CODEOWNERS), the v0.16.0→v0.17.0 B-team release (weekly gardener rota + tracked single-line .doctor-stamp with clean/dirty semantics + conventions file-per-key), the v0.17.0→v0.18.0 map-lane release (/espalier-map multi-session planning + map-guard plan-don't-do hook + grill decision mode + greenfield decide-then-bind init), the v0.18.0→v0.19.0 run-lane release (/espalier-maprun map executor — interactive master + headless stage-1–6 workers in push-blocked worktrees + the maprun state engine), the v0.19.0→v0.20.0 slice-PR release (opt-in maprun-pr.sh forge surface — one reviewable slice PR per ticket + final assembly PR + the worktree-scoped push-block fix), and the v0.20.0→v0.21.0 pipeline-speed release (per-change context pack reused by every spawn + delta-scoped re-review rounds + parallel disjoint sub-tasks + push-target pre-authorization + light-tier grill batching — same gates, fewer redundant reads and waits), and the v0.21.1 comment-brevity patch (coder/reviewer/coding-standards gain a short-comments default — one plain line, project conventions still outrank it) you need and applies them in order.
 ---
 
 # Espalier Migration Runner
@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to TWENTY-EIGHT migrations may apply, always in this order:
+version. Up to TWENTY-NINE migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -300,29 +300,38 @@ version. Up to TWENTY-EIGHT migrations may apply, always in this order:
    `espalier/.migrations-skipped` record and manual instructions, never
    mangled. No config keys, no hook wiring, no new symlinks. Mechanical:
    `scripts/migrate-v0.20.0-to-v0.21.0.sh`.
+29. **v0.21.0 → v0.21.1** — comment-brevity polish patch (field feedback:
+   generated comments ran too long). Anchored edits to 3 per-project files:
+   the coder gains a "Comments: SHORT, clear, and few" constraint bullet,
+   `coding-standards.md` a "Keep comments SHORT" bullet under Comments &
+   Docstrings, and the reviewer's Readability `comments:` tag now also flags
+   an OVERLONG comment. A documented project convention requiring fuller
+   docstrings outranks the new default. Customised files are skipped with a
+   `.migrations-skipped` record, never mangled; backups at
+   `<file>.pre-v0.21.1.bak`. Mechanical: `scripts/migrate-v0.21.0-to-v0.21.1.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL TWENTY-EIGHT; a v0.3.x
-install needs the last twenty-seven; a v0.4.x install needs the last twenty-six; a
-v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.21.0; a
-v0.5.3–v0.5.x install needs v0.6 … v0.21.0; a v0.6.x install needs
-v0.7 … v0.21.0; a v0.7.x install needs v0.8 … v0.21.0; a v0.8.0 install needs
-v0.8.1 … v0.21.0; a v0.8.1 install needs v0.8.2 … v0.21.0; a v0.8.2 install
-needs v0.9.0 … v0.21.0; a v0.9.0 install needs v0.9.1 … v0.21.0; a v0.9.1
-install needs v0.9.2 … v0.21.0; a v0.9.2 install needs v0.9.3, v0.9.4,
-v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.9.3 install
-needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a
+confirmation, apply in order. A v0.1.x install needs ALL TWENTY-NINE; a v0.3.x
+install needs the last twenty-eight; a v0.4.x install needs the last twenty-seven; a
+v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.21.1; a
+v0.5.3–v0.5.x install needs v0.6 … v0.21.1; a v0.6.x install needs
+v0.7 … v0.21.1; a v0.7.x install needs v0.8 … v0.21.1; a v0.8.0 install needs
+v0.8.1 … v0.21.1; a v0.8.1 install needs v0.8.2 … v0.21.1; a v0.8.2 install
+needs v0.9.0 … v0.21.1; a v0.9.0 install needs v0.9.1 … v0.21.1; a v0.9.1
+install needs v0.9.2 … v0.21.1; a v0.9.2 install needs v0.9.3, v0.9.4,
+v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.9.3 install
+needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a
 v0.9.4, v0.9.5, or v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
-v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
-v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.13.1
-install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.13.2 install needs v0.14.0,
-v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.14.0 install needs v0.15.0,
-v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.15.0 install needs v0.16.0, v0.17.0, v0.18.0,
-v0.19.0, v0.20.0, then v0.21.0; a v0.16.0 install needs v0.17.0, v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a
-v0.17.0 install needs v0.18.0, v0.19.0, v0.20.0, then v0.21.0; a v0.18.0 install needs
-v0.19.0, v0.20.0, then v0.21.0; a v0.19.0 install needs v0.20.0 then v0.21.0; a v0.20.0 install needs only v0.21.0.
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
+v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.13.1
+install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.13.2 install needs v0.14.0,
+v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.14.0 install needs v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.15.0 install needs v0.16.0, v0.17.0, v0.18.0,
+v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.16.0 install needs v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a
+v0.17.0 install needs v0.18.0, v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.18.0 install needs
+v0.19.0, v0.20.0, v0.21.0, then v0.21.1; a v0.19.0 install needs v0.20.0, v0.21.0, then v0.21.1; a v0.20.0 install needs v0.21.0 then v0.21.1; a v0.21.0 install needs only v0.21.1.
 
 Two gaps in the script names are deliberate, not missing steps: there is no
 v0.2→v0.3 script because v0.2/v0.3 detection is lumped — the v0.3→v0.4 step
@@ -419,6 +428,7 @@ NEEDS_V0180_PATCH=no
 NEEDS_V0190_PATCH=no
 NEEDS_V0200_PATCH=no
 NEEDS_V0210_PATCH=no
+NEEDS_V0211_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -458,6 +468,7 @@ if [ -d "harness" ]; then
   NEEDS_V0190_PATCH=yes      # ...then the v0.19.0 run-lane release
   NEEDS_V0200_PATCH=yes      # ...then the v0.20.0 slice-PR release
   NEEDS_V0210_PATCH=yes      # ...then the v0.21.0 pipeline-speed release
+  NEEDS_V0211_PATCH=yes      # ...then the v0.21.1 comment-brevity patch
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -729,6 +740,16 @@ elif [ -d "espalier" ]; then
      || ! ok21 'Delta mode (when YOUR prior round was clean)' espalier/agents/harness-security.md security-delta-mode; then
     NEEDS_V0210_PATCH=yes
   fi
+  # v0.21.1: the comment-brevity patch. Keep in sync with
+  # migrate-v0.21.0-to-v0.21.1.sh's own idempotency check; same
+  # skip-record-counts-as-handled rule (labels are v0.21.1-*).
+  ok211() { grep -qF "$1" "$2" 2>/dev/null \
+            || grep -qF "v0.21.1-$3" espalier/.migrations-skipped 2>/dev/null; }
+  if ! ok211 'Comments: SHORT' espalier/agents/harness-coder.md coder-comment-brevity \
+     || ! ok211 'OVERLONG comment' espalier/agents/harness-reviewer.md reviewer-comment-brevity \
+     || ! ok211 'Keep comments SHORT' espalier/rules/coding-standards.md standards-comment-brevity; then
+    NEEDS_V0211_PATCH=yes
+  fi
 fi
 
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
@@ -744,7 +765,8 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V0140_PATCH" = no ] && [ "$NEEDS_V0150_PATCH" = no ] \
    && [ "$NEEDS_V0160_PATCH" = no ] && [ "$NEEDS_V0170_PATCH" = no ] \
    && [ "$NEEDS_V0180_PATCH" = no ] && [ "$NEEDS_V0190_PATCH" = no ] \
-   && [ "$NEEDS_V0200_PATCH" = no ] && [ "$NEEDS_V0210_PATCH" = no ]; then
+   && [ "$NEEDS_V0200_PATCH" = no ] && [ "$NEEDS_V0210_PATCH" = no ] \
+   && [ "$NEEDS_V0211_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -765,7 +787,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.20.0-to-v0.21.0.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.21.0-to-v0.21.1.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -774,7 +796,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.20.0-to-v0.21.0.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.21.0-to-v0.21.1.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -792,7 +814,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.20.0-to-v0.21.0.sh`) — tell the user to
+is likely stale (no `migrate-v0.21.0-to-v0.21.1.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -830,6 +852,7 @@ verbatim:
 [ "$NEEDS_V0190_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.18.0-to-v0.19.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0200_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.19.0-to-v0.20.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0210_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.20.0-to-v0.21.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0211_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.21.0-to-v0.21.1.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -970,6 +993,7 @@ completed.
 [ "$NEEDS_V0190_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.18.0-to-v0.19.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0200_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.19.0-to-v0.20.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0210_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.20.0-to-v0.21.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0211_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.21.0-to-v0.21.1.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every

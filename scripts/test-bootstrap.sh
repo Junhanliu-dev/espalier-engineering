@@ -1213,6 +1213,66 @@ M21_RERUN=$( cd "$TMP" && bash "$MIGRATE21" --yes --plugin-dir="$SCRIPT_DIR/.." 
 assert "28h re-run is a no-op" "echo \"\$M21_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 29: v0.21.1 comment brevity — templates + migration ─────────────
+echo "Test 29: v0.21.1 comment brevity (templates + migration)"
+MIGRATE211="$SCRIPT_DIR/migrate-v0.21.0-to-v0.21.1.sh"
+TMP=$(mktemp -d -t smoke29.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "29a templates carry the comment-brevity markers" \
+  "grep -qF 'Comments: SHORT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && grep -qF 'OVERLONG comment' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+   && grep -qF 'Keep comments SHORT' '$SCRIPT_DIR/../skills/espalier-init/templates/rules/coding-standards.md'"
+
+# Stub agent/rules files lack the stock anchors → skip-with-record, exit 0.
+M211_SKIP=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M211_SKIP_RC=$?
+assert "29b customised files skip-with-record (exit 0)" \
+  "[ $M211_SKIP_RC -eq 0 ] && grep -qF 'v0.21.1-coder-comment-brevity' '$TMP/espalier/.migrations-skipped'"
+M211_SKIP2=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "29c re-run after skip-with-record is a no-op" \
+  "echo \"\$M211_SKIP2\" | grep -qi 'nothing to do'"
+
+# Seed stock v0.21.0-shaped files (carrying the anchors), then migrate.
+rm -f "$TMP/espalier/.migrations-skipped"
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V210CODER'
+## Your Constraints
+
+- Every new file must match the naming convention in engineering-structure.md
+- Report what you did in structured format when done
+V210CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V210REV'
+- `comments:` violates the project's discovered comment convention —
+  narrating noise where the project comments sparsely, or a missing
+  constraint note where the project documents constraints. Cite the
+  convention.
+V210REV
+cat > "$TMP/espalier/rules/coding-standards.md" << 'V210STD'
+## Comments & Docstrings
+- Match the observed density — a comment states a constraint the code cannot
+  show; never narrate what the next line does.
+
+## Required Patterns
+V210STD
+M211_OUT=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M211_RC=$?
+assert "29d apply lands every marker + backups" \
+  "[ $M211_RC -eq 0 ] \
+   && grep -qF 'Comments: SHORT' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'OVERLONG comment' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'Keep comments SHORT' '$TMP/espalier/rules/coding-standards.md' \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.21.1.bak' ] \
+   && [ -f '$TMP/espalier/rules/coding-standards.md.pre-v0.21.1.bak' ]"
+assert "29e edits land at their anchors (before report bullet / after density line / replacing tag line)" \
+  "awk '/Comments: SHORT/{p=NR} /Report what you did/{a=NR} END{exit !(p && a && p<a)}' '$TMP/espalier/agents/harness-coder.md' \
+   && awk '/never narrate what the next line does/{d=NR} /Keep comments SHORT/{k=NR} END{exit !(d && k && d<k)}' '$TMP/espalier/rules/coding-standards.md' \
+   && ! grep -qF 'sparsely, or a missing' '$TMP/espalier/agents/harness-reviewer.md'"
+M211_RERUN=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "29f re-run is a no-op" "echo \"\$M211_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

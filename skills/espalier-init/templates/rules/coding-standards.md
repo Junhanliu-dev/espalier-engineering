@@ -30,6 +30,10 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
 - What earns a comment: {observed — e.g. "a constraint the code cannot show"}
 - Match the observed density — a comment states a constraint the code cannot
   show; never narrate what the next line does.
+- Keep comments SHORT: one plain, easy-to-read line beats a paragraph. A
+  comment that needs several sentences is explanation that belongs in the
+  change's docs, not the code. (A documented project convention requiring
+  fuller docstrings outranks this default.)
 
 ## Required Patterns
 {things that must always be done — each backed by observed consistency}
