@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" role="img" aria-label="Without Espalier: 3 to 5 rework rounds between the AI coder and the reviewer. With Espalier: conventions are loaded up front and the change typically lands in one round.">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#e07856"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6fd39a"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="430" rx="18" fill="#0c1f16"/>
+
+  <!-- ============ LEFT: without ============ -->
+  <rect x="26" y="24" width="560" height="382" rx="14" fill="#16281f" stroke="#2e5c47"/>
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="306" y="66" font-size="22" font-weight="700" fill="#ecf6ef" text-anchor="middle">Without Espalier</text>
+
+    <!-- coder / reviewer columns -->
+    <rect x="66" y="96" width="160" height="224" rx="10" fill="#0f1d16" stroke="#3c6b53"/>
+    <text x="146" y="126" font-size="16" font-weight="600" fill="#ecf6ef" text-anchor="middle">AI coder</text>
+    <text x="146" y="148" font-size="12" fill="#8fae9d" text-anchor="middle">guesses your</text>
+    <text x="146" y="164" font-size="12" fill="#8fae9d" text-anchor="middle">conventions</text>
+
+    <rect x="386" y="96" width="160" height="224" rx="10" fill="#0f1d16" stroke="#3c6b53"/>
+    <text x="466" y="126" font-size="16" font-weight="600" fill="#ecf6ef" text-anchor="middle">Reviewer</text>
+    <text x="466" y="148" font-size="12" fill="#8fae9d" text-anchor="middle">&#8220;we don&#8217;t do it</text>
+    <text x="466" y="164" font-size="12" fill="#8fae9d" text-anchor="middle">like this here&#8221;</text>
+
+    <!-- ping-pong arrows -->
+    <g stroke="#e07856" stroke-width="2" fill="none">
+      <line x1="232" y1="188" x2="380" y2="188" marker-end="url(#ar)"/>
+      <line x1="380" y1="222" x2="232" y2="222" marker-end="url(#ar)"/>
+      <line x1="232" y1="256" x2="380" y2="256" marker-end="url(#ar)"/>
+      <line x1="380" y1="290" x2="232" y2="290" marker-end="url(#ar)"/>
+    </g>
+    <text x="306" y="182" font-size="11" fill="#e8a08a" text-anchor="middle">round 1: wrong helper</text>
+    <text x="306" y="216" font-size="11" fill="#e8a08a" text-anchor="middle">rework</text>
+    <text x="306" y="250" font-size="11" fill="#e8a08a" text-anchor="middle">round 2: wrong error style</text>
+    <text x="306" y="284" font-size="11" fill="#e8a08a" text-anchor="middle">rework &#8230;</text>
+
+    <text x="306" y="356" font-size="16" font-weight="600" fill="#e07856" text-anchor="middle">3&#8211;5 rework rounds per change</text>
+    <text x="306" y="380" font-size="13" fill="#8fae9d" text-anchor="middle">conventions re-explained on every request</text>
+  </g>
+
+  <!-- ============ RIGHT: with ============ -->
+  <rect x="614" y="24" width="560" height="382" rx="14" fill="#16351f" stroke="#3f7a56"/>
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="894" y="66" font-size="22" font-weight="700" fill="#ecf6ef" text-anchor="middle">With Espalier</text>
+
+    <!-- rules feed -->
+    <rect x="654" y="96" width="160" height="58" rx="10" fill="#0f1d16" stroke="#6fd39a"/>
+    <text x="734" y="120" font-size="14" font-weight="600" fill="#6fd39a" text-anchor="middle">espalier/rules</text>
+    <text x="734" y="140" font-size="11" fill="#8fae9d" text-anchor="middle">your conventions, always loaded</text>
+
+    <line x1="734" y1="154" x2="734" y2="192" stroke="#6fd39a" stroke-width="2" marker-end="url(#ag)"/>
+
+    <!-- coder -->
+    <rect x="654" y="198" width="160" height="96" rx="10" fill="#0f1d16" stroke="#3f7a56"/>
+    <text x="734" y="228" font-size="16" font-weight="600" fill="#ecf6ef" text-anchor="middle">AI coder</text>
+    <text x="734" y="250" font-size="12" fill="#8fae9d" text-anchor="middle">writes inside your</text>
+    <text x="734" y="266" font-size="12" fill="#8fae9d" text-anchor="middle">patterns from the start</text>
+
+    <line x1="820" y1="246" x2="928" y2="246" stroke="#6fd39a" stroke-width="2" marker-end="url(#ag)"/>
+    <text x="874" y="238" font-size="11" fill="#9fd8b6" text-anchor="middle">fits</text>
+
+    <!-- reviewer -->
+    <rect x="934" y="198" width="160" height="96" rx="10" fill="#0f1d16" stroke="#3f7a56"/>
+    <text x="1014" y="228" font-size="16" font-weight="600" fill="#ecf6ef" text-anchor="middle">Reviewer</text>
+    <text x="1014" y="250" font-size="12" fill="#8fae9d" text-anchor="middle">checks the same rules</text>
+    <text x="1014" y="266" font-size="12" fill="#8fae9d" text-anchor="middle">&#10003; approved</text>
+
+    <text x="894" y="356" font-size="16" font-weight="600" fill="#6fd39a" text-anchor="middle">typically 1 round</text>
+    <text x="894" y="380" font-size="13" fill="#8fae9d" text-anchor="middle">coder and reviewer share one written source of truth</text>
+  </g>
+</svg>

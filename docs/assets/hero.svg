@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-label="Espalier Engineering — train your AI coding agents to grow along your codebase's conventions">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c1f16"/>
+      <stop offset="1" stop-color="#153428"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="320" rx="18" fill="url(#bg)"/>
+
+  <!-- trellis wires -->
+  <g stroke="#2e5c47" stroke-width="2">
+    <line x1="80" y1="95"  x2="530" y2="95"/>
+    <line x1="80" y1="155" x2="530" y2="155"/>
+    <line x1="80" y1="215" x2="530" y2="215"/>
+  </g>
+  <!-- trellis posts -->
+  <g stroke="#3c6b53" stroke-width="4" stroke-linecap="round">
+    <line x1="90"  y1="80" x2="90"  y2="272"/>
+    <line x1="520" y1="80" x2="520" y2="272"/>
+  </g>
+
+  <!-- trunk -->
+  <path d="M305 278 L305 95" stroke="#8a6a48" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <!-- trained branches: horizontal along each wire -->
+  <g stroke="#8a6a48" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M305 215 C 295 213, 200 215, 130 215"/>
+    <path d="M305 215 C 315 213, 410 215, 480 215"/>
+    <path d="M305 155 C 295 153, 210 155, 150 155"/>
+    <path d="M305 155 C 315 153, 400 155, 460 155"/>
+    <path d="M305 95  C 295 93,  230 95,  175 95"/>
+    <path d="M305 95  C 315 93,  380 95,  435 95"/>
+  </g>
+
+  <!-- leaves -->
+  <g fill="#5ea87e">
+    <ellipse cx="160" cy="207" rx="11" ry="6" transform="rotate(-25 160 207)"/>
+    <ellipse cx="235" cy="222" rx="11" ry="6" transform="rotate(20 235 222)"/>
+    <ellipse cx="420" cy="207" rx="11" ry="6" transform="rotate(25 420 207)"/>
+    <ellipse cx="350" cy="222" rx="11" ry="6" transform="rotate(-18 350 222)"/>
+    <ellipse cx="185" cy="147" rx="11" ry="6" transform="rotate(-25 185 147)"/>
+    <ellipse cx="260" cy="162" rx="11" ry="6" transform="rotate(18 260 162)"/>
+    <ellipse cx="395" cy="147" rx="11" ry="6" transform="rotate(25 395 147)"/>
+    <ellipse cx="440" cy="162" rx="11" ry="6" transform="rotate(-20 440 162)"/>
+    <ellipse cx="205" cy="88"  rx="11" ry="6" transform="rotate(-22 205 88)"/>
+    <ellipse cx="365" cy="88"  rx="11" ry="6" transform="rotate(22 365 88)"/>
+    <ellipse cx="305" cy="78"  rx="12" ry="7"/>
+  </g>
+  <!-- fruit -->
+  <g fill="#e8a53a">
+    <circle cx="135" cy="222" r="7"/>
+    <circle cx="300" cy="228" r="7"/>
+    <circle cx="465" cy="222" r="7"/>
+    <circle cx="165" cy="162" r="7"/>
+    <circle cx="430" cy="148" r="7"/>
+    <circle cx="245" cy="102" r="7"/>
+    <circle cx="410" cy="102" r="7"/>
+  </g>
+
+  <!-- title -->
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="580" y="130" font-size="52" font-weight="700" fill="#ecf6ef">Espalier Engineering</text>
+    <text x="582" y="180" font-size="21" fill="#a9cbb8">Train your AI coding agents to grow along your</text>
+    <text x="582" y="210" font-size="21" fill="#a9cbb8">codebase&#8217;s conventions &#8212; on the first try.</text>
+    <text x="582" y="262" font-size="17" fill="#6fd39a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">/espalier-init &#8594; discovers your patterns &#8594; enforces them</text>
+  </g>
+</svg>
