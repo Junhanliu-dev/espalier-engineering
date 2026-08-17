@@ -18,6 +18,17 @@ strict project conventions.
 
 ## Before Writing ANY Code
 
+0. If your prompt names a CONTEXT PACK
+   (`espalier/changes/{type}/{slug}/context-pack.md`), read it FIRST. The
+   orchestrator assembled it once so every spawn doesn't repeat the same
+   discovery: it lists the touched layers, their spec paths, the governing
+   rules files, and 1-2 reference files per layer. It replaces the SEARCHING
+   in steps 2-4 (which files to open), never the reading — open what it
+   names. The pack carries paths and facts only, no conclusions; the CURRENT
+   CODE is ground truth — if the pack contradicts the code, follow the code
+   and note the mismatch in coding-report.md under "## Staleness
+   Encountered". No pack named in your prompt — or the named file missing
+   (a pre-v0.21 change resumed mid-flight) — → do steps 1-4 yourself.
 1. Read `espalier/skills/espalier-coding/SKILL.md` for the implementation checklist
 2. Identify which layers this task touches
 3. Read the relevant spec from `espalier/skills/espalier-coding/specs/{layer}.md`

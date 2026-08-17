@@ -55,7 +55,17 @@ lanes route into it rather than through it:
   self-reported "Build status: pass" is a claim, not the gate. A failing
   build/lint re-run goes straight back to the coder WITHOUT spawning the Stage 4
   panel (a panel round on unbuildable code is wasted).
-- **Constraint:** One sub-agent invocation per sub-task
+- **Constraint:** One sub-agent invocation per sub-task. Sub-tasks whose
+  planned file sets are pairwise DISJOINT (including any shared module both
+  would touch — barrel files, route tables, migration indexes count as
+  overlap) MAY be dispatched concurrently in one message; any overlap or
+  uncertainty → serial. See the espalier skill → "Parallel Sub-Tasks".
+- **Context pack (first entry only):** before the first coder spawn, the
+  orchestrator assembles `espalier/changes/{type}/{slug}/context-pack.md`
+  (see the espalier skill → "Stage 3 Entry: Context Pack") — every Stage 3-6
+  spawn is pointed at it so no sub-agent re-derives the touched layers,
+  specs, rules, and reference files. Paths and facts only, never
+  conclusions; agents verify against current code.
 - **Baseline (first entry only):** before any code is written, record
   `Base-Ref: $(git rev-parse HEAD)` as a line in pipeline-state.md. Never overwrite
   it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint and the push gate.
@@ -69,8 +79,14 @@ lanes route into it rather than through it:
 - **Loop — repeat until exit:**
   1. Spawn the FRESH panel on the CURRENT diff. On a re-review round, also hand each
      agent the "changed since last review" set — the fix's files from the latest
-     coding-report.md — so they scrutinize the new code while still owning the
-     whole-diff verdict.
+     coding-report.md. Re-review rounds run in DELTA SCOPE (fix files + prior
+     findings + direct dependents as the required reads; a floor, not a
+     ceiling — each agent expands on any suspicion; the security agent runs
+     delta mode when its own prior round was clean — see each agent's
+     "Re-review Rounds" section). The verdict still covers the whole change:
+     every line of the final diff was reviewed fresh in the round it last
+     changed, build/lint re-runs whole-tree before every round, and the
+     Reviewed-Diff fingerprint blocks unreviewed edits at push.
   2. **Non-PASS verdict (word `FAIL`, or p0/p1 > 0) from EITHER agent →** re-spawn
      `harness-coder` with the combined findings (a Stage 3 action), then **return
      to step 1 and re-review the NEW diff with the whole panel.** Never advance to
@@ -170,7 +186,12 @@ lanes route into it rather than through it:
   - `git status` shows clean working tree (all staged/committed)
   - Branch name matches convention
   - No merge conflicts
-- **Human checkpoint:** Confirm push target
+- **Human checkpoint:** Confirm push target — SKIPPED when a target was
+  pre-authorized at the Requirements Approval Gate (recorded as
+  `- Push-Target:` in pipeline-state.md; `ASK` or a missing line → prompt
+  here exactly as before). Pre-authorization removes only this redundant
+  wait; every programmatic gate above, the pre-push hook, and the
+  certificate check still apply in full.
 - **Output:** `espalier/changes/{type}/{slug}/pipeline-state.md` gains a `## Commits` table row (Stage 7, SHA, files) — read by `/espalier-fix` reverse lookup.
 
 ### 8. CI Verification

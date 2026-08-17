@@ -253,7 +253,26 @@ sign-off on `requirements.md` before Stage 3.
      3. Abort   — stop here; leave requirements.md as a draft (Status: ABORTED).
    ```
 
-3. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
+3. In the SAME `AskUserQuestion` call, add a second question collecting the
+   Stage 7 push authorization — so a run whose gates all pass later doesn't
+   stall waiting for a human who has walked away:
+
+   ```
+   When Stage 7 (push) is reached and every gate passes, push to:
+     1. {current branch} → {default remote}   (pre-authorize)
+     2. Somewhere else — specify
+     3. Ask me again at Stage 7
+   ```
+
+   Record the choice as `- Push-Target: {branch → remote | ASK}` in
+   pipeline-state.md. Stage 7 then pushes a pre-authorized target without
+   re-prompting — the programmatic gates (clean tree, branch convention,
+   pre-push hook, certificate) still apply in full; only the redundant wait
+   is removed. `ASK` or a missing line → prompt at Stage 7 as before. This
+   pre-authorization NEVER extends to Stage 10 — delivery acceptance stays a
+   human act.
+
+4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
    **Abort**, write Status: ABORTED to pipeline-state.md and stop.
 
@@ -270,6 +289,63 @@ History and proceed.
 Record the outcome in pipeline-state.md Stage History (e.g.
 `| 2 | PASSED | … | Requirements approved by user |`).
 
+### Stage 3 Entry: Context Pack (assemble once — every spawn reuses it)
+
+Immediately after the Requirements Approval Gate passes, write
+`espalier/changes/{type}/{slug}/context-pack.md` (overwrite if resuming a
+pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it):
+
+```markdown
+# Context Pack: {slug}
+- Requirement: espalier/changes/{type}/{slug}/requirements.md
+- Layers touched: {layer list, from the task decomposition}
+- Layer specs: espalier/skills/espalier-coding/specs/{layer}.md  (one line per touched layer)
+- Rules: espalier/rules/coding-standards.md · engineering-structure.md · security-standards.md · production-standards.md
+- Reference files: {1-2 existing files per touched layer that exemplify its conventions}
+- Build: {build command} · Lint: {lint command} · Tests: {test command}
+```
+
+Derive the layer list and reference files ONCE (from the requirement +
+`engineering-structure.md` + a quick glob of the touched layers) — this is
+exactly the discovery the coder, both panel agents, and the test spawns
+would otherwise EACH repeat from scratch. The pack lists PATHS AND FACTS
+only — never conclusions, never verdicts, never "this part is fine": every
+agent still reads the named files itself and trusts the current code over
+the pack. Add the `CONTEXT PACK:` line to EVERY Stage 3-6 spawn prompt (the
+prompt templates below carry it). A spawn that finds no pack (resumed old
+change, fix lane before its pack step) falls back to its own discovery —
+the pack is an accelerator, never a gate.
+
+### Parallel Sub-Tasks (Stage 3)
+
+When the task decomposition yields several sub-tasks, compare their planned
+file sets. Sub-tasks are PARALLEL-SAFE only when the sets are pairwise
+disjoint — counting any shared module both would edit (barrel files, route
+tables, migration indexes, shared fixtures are overlap). Dispatch
+parallel-safe sub-tasks as concurrent `harness-coder` spawns in ONE message,
+with two extra lines in each prompt:
+
+- `REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-{n}.md`
+  — parts, never `coding-report.md` directly.
+- `PARALLEL DISPATCH: do NOT run the build / test / dependency-install
+  commands — other coders share this working tree and concurrent runs
+  corrupt each other. Write code only; the orchestrator runs the exit gate
+  on the combined result.` (The coders' self-run build is a convenience
+  check, not a gate — the orchestrator's Stage 3 exit gate is, and it still
+  runs.)
+
+After ALL return, concatenate the parts into `coding-report.md` in sub-task
+order — KEEP the part files until the Stage 3 exit gate passes — and run the
+exit gate ONCE on the combined tree. A failure attributable to one sub-task
+re-spawns only that coder, again targeting ITS `coding-report.part-{n}.md`
+(never `coding-report.md` — an overwrite there would erase the other
+sub-tasks' reports that Stages 4-6 read); re-concatenate after the fix.
+Unclear attribution → re-run the failing sub-tasks serially (serial
+re-spawns may run the build themselves again). Only after the exit gate
+passes, delete the part files. Any overlap or uncertainty → serial dispatch,
+exactly as before. Parallelism changes DISPATCH only — the Stage 4 panel
+always reviews the COMBINED diff, and the review/gate contract is untouched.
+
 ### Sub-Agent Delegation
 
 Stages 3-6 use sub-agents for separation of concerns:
@@ -281,6 +357,9 @@ Agent tool:
     You are the harness-coder.
     Read espalier/agents/harness-coder.md for your full instructions.
 
+    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
+    first; it names the layers/specs/rules/reference files (paths and facts
+    only — verify against current code).
     REQUIREMENT: {paste requirement from Stage 1 output}
     TASK: {specific sub-task from decomposition}
 
@@ -303,9 +382,14 @@ Agent tool:
     You are the harness-reviewer.
     Read espalier/agents/harness-reviewer.md for your full instructions.
 
+    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
+    first (paths and facts only — your verdict comes from the code you read).
     WHAT TO REVIEW: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what the coder did. Then read the actual files listed there.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
+    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
+    latest coding-report.md}. Re-review in delta scope per your "Re-review
+    Rounds" section.
 
     Write (OVERWRITE) your review to:
     espalier/changes/{type}/{slug}/review-record.md
@@ -319,9 +403,14 @@ Agent tool:
     You are the harness-security auditor.
     Read espalier/agents/harness-security.md for your full instructions.
 
+    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
+    first (paths and facts only — your verdict comes from the code you read).
     WHAT TO AUDIT: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what changed, then trace the touched endpoints. Assume the client is hostile.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
+    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
+    latest coding-report.md}. If your own prior round was clean, run delta
+    mode per your "Re-review Rounds" section.
 
     Write (OVERWRITE) your audit to:
     espalier/changes/{type}/{slug}/security-record.md
@@ -337,6 +426,12 @@ Stage 5 by any other path:
 
 1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
    exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
+   On a re-review round, include the `CHANGED SINCE LAST REVIEW:` line in both
+   prompts — the agents then review in delta scope (their "Re-review Rounds"
+   sections; required reads = fix files + prior findings + direct dependents,
+   expandable on any suspicion; security runs delta mode when its own prior
+   round was clean). Both agents still return fresh current-round sentinels
+   and still own the whole-change verdict.
 2. **Completion check — BOTH files.** After both return, confirm EACH record was
    written THIS round: it exists, differs from its baseline, and its last
    `VERDICT:` line carries `round={n}` for the current round. A record that is
@@ -385,6 +480,8 @@ Agent tool:
     You are the harness-coder in testing mode.
     Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
+    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
+    first (paths and facts only — verify against current code).
     WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what was implemented. Write tests for those changes.
 
@@ -403,6 +500,8 @@ Agent tool:
     You are the harness-reviewer reviewing tests.
     Read espalier/agents/harness-reviewer.md for your instructions.
 
+    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
+    first (paths and facts only — your verdict comes from the tests you read).
     WHAT TO REVIEW: The test files created in Stage 5.
     Read espalier/changes/{type}/{slug}/coding-report.md for the list.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.

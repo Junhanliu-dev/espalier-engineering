@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.21.0 — 2026-08-17
+
+Minor: **pipeline speed** — the same gates, round caps, and review contract,
+with the redundant reads and redundant human waits removed. Nothing about the
+quality machinery changes: coder/reviewer/security stay separate agents, every
+fix still triggers a fresh panel round with per-round sentinels, all
+programmatic gates (build/lint re-run, fingerprint certificate, push gate) are
+untouched. What changes is the cost per spawn and per round:
+
+- **Context pack** (`context-pack.md`, assembled once at Stage 3 entry, both
+  lanes). The orchestrator derives the touched layers, spec paths, rules
+  files, and 1-2 reference files per layer ONCE and hands the pack to every
+  Stage 3-6 spawn — previously the coder, both panel agents, and both test
+  spawns EACH repeated that discovery from scratch (5-11 cold starts per
+  change). The pack carries paths and facts only, never conclusions; every
+  agent still reads the named files itself and the current code always
+  outranks the pack. A spawn that finds no pack falls back to its own
+  discovery — accelerator, never a gate.
+- **Delta-scoped re-review rounds.** On round n≥2 the panel's REQUIRED reads
+  are the fix's files + the prior round's findings + direct callers/dependents
+  of what changed — a floor, not a ceiling (any suspicion → expand; the
+  whole-diff verdict duty is unchanged). Soundness: every line of the final
+  diff was reviewed fresh in the round it last changed, build/lint re-runs
+  whole-tree before every round, and the `Reviewed-Diff` fingerprint blocks
+  unreviewed edits at push. The security agent additionally gets **delta
+  mode**: when its own prior round was clean (the round exists because the
+  correctness reviewer failed), it audits the fix delta for new
+  trust-boundary reads / contract changes and re-issues a fresh current-round
+  sentinel — full re-audit the moment either question answers yes.
+- **Parallel disjoint sub-tasks** (full lane, Stage 3). Sub-tasks whose
+  planned file sets are pairwise disjoint (shared modules count as overlap)
+  may dispatch as concurrent coder spawns; parts concatenate into one
+  coding-report and the exit gate + panel run on the combined result. Any
+  overlap or doubt → serial, as before.
+- **Push-target pre-authorization** (both lanes). The requirements approval
+  gate's `AskUserQuestion` gains a second question: pre-authorize the Stage 7
+  push target, name another, or "ask me again at Stage 7". A pre-authorized
+  green run no longer stalls mid-pipeline on a redundant confirm; every
+  programmatic push gate still applies, and Stage 10 delivery acceptance
+  remains a human act.
+- **Grill: light-tier batching.** `light`-tier questions that are pairwise
+  INDEPENDENT (no answer could eliminate/reorder/rephrase another) may be
+  batched into one `AskUserQuestion`. `full` tier and decision mode stay
+  strictly sequential — there the discriminating question depends on the last
+  answer by design.
+- **Deferred** (recorded in `docs/deferred-items.md`): folding interface-test
+  writing into Stage 3 and merging Stage 5/6 into the panel — highest
+  remaining spawn saving, but it restructures the stage contract; punted
+  until the field data (espalier-stats round distributions) justifies it.
+- Migration #28: `scripts/migrate-v0.20.0-to-v0.21.0.sh` — refreshes the 4
+  pure-copy files (backup-on-diff → `.pre-v0.21.bak`, backed up ONCE per file
+  even across multiple inserts) and anchored-inserts the agent sections; a
+  customised agent file is skipped with a `.migrations-skipped` record, never
+  mangled, and a skip record counts as handled so the migration still reaches
+  its "nothing to do" exit on customised installs.
+- Fix (pre-existing, surfaced by this release's review): `/espalier-migrate`'s
+  Step 1 detection machinery, Step 2 plugin probe, and Step 3/6 run lists
+  ended at v0.18.0 — a v0.18+ install could never auto-detect or run the
+  v0.19.0/v0.20.0 migrations through the documented runner path. All four
+  now extend through v0.21.0 (detection e2e-verified for up-to-date,
+  marker-missing, and skip-recorded installs).
+- Suites: bootstrap 251/251 (new Test 28 incl. migration apply / no-op /
+  customised-skip paths), hooks 146/146.
+
 ## 0.20.0 — 2026-08-12
 
 Minor: **slice PRs** — the run lane's work becomes reviewable one ticket at a

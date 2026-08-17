@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.20.0-2ea44f" alt="version v0.20.0"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.21.0-2ea44f" alt="version v0.21.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>
@@ -150,7 +150,7 @@ Init is a one-time ~$2–5 on a medium repo (Opus main + Sonnet scouts + cache).
 
 ## Latest release
 
-**v0.20.0 — slice PRs + inline worker mode.** A map run's work becomes reviewable one ticket at a time: with an opt-in `pr` key, each finished ticket gets its own PR against the integration branch (one-ticket diff + CI verdict as the review surface), and run completion opens an assembly PR linking every slice — the human sign-off gate. Plus `worker_mode: inline` for running tickets in-session without a headless CLI. Design notes: [docs/maprun-pr-lane-plan.md](./docs/maprun-pr-lane-plan.md).
+**v0.21.0 — pipeline speed, same gates.** The pipeline's quality machinery is untouched (separate coder/reviewer/security agents, fresh panel round after every fix, programmatic gates); what shrinks is the redundant work: a per-change **context pack** assembled once and reused by every sub-agent spawn, **delta-scoped re-review rounds** (required reads = fix + prior findings + dependents; expandable on any suspicion), **parallel dispatch** for disjoint sub-tasks, **push-target pre-authorization** at the approval gate, and light-tier grill questions batched when provably independent. Details in the [CHANGELOG](./CHANGELOG.md).
 
 Full history and migration guides: [CHANGELOG.md](./CHANGELOG.md) · upgrade any install with `/espalier-migrate`.
 

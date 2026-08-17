@@ -1128,6 +1128,91 @@ M20_RERUN=$( cd "$TMP" && bash "$MIGRATE20" --yes --plugin-dir="$SCRIPT_DIR/.." 
 assert "27n re-run is a no-op"              "echo \"\$M20_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 28: v0.21.0 pipeline speed — context pack, delta rounds, migration ──
+echo "Test 28: v0.21.0 pipeline speed (context pack + delta re-review + migration)"
+MIGRATE21="$SCRIPT_DIR/migrate-v0.20.0-to-v0.21.0.sh"
+TMP=$(mktemp -d -t smoke28.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "28a espalier SKILL carries the context-pack section" \
+  "grep -qF 'Stage 3 Entry: Context Pack' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "28b pipeline.md carries delta-scope doctrine + push pre-auth" \
+  "grep -qF 'DELTA SCOPE' '$TMP/espalier/pipeline.md' && grep -qF 'Push-Target' '$TMP/espalier/pipeline.md'"
+assert "28c agent TEMPLATES carry context-pack + delta sections" \
+  "grep -qF 'CONTEXT PACK' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && grep -qF 'Delta read scope' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+   && grep -qF 'Delta mode (when YOUR prior round was clean)' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md'"
+assert "28d grill batching rule + fix-lane pack/pre-auth present" \
+  "grep -qF 'pairwise INDEPENDENT' '$TMP/espalier/skills/espalier-grill/SKILL.md' \
+   && grep -qF 'context-pack.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+   && grep -qF 'Push-Target' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+
+# BSD/GNU-portable in-place sed (the suite's established fallback pattern)
+sedi() { sed -i '' "$1" "$2" 2>/dev/null || sed -i "$1" "$2"; }
+
+# The smoke install's agent files are stubs without the stock anchors — the
+# migration must degrade to skip-with-record, never mangle or fail.
+M21_SKIP=$( cd "$TMP" && bash "$MIGRATE21" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M21_SKIP_RC=$?
+assert "28e customised agents skip-with-record (exit 0)" \
+  "[ $M21_SKIP_RC -eq 0 ] && grep -qF 'v0.21.0-coder-context-pack' '$TMP/espalier/.migrations-skipped'"
+M21_SKIP2=$( cd "$TMP" && bash "$MIGRATE21" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "28e2 re-run after skip-with-record is a no-op" \
+  "echo \"\$M21_SKIP2\" | grep -qi 'nothing to do'"
+
+# Simulate a stock v0.20 install: strip pure-copy markers, seed agent files
+# carrying the stock anchors, then migrate for real.
+( cd "$TMP" \
+  && rm -f espalier/.migrations-skipped \
+  && sedi '/Stage 3 Entry: Context Pack/d' espalier/skills/espalier/SKILL.md \
+  && sedi '/DELTA SCOPE/d' espalier/pipeline.md \
+  && sedi '/pairwise INDEPENDENT/d' espalier/skills/espalier-grill/SKILL.md \
+  && sedi '/context-pack/d' espalier/skills/espalier-fix/SKILL.md )
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V20CODER'
+## Before Writing ANY Code
+
+1. Read `espalier/skills/espalier-coding/SKILL.md` for the implementation checklist
+2. Identify which layers this task touches
+V20CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V20REV'
+## Before Reviewing
+
+1. Read `espalier/skills/espalier-review/SKILL.md` for the review checklist
+
+## Re-review Rounds (you may be re-spawned on a fix)
+
+Never assume the fix is correct because it addresses your previous finding. Review
+the new code as fresh code.
+V20REV
+cat > "$TMP/espalier/agents/harness-security.md" << 'V20SEC'
+## Before Auditing
+
+1. Read `espalier/rules/security-standards.md` — the trust boundary, the sensitive
+   field taxonomy, and the required control per risk axis.
+
+Never assume the fix is correct because it addresses your prior finding. Audit the
+new code as fresh code.
+V20SEC
+M21_OUT=$( cd "$TMP" && bash "$MIGRATE21" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M21_RC=$?
+assert "28f apply restores every v0.21 marker + backups" \
+  "[ $M21_RC -eq 0 ] \
+   && grep -qF 'Stage 3 Entry: Context Pack' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'DELTA SCOPE' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'CONTEXT PACK' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'Delta read scope' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'Delta mode (when YOUR prior round was clean)' '$TMP/espalier/agents/harness-security.md' \
+   && [ -f '$TMP/espalier/pipeline.md.pre-v0.21.bak' ] \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.21.bak' ]"
+assert "28g inserts land BEFORE their anchors" \
+  "awk '/CONTEXT PACK/{p=NR} /implementation checklist/{a=NR} END{exit !(p && a && p<a)}' '$TMP/espalier/agents/harness-coder.md' \
+   && awk '/Delta read scope/{p=NR} /addresses your previous finding/{a=NR} END{exit !(p && a && p<a)}' '$TMP/espalier/agents/harness-reviewer.md'"
+M21_RERUN=$( cd "$TMP" && bash "$MIGRATE21" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "28h re-run is a no-op" "echo \"\$M21_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

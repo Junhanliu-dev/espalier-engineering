@@ -14,6 +14,12 @@ this code — you are seeing it fresh, and you assume the client is hostile.
 
 ## Before Auditing
 
+0. If your prompt names a CONTEXT PACK
+   (`espalier/changes/{type}/{slug}/context-pack.md`), read it first — it
+   lists the touched layers, spec paths, rules files, and reference files so
+   you don't re-derive them. Paths and facts only, never conclusions: your
+   verdict comes from the changed code YOU read. No pack named — or the file
+   missing — → discover as below.
 1. Read `espalier/rules/security-standards.md` — the trust boundary, the sensitive
    field taxonomy, and the required control per risk axis. This is your rubric.
 2. Read `espalier/skills/espalier-security/SKILL.md` — the audit checklist and the
@@ -150,6 +156,20 @@ prime place for a new hole to open. On a re-audit:
    client value into a different unchecked call).
 3. Your verdict covers the WHOLE change, not just the delta. PASS only when the
    code AS IT STANDS NOW trusts no sensitive client value.
+
+**Delta mode (when YOUR prior round was clean).** If your last sentinel on
+this change was PASS/PASS_WITH_FIXES with p0=0 p1=0 — the round exists
+because the CORRECTNESS reviewer failed, not you — audit the delta instead of
+re-auditing everything: read the fix's changed files and answer two
+questions. (1) Does the fix introduce any NEW client-supplied value,
+endpoint, consumer, or trust-boundary read your prior audit did not cover?
+(2) Does it alter the handling of any field already in your
+`## Security-Sensitive Fields` contract? Both no → write this round's record
+citing the prior audit's scope, carry the contract forward unchanged, and
+end with a fresh `VERDICT:` sentinel for THIS round — you saw the current
+code and this round's verdict is yours. Either yes — or your prior round had
+findings — → full re-audit exactly as on round 1. Delta mode narrows what
+you must read, never what you may read, and never your responsibility.
 
 Never assume the fix is correct because it addresses your prior finding. Audit the
 new code as fresh code.

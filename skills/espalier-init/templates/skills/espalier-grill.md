@@ -179,7 +179,15 @@ nothing and stay silent.
 ### Step 2 — Grill loop (tiers `light` and `full`)
 
 Ask questions **sequentially** — one question, wait for the answer, let the answer
-shape the next. Never batch.
+shape the next. Batching is allowed in exactly one case: tier `light`, AND the
+remaining planned questions are pairwise INDEPENDENT — no possible answer to one
+could eliminate, reorder, or rephrase another. Then ask them together in ONE
+`AskUserQuestion` call (still ≤ 3 total), saving the user a round-trip per
+question. When independence is in any doubt, sequential. `full`-tier grills stay
+strictly sequential — at that ambiguity level the discriminating question almost
+always depends on the last answer, and a batched checklist is exactly the
+failure mode the tier exists to prevent. Decision mode (`/espalier-map`) stays
+sequential too — candidate-elimination questions are inherently dependent.
 
 **Before each question**, privately list 3–5 concrete, *divergent* ways the input
 could still be built (`spec`) or explained (`diagnosis`). Ask the question whose
@@ -265,7 +273,8 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
   changing the implementation.
 - NEVER leave a resolved decision only in the chat — it must be written to
   `requirements.md`.
-- NEVER batch questions — sequential only.
+- NEVER batch dependent questions — batching is legal only for pairwise-independent
+  `light`-tier questions (Step 2); when unsure, sequential.
 - NEVER raise a collision (Step 1.5) without first verifying the cited `rules/`/`wiki/`
   claim against the current code — a stale doc gets `mark_stale`, not a question.
 - NEVER brainstorm new designs or generate alternatives in Step 1.5 — it surfaces

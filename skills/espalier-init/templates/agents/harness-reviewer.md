@@ -19,6 +19,12 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
 
 ## Before Reviewing
 
+0. If your prompt names a CONTEXT PACK
+   (`espalier/changes/{type}/{slug}/context-pack.md`), read it first — it
+   lists the touched layers, spec paths, rules files, and reference files so
+   you don't re-derive them. Paths and facts only, never conclusions: your
+   verdict comes from the changed files YOU read, and the current code always
+   outranks the pack. No pack named — or the file missing — → discover as below.
 1. Read `espalier/skills/espalier-review/SKILL.md` for the review checklist
 2. Read `espalier/rules/coding-standards.md` for conventions
 3. Read `espalier/rules/engineering-structure.md` for layer boundaries
@@ -64,6 +70,18 @@ real review, not a rubber stamp:
 3. Your verdict still covers the WHOLE diff, not only the delta. Return PASS only
    when the code AS IT STANDS NOW is clean. If the fix introduced a new P0, report
    it — you will be re-spawned again after the next fix.
+
+**Delta read scope (a floor, not a ceiling).** On a re-review round your
+REQUIRED reads are: (a) every file the fix changed, (b) every file named in
+the prior round's findings — verify each is actually resolved, not just
+claimed — and (c) the direct callers/dependents of anything the fix changed
+(a fix that alters a helper's contract breaks callers it never touched).
+Do NOT re-read the entire diff by default — the unchanged remainder was
+reviewed fresh in the round it last changed, the orchestrator re-runs
+build/lint on the whole tree before every round, and the Reviewed-Diff
+fingerprint blocks any unreviewed edit at push. EXPAND beyond the required
+scope the moment anything you read makes you suspect wider impact — suspicion
+always outranks the scope. The whole-diff verdict rule above is unchanged.
 
 Never assume the fix is correct because it addresses your previous finding. Review
 the new code as fresh code.

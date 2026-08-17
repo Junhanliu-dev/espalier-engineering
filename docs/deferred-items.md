@@ -2,6 +2,11 @@
 
 Things consciously punted from v0.2.0. Each has a documented rationale; revisit when the trigger condition (noted in each entry) materializes.
 
+## Items deferred from v0.21.0
+
+- **Fold interface-test writing into Stage 3; merge Stage 5/6 into the review panel.** The largest remaining per-run spawn saving (~2 cold starts + one fixpoint loop), but it restructures the stage contract: the security abuse-test contract only exists after Stage 4's panel passes, so test writing would split into interface-tests-with-code (Stage 3) and contract-driven abuse tests (post-panel). Design sketch in `docs/pipeline-speed-plan.md` → Deferred.
+  - **Trigger to revisit**: `espalier-stats.sh` field data showing most runs pass Stage 4 in 1 round (i.e., remaining cost is spawn count, not round count).
+
 ## Items deferred (acceptable as-is for v0.2.0)
 
 - **`harness-fix.md` "Before Starting" step 1** references `harness/pipeline.md` even though fix lane has its own stage overview (7 stages: 0–7, no Stage 2). Slightly redundant but not wrong — pipeline.md is the canonical Stage 3-7 contract.

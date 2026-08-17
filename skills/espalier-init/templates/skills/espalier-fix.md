@@ -614,7 +614,16 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
      3. Abort   — stop here; leave requirements.md as a draft (Status: ABORTED).
    ```
 
-3. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
+3. In the SAME `AskUserQuestion` call, add a second question collecting the
+   Stage 7 push authorization (mirror of the full lane's gate): pre-authorize
+   `{current branch} → {default remote}`, specify another target, or "Ask me
+   again at Stage 7". Record it as `- Push-Target: {target | ASK}` in
+   pipeline-state.md. Stage 7 then pushes a pre-authorized target without
+   re-prompting — every programmatic gate, the pre-push hook, and the
+   certificate check still apply; `ASK` or a missing line prompts at Stage 7
+   as before.
+
+4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.
 
 **Non-interactive exception:** auto-approve ONLY when EXPLICITLY unattended —
@@ -627,6 +636,16 @@ headless run auto-approves (record it in the Stage History).
 
 ## Stage 3: Coding
 
+**Context pack (first entry only):** before the first coder spawn, write
+`espalier/changes/fix/{slug}/context-pack.md` — the fix-lane version is
+small: the requirement path, the layers involved and their spec paths (both
+already in requirements.md's `## Layers involved` / `## Files likely
+touched`), the four rules files, 1-2 reference files per touched layer, and
+the discovered build/lint/test commands. Paths and facts only, never
+conclusions — every Stage 3-6 spawn below is pointed at it so no sub-agent
+re-derives the same discovery; agents verify against current code (see the
+espalier skill → "Stage 3 Entry: Context Pack" for the format).
+
 **Baseline (first entry only):** before spawning the coder, record
 `Base-Ref: $(git rev-parse HEAD)` as a line in this fix's pipeline-state.md. Never
 overwrite it on a coder re-spawn — it anchors the Stage 4/6 review fingerprint,
@@ -638,6 +657,8 @@ Spawn sub-agent. Prompt:
 You are the harness-coder.
 Read espalier/agents/harness-coder.md for full instructions.
 
+CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
+paths and facts only, verify against current code.
 REQUIREMENT: {paste requirement summary from Stage 1}
 CAUSED BY: {caused_by list — read those changes' requirements + coding-report + review-record}
 TASK: Fix the bug described above. Stay within the file(s) identified.
@@ -666,13 +687,21 @@ without spawning the panel and without counting a P0 round.
 
 1. **Baseline BOTH records** (`espalier/changes/fix/{slug}/review-record.md` and
    `.../security-record.md` — exists? size/mtime), then spawn the FRESH panel on
-   the CURRENT diff in ONE message. Pass each agent `ROUND: {n}` AND the
+   the CURRENT diff in ONE message. Pass each agent the `CONTEXT PACK:` line
+   (`espalier/changes/fix/{slug}/context-pack.md` — read first; paths and
+   facts only, verify against current code), `ROUND: {n}`, AND the
    `CAUSAL CONTEXT` line (the `caused_by` slugs + "verify the fix does not
    regress these features' acceptance criteria — read their requirements.md")
    so the regression check reaches the reviewer at Stage 4, not only at Stage 6.
    On a re-review round, also hand each agent the "changed since last review" set
-   (the fix's files from the latest coding-report.md) so they scrutinize the new
-   code while owning the whole-diff verdict.
+   (the fix's files from the latest coding-report.md) — the panel re-reviews in
+   DELTA SCOPE (fix files + prior findings + direct dependents as required
+   reads; a floor, not a ceiling — expand on any suspicion; security runs
+   delta mode when its own prior round was clean — see each agent's
+   "Re-review Rounds" section). Both agents still return fresh current-round
+   sentinels and still own the whole-change verdict: every line of the final
+   diff got a fresh review in the round it last changed, build/lint re-runs
+   before every round, and the fingerprint blocks unreviewed edits at push.
 2. **Completion check — BOTH files.** Each record must exist, differ from its
    baseline, and end with a `VERDICT:` sentinel carrying `round={n}`. A missing,
    unchanged, or sentinel-less record means that agent did NOT complete —
@@ -783,6 +812,8 @@ Spawn `harness-coder` in testing mode:
 You are the harness-coder in TESTING MODE.
 Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
+CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
+paths and facts only, verify against current code.
 WHAT WAS BUILT: Read espalier/changes/fix/{slug}/coding-report.md.
 ORIGINAL CAUSE (for regression test scope): {paste caused_by entries}
 
@@ -909,6 +940,8 @@ Spawn `harness-reviewer`:
 You are the harness-reviewer reviewing tests for a fix.
 Read espalier/agents/harness-reviewer.md.
 
+CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
+paths and facts only — your verdict comes from the tests you read.
 REVIEW: tests added in coding-report.md at espalier/changes/fix/{slug}/.
 CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
