@@ -2,10 +2,10 @@
 
 Things consciously punted from v0.2.0. Each has a documented rationale; revisit when the trigger condition (noted in each entry) materializes.
 
-## Items deferred from v0.21.0
+## Items deferred from v0.21.0 (trigger updated in v0.22.0)
 
-- **Fold interface-test writing into Stage 3; merge Stage 5/6 into the review panel.** The largest remaining per-run spawn saving (~2 cold starts + one fixpoint loop), but it restructures the stage contract: the security abuse-test contract only exists after Stage 4's panel passes, so test writing would split into interface-tests-with-code (Stage 3) and contract-driven abuse tests (post-panel). Design sketch in `docs/pipeline-speed-plan.md` → Deferred.
-  - **Trigger to revisit**: `espalier-stats.sh` field data showing most runs pass Stage 4 in 1 round (i.e., remaining cost is spawn count, not round count).
+- **Fold interface-test writing into Stage 3; merge Stage 5/6 into the review panel.** The largest remaining per-run TOKEN saving (~2 cold starts + one fixpoint loop). v0.22.0's speculative Stage 5 already captures most of the WALL-CLOCK saving without restructuring the stage contract, so the fold's remaining value is token cost. Design sketch in `docs/pipeline-speed-plan.md` → Deferred; v0.22 design in `docs/pipeline-speed-plan-v2.md` §11.
+  - **Trigger to revisit (updated)**: `espalier-stats.sh` Stage-durations field data showing (a) most runs pass Stage 4 in 1 round AND (b) spawn cold-start time still dominates agent-phase wall-clock AFTER the v0.22 overlap shipped.
 
 ## Items deferred (acceptable as-is for v0.2.0)
 
