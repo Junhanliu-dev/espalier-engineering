@@ -221,6 +221,26 @@ persistent store is unchanged. A contracted field with no such test is a Stage 6
 blocker — do not skip one. See `espalier/skills/espalier-security/SKILL.md` for
 the recipe.
 
+### Speculative & Contract entry points (Stage 5 dispatch modes)
+
+Testing mode has two prompt-marked entry points beyond the classic
+post-review dispatch:
+
+- **`SPECULATIVE DISPATCH:`** — you run CONCURRENTLY with the round-1
+  review panel. Write everything EXCEPT the contracted abuse tests. Do NOT
+  read security-record.md (it may be mid-write). Write your report to the
+  prompt's `REPORT TARGET:` part file, never to coding-report.md (the
+  panel is reading it), and list EVERY file you create under "Files
+  created" — the orchestrator's quarantine/discard mechanics operate on
+  that exact list, so an unlisted file is an unmanaged file. Run only
+  scoped invocations of your new test files; no whole-tree builds, no
+  dependency installs.
+- **`CONTRACT PHASE:`** — the panel has passed. Read security-record.md's
+  `## Security-Sensitive Fields` and write the named abuse tests. When the
+  prompt also carries "code changed since your tests", first reconcile the
+  restored speculative tests against those files. Append your test report
+  to coding-report.md normally.
+
 ## Production-Aware Coding (do this WHILE writing, not only at review)
 
 Read `espalier/rules/production-standards.md` and apply its seeds to every code

@@ -482,6 +482,21 @@ Stage 5 by any other path:
 
 1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
    exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
+   **ROUND 1 ONLY** — unless `speculative-tests: off` is set in
+   `espalier/.espalier-config` (read like the round caps; absent = on) —
+   the message is a THREE-agent dispatch: both panel agents PLUS the
+   Stage 5 test-coder in speculative mode (prompt in Stage 5 below), and
+   BOTH panel prompts gain this line:
+
+   ```
+   SPECULATIVE TESTS IN FLIGHT: a test-writing agent runs concurrently with
+   you. New/changed TEST files not listed in coding-report.md are its
+   work-in-progress — exclude them from your review scope and your verdict;
+   they are reviewed at Stage 6.
+   ```
+
+   Rounds ≥ 2 spawn the two panel agents only (the speculative tests are
+   quarantined on a FAIL — see the Stage 4 → Stage 5 handoff below).
    On a re-review round, include the `CHANGED SINCE LAST REVIEW:` line in both
    prompts — the agents then review in delta scope (their "Re-review Rounds"
    sections; required reads = fix files + prior findings + direct dependents,
@@ -525,29 +540,124 @@ Stage 5 by any other path:
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
    (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate, THEN run the
-   "Stage 4 Post-Review" drift processing below. The exit gate requires BOTH
+   "Stage 4 Post-Review" drift processing below and the "Stage 4 → Stage 5
+   handoff" protocol (both ride the same Step-1 bash). The exit gate requires BOTH
    clean — never one agent's pass alone. A security P0/P1 shares the correctness
    `max-code-rounds` round counter.
 
-**Stage 5 (Testing):**
+**Stage 5 (Testing — speculative, dispatched WITH the round-1 panel):**
+
+The test-coder joins the ROUND-1 Stage 4 message as the third concurrent
+agent (see Stage 4 step 1). Its speculative prompt:
+
 ```
 Agent tool:
   prompt: |
     You are the harness-coder in testing mode.
     Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
+    SPECULATIVE DISPATCH: a review panel is running concurrently on this code.
     CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
     first (paths and facts only — verify against current code).
     WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what was implemented. Write tests for those changes.
-
-    ALSO read espalier/changes/{type}/{slug}/security-record.md (if present) — for
-    EVERY field in its `## Security-Sensitive Fields` contract, write the negative
-    abuse test it names (tamper the value → assert rejected → assert store unchanged). A
-    contracted field with no such test will be blocked at Stage 6.
-
-    Append test report to: espalier/changes/{type}/{slug}/coding-report.md
+    what was implemented. Write the interface tests and failure-mode tests
+    for those changes NOW.
+    Do NOT read security-record.md this pass — it may be mid-write; the
+    contracted abuse tests are a separate phase after the panel returns.
+    REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-test.md
+    — never touch coding-report.md (the panel is reading it). List EVERY
+    file you create under "Files created" — the orchestrator's
+    quarantine/discard mechanics operate on that list.
+    Run ONLY scoped invocations of the test files you write; no whole-tree
+    builds, no dependency installs.
 ```
+
+With `speculative-tests: off`, skip the joint dispatch and instead run this
+prompt AFTER Stage 4 passes, without the speculative deltas (append directly
+to coding-report.md, read security-record.md for the contract) — the
+pre-v0.22 serial flow, verbatim.
+
+### Stage 4 → Stage 5 handoff (sequencing protocol — MANDATORY ordering)
+
+Races are the failure mode here: calls in one message run concurrently, so
+file-writing bash and file-reading spawns must never share a message.
+
+**Step 1 — orchestrator-local bash, ONE invocation, no agent in flight**
+(right after the joint dispatch resolves and the Stage 4 gate read is done):
+
+1. Escalation detector against the PART file:
+   `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/{type}/{slug}/coding-report.part-test.md`
+   — runs on EVERY path below (the signal describes the change's
+   testability, which survives any discard); on a hit, surface it to the
+   human like the fix lane's Stage 5 late-escalation signal.
+2. **Panel PASS (both sentinels p0=0 p1=0):** append the part file's content
+   to coding-report.md — guarded by a content-presence grep so a crash
+   between append and delete cannot double-append — then DELETE the part
+   file. Run the Stage 4 Post-Review drift/convention parse in this same
+   invocation (it must finish BEFORE any Stage 6 spawn — Stage 6 overwrites
+   the review-record.md it parses).
+3. **Panel FAIL / p0/p1 > 0:** QUARANTINE the speculative tests — move every
+   file listed in the part file's "Files created" to
+   `espalier/changes/{type}/{slug}/.speculative-tests/` (relative paths
+   preserved) and move the part file beside them. The tree the pre-round
+   build/lint gate, the next panel round, and the coder re-spawn see now
+   carries ZERO speculative artifacts — stale tests referencing renamed
+   symbols would otherwise break the whole-tree build/lint gate, and build
+   failures do not increment `max-code-rounds`, so that wedge would be
+   uncapped.
+4. **ESCALATION_REQUIRED (either agent):** quarantine as in 3, then the
+   escalation protocol unchanged — plus one line naming the quarantined
+   files so the human decides with full information.
+
+**Step 2 — test completion, ONE spawn alone in its message, after the FINAL
+panel PASS:**
+
+- No fix round + no contract → nothing to spawn; Stage 5 is complete (the
+  appended part IS the test report). Serial test cost ≈ zero.
+- No fix round + non-empty contract → one test-coder re-spawn:
+  "CONTRACT PHASE: read espalier/changes/{type}/{slug}/security-record.md —
+  for EVERY field in its `## Security-Sensitive Fields` contract, write the
+  negative abuse test it names (tamper the value → assert rejected → assert
+  store unchanged). Append the test report to coding-report.md."
+- Any fix round happened → the orchestrator RESTORES the quarantined files
+  first (moves them back to their tree paths), then one re-spawn:
+  reconcile against "code changed since your tests: {the fix rounds' files
+  from coding-report.md}", append the test report to coding-report.md, AND
+  carry the CONTRACT PHASE block when the contract is non-empty — one
+  spawn, never two.
+
+**Contract detection (deterministic):** after the final PASS,
+`grep -q '^## Security-Sensitive Fields' espalier/changes/{type}/{slug}/security-record.md`
+decides empty vs non-empty.
+
+**Step 3 — Stage 6 dispatch, alone in its message.** HARD RULE: never issue
+a bash that writes coding-report.md or review-record.md in the same message
+as an agent spawn that reads or writes that file. Step-1 bash runs with zero
+agents in flight; Steps 2 and 3 are single-spawn messages.
+
+**Round accounting (unchanged):** the speculative write, the
+restore/reconcile re-spawn, and the contract phase are all Stage 5 actions —
+none increments `max-test-rounds` (that counts Stage 6 verdict loops only).
+`max-code-rounds` semantics are untouched.
+
+**State bookkeeping & crash recovery:** `Current Stage:` stays 4 during the
+joint dispatch (it IS the Stage 4 round); write the Stage 5 row at the
+Step-1 append / Step-2 spawn. On a resume into Stage 4:
+- an orphan `coding-report.part-test.md` (tree or quarantine dir) → delete
+  the part file AND every file its "Files created" list names, wherever
+  they sit — the post-panel flow re-derives tests from scratch. Deleting
+  the FILES matters: the Stage 4 certificate's `git add -A` would
+  otherwise sweep unlisted, unreviewed tests into the fingerprint.
+- speculative test files WITHOUT a part file (crash mid-write — nothing to
+  enumerate from) → never guess-delete: surface ONE line ("possible orphan
+  speculative tests: {untracked files matching the project's test layout
+  that coding-report.md does not list} — review or delete before
+  continuing") and wait. UNATTENDED runs must not hang: set
+  `- Status: ESCALATED`, record the candidate list in a Stage History row,
+  and stop — never continue past artifacts the orchestrator cannot
+  enumerate.
+- a `.speculative-tests/` quarantine dir on a resumed change → delete it
+  (its part file sits beside it, so enumeration is exact).
 
 **Stage 6 (Test Review):**
 ```

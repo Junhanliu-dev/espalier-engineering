@@ -142,7 +142,14 @@ lanes route into it rather than through it:
   so round history survives the overwrite.
 
 ### 5. Test Writing
-- **Trigger:** Code review passed
+- **Trigger:** dispatched SPECULATIVELY with the round-1 Stage 4 panel (a
+  3-agent message; `speculative-tests: off` in `espalier/.espalier-config`
+  restores the serial post-review dispatch) — and COMPLETED after the final
+  panel PASS via the espalier skill's "Stage 4 → Stage 5 handoff" (guarded
+  part-file append; contract phase / restore-reconcile as one spawn). On a
+  panel FAIL the speculative tests are QUARANTINED under the change dir, so
+  every later gate, panel round, and coder re-spawn sees a tree with zero
+  speculative artifacts.
 - **Load:** Spawn `harness-coder` agent with testing skill
 - **Execute:** Write tests for changed interfaces. ALSO write the negative abuse
   test named by EVERY entry in security-record.md's `## Security-Sensitive Fields`
