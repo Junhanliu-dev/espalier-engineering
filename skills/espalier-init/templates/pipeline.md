@@ -207,6 +207,16 @@ lanes route into it rather than through it:
   - `tests_passed == total_tests`
   - `lint_errors == 0`
 - **Verify by:** Running CI command or reading CI output
+- **Wait protocol (remote CI):** never poll across messages — each poll is a
+  full orchestrator round-trip. Prefer the CI provider's BLOCKING watch
+  inside a single bash call (`gh run watch <run-id> --exit-status` or the
+  provider's equivalent). Bash calls cap at ~10 minutes, so for longer CI
+  chunk the wait: one `until`-loop per call with a generous internal
+  interval and a ~9-minute per-call budget, repeated — turns become
+  ceil(CI / 9min), not CI / poll-interval. The Stage 8.5 doc-drift bash may
+  ride the SAME message as the first watch call (it reads only
+  `.drift-state.tsv`, writes only the change's `doc-patches.md` — CI-
+  independent and notify-only). The gate still reads the same final values.
 - **Rollback:**
   - `total_tests == 0` → Stage 5
   - Compile/build failure → Stage 3

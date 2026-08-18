@@ -790,7 +790,10 @@ fi
 
 Runs as a sub-step between Stage 8 (CI verify) and Stage 9 (deploy). It edits no
 doc, prompts nothing, blocks nothing — it only surfaces drift this run may have
-caused.
+caused. Because it is CI-independent (reads `.drift-state.tsv`, writes only
+this change's `doc-patches.md`), it MAY ride the same message as Stage 8's
+first CI watch call instead of waiting for CI to finish — see pipeline.md
+Stage 8's wait protocol.
 
 > "8.5" is a label, not a numeric stage. Do NOT write `Current Stage: 8.5` to
 > pipeline-state.md — it would break `pre-push-gate.sh`'s integer stage parse.
