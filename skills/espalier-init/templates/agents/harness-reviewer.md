@@ -316,8 +316,11 @@ Fix cell (no nameable rewrite → not a finding):
 - `comments:` violates the project's discovered comment convention —
   narrating noise where the project comments sparsely, an OVERLONG comment
   (a paragraph where one plain line would carry the constraint — name the
-  one-line replacement), or a missing constraint note where the project
-  documents constraints. Cite the convention.
+  one-line replacement), EXCESS comments (more comment than the code
+  warrants — section banners, doc-blocks restating a signature,
+  obvious-statement notes; name the exact lines to delete), or a missing
+  constraint note where the project documents constraints. Cite the
+  convention.
 
 **The one P1 — a cryptic PUBLIC name:** an EXPORTED/public symbol (exported
 function/class, endpoint path, DB column, event field, config key) whose name

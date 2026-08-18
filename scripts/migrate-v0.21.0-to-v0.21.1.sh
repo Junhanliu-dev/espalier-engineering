@@ -48,8 +48,12 @@ if [ -z "$PLUGIN_DIR" ]; then
   [ -d "$_self_root/skills/espalier-init/templates" ] && PLUGIN_DIR="$_self_root"
 fi
 [ -n "$PLUGIN_DIR" ] || die "cannot locate the plugin. Pass --plugin-dir=<espalier-engineering root>."
-grep -q 'Comments: SHORT' "$PLUGIN_DIR/skills/espalier-init/templates/agents/harness-coder.md" 2>/dev/null \
-  || die "plugin dir $PLUGIN_DIR is not v0.21.1 (coder template lacks the comment-brevity bullet). Update the plugin first."
+# Probe against a v0.21.1 marker that SURVIVES later releases: v0.22.1's
+# comment-diet patch replaced the coder's 'Comments: SHORT' bullet, so that
+# string no longer proves anything about the plugin. The reviewer's OVERLONG
+# tag is v0.21.1 content that later templates keep.
+grep -q 'OVERLONG comment' "$PLUGIN_DIR/skills/espalier-init/templates/agents/harness-reviewer.md" 2>/dev/null \
+  || die "plugin dir $PLUGIN_DIR is not v0.21.1+ (reviewer template lacks the OVERLONG-comment tag). Update the plugin first."
 
 # --- v0.21.1 markers (also the idempotency check) ----------------------------
 CODER_MARK='Comments: SHORT'

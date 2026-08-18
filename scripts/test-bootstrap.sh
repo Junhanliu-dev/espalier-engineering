@@ -1221,9 +1221,8 @@ make_smoke_repo "$TMP"
 simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
 
-assert "29a templates carry the comment-brevity markers" \
-  "grep -qF 'Comments: SHORT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
-   && grep -qF 'OVERLONG comment' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+assert "29a templates carry the surviving comment-brevity markers (coder bullet superseded by v0.22.1 — Test 31a)" \
+  "grep -qF 'OVERLONG comment' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
    && grep -qF 'Keep comments SHORT' '$SCRIPT_DIR/../skills/espalier-init/templates/rules/coding-standards.md'"
 
 # Stub agent/rules files lack the stock anchors → skip-with-record, exit 0.
@@ -1405,6 +1404,75 @@ assert "30l migrated hook parses + carries both hook markers + switched guards" 
    && grep -qF -- '(- )?Reviewed-Diff:' '$TMP/espalier/hooks/pre-push-gate.sh'"
 M22_RERUN=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "30m re-run is a no-op" "echo \"\$M22_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 31: v0.22.1 comment diet — templates + migration ────────────────
+echo "Test 31: v0.22.1 comment diet (templates + migration)"
+MIGRATE221="$SCRIPT_DIR/migrate-v0.22.0-to-v0.22.1.sh"
+TMP=$(mktemp -d -t smoke31.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "31a templates carry the comment-diet markers" \
+  "grep -qF 'the default is NO comment' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && grep -qF 'Default to NO comment' '$SCRIPT_DIR/../skills/espalier-init/templates/rules/coding-standards.md' \
+   && grep -qF 'EXCESS comments' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+   && ! grep -qF 'SHORT, clear, and few' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md'"
+
+# Stub per-project files lack the stock anchors → skip-with-record, exit 0.
+M221_SKIP=$( cd "$TMP" && bash "$MIGRATE221" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M221_SKIP_RC=$?
+assert "31b customised files skip-with-record (exit 0)" \
+  "[ $M221_SKIP_RC -eq 0 ] && grep -qF 'v0.22.1-coder-comment-diet' '$TMP/espalier/.migrations-skipped'"
+M221_SKIP2=$( cd "$TMP" && bash "$MIGRATE221" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "31c re-run after skip-with-record is a no-op" \
+  "echo \"\$M221_SKIP2\" | grep -qi 'nothing to do'"
+
+# Seed stock v0.22.0-shaped files (both reviewer wraps covered in the fixture
+# harness pre-flight; here the fresh-template wrap), then migrate for real.
+rm -f "$TMP/espalier/.migrations-skipped"
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V220CODER'
+## Your Constraints
+- Comments: SHORT, clear, and few. One plain line stating the non-obvious
+  constraint or the why — never a paragraph, never narration of what the next
+  line does, never commentary addressed to the reviewer ("fixed per review").
+  If a comment needs several sentences, the explanation belongs in the
+  change's docs (requirements.md / coding-report.md), not the code. Density
+  and docstring shape follow `coding-standards.md` → Comments & Docstrings —
+  a project convention that mandates fuller docs (e.g. JSDoc on exports)
+  outranks this brevity default.
+- Report what you did in structured format when done
+V220CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V220REV'
+- `comments:` violates the project's discovered comment convention —
+  narrating noise where the project comments sparsely, an OVERLONG comment
+  (a paragraph where one plain line would carry the constraint — name the
+  one-line replacement), or a missing constraint note where the project
+  documents constraints. Cite the convention.
+V220REV
+cat > "$TMP/espalier/rules/coding-standards.md" << 'V220STD'
+## Comments & Docstrings
+- Keep comments SHORT: one plain, easy-to-read line beats a paragraph. A
+  comment that needs several sentences is explanation that belongs in the
+  change's docs, not the code. (A documented project convention requiring
+  fuller docstrings outranks this default.)
+
+## Required Patterns
+V220STD
+M221_OUT=$( cd "$TMP" && bash "$MIGRATE221" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M221_RC=$?
+assert "31d apply lands every marker + backups + old bullet replaced" \
+  "[ $M221_RC -eq 0 ] \
+   && grep -qF 'the default is NO comment' '$TMP/espalier/agents/harness-coder.md' \
+   && ! grep -qF 'SHORT, clear, and few' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'Default to NO comment' '$TMP/espalier/rules/coding-standards.md' \
+   && grep -qF 'EXCESS comments' '$TMP/espalier/agents/harness-reviewer.md' \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.22.1.bak' ]"
+assert "31e reviewer splice preserves the continuation text" \
+  "grep -qF 'constraint note where the project' '$TMP/espalier/agents/harness-reviewer.md'"
+M221_RERUN=$( cd "$TMP" && bash "$MIGRATE221" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "31f re-run is a no-op" "echo \"\$M221_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

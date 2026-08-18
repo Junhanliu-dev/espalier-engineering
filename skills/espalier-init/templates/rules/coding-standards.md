@@ -34,6 +34,10 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
   comment that needs several sentences is explanation that belongs in the
   change's docs, not the code. (A documented project convention requiring
   fuller docstrings outranks this default.)
+- Default to NO comment: add one only for a constraint the code cannot
+  show. No section banners, no doc-blocks restating a signature, no
+  narration, no restating the code in prose — delete any comment that
+  merely repeats what the line already says.
 
 ## Required Patterns
 {things that must always be done — each backed by observed consistency}
