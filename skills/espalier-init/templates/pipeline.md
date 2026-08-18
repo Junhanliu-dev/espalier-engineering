@@ -171,7 +171,10 @@ lanes route into it rather than through it:
     `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 - **Loop:** same fixpoint rule as Stage 4 — a non-PASS verdict sends the tests
   back to Stage 5 (re-spawn coder), then **re-review**; never exit on the fix
-  report alone.
+  report alone. On a round ≥ 2 the orchestrator hands the reviewer the
+  changed-since-last-review set (the test files the Stage 5 re-spawn touched);
+  the re-review runs in DELTA SCOPE per the agent's "Re-review Rounds" section
+  — a floor, not a ceiling; the whole-change verdict rule is unchanged.
 - **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
   tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
   against this value.

@@ -948,6 +948,9 @@ REVIEW: tests added in coding-report.md at espalier/changes/fix/{slug}/.
 CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
 ROUND: {n} — put round={n} in your VERDICT sentinel line.
+{On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the Stage 5
+fix re-spawn touched, from the latest coding-report.md}. Re-review in delta
+scope per your "Re-review Rounds" section.
 
 Check:
 - Regression test would have failed on pre-fix code. The orchestrator recorded

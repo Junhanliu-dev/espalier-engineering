@@ -509,6 +509,9 @@ Agent tool:
     WHAT TO REVIEW: The test files created in Stage 5.
     Read espalier/changes/{type}/{slug}/coding-report.md for the list.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
+    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the
+    Stage 5 fix re-spawn touched, from the latest coding-report.md}.
+    Re-review in delta scope per your "Re-review Rounds" section.
 
     Check: Are tests meaningful? Do they cover edge cases?
     Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
