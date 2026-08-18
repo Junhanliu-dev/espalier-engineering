@@ -52,7 +52,10 @@ lanes route into it rather than through it:
 - **Execute:** Sub-agent implements per task decomposition
 - **Gate (PROGRAMMATIC):** all sub-tasks done + the ORCHESTRATOR re-runs the
   discovered build and lint commands itself and both exit 0 — the coder's
-  self-reported "Build status: pass" is a claim, not the gate. A failing
+  self-reported "Build status: pass" is a claim, not the gate. The two runs
+  may execute as concurrent background jobs in one bash call (per-pid exit
+  codes, per-job output) unless the commands plainly depend on each other —
+  concurrency changes the wait, never the gate. A failing
   build/lint re-run goes straight back to the coder WITHOUT spawning the Stage 4
   panel (a panel round on unbuildable code is wasted).
 - **Constraint:** One sub-agent invocation per sub-task. Sub-tasks whose

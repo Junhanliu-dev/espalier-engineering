@@ -374,7 +374,13 @@ Agent tool:
 **Stage 3 exit gate (PROGRAMMATIC — run before every panel spawn):** after the
 coder returns (first pass AND every P0-fix re-spawn), re-run the discovered
 build + lint commands yourself (they are in `espalier/rules/development-process.md`
-/ the pre-push gate's substituted commands). Both must exit 0. The coder's
+/ the pre-push gate's substituted commands). Both must exit 0. Run them as two
+concurrent background jobs in ONE bash call (`$BUILD & $LINT &` with per-pid
+`wait`s to capture both exit codes, each job's output to its own temp file so
+a failure's log isn't interleaved) — UNLESS the discovered commands plainly
+depend on each other (e.g. a typecheck that consumes build output), in which
+case keep them serial. Concurrency changes the wait, never the gate: both
+still must exit 0. The coder's
 self-reported "Build status: pass" is a claim, not the gate. On failure,
 re-spawn the coder with the build/lint output — do NOT spawn the review panel
 on unbuildable code (a wasted panel round), and do NOT count it as a P0 round.

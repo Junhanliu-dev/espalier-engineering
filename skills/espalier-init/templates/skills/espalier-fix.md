@@ -671,8 +671,11 @@ espalier/changes/fix/{slug}/coding-report.md
 
 **Stage 3 exit gate (PROGRAMMATIC):** after the coder returns (first pass and
 every re-spawn), re-run the discovered build + lint yourself; both must exit 0
-before the panel spawns. The coder's self-reported status is a claim, not the
-gate. A failure returns to the coder without a panel round.
+before the panel spawns. Run them as two concurrent background jobs in ONE
+bash call (per-pid `wait`s capture both exit codes; per-job temp-file output)
+unless the discovered commands plainly depend on each other — concurrency
+changes the wait, never the gate. The coder's self-reported status is a claim,
+not the gate. A failure returns to the coder without a panel round.
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
@@ -1032,7 +1035,11 @@ never written, nothing to stage.)
 
 Standard push. Then:
 
-> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no `fix/` prefix), and the per-entry `CAUSING_SLUG` / `CAUSING_ROLE` / `CAUSING_LOOKUP` parsed from each `caused_by:` block in this fix's `requirements.md`. The orchestrator sets these before executing.
+> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
+> `fix/` prefix). Per-entry `caused_by` fields are passed as FUNCTION
+> ARGUMENTS in 7.2. Run 7.0 + 7.1 + 7.2 (and the cache self-heal) as ONE
+> bash invocation — the per-entry body is a function, so the whole Stage 7
+> bookkeeping costs one round-trip with byte-identical file effects.
 
 ### 7.1 Record own commit
 
@@ -1049,48 +1056,47 @@ Iterate each entry in this fix's `caused_by:` YAML list (in `requirements.md` fr
 - `slug` ∈ {`unknown`, `unknown_squash`} — no destination to write
 - entry is a `- note:` overflow marker (no `slug` key at all)
 
-For each remaining entry, run the block below with `CAUSING_SLUG`, `CAUSING_ROLE`, `CAUSING_LOOKUP` bound to that entry's fields.
-
-The orchestrator (Claude) reads the YAML, extracts each entry's fields, and executes the snippet per entry. Pseudocode-shape iteration:
-
-```
-for entry in parsed_yaml["caused_by"]:
-    if "slug" not in entry: continue                       # note: overflow
-    if entry["slug"] in ("unknown", "unknown_squash"): continue
-    CAUSING_SLUG  = entry["slug"]
-    CAUSING_ROLE  = entry["role"]
-    CAUSING_LOOKUP = entry["lookup"]
-    # then execute the bash block below
-```
+The orchestrator (Claude) reads the YAML, extracts each entry's fields, and
+calls the FUNCTION below once per remaining entry — all inside the SAME bash
+invocation as 7.0/7.1 (early-outs are `return 0`, safe inside a function;
+the old one-invocation-per-entry contract existed only because a top-level
+`exit 0` would kill a shared script and a bare `continue` outside a loop
+falls through). One invocation, byte-identical file effects, fewer
+round-trips:
 
 ```bash
-# This block runs ONCE PER ENTRY as its own bash invocation (the loop lives in
-# the orchestrator, above) — so early-outs are `exit 0`, never `continue`
-# (bare `continue` outside a loop is a no-op warning and execution falls through).
-CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
-[ ! -f "$CAUSING_STATE" ] && exit 0
+_backlink_one() {  # $1=CAUSING_SLUG  $2=CAUSING_ROLE  $3=CAUSING_LOOKUP
+  local CAUSING_SLUG="$1" CAUSING_ROLE="$2" CAUSING_LOOKUP="$3"
+  local CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
+  [ ! -f "$CAUSING_STATE" ] && return 0
 
-# Ensure section exists (schema: Role + Lookup columns)
-if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
-  cat >> "$CAUSING_STATE" << 'EOF'
+  # Ensure section exists (schema: Role + Lookup columns)
+  if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
+    cat >> "$CAUSING_STATE" << 'EOF'
 
 ## Follow-up Fixes
 | Fix Slug | Role | Lookup | Reason | Date |
 |----------|------|--------|--------|------|
 EOF
-fi
+  fi
 
-# Idempotency: own slug + role together (same slug can legitimately appear as primary and call_path in different fixes)
-OWN_SLUG="fix/${SLUG}"
-if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
-  exit 0
-fi
+  # Idempotency: own slug + role together (same slug can legitimately appear
+  # as primary and call_path in different fixes)
+  local OWN_SLUG="fix/${SLUG}"
+  if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
+    return 0
+  fi
 
-# The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
-REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
-[ -z "$REASON" ] && REASON="fix/${SLUG}"
-DATE=$(date -u +%Y-%m-%d)
-echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $DATE |" >> "$CAUSING_STATE"
+  # The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
+  local REASON
+  REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
+  [ -z "$REASON" ] && REASON="fix/${SLUG}"
+  echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $(date -u +%Y-%m-%d) |" >> "$CAUSING_STATE"
+}
+
+# One call per parsed entry (slug, role, lookup) — e.g.:
+#   _backlink_one "feat/2026-01-02-auth" "primary"   "exact"
+#   _backlink_one "feat/2026-01-05-log"  "call_path" "squash_hook"
 ```
 
 ## Escalation Gates
