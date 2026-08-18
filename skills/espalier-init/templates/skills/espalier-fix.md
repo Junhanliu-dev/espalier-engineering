@@ -276,8 +276,14 @@ Gather all three signals BEFORE prompting:
    the files yourself.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
-If all three are empty/false → no prompt, continue to Stage 0 Auto-Link Discovery.
-Otherwise issue ONE `AskUserQuestion` summarising all three:
+If all three are empty/false → no prompt, continue to Stage 0 Auto-Link
+Discovery. If only fresh (<14d) stale docs and no conv/doctor signal →
+treat as empty.
+
+**Critical/expired stale row present** (`tier_counts` shows critical or
+expired > 0) → issue ONE blocking `AskUserQuestion` NOW, default
+**"Handle now"** — the drift sidecar is per-clone, so a critical/expired row
+here is YOUR OWN flag (the prune escape-hatch case):
 
 ```
 Pre-flight found:
@@ -290,13 +296,16 @@ Options:
   3. Abort
 ```
 
-Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
-maintenance handles this (gardener rota — see /espalier-prune's
-Multi-Developer Discipline)". "Handle now" stays available and becomes the
-default ONLY when a critical/expired flag is present — the drift sidecar is
-per-clone, so a critical/expired row here is YOUR OWN flag (the prune
-escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
-signal → treat as empty.
+**Only non-critical signals** → do NOT prompt here (this wait was the
+cost): print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s),
+doctor {due|not due} — deferred to the approval gate`), append the same
+summary to `espalier/.drift-report.md` with a
+`deferred-to-approval-gate ({ts})` marker line, and continue to Stage 0
+Auto-Link Discovery. The Requirements Approval Gate carries the
+maintenance question (its step 3b) — still before any code is written. The
+weekly gardener rota remains the default owner of non-critical maintenance
+either way; an interrupted run's signals re-surface at the next
+invocation's pre-flight (the sidecar is never cleared by deferral).
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -624,6 +633,12 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
    re-prompting — every programmatic gate, the pre-push hook, and the
    certificate check still apply; `ASK` or a missing line prompts at Stage 7
    as before.
+
+3b. If the pre-flight recorded a `deferred-to-approval-gate` summary, add a
+   THIRD question to the same call (mirror of the full lane's step 3b):
+   Handle after this change (default) / Pause & handle now (run
+   /espalier-prune + convention decisions, same mechanics as the Stage 0
+   prompt, then continue) / Ignore this run.
 
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.

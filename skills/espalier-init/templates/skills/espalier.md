@@ -59,8 +59,13 @@ Gather all three signals BEFORE prompting:
    observation dedupe, and status precedence.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
-If all three are empty/false → no prompt, proceed to Stage 1.
-Otherwise issue ONE `AskUserQuestion` summarising all three:
+If all three are empty/false → no prompt, proceed to Stage 1. If only fresh
+(<14d) stale docs and no conv/doctor signal → treat as empty.
+
+**Critical/expired stale row present** (`tier_counts` shows critical or
+expired > 0) → issue ONE blocking `AskUserQuestion` NOW, default
+**"Handle now"** — the drift sidecar is per-clone, so a critical/expired row
+here is YOUR OWN flag (the prune escape-hatch case):
 
 ```
 Pre-flight found:
@@ -73,13 +78,17 @@ Options:
   3. Abort
 ```
 
-Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
-maintenance handles this (gardener rota — see /espalier-prune's
-Multi-Developer Discipline)". "Handle now" stays available and becomes the
-default ONLY when a critical/expired flag is present — the drift sidecar is
-per-clone, so a critical/expired row here is YOUR OWN flag (the prune
-escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
-signal → treat as empty.
+**Only non-critical signals** → do NOT prompt here (this wait was the cost):
+print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
+{due|not due} — deferred to the approval gate`), append the same summary to
+`espalier/.drift-report.md` with a `deferred-to-approval-gate ({ts})` marker
+line (an interrupted run leaves an inspectable trace, and the signals
+re-surface at the next invocation's pre-flight anyway — the sidecar is never
+cleared by deferral), and continue to Stage 1. The Requirements Approval
+Gate carries the maintenance question (its step 3b) — still BEFORE Stage 3,
+so a promotion decided there governs this run's coder. The weekly gardener
+rota (see /espalier-prune's Multi-Developer Discipline) remains the default
+owner of non-critical maintenance either way.
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -275,6 +284,23 @@ sign-off on `requirements.md` before Stage 3.
    is removed. `ASK` or a missing line → prompt at Stage 7 as before. This
    pre-authorization NEVER extends to Stage 10 — delivery acceptance stays a
    human act.
+
+3b. If Stage 0 recorded a `deferred-to-approval-gate` pre-flight summary,
+   add a THIRD question to the SAME `AskUserQuestion` call:
+
+   ```
+   Pre-flight noted: {N} stale doc(s) ({tiers}), {M} convention promotion
+   candidate(s), doctor {due|not due}.
+     1. Handle after this change (default — gardener rota covers it)
+     2. Pause & handle now — run /espalier-prune + convention decisions,
+        then continue to Stage 3
+     3. Ignore this run
+   ```
+
+   "Pause & handle now" runs the SAME mechanics as the Stage 0 prompt's
+   "Handle now" (Convention Promotion's race guard, per-key status flip,
+   isolated `docs:` commit) — relocated, not altered, and still before any
+   code is written.
 
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
