@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.22.1 — 2026-08-18
+
+Patch: **comment diet** — field feedback: agents still write too MANY
+comment lines, not just long ones. The brevity default strengthens to
+default-zero, always subordinate to the project's own discovered
+convention (a codebase mandating JSDoc on exports keeps it):
+
+- `harness-coder.md` — the Comments constraint becomes: default is NO
+  comment; one plain line ONLY for a constraint the code cannot show;
+  never banners, signature-restating doc-blocks, narration, or
+  reviewer-directed notes; RE-SCAN the diff and DELETE failing comments
+  before writing the coding-report (a diff whose comment lines rival its
+  code lines is over-commented).
+- `coding-standards.md` — new "Default to NO comment" bullet under
+  `## Comments & Docstrings`.
+- `harness-reviewer.md` — the Readability `comments:` tag now also flags
+  EXCESS comments (banners / signature doc-blocks / obvious notes),
+  naming the exact lines to delete.
+- Migration #31: `scripts/migrate-v0.22.0-to-v0.22.1.sh` — anchored edits
+  to the 3 per-project files (backups `.pre-v0.22.1.bak`; customised
+  files skip-with-record); the reviewer edit is a substring splice that
+  handles both the fresh-template and #29-migrated line wraps.
+
 ## 0.22.0 — 2026-08-18
 
 Minor: **pipeline speed II** — the second speed release. Same gates,
