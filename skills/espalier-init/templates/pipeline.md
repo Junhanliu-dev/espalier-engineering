@@ -244,9 +244,16 @@ lanes route into it rather than through it:
     discovered"): record `| 9 | SKIPPED | {ts} | no-deploy-config |` in Stage
     History and advance. This is a clean pass, not a gap — a repo that doesn't
     deploy per change has nothing to verify here.
-  - **Deploy configured:** confirm deploy parameters (human checkpoint), run the
+  - **Deploy configured:** confirm deploy parameters (human checkpoint) —
+    SKIPPED when a target was pre-authorized at the Requirements Approval
+    Gate (recorded as `- Deploy-Target:` in pipeline-state.md; `ASK` or a
+    missing line → prompt here exactly as before). Then run the
     discovered deploy command (or confirm the automatic deploy completed), then
     run the discovered **health check** against the target environment.
+    **Unattended posture:** pre-authorized target → proceed (deploy + health
+    check); `ASK`/missing on an unattended run → record
+    `| 9 | SKIPPED | {ts} | deploy needs-human (unattended) |` and continue —
+    an unauthorized target is NEVER auto-deployed.
 - **Gate (PROGRAMMATIC when configured):** health check returns success
   (HTTP 2xx on the health path, or the health command exits 0).
 - **Rollback:** health check fails → do NOT proceed to Stage 10; surface the

@@ -302,6 +302,26 @@ sign-off on `requirements.md` before Stage 3.
    isolated `docs:` commit) — relocated, not altered, and still before any
    code is written.
 
+3c. ONLY when the discovered `## Deploy & Verification` section of
+   `espalier/rules/development-process.md` is configured (it does NOT read
+   "No deploy configuration discovered"), add a deploy question to the same
+   call:
+
+   ```
+   When Stage 9 (deploy verify) is reached and CI is green, deploy with the
+   discovered command to:
+     1. {discovered target/environment}   (pre-authorize)
+     2. Somewhere else — specify
+     3. Ask me again at Stage 9
+   ```
+
+   Record `- Deploy-Target: {target | ASK}` in pipeline-state.md. Stage 9
+   honors it (see pipeline.md Stage 9): a pre-authorized target deploys and
+   health-checks without re-prompting; `ASK`/missing prompts at Stage 9 as
+   today. The health-check gate, its rollback path, and the Stage 10 human
+   acceptance are untouched — like the push pre-auth, this removes only the
+   redundant wait, and it NEVER extends to Stage 10.
+
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
    **Abort**, write Status: ABORTED to pipeline-state.md and stop.
