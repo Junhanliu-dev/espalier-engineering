@@ -218,7 +218,11 @@ unrelated in-flight change into the new request:
 
 For each stage:
 1. **Announce:** "## Stage N: {name}"
-2. **Update state:** Write current stage to pipeline-state.md
+2. **Update state:** Write current stage to pipeline-state.md. Stage History
+   timestamps use `date -u +%Y-%m-%dT%H:%M:%SZ` (full seconds — the stats
+   duration report floors minute-only legacy rows). Bookkeeping steps with no
+   agent in flight may batch into one bash invocation (state write + record
+   append + context read) — same file effects, fewer round-trips.
 3. **Load context:** Read the skill/agent file specified for this stage
 4. **Execute:** Perform work or delegate to sub-agent
 5. **Verify gate:** Check the quality gate

@@ -249,7 +249,9 @@ rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
 The fix lane uses the SAME per-stage state discipline as `/espalier` (its Stage
 Execution Protocol). At the START of each stage below, before doing the stage's
 work: write `- Current Stage: {N}` to this fix's pipeline-state.md and append a
-Stage History row. This is not optional bookkeeping — the **Stage 7 push gate
+Stage History row (timestamps via `date -u +%Y-%m-%dT%H:%M:%SZ` — full seconds,
+so the stats duration report can measure spans; bookkeeping steps with no agent
+in flight may batch into one bash invocation). This is not optional bookkeeping — the **Stage 7 push gate
 blocks unless `Current Stage:` ≥ 7**, so a lane that never updates the stage
 number cannot push its own clean work. `Status:` stays `IN_PROGRESS` from
 creation until a terminal state (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED /
