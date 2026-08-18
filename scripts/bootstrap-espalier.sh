@@ -45,6 +45,11 @@
 #   --lang=<typescript|python|go|unsupported>
 #                            Boundary-check variant. "unsupported" emits a no-op.
 #   --doctor-cadence=<val>   every-change | weekly | monthly | manual (default: weekly).
+#   --hook-parallel=<yes|no> Write `hook-parallel-gates: yes` into
+#                            espalier/.espalier-config so pre-push-gate.sh runs
+#                            build/lint/tests concurrently. Pass yes ONLY after
+#                            discovery judged the commands independent AND the
+#                            human confirmed (default: no — serial gates).
 #   --platforms=<list>       Comma list of agent platforms to wire:
 #                            claude | codex | copilot (shorthands: "both" =
 #                            claude,codex; "all" = all three). Default: claude.
@@ -89,6 +94,7 @@ FORCE=no
 IGNORE_DRIFT=no
 IGNORE_DRIFT_REASON=""
 DOCTOR_CADENCE=weekly
+HOOK_PARALLEL_FLAG=no # yes → hook-parallel-gates: yes in .espalier-config
 PLATFORMS=""          # resolved after parsing: flag > espalier/.platforms > claude
 PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
 CODEOWNERS_RULES=""   # optional @handle owning espalier/rules/ (A4)
@@ -103,6 +109,7 @@ for arg in "$@"; do
     --lang=*)               LANG_VARIANT="${arg#--lang=}" ;;
     --merge-decision=*)     MERGE_DECISION="${arg#--merge-decision=}" ;;
     --doctor-cadence=*)     DOCTOR_CADENCE="${arg#--doctor-cadence=}" ;;
+    --hook-parallel=*)      HOOK_PARALLEL_FLAG="${arg#--hook-parallel=}" ;;
     --platforms=*)          PLATFORMS_FLAG="${arg#--platforms=}" ;;
     --codeowners-rules=*)   CODEOWNERS_RULES="${arg#--codeowners-rules=}" ;;
     --codeowners-wiki=*)    CODEOWNERS_WIKI="${arg#--codeowners-wiki=}" ;;
@@ -1211,6 +1218,13 @@ ESPALIERCFG
     log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH)"
   fi
 
+  # Opt-in parallel push-gate sections (discovery proposed + human confirmed).
+  # Append-if-missing only — a later hand-edit to the key survives re-bootstrap.
+  if [ "$HOOK_PARALLEL_FLAG" = "yes" ]; then
+    _append_config_key hook-parallel-gates yes
+    log "  espalier/.espalier-config: hook-parallel-gates = yes (pre-push build/lint/tests run concurrently)"
+  fi
+
   # The post-merge dispatcher is installed UNCONDITIONALLY: drift-detect.sh must
   # run on every merge regardless of the squash-merge decision. Whether
   # post-merge-backlink.sh runs is gated at RUNTIME by .merge-hook-decision, so
@@ -1397,7 +1411,8 @@ stage_gitignore() {
     return
   fi
   # commit-index cache + the five drift sidecars (.drift-state.tsv* glob also
-  # covers mktemp temp files). Each entry appended once, with a newline guard.
+  # covers mktemp temp files) + the dep-audit cache. Each entry appended once,
+  # with a newline guard.
   printf '%s\n' \
     "espalier/.commit-index.tsv" \
     "espalier/.drift-state.tsv*" \
@@ -1405,6 +1420,7 @@ stage_gitignore() {
     "espalier/.drift-report.md" \
     "espalier/.doctor-last-run" \
     "espalier/.drift-overrides.log" \
+    "espalier/.dep-audit-cache" \
   | while IFS= read -r entry; do
       grep -qxF "$entry" .gitignore 2>/dev/null && continue
       if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then

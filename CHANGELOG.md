@@ -1,5 +1,91 @@
 # Changelog
 
+## 0.22.0 — 2026-08-18
+
+Minor: **pipeline speed II** — the second speed release. Same gates,
+sentinels, round caps, certificates, and both human checkpoints; every
+change is dispatch-order, read-scope, or wait-scheduling. Design doc:
+`docs/pipeline-speed-plan-v2.md` (two-agent fresh-eyes review + owner grill
+recorded inside).
+
+- **Speculative Stage 5 (quarantine-on-FAIL, both lanes).** The test-coder
+  joins the ROUND-1 Stage 4 panel as a third concurrent agent — on the
+  typical 1-round run the entire test-writing duration hides behind the
+  panel (round-1 time = max(reviewer, security, tests), not sum). It
+  reports to `coding-report.part-test.md`; the orchestrator appends it
+  (guarded) only after the round resolves, so the panel's coding-report
+  read is never racy, and both panel prompts + both reviewer agents carry
+  the in-flight exclusion as an installed contract. On a panel
+  FAIL/escalation the listed speculative files QUARANTINE under the change
+  dir (fingerprint-excluded), so the pre-round whole-tree build/lint, the
+  next panel round, and the coder re-spawn never see a stale artifact; a
+  single post-final-PASS spawn restores/reconciles and carries the
+  contracted abuse tests (one spawn, never two). Crash recovery: orphan
+  part files are discarded WITH their listed files; an unenumerable orphan
+  surfaces to the human — or sets ESCALATED on unattended runs, never a
+  hang, never a guess-delete. `speculative-tests: off` in
+  `.espalier-config` restores the serial flow verbatim (default: on).
+- **Stage 6 delta rounds.** Test re-review rounds ≥ 2 now receive the
+  `CHANGED SINCE LAST REVIEW:` set — the delta-scope contract Stage 4 got
+  in v0.21, extended to the loop it missed. Floor not ceiling;
+  whole-change verdict unchanged.
+- **Stage durations in `espalier-stats.sh`.** Per-stage wall-clock from the
+  Stage History timestamps the pipeline already writes, split
+  human-wait / agent-work / other by the row that CLOSES each span;
+  unattended `auto-*`/`non-interactive` rows never count as human;
+  section-bounded parsing; one bad row skips that row, never the report.
+  This is the field data the deferred Stage 3/5 fold decision keys on.
+- **Pre-flight fold.** Non-critical drift/convention/doctor signals no
+  longer block on their own prompt — they record a
+  `deferred-to-approval-gate` marker and ride a third question on the
+  approval gate the human already attends. Critical/expired rows keep the
+  immediate blocking prompt. One fewer human round-trip per signal-carrying
+  run.
+- **Stage 9 deploy pre-authorization.** Deploy-configured repos collect
+  `Deploy-Target:` at the approval gate (the Push-Target pattern); Stage 9
+  honors it without re-prompting — removing the post-CI stall where the
+  human has walked away. Health-check gate, rollback, and Stage 10
+  acceptance untouched. Also defines the previously unspecified unattended
+  Stage 9 posture: pre-auth deploys; `ASK` records SKIPPED needs-human; an
+  unauthorized target is never auto-deployed.
+- **Stage 8 CI wait protocol.** One blocking watch call (chunked ~9-minute
+  budgets for long CI) instead of a model round-trip per poll; the
+  notify-only Stage 8.5 drift check may ride the first watch message.
+- **Orchestrator micro-parallelism.** Build+lint run as concurrent jobs at
+  every Stage 3 exit gate / pre-panel re-run (per-pid exit codes; serial
+  when the commands plainly depend on each other); the fix lane's Stage 7
+  back-link contract becomes a function called N times inside ONE bash
+  invocation; agent-free bookkeeping may batch.
+- **Pre-push hook cost cuts (no check removed).** Opt-in
+  `hook-parallel-gates: yes` runs build/lint/tests as concurrent jobs —
+  sum → max per gated push — written only when init's discovery judges the
+  commands independent AND the human confirms (new post-discovery
+  question; `--hook-parallel` bootstrap flag; absent = serial,
+  byte-equivalent). The WARN-only dependency audit caches per
+  manifest+lockfile hash with a TTL (`dep-audit-ttl-days`, default 7) in
+  gitignored `espalier/.dep-audit-cache`.
+- **Fix (field-found by the release's live smoke): anchored pre-push
+  certificate read.** The hook's `Base-Ref:`/`Reviewed-Diff:` greps were
+  unanchored last-match, so a Stage History note QUOTING either token in
+  prose could outrank the real Status-block line — bogus revision,
+  empty-diff fingerprint, false BLOCK on a correctly certified change.
+  Now anchored to the line-start `- Key:`/`Key:` shapes (fail-closed
+  direction preserved; regression test T5q).
+- **Known issue (pre-existing, documented — not a v0.22 regression):** the
+  `eval/security` FP gate fails under today's model AT BASELINE too
+  (v0.21.1 templates: 2 FPs incl. a clean-fixture mismatch; last held
+  FP=0 on 2026-07-08 under that era's model). Catch-rate is 1.00 in every
+  run on both template versions; the counted "false positives" are the
+  judge double-counting axis-sliced findings of the SAME planted defect.
+  Needs a judge-collapse/fixture recalibration pass — see
+  `eval/security/KNOWN-ISSUES.md` and `docs/deferred-items.md`.
+- Migration #30: `scripts/migrate-v0.21.1-to-v0.22.0.sh` — refreshes 4
+  pure-copy surfaces (backups `.pre-v0.22.bak`); anchored edits into the 4
+  substituted per-project files including a span-splice of the hook's
+  audit block and the anchored certificate read (`bash -n` verified
+  after; customised files skip-with-record); appends the audit-cache
+  gitignore entry; writes no config keys.
+
 ## 0.21.1 — 2026-08-17
 
 Patch: **comment brevity** — field feedback: the generated coder agents write

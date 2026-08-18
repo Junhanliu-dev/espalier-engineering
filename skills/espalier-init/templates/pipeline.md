@@ -52,7 +52,10 @@ lanes route into it rather than through it:
 - **Execute:** Sub-agent implements per task decomposition
 - **Gate (PROGRAMMATIC):** all sub-tasks done + the ORCHESTRATOR re-runs the
   discovered build and lint commands itself and both exit 0 — the coder's
-  self-reported "Build status: pass" is a claim, not the gate. A failing
+  self-reported "Build status: pass" is a claim, not the gate. The two runs
+  may execute as concurrent background jobs in one bash call (per-pid exit
+  codes, per-job output) unless the commands plainly depend on each other —
+  concurrency changes the wait, never the gate. A failing
   build/lint re-run goes straight back to the coder WITHOUT spawning the Stage 4
   panel (a panel round on unbuildable code is wasted).
 - **Constraint:** One sub-agent invocation per sub-task. Sub-tasks whose
@@ -139,7 +142,14 @@ lanes route into it rather than through it:
   so round history survives the overwrite.
 
 ### 5. Test Writing
-- **Trigger:** Code review passed
+- **Trigger:** dispatched SPECULATIVELY with the round-1 Stage 4 panel (a
+  3-agent message; `speculative-tests: off` in `espalier/.espalier-config`
+  restores the serial post-review dispatch) — and COMPLETED after the final
+  panel PASS via the espalier skill's "Stage 4 → Stage 5 handoff" (guarded
+  part-file append; contract phase / restore-reconcile as one spawn). On a
+  panel FAIL the speculative tests are QUARANTINED under the change dir, so
+  every later gate, panel round, and coder re-spawn sees a tree with zero
+  speculative artifacts.
 - **Load:** Spawn `harness-coder` agent with testing skill
 - **Execute:** Write tests for changed interfaces. ALSO write the negative abuse
   test named by EVERY entry in security-record.md's `## Security-Sensitive Fields`
@@ -171,7 +181,10 @@ lanes route into it rather than through it:
     `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 - **Loop:** same fixpoint rule as Stage 4 — a non-PASS verdict sends the tests
   back to Stage 5 (re-spawn coder), then **re-review**; never exit on the fix
-  report alone.
+  report alone. On a round ≥ 2 the orchestrator hands the reviewer the
+  changed-since-last-review set (the test files the Stage 5 re-spawn touched);
+  the re-review runs in DELTA SCOPE per the agent's "Re-review Rounds" section
+  — a floor, not a ceiling; the whole-change verdict rule is unchanged.
 - **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
   tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
   against this value.
@@ -201,6 +214,16 @@ lanes route into it rather than through it:
   - `tests_passed == total_tests`
   - `lint_errors == 0`
 - **Verify by:** Running CI command or reading CI output
+- **Wait protocol (remote CI):** never poll across messages — each poll is a
+  full orchestrator round-trip. Prefer the CI provider's BLOCKING watch
+  inside a single bash call (`gh run watch <run-id> --exit-status` or the
+  provider's equivalent). Bash calls cap at ~10 minutes, so for longer CI
+  chunk the wait: one `until`-loop per call with a generous internal
+  interval and a ~9-minute per-call budget, repeated — turns become
+  ceil(CI / 9min), not CI / poll-interval. The Stage 8.5 doc-drift bash may
+  ride the SAME message as the first watch call (it reads only
+  `.drift-state.tsv`, writes only the change's `doc-patches.md` — CI-
+  independent and notify-only). The gate still reads the same final values.
 - **Rollback:**
   - `total_tests == 0` → Stage 5
   - Compile/build failure → Stage 3
@@ -228,9 +251,16 @@ lanes route into it rather than through it:
     discovered"): record `| 9 | SKIPPED | {ts} | no-deploy-config |` in Stage
     History and advance. This is a clean pass, not a gap — a repo that doesn't
     deploy per change has nothing to verify here.
-  - **Deploy configured:** confirm deploy parameters (human checkpoint), run the
+  - **Deploy configured:** confirm deploy parameters (human checkpoint) —
+    SKIPPED when a target was pre-authorized at the Requirements Approval
+    Gate (recorded as `- Deploy-Target:` in pipeline-state.md; `ASK` or a
+    missing line → prompt here exactly as before). Then run the
     discovered deploy command (or confirm the automatic deploy completed), then
     run the discovered **health check** against the target environment.
+    **Unattended posture:** pre-authorized target → proceed (deploy + health
+    check); `ASK`/missing on an unattended run → record
+    `| 9 | SKIPPED | {ts} | deploy needs-human (unattended) |` and continue —
+    an unauthorized target is NEVER auto-deployed.
 - **Gate (PROGRAMMATIC when configured):** health check returns success
   (HTTP 2xx on the health path, or the health command exits 0).
 - **Rollback:** health check fails → do NOT proceed to Stage 10; surface the

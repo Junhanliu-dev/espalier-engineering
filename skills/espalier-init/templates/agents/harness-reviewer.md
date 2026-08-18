@@ -31,6 +31,14 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
 4. Read `espalier/rules/production-standards.md` for the NFR seeds + severity
    tiers (the Production-Readiness Review below enforces them)
 
+If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
+agent is running concurrently with you: new/changed TEST files that
+coding-report.md does not list are its work-in-progress — exclude them from
+your scope and your verdict; they are reviewed at Stage 6. This narrows
+nothing that was ever this round's scope (tests were never Stage 4's
+subject), and your suspicion-expansion license over the CHANGE's files is
+unchanged.
+
 ## Review Process
 
 0. Pre-flight: if a rule or wiki file material to this review is listed in

@@ -1273,6 +1273,140 @@ M211_RERUN=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/..
 assert "29f re-run is a no-op" "echo \"\$M211_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 30: v0.22.0 pipeline speed II — speculative Stage 5, hook gates, migration ──
+echo "Test 30: v0.22.0 pipeline speed II (speculative Stage 5 + hook parallel/cache + migration)"
+MIGRATE22="$SCRIPT_DIR/migrate-v0.21.1-to-v0.22.0.sh"
+TMP=$(mktemp -d -t smoke30.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "30a lane skills carry speculative Stage 5 + handoff + quarantine" \
+  "grep -qF 'Stage 4 → Stage 5 handoff' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'coding-report.part-test.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+   && grep -qF -- '.speculative-tests/' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "30b pipeline.md carries speculative trigger + Stage 6 delta + CI wait + Deploy-Target" \
+  "grep -qF 'dispatched SPECULATIVELY' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'changed-since-last-review' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'Wait protocol' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'Deploy-Target' '$TMP/espalier/pipeline.md'"
+assert "30c Stage 6 prompts pass the delta line in both lanes" \
+  "grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+assert "30d agent TEMPLATES carry the v0.22 sections" \
+  "grep -qF 'Speculative & Contract entry points' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md'"
+assert "30e hook TEMPLATE carries parallel sections + audit cache; installed stats carries durations" \
+  "grep -qF 'hook-parallel-gates' '$SCRIPT_DIR/../skills/espalier-init/hook-templates/pre-push-gate.sh' \
+   && grep -qF 'dep-audit-cache' '$SCRIPT_DIR/../skills/espalier-init/hook-templates/pre-push-gate.sh' \
+   && grep -qF 'Stage durations' '$TMP/espalier/hooks/espalier-stats.sh'"
+assert "30f .gitignore gains the audit-cache entry" \
+  "grep -qxF 'espalier/.dep-audit-cache' '$TMP/.gitignore'"
+assert "30g default bootstrap writes NO hook-parallel key" \
+  "! grep -q '^hook-parallel-gates:' '$TMP/espalier/.espalier-config'"
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --hook-parallel=yes --yes --force >/dev/null 2>&1 )
+assert "30h --hook-parallel=yes writes the config key (append-if-missing)" \
+  "[ \"\$(grep -c '^hook-parallel-gates:' '$TMP/espalier/.espalier-config')\" = '1' ] \
+   && grep -q '^hook-parallel-gates: yes' '$TMP/espalier/.espalier-config'"
+
+# Migration: stub per-project files lack the stock anchors → skip-with-record.
+M22_SKIP=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M22_SKIP_RC=$?
+assert "30i customised files skip-with-record (exit 0)" \
+  "[ $M22_SKIP_RC -eq 0 ] && grep -qF 'v0.22.0-coder-speculative' '$TMP/espalier/.migrations-skipped'"
+M22_SKIP2=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "30j re-run after skip-with-record is a no-op" \
+  "echo \"\$M22_SKIP2\" | grep -qi 'nothing to do'"
+
+# Simulate a stock v0.21.1 install: strip pure-copy markers, seed stock-shaped
+# agent files + a stock-shaped hook excerpt carrying every anchor, then migrate.
+( cd "$TMP" \
+  && rm -f espalier/.migrations-skipped \
+  && sedi '/Stage 4 → Stage 5 handoff/d' espalier/skills/espalier/SKILL.md \
+  && sedi '/coding-report.part-test.md/d' espalier/skills/espalier-fix/SKILL.md \
+  && sedi '/dispatched SPECULATIVELY/d' espalier/pipeline.md \
+  && sedi '/Stage durations/d' espalier/hooks/espalier-stats.sh )
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V21CODER'
+## Before Writing ANY Code
+stub
+## Production-Aware Coding (do this WHILE writing, not only at review)
+stub
+V21CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V21REV'
+## Before Reviewing
+stub
+## Review Process
+stub
+V21REV
+cat > "$TMP/espalier/agents/harness-security.md" << 'V21SEC'
+## Before Auditing
+stub
+## Scope Gate (self-noop on irrelevant changes)
+stub
+V21SEC
+cat > "$TMP/espalier/hooks/pre-push-gate.sh" << 'V21GATE'
+#!/bin/bash
+# stock v0.21 excerpt — every anchor the v0.22 migration splices against
+# Dependency audit — WARN only, per available tool for the detected stack. Wrapped
+# in a timeout when available so a slow / offline advisory fetch can't hang the
+# push; a nonzero exit may mean vulnerabilities OR a tool/network error (never blocks).
+command -v timeout >/dev/null 2>&1 && _to="timeout 45" || _to=""
+if   [ -f package.json ] && command -v npm >/dev/null 2>&1; then
+  $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || echo "WARNING: npm audit (non-blocking)." >&2
+elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
+  $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: govulncheck (non-blocking)." >&2
+fi
+
+STATE_FILE=stub
+REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
+BASE_REF=$(grep "Base-Ref:" "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+
+# The three {command} placeholders below were substituted from
+# DISCOVERY.ci_checks at init.
+run_build() {
+  true
+}
+gate_build_section() { BUILD_OUTPUT=$(run_build 2>&1) || { echo "BLOCKED: Build fails" >&2; exit 2; }; }
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_build_section; fi
+run_lint() {
+  true
+}
+gate_lint_section() { LINT_OUTPUT=$(run_lint 2>&1) || { echo "BLOCKED: Lint fails" >&2; exit 2; }; }
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_lint_section; fi
+run_tests() {
+  echo "3 passed"
+}
+gate_tests_section() { TEST_OUTPUT=$(run_tests 2>&1) || { echo "BLOCKED: Tests fail" >&2; exit 2; }; }
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_tests_section; fi
+
+echo "All gates passed. Push allowed."
+exit 0
+V21GATE
+M22_OUT=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M22_RC=$?
+assert "30k apply restores every v0.22 marker + backups" \
+  "[ $M22_RC -eq 0 ] \
+   && grep -qF 'Stage 4 → Stage 5 handoff' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'coding-report.part-test.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+   && grep -qF 'dispatched SPECULATIVELY' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'Stage durations' '$TMP/espalier/hooks/espalier-stats.sh' \
+   && grep -qF 'Speculative & Contract entry points' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$TMP/espalier/agents/harness-security.md' \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.22.bak' ] \
+   && [ -f '$TMP/espalier/hooks/pre-push-gate.sh.pre-v0.22.bak' ]"
+assert "30l migrated hook parses + carries both hook markers + switched guards" \
+  "bash -n '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && grep -qF 'hook-parallel-gates' '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && grep -qF 'dep-audit-cache' '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && [ \"\$(grep -c 'HOOK_PARALLEL' '$TMP/espalier/hooks/pre-push-gate.sh')\" -ge 5 ] \
+   && grep -qF 'gate_parallel_section' '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && grep -qF -- '(- )?Reviewed-Diff:' '$TMP/espalier/hooks/pre-push-gate.sh'"
+M22_RERUN=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "30m re-run is a no-op" "echo \"\$M22_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

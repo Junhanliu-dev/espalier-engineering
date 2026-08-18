@@ -329,13 +329,14 @@ run_count_case "T5j explicit '0 passed' still blocks"    "echo '0 passed'"      
 run_count_case "T5k failing test command blocks"         "echo '1 failed'; false"          2
 
 # T5l: gate-template exit-code totals — the installed gate must have exactly the
-# 10 blocking `exit 2` statements and zero blocking `exit 1`.
+# 14 blocking `exit 2` statements (10 serial-path + 4 in the v0.22 parallel
+# section) and zero blocking `exit 1`.
 TMP5=$(mktemp -d -t hooks-t5l.XXXX)
 make_repo "$TMP5"
 install_hooks "$TMP5"
 make_gate "$TMP5" "echo '3 passed'"
-assert "T5l installed gate has 10 'exit 2' sites" \
-  "[ \"\$(grep -c 'exit 2' '$TMP5/espalier/hooks/pre-push-gate.sh')\" = '10' ]"
+assert "T5l installed gate has 14 'exit 2' sites" \
+  "[ \"\$(grep -c 'exit 2' '$TMP5/espalier/hooks/pre-push-gate.sh')\" = '14' ]"
 assert "T5l2 installed gate has zero 'exit 1' sites" \
   "[ \"\$(grep -c 'exit 1' '$TMP5/espalier/hooks/pre-push-gate.sh')\" = '0' ]"
 
@@ -390,7 +391,29 @@ T5P_RC=$?
 assert "T5p Stage-4-PASSED without certificate fails closed (exit 2)" "[ $T5P_RC -eq 2 ]"
 assert "T5p2 missing-certificate block on stderr" "grep -q 'review certificate is missing' '$TMP8/err.txt'"
 
-[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8"
+# T5q: certificate read is ANCHORED — a Stage History note quoting
+# "Base-Ref:"/"Reviewed-Diff:" in prose must not outrank the real Status-block
+# lines (v0.22 field find: unanchored last-match produced a bogus revision +
+# empty-diff fingerprint and a false BLOCK on a correctly certified change).
+TMP9=$(mktemp -d -t hooks-t5q.XXXX)
+make_repo "$TMP9"
+install_hooks "$TMP9"
+make_gate "$TMP9" "echo '3 passed'"
+T5Q_BASE=$(cd "$TMP9" && git rev-parse HEAD)
+echo change > "$TMP9/work.txt"
+( cd "$TMP9" && git add -A && git -c user.email=t@t -c user.name=t commit -q -m "fix change" )
+T5Q_FP=$(cd "$TMP9" && git diff "$T5Q_BASE" -- . ':(exclude)espalier/' | git hash-object --stdin)
+state_file "$TMP9" fix 2026-01-01-prose 7 IN_PROGRESS
+{
+  printf -- '- Base-Ref: %s\n- Reviewed-Diff: %s\n' "$T5Q_BASE" "$T5Q_FP"
+  printf '| 0 | PASSED | 2026-01-01T10:00:00Z | rejected a Layer 1 match anchored at Base-Ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef (prose quote, not the certificate) |\n'
+} >> "$TMP9/espalier/changes/fix/2026-01-01-prose/pipeline-state.md"
+( cd "$TMP9" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP9/err.txt" )
+T5Q_RC=$?
+assert "T5q prose-quoted anchor token never outranks the real certificate (exit 0)" \
+  "[ $T5Q_RC -eq 0 ] && ! grep -q 'Reviewed-Diff mismatch' '$TMP9/err.txt'"
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8" "$TMP9"
 
 # ─── T6: drift-helpers basics ──────────────────────────────────────────────
 echo "T6: drift-helpers"
@@ -940,6 +963,130 @@ assert "17g fix echo lands on uncharted" "echo \"\$OUT\" | grep -q 'against-char
 assert "17h map ticket/type/session/fog" "echo \"\$OUT\" | grep -q 'open=1 closed=2 out-of-scope=0 (grilling=1 research=1 prototype=0 task=1) sessions=2 fog-remaining=1 spawned=1'"
 assert "17i read-only (no writes)"       "[ -z \"\$(cd \"$TMP\" && git status --porcelain espalier 2>/dev/null | grep -v '^??')\" ] && [ ! -f '$TMP/espalier/.stats-report.md' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T18: espalier-stats.sh — stage durations (v0.22) ─────────────────────
+echo "T18: espalier-stats stage durations"
+STATS="$HOOKS_SRC/espalier-stats.sh"
+TMP=$(mktemp -d -t hooks-t18.XXXX)
+make_repo "$TMP"
+mkdir -p "$TMP/espalier/changes/fix/2026-08-10-dur"
+cat > "$TMP/espalier/changes/fix/2026-08-10-dur/pipeline-state.md" << 'DURFIX'
+# Pipeline State: dur
+
+## Status
+- Current Stage: 7
+- Status: COMPLETE
+- Review Rounds: req=1/3, code=1/3, test=1/3
+- Total Rollbacks: 0
+
+## Stage History
+| Stage | Status | Timestamp | Notes |
+|-------|--------|-----------|-------|
+| 0 | PASSED | 2026-08-10T10:00:00Z | Auto-linked |
+| 1 | PASSED | 2026-08-10T10:20:00Z | GRILLED |
+| 3 | IN_PROGRESS | 2026-08-10T10:25:00Z | |
+| 4 | PASSED | 2026-08-10T10:45:00Z | reviewer PASS |
+| 6 | PASSED | badstamp | tests reviewed |
+| 7 | PASSED | 2026-08-10T11:10:00Z | delivery auto-accepted (non-interactive) |
+
+## Commits
+| Stage | SHA | Files |
+|-------|-----|-------|
+| 7 | 9999999 | a.ts |
+DURFIX
+OUT=$( cd "$TMP" && bash "$STATS" )
+# Span math: 0→1 = 1200s (closed by GRILLED → human); 1→3 = 300s (agent);
+# 3→4 = 1200s (agent); the badstamp row breaks its spans (skipped_rows=1);
+# the auto-accepted closing row must never count as human.
+assert "18a per-stage duration lines" \
+  "echo \"\$OUT\" | grep -q 'stage 0: n=1 min=1200s' && echo \"\$OUT\" | grep -q 'stage 1: n=1 min=300s'"
+assert "18b human/agent split with unattended exclusion" \
+  "echo \"\$OUT\" | grep -q 'totals: human-wait=1200s agent-work=1500s other=0s (skipped_rows=1)'"
+assert "18c Commits table rows never parsed as stages" \
+  "! echo \"\$OUT\" | grep -q 'stage 7:'"
+assert "18d degrade guard present (python3 probe + unavailable line)" \
+  "grep -q 'command -v python3' '$STATS' && grep -q 'stage durations: unavailable' '$STATS'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── T19: pre-push-gate.sh — parallel gate sections + audit cache (v0.22) ──
+echo "T19: pre-push parallel gates + audit cache"
+make_gate22() {  # dir build lint test — full three-command substitution
+  local dir=$1 b=$2 l=$3 t=$4
+  mkdir -p "$dir/espalier/hooks"
+  sed -e "s|{build_command}|$b|g" \
+      -e "s|{lint_command}|$l|g" \
+      -e "s|{test_command}|$t|g" \
+      "$HOOKS_SRC/pre-push-gate.sh" > "$dir/espalier/hooks/pre-push-gate.sh"
+  chmod +x "$dir/espalier/hooks/pre-push-gate.sh"
+}
+
+# 19a: key present → parallel path passes end-to-end.
+TMP=$(mktemp -d -t hooks-t19a.XXXX)
+make_repo "$TMP"
+make_gate22 "$TMP" "echo building" "echo linting" "echo '3 passed'"
+state_file "$TMP" feat 2026-08-11-par 7 IN_PROGRESS
+printf 'hook-parallel-gates: yes\n' > "$TMP/espalier/.espalier-config"
+( cd "$TMP" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 )
+assert "19a parallel mode passes clean gates" "[ $? -eq 0 ]"
+
+# 19b-d: each command failing in turn blocks with ITS message, exit 2.
+for spec in "false|echo linting|echo '3 passed'|Build" \
+            "echo building|false|echo '3 passed'|Lint" \
+            "echo building|echo linting|false|Tests"; do
+  b=${spec%%|*}; rest=${spec#*|}
+  l=${rest%%|*}; rest=${rest#*|}
+  t=${rest%%|*}; word=${rest#*|}
+  D=$(mktemp -d -t hooks-t19x.XXXX)
+  make_repo "$D"
+  make_gate22 "$D" "$b" "$l" "$t"
+  state_file "$D" feat 2026-08-11-parf 7 IN_PROGRESS
+  printf 'hook-parallel-gates: yes\n' > "$D/espalier/.espalier-config"
+  ( cd "$D" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$D/err.txt" )
+  rc=$?
+  assert "19b $word failure blocks in parallel mode (exit 2 + message)" \
+    "[ $rc -eq 2 ] && grep -q 'BLOCKED: $word fail' '$D/err.txt'"
+  [ "$KEEP" != "yes" ] && rm -rf "$D"
+done
+
+# 19e: parallel no-tests-found still blocks.
+TMP2=$(mktemp -d -t hooks-t19e.XXXX)
+make_repo "$TMP2"
+make_gate22 "$TMP2" "echo building" "echo linting" "echo '0 passed'"
+state_file "$TMP2" feat 2026-08-11-notests 7 IN_PROGRESS
+printf 'hook-parallel-gates: yes\n' > "$TMP2/espalier/.espalier-config"
+( cd "$TMP2" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP2/err.txt" )
+assert "19e parallel zero-test-count blocks" \
+  "[ $? -eq 2 ] && grep -q 'No tests found' '$TMP2/err.txt'"
+
+# 19f-h: dependency-audit cache. package-lock WITHOUT package.json → no audit
+# tool runs, but the cache records the manifest hash; a seeded matching-hash
+# cache replays its warning; a lockfile change forces a fresh (clean) run;
+# an expired TTL also forces a fresh run.
+TMP3=$(mktemp -d -t hooks-t19f.XXXX)
+make_repo "$TMP3"
+make_gate22 "$TMP3" "true" "true" "echo '3 passed'"
+state_file "$TMP3" feat 2026-08-11-audit 7 IN_PROGRESS
+printf 'lockv1\n' > "$TMP3/package-lock.json"
+( cd "$TMP3" && git add -A && git -c user.email=t@t -c user.name=t commit -q -m lock )
+( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 )
+assert "19f first run writes the audit cache (hash + epoch)" \
+  "[ -f '$TMP3/espalier/.dep-audit-cache' ] && awk 'NR==1{exit !(length(\$1)==40 && \$2 ~ /^[0-9]+\$/)}' '$TMP3/espalier/.dep-audit-cache'"
+H=$(head -1 "$TMP3/espalier/.dep-audit-cache" | cut -d' ' -f1)
+printf '%s %s cached-warning-marker\n' "$H" "$(date +%s)" > "$TMP3/espalier/.dep-audit-cache"
+( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP3/err.txt" )
+assert "19g matching hash within TTL replays the cached warning" \
+  "grep -q 'WARNING (cached): cached-warning-marker' '$TMP3/err.txt'"
+printf 'lockv2\n' > "$TMP3/package-lock.json"
+( cd "$TMP3" && git add -A && git -c user.email=t@t -c user.name=t commit -q -m lock2 )
+( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP3/err.txt" )
+assert "19h lockfile change busts the cache (fresh clean run, no replay)" \
+  "! grep -q 'cached-warning-marker' '$TMP3/err.txt' && ! grep -q 'cached-warning-marker' '$TMP3/espalier/.dep-audit-cache'"
+H2=$(head -1 "$TMP3/espalier/.dep-audit-cache" | cut -d' ' -f1)
+printf '%s %s stale-ttl-marker\n' "$H2" "$(( $(date +%s) - 8*86400 ))" > "$TMP3/espalier/.dep-audit-cache"
+( cd "$TMP3" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP3/err.txt" )
+assert "19i expired TTL forces a fresh run (no replay)" \
+  "! grep -q 'stale-ttl-marker' '$TMP3/err.txt'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""

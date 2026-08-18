@@ -59,8 +59,13 @@ Gather all three signals BEFORE prompting:
    observation dedupe, and status precedence.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
-If all three are empty/false → no prompt, proceed to Stage 1.
-Otherwise issue ONE `AskUserQuestion` summarising all three:
+If all three are empty/false → no prompt, proceed to Stage 1. If only fresh
+(<14d) stale docs and no conv/doctor signal → treat as empty.
+
+**Critical/expired stale row present** (`tier_counts` shows critical or
+expired > 0) → issue ONE blocking `AskUserQuestion` NOW, default
+**"Handle now"** — the drift sidecar is per-clone, so a critical/expired row
+here is YOUR OWN flag (the prune escape-hatch case):
 
 ```
 Pre-flight found:
@@ -73,13 +78,17 @@ Options:
   3. Abort
 ```
 
-Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
-maintenance handles this (gardener rota — see /espalier-prune's
-Multi-Developer Discipline)". "Handle now" stays available and becomes the
-default ONLY when a critical/expired flag is present — the drift sidecar is
-per-clone, so a critical/expired row here is YOUR OWN flag (the prune
-escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
-signal → treat as empty.
+**Only non-critical signals** → do NOT prompt here (this wait was the cost):
+print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
+{due|not due} — deferred to the approval gate`), append the same summary to
+`espalier/.drift-report.md` with a `deferred-to-approval-gate ({ts})` marker
+line (an interrupted run leaves an inspectable trace, and the signals
+re-surface at the next invocation's pre-flight anyway — the sidecar is never
+cleared by deferral), and continue to Stage 1. The Requirements Approval
+Gate carries the maintenance question (its step 3b) — still BEFORE Stage 3,
+so a promotion decided there governs this run's coder. The weekly gardener
+rota (see /espalier-prune's Multi-Developer Discipline) remains the default
+owner of non-critical maintenance either way.
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -218,7 +227,11 @@ unrelated in-flight change into the new request:
 
 For each stage:
 1. **Announce:** "## Stage N: {name}"
-2. **Update state:** Write current stage to pipeline-state.md
+2. **Update state:** Write current stage to pipeline-state.md. Stage History
+   timestamps use `date -u +%Y-%m-%dT%H:%M:%SZ` (full seconds — the stats
+   duration report floors minute-only legacy rows). Bookkeeping steps with no
+   agent in flight may batch into one bash invocation (state write + record
+   append + context read) — same file effects, fewer round-trips.
 3. **Load context:** Read the skill/agent file specified for this stage
 4. **Execute:** Perform work or delegate to sub-agent
 5. **Verify gate:** Check the quality gate
@@ -271,6 +284,43 @@ sign-off on `requirements.md` before Stage 3.
    is removed. `ASK` or a missing line → prompt at Stage 7 as before. This
    pre-authorization NEVER extends to Stage 10 — delivery acceptance stays a
    human act.
+
+3b. If Stage 0 recorded a `deferred-to-approval-gate` pre-flight summary,
+   add a THIRD question to the SAME `AskUserQuestion` call:
+
+   ```
+   Pre-flight noted: {N} stale doc(s) ({tiers}), {M} convention promotion
+   candidate(s), doctor {due|not due}.
+     1. Handle after this change (default — gardener rota covers it)
+     2. Pause & handle now — run /espalier-prune + convention decisions,
+        then continue to Stage 3
+     3. Ignore this run
+   ```
+
+   "Pause & handle now" runs the SAME mechanics as the Stage 0 prompt's
+   "Handle now" (Convention Promotion's race guard, per-key status flip,
+   isolated `docs:` commit) — relocated, not altered, and still before any
+   code is written.
+
+3c. ONLY when the discovered `## Deploy & Verification` section of
+   `espalier/rules/development-process.md` is configured (it does NOT read
+   "No deploy configuration discovered"), add a deploy question to the same
+   call:
+
+   ```
+   When Stage 9 (deploy verify) is reached and CI is green, deploy with the
+   discovered command to:
+     1. {discovered target/environment}   (pre-authorize)
+     2. Somewhere else — specify
+     3. Ask me again at Stage 9
+   ```
+
+   Record `- Deploy-Target: {target | ASK}` in pipeline-state.md. Stage 9
+   honors it (see pipeline.md Stage 9): a pre-authorized target deploys and
+   health-checks without re-prompting; `ASK`/missing prompts at Stage 9 as
+   today. The health-check gate, its rollback path, and the Stage 10 human
+   acceptance are untouched — like the push pre-auth, this removes only the
+   redundant wait, and it NEVER extends to Stage 10.
 
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
@@ -370,7 +420,13 @@ Agent tool:
 **Stage 3 exit gate (PROGRAMMATIC — run before every panel spawn):** after the
 coder returns (first pass AND every P0-fix re-spawn), re-run the discovered
 build + lint commands yourself (they are in `espalier/rules/development-process.md`
-/ the pre-push gate's substituted commands). Both must exit 0. The coder's
+/ the pre-push gate's substituted commands). Both must exit 0. Run them as two
+concurrent background jobs in ONE bash call (`$BUILD & $LINT &` with per-pid
+`wait`s to capture both exit codes, each job's output to its own temp file so
+a failure's log isn't interleaved) — UNLESS the discovered commands plainly
+depend on each other (e.g. a typecheck that consumes build output), in which
+case keep them serial. Concurrency changes the wait, never the gate: both
+still must exit 0. The coder's
 self-reported "Build status: pass" is a claim, not the gate. On failure,
 re-spawn the coder with the build/lint output — do NOT spawn the review panel
 on unbuildable code (a wasted panel round), and do NOT count it as a P0 round.
@@ -426,6 +482,21 @@ Stage 5 by any other path:
 
 1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
    exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
+   **ROUND 1 ONLY** — unless `speculative-tests: off` is set in
+   `espalier/.espalier-config` (read like the round caps; absent = on) —
+   the message is a THREE-agent dispatch: both panel agents PLUS the
+   Stage 5 test-coder in speculative mode (prompt in Stage 5 below), and
+   BOTH panel prompts gain this line:
+
+   ```
+   SPECULATIVE TESTS IN FLIGHT: a test-writing agent runs concurrently with
+   you. New/changed TEST files not listed in coding-report.md are its
+   work-in-progress — exclude them from your review scope and your verdict;
+   they are reviewed at Stage 6.
+   ```
+
+   Rounds ≥ 2 spawn the two panel agents only (the speculative tests are
+   quarantined on a FAIL — see the Stage 4 → Stage 5 handoff below).
    On a re-review round, include the `CHANGED SINCE LAST REVIEW:` line in both
    prompts — the agents then review in delta scope (their "Re-review Rounds"
    sections; required reads = fix files + prior findings + direct dependents,
@@ -469,29 +540,124 @@ Stage 5 by any other path:
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
    (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate, THEN run the
-   "Stage 4 Post-Review" drift processing below. The exit gate requires BOTH
+   "Stage 4 Post-Review" drift processing below and the "Stage 4 → Stage 5
+   handoff" protocol (both ride the same Step-1 bash). The exit gate requires BOTH
    clean — never one agent's pass alone. A security P0/P1 shares the correctness
    `max-code-rounds` round counter.
 
-**Stage 5 (Testing):**
+**Stage 5 (Testing — speculative, dispatched WITH the round-1 panel):**
+
+The test-coder joins the ROUND-1 Stage 4 message as the third concurrent
+agent (see Stage 4 step 1). Its speculative prompt:
+
 ```
 Agent tool:
   prompt: |
     You are the harness-coder in testing mode.
     Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
+    SPECULATIVE DISPATCH: a review panel is running concurrently on this code.
     CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
     first (paths and facts only — verify against current code).
     WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what was implemented. Write tests for those changes.
-
-    ALSO read espalier/changes/{type}/{slug}/security-record.md (if present) — for
-    EVERY field in its `## Security-Sensitive Fields` contract, write the negative
-    abuse test it names (tamper the value → assert rejected → assert store unchanged). A
-    contracted field with no such test will be blocked at Stage 6.
-
-    Append test report to: espalier/changes/{type}/{slug}/coding-report.md
+    what was implemented. Write the interface tests and failure-mode tests
+    for those changes NOW.
+    Do NOT read security-record.md this pass — it may be mid-write; the
+    contracted abuse tests are a separate phase after the panel returns.
+    REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-test.md
+    — never touch coding-report.md (the panel is reading it). List EVERY
+    file you create under "Files created" — the orchestrator's
+    quarantine/discard mechanics operate on that list.
+    Run ONLY scoped invocations of the test files you write; no whole-tree
+    builds, no dependency installs.
 ```
+
+With `speculative-tests: off`, skip the joint dispatch and instead run this
+prompt AFTER Stage 4 passes, without the speculative deltas (append directly
+to coding-report.md, read security-record.md for the contract) — the
+pre-v0.22 serial flow, verbatim.
+
+### Stage 4 → Stage 5 handoff (sequencing protocol — MANDATORY ordering)
+
+Races are the failure mode here: calls in one message run concurrently, so
+file-writing bash and file-reading spawns must never share a message.
+
+**Step 1 — orchestrator-local bash, ONE invocation, no agent in flight**
+(right after the joint dispatch resolves and the Stage 4 gate read is done):
+
+1. Escalation detector against the PART file:
+   `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/{type}/{slug}/coding-report.part-test.md`
+   — runs on EVERY path below (the signal describes the change's
+   testability, which survives any discard); on a hit, surface it to the
+   human like the fix lane's Stage 5 late-escalation signal.
+2. **Panel PASS (both sentinels p0=0 p1=0):** append the part file's content
+   to coding-report.md — guarded by a content-presence grep so a crash
+   between append and delete cannot double-append — then DELETE the part
+   file. Run the Stage 4 Post-Review drift/convention parse in this same
+   invocation (it must finish BEFORE any Stage 6 spawn — Stage 6 overwrites
+   the review-record.md it parses).
+3. **Panel FAIL / p0/p1 > 0:** QUARANTINE the speculative tests — move every
+   file listed in the part file's "Files created" to
+   `espalier/changes/{type}/{slug}/.speculative-tests/` (relative paths
+   preserved) and move the part file beside them. The tree the pre-round
+   build/lint gate, the next panel round, and the coder re-spawn see now
+   carries ZERO speculative artifacts — stale tests referencing renamed
+   symbols would otherwise break the whole-tree build/lint gate, and build
+   failures do not increment `max-code-rounds`, so that wedge would be
+   uncapped.
+4. **ESCALATION_REQUIRED (either agent):** quarantine as in 3, then the
+   escalation protocol unchanged — plus one line naming the quarantined
+   files so the human decides with full information.
+
+**Step 2 — test completion, ONE spawn alone in its message, after the FINAL
+panel PASS:**
+
+- No fix round + no contract → nothing to spawn; Stage 5 is complete (the
+  appended part IS the test report). Serial test cost ≈ zero.
+- No fix round + non-empty contract → one test-coder re-spawn:
+  "CONTRACT PHASE: read espalier/changes/{type}/{slug}/security-record.md —
+  for EVERY field in its `## Security-Sensitive Fields` contract, write the
+  negative abuse test it names (tamper the value → assert rejected → assert
+  store unchanged). Append the test report to coding-report.md."
+- Any fix round happened → the orchestrator RESTORES the quarantined files
+  first (moves them back to their tree paths), then one re-spawn:
+  reconcile against "code changed since your tests: {the fix rounds' files
+  from coding-report.md}", append the test report to coding-report.md, AND
+  carry the CONTRACT PHASE block when the contract is non-empty — one
+  spawn, never two.
+
+**Contract detection (deterministic):** after the final PASS,
+`grep -q '^## Security-Sensitive Fields' espalier/changes/{type}/{slug}/security-record.md`
+decides empty vs non-empty.
+
+**Step 3 — Stage 6 dispatch, alone in its message.** HARD RULE: never issue
+a bash that writes coding-report.md or review-record.md in the same message
+as an agent spawn that reads or writes that file. Step-1 bash runs with zero
+agents in flight; Steps 2 and 3 are single-spawn messages.
+
+**Round accounting (unchanged):** the speculative write, the
+restore/reconcile re-spawn, and the contract phase are all Stage 5 actions —
+none increments `max-test-rounds` (that counts Stage 6 verdict loops only).
+`max-code-rounds` semantics are untouched.
+
+**State bookkeeping & crash recovery:** `Current Stage:` stays 4 during the
+joint dispatch (it IS the Stage 4 round); write the Stage 5 row at the
+Step-1 append / Step-2 spawn. On a resume into Stage 4:
+- an orphan `coding-report.part-test.md` (tree or quarantine dir) → delete
+  the part file AND every file its "Files created" list names, wherever
+  they sit — the post-panel flow re-derives tests from scratch. Deleting
+  the FILES matters: the Stage 4 certificate's `git add -A` would
+  otherwise sweep unlisted, unreviewed tests into the fingerprint.
+- speculative test files WITHOUT a part file (crash mid-write — nothing to
+  enumerate from) → never guess-delete: surface ONE line ("possible orphan
+  speculative tests: {untracked files matching the project's test layout
+  that coding-report.md does not list} — review or delete before
+  continuing") and wait. UNATTENDED runs must not hang: set
+  `- Status: ESCALATED`, record the candidate list in a Stage History row,
+  and stop — never continue past artifacts the orchestrator cannot
+  enumerate.
+- a `.speculative-tests/` quarantine dir on a resumed change → delete it
+  (its part file sits beside it, so enumeration is exact).
 
 **Stage 6 (Test Review):**
 ```
@@ -505,6 +671,9 @@ Agent tool:
     WHAT TO REVIEW: The test files created in Stage 5.
     Read espalier/changes/{type}/{slug}/coding-report.md for the list.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
+    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the
+    Stage 5 fix re-spawn touched, from the latest coding-report.md}.
+    Re-review in delta scope per your "Re-review Rounds" section.
 
     Check: Are tests meaningful? Do they cover edge cases?
     Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
@@ -777,7 +946,10 @@ fi
 
 Runs as a sub-step between Stage 8 (CI verify) and Stage 9 (deploy). It edits no
 doc, prompts nothing, blocks nothing — it only surfaces drift this run may have
-caused.
+caused. Because it is CI-independent (reads `.drift-state.tsv`, writes only
+this change's `doc-patches.md`), it MAY ride the same message as Stage 8's
+first CI watch call instead of waiting for CI to finish — see pipeline.md
+Stage 8's wait protocol.
 
 > "8.5" is a label, not a numeric stage. Do NOT write `Current Stage: 8.5` to
 > pipeline-state.md — it would break `pre-push-gate.sh`'s integer stage parse.

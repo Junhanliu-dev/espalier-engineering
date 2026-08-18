@@ -31,6 +31,12 @@ this code — you are seeing it fresh, and you assume the client is hostile.
    audit against the CURRENT code, not the stale doc. Note only — do not flip the
    verdict for staleness.
 
+If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
+agent is running concurrently with you: new/changed TEST files that
+coding-report.md does not list are its work-in-progress — exclude them from
+your scope and your verdict; they are reviewed at Stage 6. Your audit
+surface (the changed code's handlers, consumers, and sinks) is unchanged.
+
 ## Scope Gate (self-noop on irrelevant changes)
 
 First decide whether this change touches a **security-sensitive surface** — a

@@ -86,6 +86,117 @@ else
 fi
 echo
 
+# ── Stage durations ──────────────────────────────────────────────────────────
+echo "## Stage durations (from Stage History timestamps)"
+echo
+if [ ! -d "$CH" ] || ! ls "$CH"/*/*/pipeline-state.md >/dev/null 2>&1; then
+  echo "none"
+elif ! command -v python3 >/dev/null 2>&1; then
+  echo "stage durations: unavailable (python3 not found)"
+else
+  # Span = gap between consecutive Stage History rows, attributed to the
+  # EARLIER row's stage and classified by the row that CLOSES it (a gate row
+  # is written after the human answers, so the wait ends at that row). Rows
+  # noting non-interactive/auto-* never count as human — headless fleets and
+  # maprun workers write those markers with zero human wait behind them.
+  # Parsing is bounded to the "## Stage History" section (the same file holds
+  # Commits/Follow-up tables); one unparsable row skips that row only.
+  find "$CH" -mindepth 3 -maxdepth 3 -name pipeline-state.md -not -path "*/_template/*" 2>/dev/null \
+  | python3 -c '
+import sys, re
+from datetime import datetime
+
+FORMATS = ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M")
+HUMAN = ("requirements approved", "approved by user", "delivery", "grilled", "skipped:")
+UNATTENDED = ("non-interactive", "auto-")
+
+def parse_ts(s):
+    s = s.strip()
+    for f in FORMATS:
+        try:
+            return datetime.strptime(s, f)
+        except ValueError:
+            pass
+    return None
+
+lanes = {}
+
+for path in sys.stdin:
+    path = path.strip()
+    if not path:
+        continue
+    m = re.search(r"changes/([^/]+)/", path)
+    lane = m.group(1) if m else "?"
+    L = lanes.setdefault(lane, {"stages": {}, "cls": {"human": 0, "agent": 0, "other": 0}, "skipped": 0})
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        continue
+    sect = re.search(r"^## Stage History\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not sect:
+        continue
+    rows = []
+    for line in sect.group(1).splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3 or cells[0].lower() == "stage" or set(cells[0]) <= {"-", " "}:
+            continue
+        ts = parse_ts(cells[2])
+        if ts is None:
+            L["skipped"] += 1
+            rows.append(None)
+            continue
+        rows.append((cells[0], cells[1], ts, cells[3] if len(cells) > 3 else ""))
+    for a, b in zip(rows, rows[1:]):
+        if a is None or b is None:
+            continue
+        secs = int((b[2] - a[2]).total_seconds())
+        if secs < 0:
+            continue
+        try:
+            stage = int(re.match(r"\d+", a[0]).group(0))
+        except AttributeError:
+            stage = -1
+        L["stages"].setdefault(stage, []).append(secs)
+        note = (b[3] + " " + b[1]).lower()
+        if any(u in note for u in UNATTENDED):
+            cls = "agent"
+        elif any(h in note for h in HUMAN):
+            cls = "human"
+        elif b[0][:1].isdigit() and 3 <= int(re.match(r"\d+", b[0]).group(0)) <= 6:
+            cls = "agent"
+        else:
+            cls = "other"
+        L["cls"][cls] += secs
+
+def dist(vals):
+    n = len(vals)
+    v = sorted(vals)
+    med = v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
+    return "n=%d min=%ds median=%ds mean=%.1fs max=%ds" % (n, v[0], med, sum(v) / n, v[-1])
+
+printed = False
+for lane in sorted(lanes):
+    L = lanes[lane]
+    if not L["stages"]:
+        continue
+    printed = True
+    for st in sorted(L["stages"]):
+        label = ("stage %d" % st) if st >= 0 else "stage ?"
+        print("- **%s** %s: %s" % (lane, label, dist(L["stages"][st])))
+    extra = " (skipped_rows=%d)" % L["skipped"] if L["skipped"] else ""
+    c = L["cls"]
+    print("- **%s** totals: human-wait=%ds agent-work=%ds other=%ds%s" % (lane, c["human"], c["agent"], c["other"], extra))
+if not printed:
+    print("none — no parsable Stage History timestamps yet")
+'
+  echo
+  echo "(Approximate by design — the buckets answer \"where did the hour go\","
+  echo "not billing. Minute-resolution legacy timestamps floor to 0s spans.)"
+fi
+echo
+
 # ── Grill verdicts ───────────────────────────────────────────────────────────
 echo "## Grill verdicts (Stage 1 residual-ambiguity mix)"
 echo

@@ -249,6 +249,30 @@ skipped). Bootstrap normalizes a missing `@` prefix; both empty → the
 CODEOWNERS sub-step no-ops. The generated block is advisory until the repo
 turns on "Require review from Code Owners" branch protection.
 
+### Post-discovery confirm — parallel push-gate sections (conditional)
+
+This one is asked AFTER Phase 1, not in Phase 0 — it depends on what
+discovery finds. If DISCOVERY.ci_checks' three commands (build / lint /
+test) are plainly INDEPENDENT (each runs standalone; tests do not consume a
+prebuilt artifact — most test runners self-build), ask ONE quick
+`AskUserQuestion` (fold it into the no-evidence follow-up batch when one
+fires; otherwise its own quick question):
+
+```
+Discovery judged your build, lint, and test commands independent. Run them
+CONCURRENTLY inside the pre-push gate (sum → max wall-clock per push)?
+Every check still runs and still blocks on failure — only the overlap
+changes.
+
+  1. Yes (recommended for independent commands)  → HOOK_PARALLEL = yes
+  2. No — keep them serial (default)             → HOOK_PARALLEL = no
+```
+
+Commands NOT plainly independent, or any doubt → do not ask; serial is the
+default and needs no key. On yes, pass `--hook-parallel=yes` to
+`bootstrap-espalier.sh` in Phase 3 (it appends `hook-parallel-gates: yes`
+to `espalier/.espalier-config`).
+
 > Why agent identifiers stay `harness-coder` / `harness-reviewer`: these are internal sub-agent names baked into pipeline orchestration. Renaming them mid-pipeline would break any in-flight changes. The plugin name and slash commands rebranded to Espalier in v0.4.0; agent identifiers remain frozen.
 
 Note the answers; you will substitute them literally in Phase 3 — shell
@@ -423,6 +447,8 @@ bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
   --merge-decision=<answer from Q1> \
   --doctor-cadence=<answer from Q3> \
   --platforms=<answer from Q4: comma list of claude|codex|copilot>
+# ONLY when the post-discovery confirm answered yes: also append
+#   --hook-parallel=yes
 # Greenfield Pass 1 ONLY (see Greenfield Path above): also append --greenfield
 # Append ONLY when Q5 collected handles (omit the flags entirely when skipped):
 #   --codeowners-rules=<Q5 rules handle> --codeowners-wiki=<Q5 wiki handle>

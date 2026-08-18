@@ -249,7 +249,9 @@ rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
 The fix lane uses the SAME per-stage state discipline as `/espalier` (its Stage
 Execution Protocol). At the START of each stage below, before doing the stage's
 work: write `- Current Stage: {N}` to this fix's pipeline-state.md and append a
-Stage History row. This is not optional bookkeeping — the **Stage 7 push gate
+Stage History row (timestamps via `date -u +%Y-%m-%dT%H:%M:%SZ` — full seconds,
+so the stats duration report can measure spans; bookkeeping steps with no agent
+in flight may batch into one bash invocation). This is not optional bookkeeping — the **Stage 7 push gate
 blocks unless `Current Stage:` ≥ 7**, so a lane that never updates the stage
 number cannot push its own clean work. `Status:` stays `IN_PROGRESS` from
 creation until a terminal state (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED /
@@ -274,8 +276,14 @@ Gather all three signals BEFORE prompting:
    the files yourself.
 3. **DOCTOR** — `doctor_due()`. Skip if `/espalier-doctor` is not installed.
 
-If all three are empty/false → no prompt, continue to Stage 0 Auto-Link Discovery.
-Otherwise issue ONE `AskUserQuestion` summarising all three:
+If all three are empty/false → no prompt, continue to Stage 0 Auto-Link
+Discovery. If only fresh (<14d) stale docs and no conv/doctor signal →
+treat as empty.
+
+**Critical/expired stale row present** (`tier_counts` shows critical or
+expired > 0) → issue ONE blocking `AskUserQuestion` NOW, default
+**"Handle now"** — the drift sidecar is per-clone, so a critical/expired row
+here is YOUR OWN flag (the prune escape-hatch case):
 
 ```
 Pre-flight found:
@@ -288,13 +296,16 @@ Options:
   3. Abort
 ```
 
-Default: **"Proceed"**, with a one-line pointer in the prompt — "weekly
-maintenance handles this (gardener rota — see /espalier-prune's
-Multi-Developer Discipline)". "Handle now" stays available and becomes the
-default ONLY when a critical/expired flag is present — the drift sidecar is
-per-clone, so a critical/expired row here is YOUR OWN flag (the prune
-escape-hatch case). If only fresh (<14d) stale docs and no conv/doctor
-signal → treat as empty.
+**Only non-critical signals** → do NOT prompt here (this wait was the
+cost): print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s),
+doctor {due|not due} — deferred to the approval gate`), append the same
+summary to `espalier/.drift-report.md` with a
+`deferred-to-approval-gate ({ts})` marker line, and continue to Stage 0
+Auto-Link Discovery. The Requirements Approval Gate carries the
+maintenance question (its step 3b) — still before any code is written. The
+weekly gardener rota remains the default owner of non-critical maintenance
+either way; an interrupted run's signals re-surface at the next
+invocation's pre-flight (the sidecar is never cleared by deferral).
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -623,6 +634,12 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
    certificate check still apply; `ASK` or a missing line prompts at Stage 7
    as before.
 
+3b. If the pre-flight recorded a `deferred-to-approval-gate` summary, add a
+   THIRD question to the same call (mirror of the full lane's step 3b):
+   Handle after this change (default) / Pause & handle now (run
+   /espalier-prune + convention decisions, same mechanics as the Stage 0
+   prompt, then continue) / Ignore this run.
+
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.
 
@@ -669,8 +686,11 @@ espalier/changes/fix/{slug}/coding-report.md
 
 **Stage 3 exit gate (PROGRAMMATIC):** after the coder returns (first pass and
 every re-spawn), re-run the discovered build + lint yourself; both must exit 0
-before the panel spawns. The coder's self-reported status is a claim, not the
-gate. A failure returns to the coder without a panel round.
+before the panel spawns. Run them as two concurrent background jobs in ONE
+bash call (per-pid `wait`s capture both exit codes; per-job temp-file output)
+unless the discovered commands plainly depend on each other — concurrency
+changes the wait, never the gate. The coder's self-reported status is a claim,
+not the gate. A failure returns to the coder without a panel round.
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
@@ -687,7 +707,16 @@ without spawning the panel and without counting a P0 round.
 
 1. **Baseline BOTH records** (`espalier/changes/fix/{slug}/review-record.md` and
    `.../security-record.md` — exists? size/mtime), then spawn the FRESH panel on
-   the CURRENT diff in ONE message. Pass each agent the `CONTEXT PACK:` line
+   the CURRENT diff in ONE message. **ROUND 1 ONLY** — unless
+   `speculative-tests: off` is set in `espalier/.espalier-config` (absent =
+   on) — the message is a THREE-agent dispatch: both panel agents PLUS the
+   Stage 5 test-coder in speculative mode (prompt in Stage 5 below), and
+   BOTH panel prompts gain the line: `SPECULATIVE TESTS IN FLIGHT: a
+   test-writing agent runs concurrently with you. New/changed TEST files
+   not listed in coding-report.md are its work-in-progress — exclude them
+   from your review scope and your verdict; they are reviewed at Stage 6.`
+   Rounds ≥ 2 spawn the two panel agents only (a FAIL quarantines the
+   speculative tests — see Stage 5's handoff). Pass each agent the `CONTEXT PACK:` line
    (`espalier/changes/fix/{slug}/context-pack.md` — read first; paths and
    facts only, verify against current code), `ROUND: {n}`, AND the
    `CAUSAL CONTEXT` line (the `caused_by` slugs + "verify the fix does not
@@ -804,54 +833,90 @@ row-append-only — columns `date · change_slug · pattern_key · location · s
 When a `pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`)
 it is a promotion candidate, surfaced at the next Stage 0 pre-flight.
 
-## Stage 5: Test Writing
+## Stage 5: Test Writing (speculative — dispatched WITH the round-1 panel)
 
-Spawn `harness-coder` in testing mode:
+Unless `speculative-tests: off` is set in `espalier/.espalier-config`
+(absent = on), the test-coder joins the ROUND-1 Stage 4 message as the
+third concurrent agent (see Stage 4 step 1). Speculative prompt:
 
 ```
 You are the harness-coder in TESTING MODE.
 Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
 
+SPECULATIVE DISPATCH: a review panel is running concurrently on this code.
 CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
 paths and facts only, verify against current code.
 WHAT WAS BUILT: Read espalier/changes/fix/{slug}/coding-report.md.
 ORIGINAL CAUSE (for regression test scope): {paste caused_by entries}
 
-Write tests for the fix. Required:
+Write NOW — everything EXCEPT the contracted abuse tests:
 1. A regression test that reproduces the original bug (must FAIL on the
    pre-fix code; PASS on the current code — the orchestrator verifies the
-   FAIL half mechanically against Base-Ref after you return).
+   FAIL half mechanically against Base-Ref once the tests are final).
 2. A test from the original feature's spec (proves the causing feature
    still works — read its requirements.md acceptance criteria).
-3. For EVERY entry in espalier/changes/fix/{slug}/security-record.md's
-   `## Security-Sensitive Fields` contract (if present), the negative abuse
-   test it names: tamper the value → assert rejected → assert store unchanged.
-4. For every NEW external-call path the fix introduced, a failure-mode test
+3. For every NEW external-call path the fix introduced, a failure-mode test
    (dependency times out / errors → decided failure behaviour, no partial
    write) per espalier/rules/production-standards.md.
 
+Do NOT read security-record.md this pass — it may be mid-write; the
+contracted abuse tests are a separate phase after the panel returns.
+REPORT TARGET: espalier/changes/fix/{slug}/coding-report.part-test.md —
+never touch coding-report.md (the panel is reading it). List EVERY file
+you create under "Files created" — the orchestrator's quarantine/discard
+mechanics operate on that list.
+Run ONLY scoped invocations of the test files you write; no whole-tree
+builds, no dependency installs.
+
 If a meaningful test requires touching files OUTSIDE the fix's scope (>2
 additional files or crossing a layer boundary), append the Test Scope
-Signal block to your coding-report.md per harness-coder.md instructions —
+Signal block to your part-file report per harness-coder.md instructions —
 do NOT silently expand scope.
-
-Append test results to: espalier/changes/fix/{slug}/coding-report.md
 ```
 
-After sub-agent returns, run the detector:
+With `speculative-tests: off`: run the pre-v0.22 serial flow after Stage 4
+passes — the same required list PLUS the contracted abuse tests (read
+security-record.md's `## Security-Sensitive Fields`), appending directly
+to coding-report.md.
+
+**Handoff protocol:** identical to the espalier skill's "Stage 4 → Stage 5
+handoff" — Step-1 single-bash with no agent in flight (detector on the
+part file, then PASS: guarded append to coding-report.md + delete the part
+file + the drift parse; FAIL/ESCALATION: quarantine the listed files to
+`espalier/changes/fix/{slug}/.speculative-tests/` with the part file
+beside them); Step-2 completion spawn ALONE in its message after the final
+PASS (contract phase and/or restore-reconcile — one spawn, never two);
+Step-3 Stage 6 alone. Same round accounting (Stage 5 actions never
+increment `max-test-rounds`) and the same crash-recovery rules, including
+the unattended posture: never hang on the no-list orphan case — set
+`- Status: ESCALATED` with the candidate list recorded and stop.
+
+The Stage 5 escalation detector runs at Step 1 on EVERY path (the signal
+describes the fix's testability, which survives any discard):
+
 ```bash
-COD="espalier/changes/fix/${SLUG}/coding-report.md"
-if grep -q "^- TEST_SCOPE_INFLATION: true" "$COD"; then
+PART="espalier/changes/fix/${SLUG}/coding-report.part-test.md"
+if grep -q "^- TEST_SCOPE_INFLATION: true" "$PART" 2>/dev/null; then
   echo "LATE_ESCALATION_GATE: stage=5 (test scope inflation)"
 fi
 ```
 
-A `LATE_ESCALATION_GATE:` line on stdout means STOP and run the
-"Stage 5/6 Late-Escalation Prompt" (below) with that stage's context. The
-prompt is an `AskUserQuestion` the orchestrator issues — a human gate, not a
-shell helper; the bash above only detects, it never prompts.
+(With `speculative-tests: off` the signal lands in coding-report.md — grep
+that instead, exactly as pre-v0.22.) A `LATE_ESCALATION_GATE:` line on
+stdout means STOP and run the "Stage 5/6 Late-Escalation Prompt" (below)
+with that stage's context. The prompt is an `AskUserQuestion` the
+orchestrator issues — a human gate, not a shell helper; the bash above only
+detects, it never prompts.
 
 ### Stage 5 regression verification (PROGRAMMATIC — proves the test earns its keep)
+
+**When:** after the LAST test-writing spawn has returned, with the test
+files in their final in-tree locations — NEVER in the same message as a
+test-writing spawn (a verification racing a rewrite certifies the wrong
+tree). Happy path: inside the Step-1 bash right after the part append; any
+fix round: after the Step-2 restore/reconcile spawn; contract-phase-only:
+after the contract spawn (uniform rather than clever — the contract spawn
+does not touch the regression test, but one rule beats two).
 
 A regression test that passes on BOTH the fixed and the pre-fix code proves
 nothing — and a test that merely ERRORS at `Base-Ref` (missing deps in a fresh
@@ -946,6 +1011,9 @@ REVIEW: tests added in coding-report.md at espalier/changes/fix/{slug}/.
 CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
 ROUND: {n} — put round={n} in your VERDICT sentinel line.
+{On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the Stage 5
+fix re-spawn touched, from the latest coding-report.md}. Re-review in delta
+scope per your "Re-review Rounds" section.
 
 Check:
 - Regression test would have failed on pre-fix code. The orchestrator recorded
@@ -1027,7 +1095,11 @@ never written, nothing to stage.)
 
 Standard push. Then:
 
-> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no `fix/` prefix), and the per-entry `CAUSING_SLUG` / `CAUSING_ROLE` / `CAUSING_LOOKUP` parsed from each `caused_by:` block in this fix's `requirements.md`. The orchestrator sets these before executing.
+> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
+> `fix/` prefix). Per-entry `caused_by` fields are passed as FUNCTION
+> ARGUMENTS in 7.2. Run 7.0 + 7.1 + 7.2 (and the cache self-heal) as ONE
+> bash invocation — the per-entry body is a function, so the whole Stage 7
+> bookkeeping costs one round-trip with byte-identical file effects.
 
 ### 7.1 Record own commit
 
@@ -1044,48 +1116,47 @@ Iterate each entry in this fix's `caused_by:` YAML list (in `requirements.md` fr
 - `slug` ∈ {`unknown`, `unknown_squash`} — no destination to write
 - entry is a `- note:` overflow marker (no `slug` key at all)
 
-For each remaining entry, run the block below with `CAUSING_SLUG`, `CAUSING_ROLE`, `CAUSING_LOOKUP` bound to that entry's fields.
-
-The orchestrator (Claude) reads the YAML, extracts each entry's fields, and executes the snippet per entry. Pseudocode-shape iteration:
-
-```
-for entry in parsed_yaml["caused_by"]:
-    if "slug" not in entry: continue                       # note: overflow
-    if entry["slug"] in ("unknown", "unknown_squash"): continue
-    CAUSING_SLUG  = entry["slug"]
-    CAUSING_ROLE  = entry["role"]
-    CAUSING_LOOKUP = entry["lookup"]
-    # then execute the bash block below
-```
+The orchestrator (Claude) reads the YAML, extracts each entry's fields, and
+calls the FUNCTION below once per remaining entry — all inside the SAME bash
+invocation as 7.0/7.1 (early-outs are `return 0`, safe inside a function;
+the old one-invocation-per-entry contract existed only because a top-level
+`exit 0` would kill a shared script and a bare `continue` outside a loop
+falls through). One invocation, byte-identical file effects, fewer
+round-trips:
 
 ```bash
-# This block runs ONCE PER ENTRY as its own bash invocation (the loop lives in
-# the orchestrator, above) — so early-outs are `exit 0`, never `continue`
-# (bare `continue` outside a loop is a no-op warning and execution falls through).
-CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
-[ ! -f "$CAUSING_STATE" ] && exit 0
+_backlink_one() {  # $1=CAUSING_SLUG  $2=CAUSING_ROLE  $3=CAUSING_LOOKUP
+  local CAUSING_SLUG="$1" CAUSING_ROLE="$2" CAUSING_LOOKUP="$3"
+  local CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
+  [ ! -f "$CAUSING_STATE" ] && return 0
 
-# Ensure section exists (schema: Role + Lookup columns)
-if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
-  cat >> "$CAUSING_STATE" << 'EOF'
+  # Ensure section exists (schema: Role + Lookup columns)
+  if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
+    cat >> "$CAUSING_STATE" << 'EOF'
 
 ## Follow-up Fixes
 | Fix Slug | Role | Lookup | Reason | Date |
 |----------|------|--------|--------|------|
 EOF
-fi
+  fi
 
-# Idempotency: own slug + role together (same slug can legitimately appear as primary and call_path in different fixes)
-OWN_SLUG="fix/${SLUG}"
-if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
-  exit 0
-fi
+  # Idempotency: own slug + role together (same slug can legitimately appear
+  # as primary and call_path in different fixes)
+  local OWN_SLUG="fix/${SLUG}"
+  if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
+    return 0
+  fi
 
-# The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
-REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
-[ -z "$REASON" ] && REASON="fix/${SLUG}"
-DATE=$(date -u +%Y-%m-%d)
-echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $DATE |" >> "$CAUSING_STATE"
+  # The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
+  local REASON
+  REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
+  [ -z "$REASON" ] && REASON="fix/${SLUG}"
+  echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $(date -u +%Y-%m-%d) |" >> "$CAUSING_STATE"
+}
+
+# One call per parsed entry (slug, role, lookup) — e.g.:
+#   _backlink_one "feat/2026-01-02-auth" "primary"   "exact"
+#   _backlink_one "feat/2026-01-05-log"  "call_path" "squash_hook"
 ```
 
 ## Escalation Gates
