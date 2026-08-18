@@ -1,7 +1,10 @@
 # Pipeline Speed Plan v2 (v0.22.0)
 
-> **Status:** Draft v2, decisions resolved — ready to implement on the
-> owner's go.
+> **Status:** IMPLEMENTED on branch `feat/v0.22-pipeline-speed`
+> (2026-08-18) — all eight tracks, migration #30, migrate-skill chain,
+> version bumps, changelog; suites green (bootstrap 270/270, hooks
+> 159/159). Remaining before release: eval re-runs (§12.3), manual smoke
+> (§12.4), merge + tag.
 > Revised after a two-agent fresh-eyes review (an adversarial contract
 > check + an independent opportunity scout): Track B redesigned around
 > quarantine-on-FAIL, dispatch-sequencing races removed, fix-lane Stage 5
