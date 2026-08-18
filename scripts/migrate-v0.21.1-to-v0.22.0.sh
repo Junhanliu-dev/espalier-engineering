@@ -84,6 +84,7 @@ CODER_MARK='Speculative & Contract entry points'
 REV_MARK='SPECULATIVE TESTS IN FLIGHT'
 HOOK_PAR_MARK='hook-parallel-gates'
 HOOK_CACHE_MARK='dep-audit-cache'
+HOOK_CERT_MARK='(- )?Reviewed-Diff:'
 SKIPFILE="espalier/.migrations-skipped"
 
 handled() {  # $1 = marker, $2 = file, $3 = skip label
@@ -102,6 +103,7 @@ handled "$REV_MARK"   espalier/agents/harness-reviewer.md reviewer-inflight    |
 handled "$REV_MARK"   espalier/agents/harness-security.md security-inflight    || mark "security in-flight exclusion"
 handled "$HOOK_PAR_MARK"   espalier/hooks/pre-push-gate.sh hook-parallel       || mark "pre-push parallel gate sections"
 handled "$HOOK_CACHE_MARK" espalier/hooks/pre-push-gate.sh hook-audit-cache    || mark "pre-push dependency-audit cache"
+handled "$HOOK_CERT_MARK"  espalier/hooks/pre-push-gate.sh hook-cert-anchor    || mark "pre-push anchored certificate read"
 
 if [ -z "$missing" ]; then
   log "already at v0.22.0 (every marker present). Nothing to do."
@@ -408,6 +410,38 @@ EOF
   fi
 fi
 
+# 2f. pre-push-gate.sh — anchored certificate read (field find: a Stage
+# History note quoting "Base-Ref:"/"Reviewed-Diff:" in prose outranked the
+# real Status-block line via the unanchored last-match, producing a bogus
+# fingerprint and a false BLOCK).
+if ! handled "$HOOK_CERT_MARK" "$GATE" hook-cert-anchor; then
+  C1='REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE"'
+  C2='BASE_REF=$(grep "Base-Ref:" "$STATE_FILE"'
+  if grep -qF -- "$C1" "$GATE" && grep -qF -- "$C2" "$GATE"; then
+    backup_once "$GATE"
+    tmp="$GATE.v022tmp"; cp "$GATE" "$tmp"
+    awk '
+      index($0, "REVIEWED=$(grep \"Reviewed-Diff:\" \"$STATE_FILE\"") {
+        print "  # Anchored to line start (Status-block shape `- Key:` or bare `Key:`): a"
+        print "  # Stage History note QUOTING either token in prose must never outrank the"
+        print "  # real certificate line (v0.22 field find: unanchored last-match produced"
+        print "  # a bogus revision + empty-diff fingerprint and a false BLOCK)."
+        print "  REVIEWED=$(grep -E \x27^(- )?Reviewed-Diff:\x27 \"$STATE_FILE\" | tail -1 | sed \x27s/.*Reviewed-Diff:[[:space:]]*//\x27 | tr -d \x27[:space:]\x27)"
+        next
+      }
+      index($0, "BASE_REF=$(grep \"Base-Ref:\" \"$STATE_FILE\"") {
+        print "  BASE_REF=$(grep -E \x27^(- )?Base-Ref:\x27 \"$STATE_FILE\" | tail -1 | sed \x27s/.*Base-Ref:[[:space:]]*//\x27 | tr -d \x27[:space:]\x27)"
+        next
+      }
+      { print }
+    ' "$tmp" > "$GATE"
+    rm -f "$tmp"
+    log "anchored the pre-push certificate read"
+  else
+    record_skip hook-cert-anchor "$GATE" "the stock Reviewed-Diff/Base-Ref grep lines"
+  fi
+fi
+
 # --- 3. .gitignore append (idempotent + newline guard) -----------------------
 entry="espalier/.dep-audit-cache"
 if ! grep -qxF "$entry" .gitignore 2>/dev/null; then
@@ -431,6 +465,7 @@ handled "$REV_MARK"        espalier/agents/harness-reviewer.md reviewer-inflight
 handled "$REV_MARK"        espalier/agents/harness-security.md security-inflight || die "post-migration verification failed: security lacks '$REV_MARK'"
 handled "$HOOK_PAR_MARK"   "$GATE"                             hook-parallel     || die "post-migration verification failed: gate lacks '$HOOK_PAR_MARK'"
 handled "$HOOK_CACHE_MARK" "$GATE"                             hook-audit-cache  || die "post-migration verification failed: gate lacks '$HOOK_CACHE_MARK'"
+handled "$HOOK_CERT_MARK"  "$GATE"                             hook-cert-anchor  || die "post-migration verification failed: gate lacks the anchored certificate read"
 bash -n "$GATE" || die "post-migration verification failed: pre-push-gate.sh no longer parses (restore from $GATE.pre-v0.22.bak)"
 
 log "done. v0.22.0 applied — backups at <file>.pre-v0.22.bak."

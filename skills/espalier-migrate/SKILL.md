@@ -323,7 +323,10 @@ version. Up to THIRTY migrations may apply, always in this order:
    coder's Speculative/Contract entry points, the reviewer's and the
    security agent's in-flight exclusion paragraphs, and
    `pre-push-gate.sh`'s opt-in parallel gate sections + dependency-audit
-   cache (span-splice; `bash -n` verified after) — customised files are
+   cache (span-splice; `bash -n` verified after) + its ANCHORED
+   certificate read (a Stage History note quoting `Base-Ref:` /
+   `Reviewed-Diff:` in prose must never outrank the real Status-block
+   line — a field-found false-BLOCK) — customised files are
    skipped with a `.migrations-skipped` record, never mangled. Appends
    `espalier/.dep-audit-cache` to `.gitignore`. Writes NO config keys:
    `speculative-tests` defaults on when absent; `hook-parallel-gates`
@@ -785,7 +788,8 @@ elif [ -d "espalier" ]; then
      || ! ok220 'SPECULATIVE TESTS IN FLIGHT' espalier/agents/harness-reviewer.md reviewer-inflight \
      || ! ok220 'SPECULATIVE TESTS IN FLIGHT' espalier/agents/harness-security.md security-inflight \
      || ! ok220 'hook-parallel-gates' espalier/hooks/pre-push-gate.sh hook-parallel \
-     || ! ok220 'dep-audit-cache' espalier/hooks/pre-push-gate.sh hook-audit-cache; then
+     || ! ok220 'dep-audit-cache' espalier/hooks/pre-push-gate.sh hook-audit-cache \
+     || ! ok220 '(- )?Reviewed-Diff:' espalier/hooks/pre-push-gate.sh hook-cert-anchor; then
     NEEDS_V0220_PATCH=yes
   fi
 fi

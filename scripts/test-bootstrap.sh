@@ -1358,6 +1358,10 @@ elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
   $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: govulncheck (non-blocking)." >&2
 fi
 
+STATE_FILE=stub
+REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
+BASE_REF=$(grep "Base-Ref:" "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+
 # The three {command} placeholders below were substituted from
 # DISCOVERY.ci_checks at init.
 run_build() {
@@ -1397,7 +1401,8 @@ assert "30l migrated hook parses + carries both hook markers + switched guards" 
    && grep -qF 'hook-parallel-gates' '$TMP/espalier/hooks/pre-push-gate.sh' \
    && grep -qF 'dep-audit-cache' '$TMP/espalier/hooks/pre-push-gate.sh' \
    && [ \"\$(grep -c 'HOOK_PARALLEL' '$TMP/espalier/hooks/pre-push-gate.sh')\" -ge 5 ] \
-   && grep -qF 'gate_parallel_section' '$TMP/espalier/hooks/pre-push-gate.sh'"
+   && grep -qF 'gate_parallel_section' '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && grep -qF -- '(- )?Reviewed-Diff:' '$TMP/espalier/hooks/pre-push-gate.sh'"
 M22_RERUN=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "30m re-run is a no-op" "echo \"\$M22_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"

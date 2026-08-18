@@ -112,8 +112,12 @@ fi
 REVIEWED=""
 BASE_REF=""
 if [ "$PIPELINE_TRACKED" = "yes" ]; then
-  REVIEWED=$(grep "Reviewed-Diff:" "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
-  BASE_REF=$(grep "Base-Ref:" "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+  # Anchored to line start (Status-block shape `- Key:` or bare `Key:`): a
+  # Stage History note QUOTING either token in prose must never outrank the
+  # real certificate line — an unanchored last-match once produced a bogus
+  # revision + empty-diff fingerprint and a false BLOCK (v0.22 field find).
+  REVIEWED=$(grep -E '^(- )?Reviewed-Diff:' "$STATE_FILE" | tail -1 | sed 's/.*Reviewed-Diff:[[:space:]]*//' | tr -d '[:space:]')
+  BASE_REF=$(grep -E '^(- )?Base-Ref:' "$STATE_FILE" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
   if [ -n "$REVIEWED" ] && [ -n "$BASE_REF" ]; then
     CURRENT=$(git diff "$BASE_REF" -- . ':(exclude)espalier/' | git hash-object --stdin)
     if [ "$CURRENT" != "$REVIEWED" ]; then

@@ -391,7 +391,29 @@ T5P_RC=$?
 assert "T5p Stage-4-PASSED without certificate fails closed (exit 2)" "[ $T5P_RC -eq 2 ]"
 assert "T5p2 missing-certificate block on stderr" "grep -q 'review certificate is missing' '$TMP8/err.txt'"
 
-[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8"
+# T5q: certificate read is ANCHORED — a Stage History note quoting
+# "Base-Ref:"/"Reviewed-Diff:" in prose must not outrank the real Status-block
+# lines (v0.22 field find: unanchored last-match produced a bogus revision +
+# empty-diff fingerprint and a false BLOCK on a correctly certified change).
+TMP9=$(mktemp -d -t hooks-t5q.XXXX)
+make_repo "$TMP9"
+install_hooks "$TMP9"
+make_gate "$TMP9" "echo '3 passed'"
+T5Q_BASE=$(cd "$TMP9" && git rev-parse HEAD)
+echo change > "$TMP9/work.txt"
+( cd "$TMP9" && git add -A && git -c user.email=t@t -c user.name=t commit -q -m "fix change" )
+T5Q_FP=$(cd "$TMP9" && git diff "$T5Q_BASE" -- . ':(exclude)espalier/' | git hash-object --stdin)
+state_file "$TMP9" fix 2026-01-01-prose 7 IN_PROGRESS
+{
+  printf -- '- Base-Ref: %s\n- Reviewed-Diff: %s\n' "$T5Q_BASE" "$T5Q_FP"
+  printf '| 0 | PASSED | 2026-01-01T10:00:00Z | rejected a Layer 1 match anchored at Base-Ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef (prose quote, not the certificate) |\n'
+} >> "$TMP9/espalier/changes/fix/2026-01-01-prose/pipeline-state.md"
+( cd "$TMP9" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP9/err.txt" )
+T5Q_RC=$?
+assert "T5q prose-quoted anchor token never outranks the real certificate (exit 0)" \
+  "[ $T5Q_RC -eq 0 ] && ! grep -q 'Reviewed-Diff mismatch' '$TMP9/err.txt'"
+
+[ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3" "$TMP4" "$TMP5" "$TMP6" "$TMP7" "$TMP8" "$TMP9"
 
 # ─── T6: drift-helpers basics ──────────────────────────────────────────────
 echo "T6: drift-helpers"

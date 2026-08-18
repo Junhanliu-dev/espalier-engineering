@@ -64,12 +64,27 @@ recorded inside).
   byte-equivalent). The WARN-only dependency audit caches per
   manifest+lockfile hash with a TTL (`dep-audit-ttl-days`, default 7) in
   gitignored `espalier/.dep-audit-cache`.
+- **Fix (field-found by the release's live smoke): anchored pre-push
+  certificate read.** The hook's `Base-Ref:`/`Reviewed-Diff:` greps were
+  unanchored last-match, so a Stage History note QUOTING either token in
+  prose could outrank the real Status-block line — bogus revision,
+  empty-diff fingerprint, false BLOCK on a correctly certified change.
+  Now anchored to the line-start `- Key:`/`Key:` shapes (fail-closed
+  direction preserved; regression test T5q).
+- **Known issue (pre-existing, documented — not a v0.22 regression):** the
+  `eval/security` FP gate fails under today's model AT BASELINE too
+  (v0.21.1 templates: 2 FPs incl. a clean-fixture mismatch; last held
+  FP=0 on 2026-07-08 under that era's model). Catch-rate is 1.00 in every
+  run on both template versions; the counted "false positives" are the
+  judge double-counting axis-sliced findings of the SAME planted defect.
+  Needs a judge-collapse/fixture recalibration pass — see
+  `eval/security/KNOWN-ISSUES.md` and `docs/deferred-items.md`.
 - Migration #30: `scripts/migrate-v0.21.1-to-v0.22.0.sh` — refreshes 4
   pure-copy surfaces (backups `.pre-v0.22.bak`); anchored edits into the 4
   substituted per-project files including a span-splice of the hook's
-  audit block (`bash -n` verified after; customised files
-  skip-with-record); appends the audit-cache gitignore entry; writes no
-  config keys.
+  audit block and the anchored certificate read (`bash -n` verified
+  after; customised files skip-with-record); appends the audit-cache
+  gitignore entry; writes no config keys.
 
 ## 0.21.1 — 2026-08-17
 
