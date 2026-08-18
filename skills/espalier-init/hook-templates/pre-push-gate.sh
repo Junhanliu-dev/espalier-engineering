@@ -194,16 +194,55 @@ fi
 # Dependency audit — WARN only, per available tool for the detected stack. Wrapped
 # in a timeout when available so a slow / offline advisory fetch can't hang the
 # push; a nonzero exit may mean vulnerabilities OR a tool/network error (never blocks).
-command -v timeout >/dev/null 2>&1 && _to="timeout 45" || _to=""
-if   [ -f package.json ] && command -v npm >/dev/null 2>&1; then
-  $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || echo "WARNING: 'npm audit' flagged high-severity advisories or errored (non-blocking)." >&2
-elif { [ -f pyproject.toml ] || [ -f requirements.txt ]; } && command -v pip-audit >/dev/null 2>&1; then
-  $_to pip-audit >/dev/null 2>&1 || echo "WARNING: 'pip-audit' flagged vulnerable dependencies or errored (non-blocking)." >&2
-elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
-  $_to govulncheck ./... >/dev/null 2>&1 || echo "WARNING: 'govulncheck' flagged vulnerabilities or errored (non-blocking)." >&2
-elif [ -f Cargo.toml ] && command -v cargo-audit >/dev/null 2>&1; then
-  $_to cargo audit >/dev/null 2>&1 || echo "WARNING: 'cargo audit' flagged vulnerable crates or errored (non-blocking)." >&2
+# Cached per lockfile hash (gitignored espalier/.dep-audit-cache) with a TTL
+# (dep-audit-ttl-days, default 7): the audit never blocks, so replaying a cached
+# warning weakens no gate — a new dependency changes the lockfile and forces a
+# fresh run; the TTL bounds staleness for newly published advisories.
+AUDIT_CACHE="espalier/.dep-audit-cache"
+_lock_hash=$( { cat package.json package-lock.json pnpm-lock.yaml yarn.lock pyproject.toml poetry.lock uv.lock requirements.txt go.mod go.sum Cargo.toml Cargo.lock 2>/dev/null; } | git hash-object --stdin 2>/dev/null )
+_audit_should_run() {
+  [ -z "$_lock_hash" ] && return 0   # nothing to key on — run as before
+  _ttl_days=$(grep '^dep-audit-ttl-days:' espalier/.espalier-config 2>/dev/null | grep -oE '[0-9]+' | head -1)
+  [ -z "$_ttl_days" ] && _ttl_days=7
+  if [ -f "$AUDIT_CACHE" ]; then
+    _c_hash=$(head -1 "$AUDIT_CACHE" | cut -d' ' -f1)
+    _c_epoch=$(head -1 "$AUDIT_CACHE" | cut -d' ' -f2)
+    case "$_c_epoch" in ''|*[!0-9]*) return 0 ;; esac
+    if [ "$_c_hash" = "$_lock_hash" ] \
+       && [ $(( $(date +%s) - _c_epoch )) -lt $(( _ttl_days * 86400 )) ]; then
+      _c_msg=$(head -1 "$AUDIT_CACHE" | cut -d' ' -f3-)
+      [ -n "$_c_msg" ] && echo "WARNING (cached): $_c_msg" >&2
+      return 1
+    fi
+  fi
+  return 0
+}
+_audit_record() {  # $1 = warning message ("" = clean)
+  [ -n "$_lock_hash" ] && echo "$_lock_hash $(date +%s) $1" > "$AUDIT_CACHE" 2>/dev/null || true
+}
+if _audit_should_run; then
+  command -v timeout >/dev/null 2>&1 && _to="timeout 45" || _to=""
+  _audit_msg=""
+  if   [ -f package.json ] && command -v npm >/dev/null 2>&1; then
+    $_to npm audit --omit=dev --audit-level=high >/dev/null 2>&1 || _audit_msg="'npm audit' flagged high-severity advisories or errored (non-blocking)."
+  elif { [ -f pyproject.toml ] || [ -f requirements.txt ]; } && command -v pip-audit >/dev/null 2>&1; then
+    $_to pip-audit >/dev/null 2>&1 || _audit_msg="'pip-audit' flagged vulnerable dependencies or errored (non-blocking)."
+  elif [ -f go.mod ] && command -v govulncheck >/dev/null 2>&1; then
+    $_to govulncheck ./... >/dev/null 2>&1 || _audit_msg="'govulncheck' flagged vulnerabilities or errored (non-blocking)."
+  elif [ -f Cargo.toml ] && command -v cargo-audit >/dev/null 2>&1; then
+    $_to cargo audit >/dev/null 2>&1 || _audit_msg="'cargo audit' flagged vulnerable crates or errored (non-blocking)."
+  fi
+  [ -n "$_audit_msg" ] && echo "WARNING: $_audit_msg" >&2
+  _audit_record "$_audit_msg"
 fi
+
+# Parallel gate mode (opt-in): `hook-parallel-gates: yes` in
+# espalier/.espalier-config runs build/lint/tests as concurrent jobs
+# (sum → max wall-clock). The key is written at init only when discovery
+# judged the three commands independent AND the human confirmed. Every check
+# still runs and still blocks on failure — only the overlap changes. Key
+# absent (the default): the serial sections below run exactly as before.
+HOOK_PARALLEL=$(grep '^hook-parallel-gates:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
 
 # The three {command} placeholders below were substituted from
 # DISCOVERY.ci_checks at init. A kind the repo did not have (null) was
@@ -234,7 +273,7 @@ gate_build_section() {
     exit 2
   fi
 }
-if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_build_section; fi
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_build_section; fi
 
 # Run lint check
 run_lint() {
@@ -250,7 +289,7 @@ gate_lint_section() {
     exit 2
   fi
 }
-if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_lint_section; fi
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_lint_section; fi
 
 # Run tests and check count. Runners word their counts differently —
 # jest/pytest/cargo "N passed", mocha "N passing", rspec "N examples",
@@ -292,7 +331,52 @@ gate_tests_section() {
     exit 2
   fi
 }
-if [ "${PIPELINE_TRACKED:-yes}" = "yes" ]; then gate_tests_section; fi
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_tests_section; fi
+
+# Parallel gate execution (hook-parallel-gates: yes) — the SAME three checks
+# with the SAME messages and the same exit-2 blocking; build/lint/tests
+# overlap instead of queue. Failures report in the serial order (build first)
+# so multi-failure output stays deterministic. bash-3.2 safe: per-pid `wait`
+# (no `wait -n`), per-job temp-file output.
+gate_parallel_section() {
+  _pb=$(mktemp); _pl=$(mktemp); _pt=$(mktemp)
+  run_build  > "$_pb" 2>&1 & _pid_b=$!
+  run_lint   > "$_pl" 2>&1 & _pid_l=$!
+  run_tests  > "$_pt" 2>&1 & _pid_t=$!
+  wait "$_pid_b"; _rc_b=$?
+  wait "$_pid_l"; _rc_l=$?
+  wait "$_pid_t"; _rc_t=$?
+  if [ "$_rc_b" -ne 0 ]; then
+    { echo "BLOCKED: Build fails"; tail -20 "$_pb"; } >&2
+    rm -f "$_pb" "$_pl" "$_pt"; exit 2
+  fi
+  if [ "$_rc_l" -ne 0 ]; then
+    { echo "BLOCKED: Lint fails"; tail -20 "$_pl"; } >&2
+    rm -f "$_pb" "$_pl" "$_pt"; exit 2
+  fi
+  TEST_OUTPUT=$(cat "$_pt")
+  rm -f "$_pb" "$_pl" "$_pt"
+  if [ "$_rc_t" -ne 0 ]; then
+    { echo "BLOCKED: Tests fail"; printf '%s\n' "$TEST_OUTPUT" | tail -20; } >&2
+    exit 2
+  fi
+  # Same count-parse as gate_tests_section (kept in lockstep).
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  if [ -z "$TEST_COUNT" ]; then
+    _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
+    [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok
+  fi
+  if [ -z "$TEST_COUNT" ]; then
+    {
+      echo "WARNING: could not parse a test count from the runner output (unrecognized format)."
+      echo "         Exit code 0 accepted; the total_tests>0 check was skipped this push."
+    } >&2
+  elif [ "$TEST_COUNT" -eq 0 ]; then
+    echo "BLOCKED: No tests found (total_tests must be > 0)" >&2
+    exit 2
+  fi
+}
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" = "yes" ]; then gate_parallel_section; fi
 
 echo "All gates passed. Push allowed."
 exit 0
