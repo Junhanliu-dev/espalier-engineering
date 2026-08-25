@@ -350,8 +350,9 @@ if ! handled "$REV_MARK" "$REV" reviewer-fold; then
   R2_END='8. Produce findings in the required format'
   R3_START='## Security Abuse-Test Coverage (Stage 6 — test review)'
   R3_END='coverage, not a suggestion.'
-  if grep -qF -- "$R1_START" "$REV" && grep -qF -- "$R2_START" "$REV" \
-     && grep -qF -- "$R3_START" "$REV"; then
+  if grep -qF -- "$R1_START" "$REV" && grep -qF -- "$R1_END" "$REV" \
+     && grep -qF -- "$R2_START" "$REV" && grep -qF -- "$R2_END" "$REV" \
+     && grep -qF -- "$R3_START" "$REV" && grep -qF -- "$R3_END" "$REV"; then
     printf '' > "$BLK"
     span_replace "$REV" "$R1_START" "$R1_END"
     cat > "$BLK" << 'EOF'
@@ -443,7 +444,8 @@ if ! handled "$SEC_MARK" "$SEC" security-fold; then
   S1_START='If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing'
   S1_END='sinks) is unchanged.'
   S2_LINE='### Abuse-Test Contract (Stage 5 must satisfy, Stage 6 enforces)'
-  if grep -qF -- "$S1_START" "$SEC" && grep -qF -- "$S2_LINE" "$SEC"; then
+  if grep -qF -- "$S1_START" "$SEC" && grep -qF -- "$S1_END" "$SEC" \
+     && grep -qF -- "$S2_LINE" "$SEC"; then
     cat > "$BLK" << 'EOF'
 Test files in the diff are in scope for secrets, live-endpoint calls, and
 fixture-data leakage ONLY — a test hard-coding a real credential, hitting a

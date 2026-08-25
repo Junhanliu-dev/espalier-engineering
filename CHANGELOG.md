@@ -76,7 +76,12 @@ the claim-by-claim code review that reshaped it).
   status labels; `rebuild-commit-index.sh`'s squash-SHA extraction drops
   its awk interval regex — mawk (the Debian/Ubuntu default awk) matched
   it but set RLENGTH to the interval minimum, truncating every indexed
-  squash SHA to 7 chars on those hosts.
+  squash SHA to 7 chars on those hosts; migration #32's reviewer and
+  security span edits now require their END anchors too before cutting —
+  found live on a field install whose customised reviewer renumbers the
+  process steps: the START anchors matched, the END never did, and the
+  span swallowed the file to EOF (backup + skip-with-record made it
+  recoverable; the gate now skips such files up front).
 - Migration #32: `scripts/migrate-v0.22.1-to-v0.23.0.sh` — refreshes 10
   pure-copy files (backups `.pre-v0.23.bak`) and anchored-edits the 3
   agent files, 2 rules files, 2 substituted SKILLs, and

@@ -24,6 +24,8 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
   - **Trigger to revisit**: eval parity under the candidate model across coder/review/security suites, with `--model` pinned everywhere headless (a fable-default headless run safeguard-refuses agentic prompts).
 - **maprun Spawned-Changes COMPLETE flip.** Workers stop at Stage 6 and the master never updates map.md at merge, so Spawned-Changes rows stay stale for maprun-built maps (pre-existing; surfaced by the v0.23 digest review). Natural home: the master's merge/completion step.
   - **Trigger to revisit**: a BUILT-map offer that never fires on a maprun-built map, or the first user report of stale Spawned-Changes rows.
+- **Migration #23 (v0.15→v0.16) is order-broken for pre-v0.18 installs under the current plugin.** Its Step 3 `bootstrap --wire-only` runs the CURRENT validator, whose checks 59-62 (map skill/guard, maprun skill/engine) fail on an install that has not yet run migrations #25/#26 — the chain dies at its own first step. Field workaround (2026-08-25, portal.cneaustralia): run #25 and #26 first (they install the current pure-copy lanes), then #23/#24, then #27+ — every script is marker-guarded so the reorder is safe. Proper fix: #23 pre-seeds missing pure-copy skills from templates (write-if-absent) before wiring, or wire-only validation renders not-yet-migrated lane checks as pending-skips.
+  - **Trigger to revisit**: the next pre-v0.18 install that needs migrating, or the next release that touches migration #23 / the wire-only validator.
 
 ## Items deferred (acceptable as-is for v0.2.0)
 
