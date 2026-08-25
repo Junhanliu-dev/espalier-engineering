@@ -48,10 +48,17 @@ find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md 2>/dev/nul
     }
 
     in_squash && /squashed_to:/ {
-      where = match($0, /[a-f0-9]{7,40}/)
-      if (where) {
-        sha = substr($0, RSTART, RLENGTH)
-        print sha "\t" slug "\tsquashed_to\t" now
+      # No interval regex here: mawk (Debian/Ubuntu default awk) matches
+      # /[a-f0-9]{7,40}/ but sets RLENGTH to the interval minimum, silently
+      # truncating every squash SHA to 7 chars. Split on non-hex runs and
+      # take the first hex run long enough to be a SHA instead.
+      n = split($0, cols, /[^a-f0-9]+/)
+      for (i = 1; i <= n; i++) {
+        if (length(cols[i]) >= 7) {
+          sha = substr(cols[i], 1, 40)
+          print sha "\t" slug "\tsquashed_to\t" now
+          break
+        }
       }
     }
   ' "$f"

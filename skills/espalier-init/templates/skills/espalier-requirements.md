@@ -55,8 +55,8 @@ Rule: Each sub-task should touch ≤ 5 files. If more, decompose further.
    `espalier-grill` skill in `spec` mode on the draft. Grill interrogates the
    requirement (adaptive depth — it may skip a crisp one) and writes resolved
    decisions into the Acceptance Criteria and Scope Definition sections above.
-   Record its verdict (`GRILLED` / `SKIPPED: <reason>`) — the orchestrator logs
-   it to pipeline-state.md.
+   Record its verdict (`GRILLED (light)` / `GRILLED (full)` /
+   `SKIPPED: <reason>`) — the orchestrator logs it to pipeline-state.md.
 
 ## Anti-Patterns
 - NEVER start coding without acceptance criteria

@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.15.0</span>
+      <span class="nav-pill">v0.23.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1146,7 +1146,7 @@ footer {
       <div class="hero-text">
         <div class="eyebrow">
           <span class="eyebrow-dot"></span>
-          v0.8.0 — requirements approval gate
+          v0.23.0 — round economy
         </div>
         <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
         <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
@@ -1524,6 +1524,7 @@ footer {
 <span class="tree-row" data-key="wiki">├── wiki/                   <span class="gloss"># architecture, data models, critical paths</span></span>
 <span class="tree-row" data-key="hooks">├── hooks/                  <span class="gloss"># layer boundary, pre-push, post-merge drift</span></span>
 <span class="tree-row" data-key="pipeline">├── pipeline.md             <span class="gloss"># 10-stage workflow with gates &amp; rollback</span></span>
+<span class="tree-row" data-key="maps">├── maps/                   <span class="gloss"># decision maps — tickets, fog, findings digests</span></span>
 <span class="tree-row" data-key="changes">└── changes/                <span class="gloss"># feat/, fix/, refactor/, docs/ — one dir per req</span></span>
       </div>
 
@@ -1554,7 +1555,7 @@ footer {
           <div class="pipe-cmd">/espalier <span class="arg">&lt;requirement&gt;</span></div>
           <div class="pipe-title" style="margin-top:8px">Full 10-stage pipeline</div>
         </div>
-        <div class="pipe-desc">For features, refactors, and large fixes. Requirement → reqs review → coding (sub-agent) → code review (different sub-agent) → tests → test review → push → CI verify → deploy verify → user confirmation.</div>
+        <div class="pipe-desc">For features, refactors, and large fixes. Requirement → reqs review → coding <em>with tests</em> (sub-agent) → two-agent panel review of code + tests → security contract phase (or SKIPPED on a non-sensitive change) → push → CI verify → deploy verify → user confirmation. <code style="font-family:var(--f-mono);color:var(--vine);font-size:13px">test-mode: serial</code> restores the pre-fold flow.</div>
       </div>
       <div class="pipe-stages">
         <svg viewBox="0 0 1000 140" xmlns="http://www.w3.org/2000/svg">
@@ -1577,24 +1578,25 @@ footer {
             <g transform="translate(260,70)">
               <circle r="5" fill="#c9a961"/>
               <text y="-12" fill="#c9a961">03</text>
-              <text y="20" fill="#e8e4d8">coding</text>
+              <text y="20" fill="#e8e4d8">code + tests</text>
               <text y="32" font-size="7" fill="#8fb288">sub-agent</text>
             </g>
             <g transform="translate(350,70)">
               <circle r="5" fill="#c9a961"/>
               <text y="-12" fill="#c9a961">04</text>
-              <text y="20" fill="#e8e4d8">code review</text>
-              <text y="32" font-size="7" fill="#8fb288">different agent</text>
+              <text y="20" fill="#e8e4d8">panel review</text>
+              <text y="32" font-size="7" fill="#8fb288">2 agents, code + tests</text>
             </g>
             <g transform="translate(440,70)">
               <circle r="5" fill="#c9a961"/>
               <text y="-12" fill="#c9a961">05</text>
-              <text y="20" fill="#e8e4d8">tests</text>
+              <text y="20" fill="#e8e4d8">contract</text>
+              <text y="32" font-size="7" fill="#8fb288">abuse tests · or SKIPPED</text>
             </g>
             <g transform="translate(530,70)">
               <circle r="5" fill="#c9a961"/>
               <text y="-12" fill="#c9a961">06</text>
-              <text y="20" fill="#e8e4d8">test review</text>
+              <text y="20" fill="#e8e4d8">delta review</text>
             </g>
             <g transform="translate(620,70)">
               <circle r="5" fill="#c9a961"/>
@@ -1626,9 +1628,9 @@ footer {
       <div class="pipe-head">
         <div>
           <div class="pipe-cmd">/espalier-fix <span class="arg">&lt;bug&gt;</span></div>
-          <div class="pipe-title" style="margin-top:8px">5-stage bug-fix lane</div>
+          <div class="pipe-title" style="margin-top:8px">7-stage bug-fix lane</div>
         </div>
-        <div class="pipe-desc">Slimmer than the full pipeline. Stage 0 auto-link discovery walks <code style="font-family:var(--f-mono);color:var(--vine);font-size:13px">git blame</code> + reverse-lookup cache + squash-merge mapping to bind the fix back to the feature change that caused it.</div>
+        <div class="pipe-desc">Slimmer than the full pipeline — same stage numbering (no Stage 2), so gates and stats read both lanes identically. Stage 0 auto-link discovery walks <code style="font-family:var(--f-mono);color:var(--vine);font-size:13px">git blame</code> + reverse-lookup cache + squash-merge mapping to bind the fix back to the feature change that caused it; the Stage 3 exit gate re-proves the regression test on every coder return.</div>
       </div>
       <div class="pipe-stages">
         <svg viewBox="0 0 1000 140" xmlns="http://www.w3.org/2000/svg">
@@ -1649,24 +1651,27 @@ footer {
             </g>
             <g transform="translate(460,70)">
               <circle r="5" fill="#c9a961"/>
-              <text y="-12" fill="#c9a961">02</text>
-              <text y="20" fill="#e8e4d8">fix</text>
-              <text y="32" font-size="7" fill="#8fb288">sub-agent</text>
+              <text y="-12" fill="#c9a961">03</text>
+              <text y="20" fill="#e8e4d8">fix + tests</text>
+              <text y="32" font-size="7" fill="#8fb288">sub-agent · regression proof</text>
             </g>
             <g transform="translate(630,70)">
               <circle r="5" fill="#c9a961"/>
-              <text y="-12" fill="#c9a961">03</text>
-              <text y="20" fill="#e8e4d8">regression test</text>
+              <text y="-12" fill="#c9a961">04</text>
+              <text y="20" fill="#e8e4d8">panel review</text>
+              <text y="32" font-size="7" fill="#8fb288">2 agents</text>
             </g>
             <g transform="translate(800,70)">
               <circle r="5" fill="#c9a961"/>
-              <text y="-12" fill="#c9a961">04</text>
-              <text y="20" fill="#e8e4d8">push + CI</text>
+              <text y="-12" fill="#c9a961">05/06</text>
+              <text y="20" fill="#e8e4d8">contract</text>
+              <text y="32" font-size="7" fill="#8fb288">or SKIPPED</text>
             </g>
             <g transform="translate(920,70)">
               <circle r="6" fill="#8fb288"/>
-              <text y="-12" fill="#8fb288">05</text>
-              <text y="20" fill="#e8e4d8">confirm</text>
+              <text y="-12" fill="#8fb288">07</text>
+              <text y="20" fill="#e8e4d8">push</text>
+              <text y="32" font-size="7" fill="#8fb288">back-link</text>
             </g>
           </g>
         </svg>
@@ -1745,6 +1750,27 @@ footer {
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.23.0</span> — round economy: the review rounds get cheaper without getting softer. Under <code style="font-family:var(--f-mono);color:var(--vine)">test-mode: folded</code> (the default, both lanes) the coder writes the change&rsquo;s interface and failure-mode tests <em>with</em> the code, the Stage 3 exit gate runs build + lint + the scoped tests on every coder return — the panel never reviews unexecuted tests — and the two-agent Stage 4 panel reviews code and tests in one verdict, with the code in view, where the old Stage 6 test review was code-blind. Stages 5/6 become the security abuse-test contract phase (contract spawn → gate re-run → one delta-scoped review) or plain <code style="font-family:var(--f-mono);color:var(--vine)">SKIPPED</code> rows on a non-sensitive change — zero post-panel spawns on the happy path, stage numbers untouched for every integer consumer (push gate, stats, maprun). A contract-phase fix that touches non-test code routes back to a <em>full</em> panel round. The fix lane moves regression verification into the same exit gate, re-proven on every coder return. The map loop learns from failure: FAIL rounds snapshot one bracketed finding line per agent, charted changes write a findings digest under <code style="font-family:var(--f-mono);color:var(--vine)">espalier/maps/{slug}/findings/</code>, and slice adoption folds the newest P0/P1 patterns into sibling requirements — facts for more scrutiny, never a checklist ceiling. The CLEARED → FILED handoff now scores each slice&rsquo;s crispness with grill&rsquo;s new <code style="font-family:var(--f-mono);color:var(--vine)">mode=score</code>; a would-be-full slice is refused and its fog becomes tickets. <code style="font-family:var(--f-mono);color:var(--vine)">test-mode: serial</code> keeps the pre-fold flow per repo. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.22.0</span> — pipeline speed II: every change is dispatch-order, read-scope, or wait-scheduling — same gates, sentinels, round caps, certificates, and both human checkpoints. The test-writer joined the round-1 review panel speculatively with quarantine-on-FAIL (since retired by v0.23&rsquo;s fold), Stage 6 re-review rounds gained delta scope, and <code style="font-family:var(--f-mono);color:var(--vine)">espalier-stats.sh</code> learned per-stage wall-clock split human-wait / agent-work — the field data the fold decision was designed against. Pre-flight drift signals ride the approval gate instead of their own prompt, deploy targets pre-authorize at that same gate, Stage 8 waits on CI in one chunked watch call, and opt-in <code style="font-family:var(--f-mono);color:var(--vine)">hook-parallel-gates</code> runs the push gate&rsquo;s build/lint/tests concurrently. Field-found fix: the certificate read is line-anchored, so prose quoting a token can never outrank the real Status line. <span style="color:var(--paper)">v0.22.1</span> follows with the comment diet — the default is NO comment, one plain line only for a constraint the code cannot show, always subordinate to the project&rsquo;s own discovered convention.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.21.0</span> — pipeline speed: the redundant reads and redundant human waits removed, nothing about the quality machinery changed. A <em>context pack</em> assembled once at Stage 3 entry replaces the 5–11 per-spawn discovery cold starts (paths and facts only, never conclusions — every agent still reads the named files itself); re-review rounds are delta-scoped (a floor, not a ceiling — the whole-diff verdict duty stands, and the <code style="font-family:var(--f-mono);color:var(--vine)">Reviewed-Diff</code> fingerprint still blocks unreviewed edits at push); disjoint sub-tasks may code in parallel; the approval gate pre-authorizes the Stage 7 push target; grill batches independent light-tier questions. <span style="color:var(--paper)">v0.21.1</span> starts the comment-brevity line.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.20.0</span> — slice PRs: the run lane&rsquo;s work becomes reviewable one ticket at a time, without changing its merge topology (the motivating 14-slice production run ended in a single 103-file integration PR — mergeable, not reviewable). Opt-in per map: each PASSED ticket pushes its branch and opens a PR against the integration branch <em>before</em> the local merge, so the forge closes it as merged on its own — the slice&rsquo;s diff and CI verdict preserved as the review surface; at run completion an assembly PR links every slice PR, and merging it stays a human act. <code style="font-family:var(--f-mono);color:var(--vine)">worker_mode: inline</code> arrives too — the master works tickets in-session with no headless CLI, the one mode a Copilot-only install can use. Plus the shared-config push-block poisoning fix (latent in v0.19, fatal once the master must push).
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.19.0</span> — the run lane: a cleared map executes itself, survivably. <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-maprun</code> drives a map&rsquo;s FILED slices to completion over hours and days — an interactive <em>master</em> pass (reap → halt-on-escalation → relay parked questions → merge → grill-then-dispatch → verify → report, then STOP), up to N headless <em>workers</em> in isolated git worktrees with pushes blocked at git-config level, and disk <em>state</em> beside the map, so a master killed at any instant loses at most the pass it was in. Workers park questions instead of answering them; death diagnosis distinguishes resumable quota exhaustion from real failure; <code style="font-family:var(--f-mono);color:var(--vine)">maprun.py watch</code> is a live TUI dashboard and <code style="font-family:var(--f-mono);color:var(--vine)">feed</code> streams a worker&rsquo;s whole thought process. Field-built inside a real 14-slice production run.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.18.0</span> — the map lane: multi-session planning above the pipeline, and a road into greenfield. <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-map</code> charts an effort too big for one session as a decision map — destination grilled first, one file per ticket (no cross-ticket merge conflicts; claims are the lock), fog tracked explicitly, a 9-open-ticket anti-waterfall cap. <code style="font-family:var(--f-mono);color:var(--vine)">map-guard.sh</code> makes plan-don&rsquo;t-do machine-verified: while a map session is active, writes outside <code style="font-family:var(--f-mono);color:var(--vine)">espalier/maps/</code> are blocked at hook level. A cleared map hands off as FILED change skeletons the pipeline adopts, so the audit chain reads decision → ticket → change → commit; greenfield repos chart first, then bind init&rsquo;s discovery from the decisions. Concept adapted from wayfinder (MIT); the enforcement layer is Espalier&rsquo;s.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.16.0 + v0.17.0</span> — multi-dev maintenance: espalier upkeep becomes team-shaped. A tracked one-line doctor stamp (last-writer-wins, deliberately never union-merged) makes freshness team-wide; convention observations move to file-per-key TSVs, where a concurrent same-key decision surfaces as an ordinary ~5-line git conflict — which <em>is</em> the race detection; a weekly gardener rota runs the ~15-minute doctor → prune → restamp loop as one maintenance PR while everyone else&rsquo;s pre-flight defaults to Proceed; <code style="font-family:var(--f-mono);color:var(--vine)">conv_fold</code> is the single width-tolerant reader over legacy and per-key state (readers shipped before the writer — a v0.16 clone reads v0.17 files fine). Canonical-remote/branch detection, a union merge attribute for ask-gaps, and an optional CODEOWNERS block round out the compatibility floor.
+        </p>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.15.0</span> — Espalier learns Copilot; the wiring layer goes three-platform. <code style="font-family:var(--f-mono);color:var(--vine)">--platforms</code> now takes any subset of claude / codex / copilot. For <em>GitHub Copilot</em>: the 12 skills land as Agent Skills in <code style="font-family:var(--f-mono);color:var(--vine)">.github/skills/</code> (VS Code, Copilot CLI, and the cloud coding agent all read it; invoked <code style="font-family:var(--f-mono);color:var(--vine)">/espalier</code>&hellip;), the always-loaded rules ride a generated <code style="font-family:var(--f-mono);color:var(--vine)">.github/copilot-instructions.md</code> section, coder/reviewer/security separation becomes <code style="font-family:var(--f-mono);color:var(--vine)">@harness-*</code> custom agents, and the two quality gates install as Copilot hooks in <code style="font-family:var(--f-mono);color:var(--vine)">.github/hooks/espalier-gates.json</code> — a small adapter translates Copilot&rsquo;s camelCase payload so the <em>same</em> two wrapper scripts now gate all three platforms (non-zero preToolUse exits fail closed, matching the exit-2 contract). Additive wiring, byte-stable claude-only output. Suites: bootstrap 117/117, hooks 86/86; validation 46/51/56 by platform set. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
@@ -1772,7 +1798,7 @@ footer {
           <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.10.0 → v0.11.0 → v0.12.0 → v0.13.0) in order.
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.21.0 → v0.22.0 → v0.22.1 → v0.23.0) in order.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           New pipeline runs get the loop; in-flight changes are unaffected. <span style="color:var(--paper)">Non-breaking.</span>
@@ -2147,12 +2173,12 @@ footer {
       <div>
         <h4>Migration</h4>
         <ul>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.7-to-v0.8.md">v0.7 → v0.8</a></li>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.6-to-v0.7.md">v0.6 → v0.7</a></li>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.5-to-v0.6.md">v0.5 → v0.6</a></li>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.4-to-v0.5.md">v0.4 → v0.5</a></li>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.3-to-v0.4.md">v0.3 → v0.4</a></li>
-          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.1-to-v0.2.md">v0.1 → v0.2</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.18-to-v0.19.md">v0.18 → v0.19</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.17-to-v0.18.md">v0.17 → v0.18</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.16-to-v0.17.md">v0.16 → v0.17</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.15-to-v0.16.md">v0.15 → v0.16</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.14-to-v0.15.md">v0.14 → v0.15</a></li>
+          <li><a href="https://github.com/Junhanliu-dev/espalier-engineering/blob/main/docs/migrating-v0.13-to-v0.14.md">v0.13 → v0.14</a></li>
         </ul>
       </div>
       <div>
@@ -2167,7 +2193,7 @@ footer {
     </div>
     <div class="footer-bottom">
       <div>© 2026 · Espalier Engineering</div>
-      <div>v0.8.0 — requirements approval gate</div>
+      <div>v0.23.0 — round economy</div>
     </div>
   </div>
 </footer>
@@ -2530,7 +2556,7 @@ const treeData = {
   skills: {
     kind: 'Phase-loaded',
     name: 'espalier/skills/',
-    desc: 'Coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-prune, /espalier-doctor, /espalier-ask, /espalier-audit. Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
+    desc: 'Fifteen skills: coding, review, testing, requirements, /espalier, /espalier-fix, /espalier-map, /espalier-maprun, /espalier-grill, /espalier-ask, /espalier-audit, /espalier-prune, /espalier-doctor… Each skill loads only during the pipeline phase it applies to — keeping context windows tight.',
     loaded: 'Loaded per pipeline phase'
   },
   agents: {
@@ -2554,8 +2580,14 @@ const treeData = {
   pipeline: {
     kind: 'Workflow definition',
     name: 'espalier/pipeline.md',
-    desc: 'The 10-stage workflow with explicit gates and rollback rules. Each stage has pass/fail criteria, retry policy, and an escalation path. Failed gates accumulate into a counter that triggers human review.',
+    desc: 'The 10-stage workflow with explicit gates and rollback rules. Under test-mode: folded (the default) the coder writes tests with the code and Stages 5/6 become the security contract phase — the numbering never moves. Each stage has pass/fail criteria, retry policy, and an escalation path. Failed gates accumulate into a counter that triggers human review.',
     loaded: 'Loaded by /espalier orchestrator'
+  },
+  maps: {
+    kind: 'Multi-session planning',
+    name: 'espalier/maps/',
+    desc: 'Decision maps for efforts too big for one session — map.md as index, one file per ticket, fog tracked explicitly, writes outside the map blocked by hook while charting. A cleared map hands off as FILED change skeletons (each scored for crispness first); /espalier-maprun executes them with headless workers, and per-change findings digests feed failure patterns back to sibling slices.',
+    loaded: 'Charted by /espalier-map'
   },
   changes: {
     kind: 'Typed audit trail',

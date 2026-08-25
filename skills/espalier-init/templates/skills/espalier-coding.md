@@ -4,7 +4,8 @@ description: >-
   How {project} implements features — the per-layer spec map, the
   project-specific implementation checklist, and the lean solution-selection
   rule. Load BEFORE writing any code in {project}; used by harness-coder at
-  Stage 3 (implementation), Stage 5 (testing mode), and on fix rounds.
+  Stage 3 (implementation — including its folded test-writing duty), the
+  contract phase, and on fix rounds.
   Triggers: "implement", "add feature", "write code", "which layer does this
   go in", "layer spec".
 ---
@@ -41,10 +42,12 @@ Specs map and the Implementation Checklist above.
 The layer map above is stage-agnostic; which parts carry the weight changes
 with the context the pipeline loaded this skill in:
 
-- **Stage 3 — implementation.** The whole skill applies: the layer spec for
+- **Stage 3 — implementation (code AND, folded, its tests).** The whole
+  skill applies: the layer spec for
   every layer touched, the full Implementation Checklist, the Solution
   Selection Ladder before choosing the change's shape.
-- **Stage 5 — testing mode.** Layer specs still govern WHERE tests live and
+- **Test writing (Stage 3 folded duty / contract phase / serial test
+  pass).** Layer specs still govern WHERE tests live and
   what naming/structure they follow; the ladder applies to test code too —
   reuse the project's existing test helpers, fixtures, and factories before
   writing new ones, and a new test-only dependency is still a NEW dependency
@@ -52,7 +55,7 @@ with the context the pipeline loaded this skill in:
   tests, failure-mode tests) are canonical in
   `espalier/agents/harness-coder.md` and
   `espalier/skills/espalier-security/SKILL.md`, not here.
-- **Fix rounds — Stage 4/6 re-spawns.** Scope is the findings, nothing else:
+- **Fix rounds — review re-spawns.** Scope is the findings, nothing else:
   re-read only the spec(s) for the layers the fix touches, make the smallest
   convention-compliant change that clears the finding, and never "improve"
   adjacent code the finding didn't name. The checklist applies to what the
@@ -67,4 +70,8 @@ already-installed dependency; NEVER add a new dependency without a
 `requirements.md` line naming it. Build nothing the requirement didn't ask
 for. The full ladder lives in `espalier/agents/harness-coder.md` — it is the
 coder's rule, and the reviewer checks against it (advisory, plus the
-new-dependency and cryptic-public-name gates).
+new-dependency and cryptic-public-name gates). Write it readable as you go:
+named constants over magic values, guard clauses over nesting, small
+intent-named functions — defaults canonical in
+`espalier/agents/harness-coder.md` ("Write It Readable") and
+`espalier/rules/coding-standards.md` ("Readable by Default").

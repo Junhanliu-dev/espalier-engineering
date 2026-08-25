@@ -1272,30 +1272,33 @@ M211_RERUN=$( cd "$TMP" && bash "$MIGRATE211" --yes --plugin-dir="$SCRIPT_DIR/..
 assert "29f re-run is a no-op" "echo \"\$M211_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
-# ─── Test 30: v0.22.0 pipeline speed II — speculative Stage 5, hook gates, migration ──
-echo "Test 30: v0.22.0 pipeline speed II (speculative Stage 5 + hook parallel/cache + migration)"
+# ─── Test 30: v0.22.0 pipeline speed II — hook gates + migration (pure-copy markers now v0.23-folded) ──
+echo "Test 30: v0.22.0 pipeline speed II (hook parallel/cache + migration; folded pure-copies)"
 MIGRATE22="$SCRIPT_DIR/migrate-v0.21.1-to-v0.22.0.sh"
 TMP=$(mktemp -d -t smoke30.XXXX)
 make_smoke_repo "$TMP"
 simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
 
-assert "30a lane skills carry speculative Stage 5 + handoff + quarantine" \
-  "grep -qF 'Stage 4 → Stage 5 handoff' '$TMP/espalier/skills/espalier/SKILL.md' \
-   && grep -qF 'coding-report.part-test.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
-   && grep -qF -- '.speculative-tests/' '$TMP/espalier/skills/espalier/SKILL.md'"
-assert "30b pipeline.md carries speculative trigger + Stage 6 delta + CI wait + Deploy-Target" \
-  "grep -qF 'dispatched SPECULATIVELY' '$TMP/espalier/pipeline.md' \
-   && grep -qF 'changed-since-last-review' '$TMP/espalier/pipeline.md' \
+assert "30a lane skills carry the folded stage contract (v0.23 pure-copies; speculative machinery gone)" \
+  "grep -qF 'Stage 5/6 (folded)' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'Stage 5/6 (folded)' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+   && ! grep -qF 'coding-report.part-test.md' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && ! grep -qF -- '.speculative-tests/' '$TMP/espalier/skills/espalier/SKILL.md'"
+assert "30b pipeline.md carries the folded contract + delta scope + CI wait + Deploy-Target" \
+  "grep -qF 'Contract Phase (folded)' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'delta scope' '$TMP/espalier/pipeline.md' \
    && grep -qF 'Wait protocol' '$TMP/espalier/pipeline.md' \
    && grep -qF 'Deploy-Target' '$TMP/espalier/pipeline.md'"
 assert "30c Stage 6 prompts pass the delta line in both lanes" \
   "grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier/SKILL.md' \
    && grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
-assert "30d agent TEMPLATES carry the v0.22 sections" \
-  "grep -qF 'Speculative & Contract entry points' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
-   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
-   && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md'"
+assert "30d agent TEMPLATES are past the speculative dispatch (v0.23 fold)" \
+  "! grep -qF 'Speculative & Contract entry points' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && grep -qF 'Contract entry point (post-panel dispatch mode)' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
+   && ! grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
+   && ! grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md' \
+   && grep -qF 'fixture-data leakage' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md'"
 assert "30e hook TEMPLATE carries parallel sections + audit cache; installed stats carries durations" \
   "grep -qF 'hook-parallel-gates' '$SCRIPT_DIR/../skills/espalier-init/hook-templates/pre-push-gate.sh' \
    && grep -qF 'dep-audit-cache' '$SCRIPT_DIR/../skills/espalier-init/hook-templates/pre-push-gate.sh' \
@@ -1384,11 +1387,11 @@ exit 0
 V21GATE
 M22_OUT=$( cd "$TMP" && bash "$MIGRATE22" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 M22_RC=$?
-assert "30k apply restores every v0.22 marker + backups" \
+assert "30k apply refreshes pure-copies to the CURRENT (folded) templates + splices agents + backups" \
   "[ $M22_RC -eq 0 ] \
-   && grep -qF 'Stage 4 → Stage 5 handoff' '$TMP/espalier/skills/espalier/SKILL.md' \
-   && grep -qF 'coding-report.part-test.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
-   && grep -qF 'dispatched SPECULATIVELY' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'Stage 5/6 (folded)' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'Stage 5/6 (folded)' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+   && grep -qF 'Contract Phase (folded)' '$TMP/espalier/pipeline.md' \
    && grep -qF 'Stage durations' '$TMP/espalier/hooks/espalier-stats.sh' \
    && grep -qF 'Speculative & Contract entry points' '$TMP/espalier/agents/harness-coder.md' \
    && grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$TMP/espalier/agents/harness-reviewer.md' \
@@ -1473,6 +1476,226 @@ assert "31e reviewer splice preserves the continuation text" \
   "grep -qF 'constraint note where the project' '$TMP/espalier/agents/harness-reviewer.md'"
 M221_RERUN=$( cd "$TMP" && bash "$MIGRATE221" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "31f re-run is a no-op" "echo \"\$M221_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 32: v0.23.0 round economy — the Stage 3/5 fold + migration ──────
+echo "Test 32: v0.23.0 round economy (fold templates + tracks + migration)"
+MIGRATE23="$SCRIPT_DIR/migrate-v0.22.1-to-v0.23.0.sh"
+TPL32="$SCRIPT_DIR/../skills/espalier-init/templates"
+HTPL32="$SCRIPT_DIR/../skills/espalier-init/hook-templates"
+TMP=$(mktemp -d -t smoke32.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "32a lane templates carry the fold (test-mode read, SKIPPED rows, FAIL routing)" \
+  "grep -qF 'test-mode' '$TPL32/skills/espalier.md' \
+   && grep -qF '| 5 | SKIPPED | {ts} | folded: no contract |' '$TPL32/skills/espalier.md' \
+   && grep -qF '| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |' '$TPL32/skills/espalier.md' \
+   && grep -qF 'route' '$TPL32/skills/espalier.md' \
+   && grep -qF 'FULL Stage 4 panel round' '$TPL32/skills/espalier.md' \
+   && grep -qF 'REGRESSION_VERIFIED_SCOPE' '$TPL32/skills/espalier-fix.md' \
+   && grep -qF 'non-test files only' '$TPL32/skills/espalier-fix.md'"
+assert "32b legacy-key mapping rows present (absent→folded; off→serial; test-mode wins)" \
+  "grep -qF \"speculative-tests\" '$TPL32/skills/espalier.md' \
+   && grep -qF 'TEST_MODE=serial || TEST_MODE=folded' '$TPL32/skills/espalier.md' \
+   && grep -qF \"grep '^test-mode:'\" '$TPL32/skills/espalier.md' \
+   && grep -qF 'using folded' '$TPL32/skills/espalier.md'"
+assert "32c pipeline + agents + rules + testing/coding re-pointed" \
+  "grep -qF 'Contract Phase (folded)' '$TPL32/pipeline.md' \
+   && grep -qF 'folded — tests are a Stage 3 duty' '$TPL32/pipeline.md' \
+   && grep -qF -- '- Test files:' '$TPL32/agents/harness-coder.md' \
+   && grep -qF '## Test Review (folded Stage 4 / serial Stage 6)' '$TPL32/agents/harness-reviewer.md' \
+   && grep -qF 'a coding-stage duty' '$TPL32/rules/production-standards.md' \
+   && grep -qF 'contract delta' '$TPL32/rules/security-standards.md' \
+   && grep -qF 'folded test-writing duty' '$TPL32/skills/espalier-coding.md' \
+   && grep -qF 'contract delta review' '$TPL32/skills/espalier-testing.md' \
+   && grep -qF 'Write It Readable' '$TPL32/agents/harness-coder.md' \
+   && grep -qF 'Readable by Default' '$TPL32/rules/coding-standards.md' \
+   && grep -qF 'Write it readable as you go' '$TPL32/skills/espalier-coding.md' \
+   && grep -qF -- '- \`structure:\`' '$TPL32/agents/harness-reviewer.md' \
+   && grep -qF 'one-line declaration comment' '$TPL32/agents/harness-reviewer.md'"
+assert "32d digest + crispness + tier + nudge + maprun boundary markers" \
+  "grep -qF 'Known failure patterns (from sibling slices)' '$TPL32/skills/espalier.md' \
+   && grep -qF 'findings/' '$TPL32/skills/espalier-map.md' \
+   && grep -qF 'mode=score' '$TPL32/skills/espalier-map.md' \
+   && grep -qF 'LAST, only when every slice' '$TPL32/skills/espalier-map.md' \
+   && grep -qF 'mode=score' '$TPL32/skills/espalier-grill.md' \
+   && grep -qF 'GRILLED (light)' '$TPL32/skills/espalier-grill.md' \
+   && grep -qF 'GRILLED (light)' '$TPL32/skills/espalier-requirements.md' \
+   && grep -qF 'untiered' '$HTPL32/espalier-stats.sh' \
+   && grep -qF 'hook-parallel-gates not set' '$HTPL32/espalier-stats.sh' \
+   && grep -qF 'Config Advisories' '$TPL32/skills/espalier-doctor.md' \
+   && grep -qF 'SKIPPED | folded' '$HTPL32/maprun-dispatch.sh' \
+   && grep -qF 'findings/' '$HTPL32/maprun-dispatch.sh'"
+assert "32e installed lane skills + stats carry the fold after bootstrap" \
+  "grep -qF 'test-mode' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'Known failure patterns' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'untiered' '$TMP/espalier/hooks/espalier-stats.sh'"
+
+# Migration triplet, Test 30/31 shape: the smoke install's SUBSTITUTED
+# per-project files are simulate_llm_writes stubs (no stock anchors), so the
+# first run skip-with-records the anchored edits while pure copies refresh.
+M23_SKIP=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M23_SKIP_RC=$?
+assert "32f stub per-project files skip-with-record (exit 0) + pure copies stay refreshed" \
+  "[ $M23_SKIP_RC -eq 0 ] \
+   && grep -qF 'v0.23.0-coder-fold' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'untiered' '$TMP/espalier/hooks/espalier-stats.sh'"
+M23_SKIP2=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "32g re-run after skip-with-record is a no-op" \
+  "echo \"\$M23_SKIP2\" | grep -qi 'nothing to do'"
+
+# Seed stock v0.22.1-shaped per-project files carrying every anchor, then
+# migrate for real.
+rm -f "$TMP/espalier/.migrations-skipped"
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V221CODER'
+## Output Format (when task complete)
+- Files created: {list}
+- Files modified: {list}
+- Layers touched: {list}
+### Test-mode self-report (fix lane Stage 5 only)
+When running in test-writing mode under `/espalier-fix` Stage 5 AND a meaningful
+test needs more scope, say so.
+### Writing Abuse Tests (Stage 5)
+When you run in testing mode (Stage 5), read the contract. A contracted field
+with no such test is a Stage 6 blocker.
+### Speculative & Contract entry points (Stage 5 dispatch modes)
+- SPECULATIVE DISPATCH: write to the part file.
+- CONTRACT PHASE: the panel has passed. Append your test report
+  to coding-report.md normally.
+### Writing Failure-Mode Tests (Stage 5)
+In testing mode, for each NEW external-call path this change introduced, write
+at least one failure-mode test. Missing
+failure-mode coverage on a new external call is a P1 at Stage 6.
+V221CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V221REV'
+If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
+agent is running concurrently with you: exclude its files. This narrows
+nothing and your license is
+unchanged.
+
+## Review Process
+6. Run the minimalism review.
+7. Test-review rounds only (Stage 6): run the **Security Abuse-Test Coverage**
+   check — a gap is a P0 back to Stage 5.
+8. Produce findings in the required format
+
+## Security Abuse-Test Coverage (Stage 6 — test review)
+When reviewing tests, verify EVERY listed field has a passing negative test.
+This is enforced
+coverage, not a suggestion.
+
+## Readability Review (advisory — P2/P3 only, one exception)
+- `magic:` an unexplained literal on a decision path. Replacement: the named
+  constant, per the project's constants convention.
+V221REV
+cat > "$TMP/espalier/agents/harness-security.md" << 'V221SEC'
+If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
+agent is running concurrently with you: exclude its files. Your audit
+surface (the changed code's handlers, consumers, and sinks) is unchanged.
+
+### Abuse-Test Contract (Stage 5 must satisfy, Stage 6 enforces)
+
+Emit one block per sensitive field in scope. Stage 5 (`harness-coder` in testing
+mode) writes a test for each; Stage 6 (`harness-reviewer`) blocks if any is missing.
+V221SEC
+cat > "$TMP/espalier/rules/production-standards.md" << 'V221PROD'
+## Failure-Mode Tests (Stage 5 duty)
+
+For each NEW external-call path the change introduces, Stage 5 writes at least
+one failure-mode test. Missing failure-mode coverage on a new
+external call is a **P1** at Stage 6.
+
+## Project-Specific Production Conventions
+V221PROD
+cat > "$TMP/espalier/rules/security-standards.md" << 'V221SSTD'
+## Abuse Tests
+The `harness-security` audit emits the exact list of fields requiring such a test;
+Stage 5 writes them and Stage 6 blocks if any is missing.
+V221SSTD
+cat > "$TMP/espalier/skills/espalier-coding/SKILL.md" << 'V221CSKL'
+---
+description: >-
+  Used by harness-coder at
+  Stage 3 (implementation), Stage 5 (testing mode), and on fix rounds.
+---
+## How This Skill Applies by Stage
+- **Stage 3 — implementation.** The whole skill applies: everything.
+- **Stage 5 — testing mode.** Layer specs still govern tests.
+- **Fix rounds — Stage 4/6 re-spawns.** Scope is the findings, nothing else:
+  re-read only what the fix touches.
+V221CSKL
+cat > "$TMP/espalier/skills/espalier-testing/SKILL.md" << 'V221TSKL'
+## Security Abuse Tests
+A happy-path test does NOT satisfy the contract. See
+`espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at Stage 6 —
+a contracted field with no abuse test is a P0.
+## Failure-Mode Tests
+Use the project's mock/fixture conventions above to simulate the failure.
+Enforced at Stage 6 — a new external call with no failure-mode test is a P1.
+V221TSKL
+cat > "$TMP/espalier/hooks/pre-push-gate.sh" << 'V221GATE'
+#!/bin/bash
+STATE_FILE=stub
+CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+if [ "$CURRENT_STAGE" -lt 7 ]; then
+  {
+      echo "BLOCKED: Pipeline is at Stage $CURRENT_STAGE (need ≥ 7 for push)"
+      echo "Complete code review and tests before pushing."
+  } >&2
+  exit 2
+fi
+# (Stage 4 code / Stage 6 test) actually saw. Reviewed-Diff is a content fingerprint
+run_tests() { echo "3 passed"; }
+gate_tests_section() {
+  TEST_OUTPUT=$(run_tests 2>&1)
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  :
+}
+gate_parallel_section() {
+  TEST_OUTPUT=$(run_tests 2>&1)
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  :
+}
+echo "All gates passed. Push allowed."
+exit 0
+V221GATE
+cat > "$TMP/espalier/rules/coding-standards.md" << 'V221CSTD'
+## Comments & Docstrings
+- Density: sparse.
+
+## Required Patterns
+- Service returns the project's Result type.
+V221CSTD
+M23_OUT=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M23_RC=$?
+assert "32h apply lands every v0.23 marker + backups" \
+  "[ $M23_RC -eq 0 ] \
+   && grep -qF 'Contract entry point (post-panel dispatch mode)' '$TMP/espalier/agents/harness-coder.md' \
+   && ! grep -qF 'Speculative & Contract entry points' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF -- '- Test files:' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF '## Test Review (folded Stage 4 / serial Stage 6)' '$TMP/espalier/agents/harness-reviewer.md' \
+   && ! grep -qF 'SPECULATIVE TESTS IN FLIGHT' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'fixture-data leakage' '$TMP/espalier/agents/harness-security.md' \
+   && grep -qF 'a coding-stage duty' '$TMP/espalier/rules/production-standards.md' \
+   && grep -qF 'contract delta' '$TMP/espalier/rules/security-standards.md' \
+   && grep -qF 'folded test-writing duty' '$TMP/espalier/skills/espalier-coding/SKILL.md' \
+   && grep -qF 'contract delta review' '$TMP/espalier/skills/espalier-testing/SKILL.md' \
+   && grep -qF 'Write It Readable' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'Readable by Default' '$TMP/espalier/rules/coding-standards.md' \
+   && grep -qF -- '- \`structure:\`' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'one-line declaration comment' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'untiered' '$TMP/espalier/hooks/espalier-stats.sh' \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.23.bak' ] \
+   && [ -f '$TMP/espalier/hooks/pre-push-gate.sh.pre-v0.23.bak' ]"
+assert "32i migrated gate parses + anchored stage read + last-match count (both copies)" \
+  "bash -n '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && grep -qF -- '(- )?Current Stage:' '$TMP/espalier/hooks/pre-push-gate.sh' \
+   && [ \"\$(grep -c 'tail -1)' '$TMP/espalier/hooks/pre-push-gate.sh')\" -ge 2 ] \
+   && ! grep -qF 'Complete code review and tests before pushing.' '$TMP/espalier/hooks/pre-push-gate.sh'"
+M23_RERUN=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "32j re-run is a no-op" "echo \"\$M23_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

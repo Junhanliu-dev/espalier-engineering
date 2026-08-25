@@ -1,5 +1,94 @@
 # Changelog
 
+## 0.23.0 — 2026-08-25
+
+Minor: **round economy** — the third speed release, designed against field
+data from a real v0.22.1 install (42 changes, one BUILT map, heavy maprun).
+Same gates, sentinels, round caps, certificates, and both human
+checkpoints. Design doc: `docs/pipeline-speed-plan-v3.md` (r2 — includes
+the claim-by-claim code review that reshaped it).
+
+- **The Stage 3/5 fold (`test-mode: folded`, the default; both lanes).**
+  The coder writes the change's interface/failure-mode tests WITH the code;
+  the Stage 3 exit gate runs build + lint + the scoped test command on
+  every coder return (the old Stage 5 "tests pass" gate, moved earlier —
+  the panel never reviews unexecuted tests); the 2-agent Stage 4 panel
+  reviews code AND tests in one verdict, with the code in view (today's
+  Stage 6 test review was code-blind). Stages 5/6 become the security
+  abuse-test contract phase (contract spawn → exit-gate re-run → ONE
+  delta-scoped review) or `SKIPPED` rows on a non-sensitive change — zero
+  post-panel spawns on the happy path. Stage numbers stay monotonic
+  3→4→5→6→7 for every integer consumer (push gate, stats, maprun).
+  `test-mode: serial` keeps the pre-v0.22 flow per repo; the legacy
+  `speculative-tests` key maps through (`off` → serial, else folded); no
+  config is ever auto-written. The speculative dispatch (part files,
+  quarantine-on-FAIL, restore/reconcile — ~190 lines of machinery) is
+  retired.
+- **Contract-FAIL routing (strictly stronger than v0.22):** a contract-
+  phase fix that must touch any non-test file routes back to a FULL
+  Stage 4 panel round — security eyes return to exactly the code most
+  likely to need them (previously reviewer-only).
+- **Fix lane:** the regression verification moves into the Stage 3 exit
+  gate — it re-runs on every coder return (last-line-wins read), records
+  a `REGRESSION_VERIFIED_SCOPE` hash so unchanged test scopes skip the
+  worktree half, and the panel sees the result BEFORE round 1. The
+  reactive escalation gate counts non-test files only.
+- **Findings digest (map feedback loop).** FAIL-round Stage History
+  snapshots now append one bracketed finding line per failing agent
+  (`[P0 …≤80 chars]`) — the only place finding text survives the
+  per-round record overwrite. Charted changes write a per-change digest
+  file under `espalier/maps/{slug}/findings/` at Completion (full lane,
+  commit scope widened to carry it) or before the PASSED sentinel
+  (maprun workers — they never reach Completion); slice adoption folds
+  the newest 12 P0/P1 lines into requirements.md as
+  `## Known failure patterns (from sibling slices)` — facts for MORE
+  scrutiny, never a checklist ceiling.
+- **Crispness gate (map handoff).** The CLEARED → FILED handoff drafts
+  and SCORES each slice with grill's new `mode=score` (Step 1 signal
+  count only); a would-be-`full` slice is refused — its fog becomes
+  tickets and the map stays IN_PROGRESS; `status: CLEARED` now flips
+  LAST. Grill verdicts carry their tier: `GRILLED (light)` /
+  `GRILLED (full)` (stats splits them; old bare rows still count).
+- **Adoption nudge (report-only).** `espalier-stats.sh` gains a trailing
+  advisory when `hook-parallel-gates` is unset and ≥ 3 gated pushes are
+  recorded; `espalier-doctor` gains the same check as a plain report
+  line. Discovery proposes, the human confirms — nothing auto-writes.
+- **Context pack earlier:** assembled in the same orchestrator turn that
+  presents the Requirements Approval Gate (re-derived on an Edit that
+  changes the layer set) — one turn saved per run.
+- **Readable by default (coder).** Writing human-readable code becomes a
+  stated coder duty: named constants over magic values on decision paths,
+  intent-stating names, guard clauses over nesting, small single-purpose
+  functions, and comments as the last resort — one plain line, only for
+  genuinely complex logic or a business rule the code cannot show — always
+  subordinate to the project's own discovered conventions.
+  `coding-standards.md` gains the matching "Readable by Default" section,
+  and the reviewer's Readability Review enforces it: the existing
+  `naming:`/`nesting:`/`magic:` tags plus a new `structure:` tag (a
+  function doing more than its name says — extract it) and a
+  magic-constant check (a constant whose name cannot carry the meaning
+  gets its one-line declaration comment); the espalier-coding SKILL
+  points at both. Migration #32 carries the inserts.
+- **Hygiene:** `pre-push-gate.sh`'s `Current Stage:` read is now
+  line-anchored (the v0.22 certificate-read lesson applied); the
+  test-count parse takes the LAST summary match in both serial and
+  parallel sections; `espalier-stats.sh` no longer truncates multi-word
+  status labels; `rebuild-commit-index.sh`'s squash-SHA extraction drops
+  its awk interval regex — mawk (the Debian/Ubuntu default awk) matched
+  it but set RLENGTH to the interval minimum, truncating every indexed
+  squash SHA to 7 chars on those hosts; migration #32's reviewer and
+  security span edits now require their END anchors too before cutting —
+  found live on a field install whose customised reviewer renumbers the
+  process steps: the START anchors matched, the END never did, and the
+  span swallowed the file to EOF (backup + skip-with-record made it
+  recoverable; the gate now skips such files up front).
+- Migration #32: `scripts/migrate-v0.22.1-to-v0.23.0.sh` — refreshes 10
+  pure-copy files (backups `.pre-v0.23.bak`) and anchored-edits the 3
+  agent files, 2 rules files, 2 substituted SKILLs, and
+  `pre-push-gate.sh`; customised files skip-with-record. Writes NO
+  config keys. Migration #30's pure-copy markers/probe were re-pointed
+  to the current templates so the chain still runs for older installs.
+
 ## 0.22.1 — 2026-08-18
 
 Patch: **comment diet** — field feedback: agents still write too MANY

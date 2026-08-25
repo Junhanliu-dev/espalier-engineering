@@ -59,14 +59,16 @@ may be waved through on "it works".
 | Mutating consumers / webhooks / retried jobs | **idempotent** — a redelivered message or retried job must not double-apply (dedupe key, upsert, or idempotency token) | {discovered — queue semantics, idempotency helpers} |
 | Backfills / data transforms | resumable and bounded (chunked, progress-tracked) — never one unbounded UPDATE over a production table | {discovered} |
 
-## Failure-Mode Tests (Stage 5 duty)
+## Failure-Mode Tests (a coding-stage duty)
 
 Production code is proven by how it fails, not only how it succeeds. For each
-NEW external-call path the change introduces, Stage 5 writes at least one
-failure-mode test: the dependency times out / errors / returns garbage → assert
+NEW external-call path the change introduces, the coder writes at least one
+failure-mode test alongside the code (Stage 3 under folded test-mode; the
+serial test pass otherwise): the dependency times out / errors / returns
+garbage → assert
 the decided failure behaviour happens (fallback used, error propagated with
 context, no partial write persisted). Missing failure-mode coverage on a new
-external call is a **P1** at Stage 6. (Abuse tests for sensitive fields are the
+external call is a **P1** at review. (Abuse tests for sensitive fields are the
 [[security-standards]] contract — this is additional, not instead.)
 
 ## Project-Specific Production Conventions

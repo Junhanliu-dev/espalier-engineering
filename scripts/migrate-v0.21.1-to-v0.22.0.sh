@@ -72,13 +72,20 @@ fi
 [ -n "$PLUGIN_DIR" ] || die "cannot locate the plugin. Pass --plugin-dir=<espalier-engineering root>."
 TPL="$PLUGIN_DIR/skills/espalier-init/templates"
 HTPL="$PLUGIN_DIR/skills/espalier-init/hook-templates"
-grep -q 'Stage 4 → Stage 5 handoff' "$TPL/skills/espalier.md" 2>/dev/null \
-  || die "plugin dir $PLUGIN_DIR is not v0.22.0 (espalier template lacks the Stage 4→5 handoff). Update the plugin first."
+# v0.23 note: the plugin's templates moved past the speculative dispatch (the
+# Stage 3/5 fold). This migration still runs mid-chain for older installs: the
+# pure-copy refresh below installs the CURRENT templates (per the chain
+# convention), so its pure-copy markers/probe track the current template text,
+# while the anchored agent/hook splices below stay v0.22-shaped — migration
+# #32 replaces those spans afterward.
+grep -q "test-mode" "$TPL/skills/espalier.md" 2>/dev/null \
+  || die "plugin dir $PLUGIN_DIR is not current (espalier template lacks the test-mode read). Update the plugin first."
 
 # --- v0.22 markers (also the idempotency check) ------------------------------
-PIPE_MARK='dispatched SPECULATIVELY'
-ESP_MARK='Stage 4 → Stage 5 handoff'
-FIX_MARK='coding-report.part-test.md'
+# Pure-copy markers track the CURRENT template text (v0.23 fold).
+PIPE_MARK='Contract Phase (folded)'
+ESP_MARK='Stage 5/6 (folded)'
+FIX_MARK='Stage 5/6 (folded)'
 STATS_MARK='Stage durations'
 CODER_MARK='Speculative & Contract entry points'
 REV_MARK='SPECULATIVE TESTS IN FLIGHT'

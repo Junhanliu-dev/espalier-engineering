@@ -5,9 +5,12 @@ file: src/signup.controller.js
 expected_verdict: FAIL
 expected_surface: sensitive
 planted_vulns:
-  - field: verified / plan (req.body via a partial allow-list)
+  - field: verified (req.body via a partial allow-list)
     axis: permission
-    hint: registration binds the request body through a pick() that LOOKS like an allow-list but includes 'verified' and 'plan' alongside display fields — a caller sets account-trust and paid-plan flags at signup (mass assignment; the allow-list is the bug, not its absence)
+    hint: registration binds the request body through a pick() that LOOKS like an allow-list but includes 'verified' alongside display fields — a caller sets the account-trust flag at signup (mass assignment; the allow-list is the bug, not its absence)
+  - field: plan (req.body via the same partial allow-list)
+    axis: permission
+    hint: the same pick() also passes 'plan' — a caller grants themselves a paid plan at signup; one root pick() bug, but two distinct sensitive fields, each needing its own contract entry
 false_positive_watch:
   - "email and displayName are legitimately client-set — flagging those is a false positive; the defect is that verified/plan are in the same pick()"
 shadow: true

@@ -176,6 +176,9 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   if ! line="$(judge "$fixture" "$record")"; then
     echo "$fid: judge failed"; fail_count=$((fail_count + 1)); continue
   fi
+  # A judge reply sometimes carries prose before the JSON — take the LAST
+  # JSON-object line rather than failing the fixture on the preamble.
+  line="$(printf '%s\n' "$line" | grep -E '^\{.*\}[[:space:]]*$' | tail -1)"
 
   planted="$(printf '%s' "$line" | sed -E 's/.*"planted":([0-9]+).*/\1/')"
   caught="$(printf '%s'  "$line" | sed -E 's/.*"caught":([0-9]+).*/\1/')"

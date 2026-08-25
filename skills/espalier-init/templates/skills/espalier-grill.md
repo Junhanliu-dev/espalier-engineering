@@ -29,6 +29,7 @@ is never called directly by the user.
 | `mode` | `spec` (from `/espalier`) — interrogates the requirement |
 | | `diagnosis` (from `/espalier-fix`) — interrogates the bug's root cause |
 | | `decision` (from `/espalier-map`) — settles an open decision ticket |
+| | `score` (from `/espalier-map` handoff) — Step 1 signal count only; no interrogation, no writes |
 | `input_text` | the requirement, bug description, or ticket question (+ map context) |
 | `reqs_path` | path to the change's `requirements.md` (spec/diagnosis) or the ticket file (decision) |
 
@@ -54,7 +55,19 @@ ambiguity lives in the answer space. Everything below applies with these deltas:
   the answer, its rationale, citations from Step 1.5 — plus a one-line gist
   the caller appends to the map's Decisions-so-far. A non-answer records the
   conservative default in `## Resolution` marked `(default — revisit)`.
-- **Verdict:** `GRILLED` or `SKIPPED: non-interactive` only.
+- **Verdict:** `GRILLED (light)` / `GRILLED (full)` or
+  `SKIPPED: non-interactive` only.
+
+### Score-only mode (`mode=score`)
+
+The map lane's CLEARED → FILED handoff calls this to score each drafted
+slice requirement BEFORE filing it. Run Step 1's signal count against
+`input_text` (the drafted slice requirement) — nothing else: no Step 1.5,
+no questions, no file writes. Return ONE line to the caller:
+`SCORE: {skip|light|full} (signals={N})`. The handoff files `skip`/`light`
+slices and refuses would-be-`full` ones (the map is not actually clear
+there). This mode records no verdict in pipeline-state.md — no change
+exists yet.
 
 ## Process
 
@@ -259,7 +272,7 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
 
 | Verdict | When |
 |---------|------|
-| `GRILLED` | grill ran (`light` or `full`); `requirements.md` (or the decision ticket) updated |
+| `GRILLED (light)` / `GRILLED (full)` | grill ran; the tier word is the tier that actually ran (after any Step 1.5 floor or user bump); `requirements.md` (or the decision ticket) updated |
 | `SKIPPED: crisp` | spec/diagnosis only — tier was `skip`, input already well-specified, **and** Step 1.5 confirmed zero collisions. A crisp input that collides with a rule/wiki convention returns `GRILLED`, not this. Decision mode never returns it. |
 | `SKIPPED: non-interactive` | unattended run (Step 0's interactivity_mode check) |
 | `SKIPPED: --no-grill` | spec/diagnosis only — the invoking stage passed the opt-out flag |

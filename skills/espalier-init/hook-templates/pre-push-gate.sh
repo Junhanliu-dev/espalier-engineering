@@ -80,9 +80,11 @@ if [ "$ACTIVE_COUNT" -gt 1 ]; then
   } >&2
 fi
 
-# Check pipeline stage (must be ≥ 7). Take the FIRST match's first integer —
-# `grep -oE '[0-9]+'` across multiple matching lines would concatenate digits.
-CURRENT_STAGE=$(grep "Current Stage:" "$STATE_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
+# Check pipeline stage (must be ≥ 7). Line-anchored like the certificate
+# reads below — a Stage History note QUOTING the token in prose must never
+# outrank the real Status line (the v0.22 cert-field lesson, applied here
+# too). Take the FIRST match's first integer.
+CURRENT_STAGE=$(grep -E '^(- )?Current Stage:' "$STATE_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
 if [ "$PIPELINE_TRACKED" = "yes" ]; then
   if [ -z "$CURRENT_STAGE" ]; then
     # Fail closed: a tracked change whose stage cannot be parsed means the
@@ -97,14 +99,15 @@ if [ "$PIPELINE_TRACKED" = "yes" ]; then
   if [ "$CURRENT_STAGE" -lt 7 ]; then
     {
       echo "BLOCKED: Pipeline is at Stage $CURRENT_STAGE (need ≥ 7 for push)"
-      echo "Complete code review and tests before pushing."
+      echo "Complete the review stages (panel + contract phase, or serial tests) before pushing."
     } >&2
     exit 2
   fi
 fi
 
 # Review-certificate check — the code being pushed must match what the last review
-# (Stage 4 code / Stage 6 test) actually saw. Reviewed-Diff is a content fingerprint
+# (the Stage 4 panel, or the contract delta review / serial Stage 6) actually
+# saw. Reviewed-Diff is a content fingerprint
 # of the source diff (espalier/ bookkeeping excluded), anchored to the Base-Ref
 # recorded at Stage 3. A code change after review changes the fingerprint and blocks
 # the push until a fresh review re-certifies the current diff. This is what makes the
@@ -316,7 +319,9 @@ gate_tests_section() {
     exit 2
   fi
 
-  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  # LAST count match, not first — a runner printing an intermediate "N tests"
+  # progress line before its summary must not shadow the final total.
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | tail -1)
   if [ -z "$TEST_COUNT" ]; then
     _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
     [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok
@@ -364,8 +369,8 @@ gate_parallel_section() {
     { echo "BLOCKED: Tests fail"; printf '%s\n' "$TEST_OUTPUT" | tail -20; } >&2
     exit 2
   fi
-  # Same count-parse as gate_tests_section (kept in lockstep).
-  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | head -1)
+  # Same count-parse as gate_tests_section (kept in lockstep): LAST match.
+  TEST_COUNT=$(echo "$TEST_OUTPUT" | grep -oE '[0-9]+ (passed|passing|tests|examples|specs)' | grep -oE '[0-9]+' | tail -1)
   if [ -z "$TEST_COUNT" ]; then
     _go_ok=$(echo "$TEST_OUTPUT" | grep -cE '^ok[[:space:]]')
     [ "$_go_ok" -gt 0 ] 2>/dev/null && TEST_COUNT=$_go_ok

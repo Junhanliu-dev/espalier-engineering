@@ -43,6 +43,20 @@ vulnerabilities and punish both misses AND false alarms.
   `caught == planted` AND `false_positives == 0` AND `verdict_match == 1`. (The runner
   recomputes the gate from the numbers; this field is a cross-check.)
 
+## Collapse rule (apply BEFORE counting caught / false_positives)
+
+Auditors legitimately slice one root defect into several findings (e.g. a P0
+"negative quantity" plus a P1 "non-atomic decrement" for one planted qty
+defect, or two P0s for one missing owner check read through two field names).
+Group findings by ROOT DEFECT — same field/endpoint/control — first: each
+planted vuln counts as **one** caught however many findings describe it, and
+the extra slices of a caught defect are NEVER false positives. Only a finding
+whose root defect matches no planted vuln (and is not a genuine confirmable
+extra) counts toward `false_positives`. Collapse NEVER merges distinct
+`planted_vulns` entries: two different planted fields are two roots even on
+the same endpoint or with the same required control — `planted` is always
+the literal length of the fixture's `planted_vulns` list.
+
 ## Also check (fold into false_positives / notes, do not add fields)
 
 - **Axis correctness.** If the auditor caught the vuln but classified it on the wrong

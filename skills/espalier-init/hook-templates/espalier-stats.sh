@@ -64,7 +64,7 @@ else
 $(_last_status "$sf")"
     done
     dist=$(printf '%s\n' "$statuses" | grep -v '^$' | sort | uniq -c | sort -rn \
-           | awk '{ printf "%s%s=%s", (NR>1 ? " " : ""), $2, $1 }')
+           | awk '{ c=$1; sub(/^[[:space:]]*[0-9]+[[:space:]]+/, ""); printf "%s%s=%s", (NR>1 ? " " : ""), $0, c }')
     echo "- **$type**: $total ($dist)"
   done
 fi
@@ -193,7 +193,9 @@ if not printed:
 '
   echo
   echo "(Approximate by design — the buckets answer \"where did the hour go\","
-  echo "not billing. Minute-resolution legacy timestamps floor to 0s spans.)"
+  echo "not billing. Minute-resolution legacy timestamps floor to 0s spans."
+  echo "Post-fold (v0.23) Stage 4 rows are code+tests reviews and Stage 5/6 may"
+  echo "be SKIPPED rows with ~0s spans — compare durations within-era.)"
 fi
 echo
 
@@ -202,10 +204,13 @@ echo "## Grill verdicts (Stage 1 residual-ambiguity mix)"
 echo
 if [ -d "$CH" ] && ls "$CH"/*/*/pipeline-state.md >/dev/null 2>&1; then
   g=$(grep -ho 'GRILLED' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
+  gl=$(grep -ho 'GRILLED (light)' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
+  gf=$(grep -ho 'GRILLED (full)' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
+  gu=$((g - gl - gf))   # pre-v0.23 rows recorded a bare GRILLED with no tier
   sc=$(grep -ho 'SKIPPED: crisp' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
   sn=$(grep -ho 'SKIPPED: --no-grill' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
   si=$(grep -ho 'SKIPPED: non-interactive' "$CH"/*/*/pipeline-state.md 2>/dev/null | wc -l | tr -d ' ')
-  echo "GRILLED=$g  crisp=$sc  no-grill=$sn  non-interactive=$si"
+  echo "GRILLED=$g (light=$gl full=$gf untiered=$gu)  crisp=$sc  no-grill=$sn  non-interactive=$si"
   echo
   echo "(A map-charted slice should trend crisp/light — high GRILLED among"
   echo "charted feats means maps are under-specifying their slices.)"
@@ -335,4 +340,21 @@ if [ -f espalier/hooks/drift-helpers.sh ]; then
   fi
 else
   echo "drift-helpers not installed"
+fi
+
+# ── Adoption nudges ──────────────────────────────────────────────────────────
+# Report-only: surfaces a shipped-but-unused opt-in when the data says it
+# would pay. Never writes config — discovery proposes, the human confirms.
+# Gated-push proxy: `| 7 | <sha> | <files> |` Commits rows (one per Stage 7
+# push, idempotent per SHA).
+if [ -d "$CH" ] && ! grep -q '^hook-parallel-gates:' espalier/.espalier-config 2>/dev/null; then
+  pushes=$(grep -hcE '^\| 7 \| ' "$CH"/*/*/pipeline-state.md 2>/dev/null | awk '{s+=$1} END{print s+0}')
+  if [ "${pushes:-0}" -ge 3 ]; then
+    echo
+    echo "## Adoption nudges"
+    echo
+    echo "hook-parallel-gates not set — if build/lint/tests are independent,"
+    echo "opting in saves ~40% per gated push (see docs). Opt in only when the"
+    echo "three discovered commands are truly independent."
+  fi
 fi

@@ -59,14 +59,45 @@ run_review() {
   cp "$SEC_RULE_TPL"  "$proj/espalier/rules/security-standards.md"
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-reviewer.md"
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$REVIEW_SKILL_TPL" > "$proj/espalier/skills/espalier-review/SKILL.md"
-  printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file path)\n- Notes: the change under review.\n' "$file" > "$cdir/coding-report.md"
+
+  # Multi-file fixture support (v0.23 combined code+tests fixtures): a body
+  # made of '=== FILE: <path> ===' blocks materializes one file per block;
+  # otherwise the whole body is the single $file, as before.
+  if grep -q '^=== FILE: ' "$fixture"; then
+    awk 'body{print} /^---[[:space:]]*$/{c++; if(c==2) body=1}' "$fixture" \
+    | (
+        cur=""
+        while IFS= read -r bline; do
+          case "$bline" in
+            "=== FILE: "*" ===")
+              cur="${bline#=== FILE: }"; cur="${cur% ===}"
+              mkdir -p "$proj/$(dirname "$cur")"
+              : > "$proj/$cur"
+              ;;
+            *)
+              [ -n "$cur" ] && printf '%s\n' "$bline" >> "$proj/$cur"
+              ;;
+          esac
+        done
+      )
+    filelist="$(sed -n -E 's/^=== FILE: (.*) ===$/\1/p' "$fixture")"
+    testlist="$(printf '%s\n' "$filelist" | grep -E '^tests?/' || true)"
+    {
+      printf '## Coding Report\n- Files created: %s\n' "$(printf '%s' "$filelist" | tr '\n' ' ')"
+      [ -n "$testlist" ] && printf -- '- Test files: %s\n' "$(printf '%s' "$testlist" | tr '\n' ' ')"
+      printf -- '- Layers touched: (inspect the file paths)\n- Notes: the change under review.\n'
+    } > "$cdir/coding-report.md"
+    file="$(printf '%s\n' "$filelist" | head -1)"
+  else
+    printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file path)\n- Notes: the change under review.\n' "$file" > "$cdir/coding-report.md"
+  fi
 
   claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-reviewer for ReviewApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
 Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md, $proj/espalier/rules/engineering-structure.md, $proj/espalier/rules/production-standards.md, and $proj/espalier/skills/espalier-review/SKILL.md. Judge ONLY against those project rules, not generic opinions.
 
-WHAT TO REVIEW: read $cdir/coding-report.md, then the file it lists ($proj/$file).
+WHAT TO REVIEW: read $cdir/coding-report.md, then EVERY file it lists (under $proj/). When it lists test files, your verdict covers the tests too — run your test checklist on them with the code in view.
 
 Write your review to $cdir/review-record.md using your instruction file's EXACT output format (findings table with Priority + Verdict). You have no Write/Edit tool — use a Bash heredoc/redirection." >/dev/null 2>&1 || return 1
 }
@@ -103,6 +134,9 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   if ! line="$(judge "$fixture" "$record")"; then
     echo "$fid: judge failed"; fail_count=$((fail_count + 1)); continue
   fi
+  # A judge reply sometimes carries prose before the JSON — take the LAST
+  # JSON-object line rather than failing the fixture on the preamble.
+  line="$(printf '%s\n' "$line" | grep -E '^\{.*\}[[:space:]]*$' | tail -1)"
 
   planted="$(printf '%s' "$line" | sed -E 's/.*"planted":([0-9]+).*/\1/')"
   caught="$(printf '%s'  "$line" | sed -E 's/.*"caught":([0-9]+).*/\1/')"

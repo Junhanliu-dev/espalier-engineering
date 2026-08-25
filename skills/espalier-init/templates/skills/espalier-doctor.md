@@ -151,6 +151,22 @@ file, so the two can never drift apart.
 For an artifact with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both
 and merge before the two-way diff.
 
+## Config Advisories (report-only)
+
+While writing the report, check one shipped-but-unused opt-in and, when it
+applies, add ONE plain advisory line (the doctor has no severity levels and
+this adds none):
+
+- `hook-parallel-gates` absent from `espalier/.espalier-config` AND ≥ 3
+  Stage-7 push rows recorded
+  (`grep -hcE '^\| 7 \| ' espalier/changes/*/*/pipeline-state.md` summed) →
+  report: `hook-parallel-gates not set — if build/lint/tests are
+  independent, opting in saves ~40% per gated push (see docs). Opt in only
+  when the three discovered commands are truly independent (the init-time
+  question's caveat).`
+
+Report-only: never write the key — discovery proposes, the human confirms.
+
 ## What This Skill Does NOT Do
 
 - Does not edit any artifact — it only flags (`mark_stale`) and reports.

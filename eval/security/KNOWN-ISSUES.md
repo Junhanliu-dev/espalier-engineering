@@ -1,44 +1,54 @@
-# Known Issues — eval/security
+# eval/security — Known Issues
 
-## FP gate fails under current models at BASELINE (found 2026-08-18, v0.22 release gate)
+Status 2026-08-25 (v0.23.0 fix round): the deferred v0.22 recalibration is
+DONE — judge validated at **24/24 = 1.00 agreement** against the hand-scored
+set (`judge-validation/`, threshold ≥ 0.75), shadow-03 is re-keyed and
+green, and the full 20-fixture suite runs at catch-rate 1.00. The one FP
+observed in a full run (shadow-02) does not reproduce and is recorded as
+judge variance below. History kept as the diagnostic record.
 
-**Symptom:** the `false positives == 0` gate fails even though catch-rate is
-1.00 — every planted vulnerability is caught in every run.
+## FIXED: judge-collapse counting artifact
 
-**Evidence (all under the same 2026-08 model, `ANTHROPIC_MODEL=opus`):**
+The rubric now codifies the collapse rule the hand scores always assumed:
+findings are grouped by ROOT DEFECT before counting — each planted vuln is
+ONE catch however many findings slice it, extra slices are never FPs — and
+collapse NEVER merges distinct `planted_vulns` entries (`planted` is the
+literal list length). Re-validated after the change: 24/24 agreement
+(first pass 22/24; the two misses were shadow-01's answer key packing two
+fields into one entry — split into two entries, see below).
 
-| Run | Templates | FPs | Failing fixtures |
-|---|---|---|---|
-| baseline (main worktree, solo) | v0.21.1 | 2 | shadow-02, shadow-03 (clean-fixture MISMATCH) |
-| release run (concurrent) | v0.22.0 | 8 | shadow-01/02/03, vuln-02, vuln-03 |
-| release run (solo, reproduced) | v0.22.0 | 8 | shadow-01/02/03, vuln-03 (+2 elsewhere) |
-| single-fixture A/B, vuln-03 | v0.21.1 → 0 FP; v0.22.0 → 2 FP | | |
+## FIXED: shadow-03 answer key
 
-**Diagnosis (records read side by side, KEEP_WORK=1):** both auditors catch
-the identical planted defect (the `{ ...req.body }` mass-assignment) and
-both slice it BY AXIS (permission / identity / state / money) at the same
-file:line — the v0.21.1 record as 4 P0s, the v0.22 record as 3 P0s + 1 P1.
-The judge collapsed one record's slices into `caught=1 fp=0` and counted
-the other's as false positives. The FP number is therefore a
-**judge-collapse counting artifact on same-defect multi-findings**, not an
-invented vulnerability. The one clean-fixture mismatch (shadow-03) fails on
-BOTH template versions.
+Root-caused: the auditor's recurring "false positive" was a REAL hole in
+the fixture's own "clean" code — `PLANS[req.body.planId]` resolves
+prototype-chain keys (`"constructor"`, `"__proto__"`, …), the `== null`
+allow-list check passes, and a Function is persisted as `priceCents`.
+2026-08 models legitimately catch it. The fixture now guards with
+`Object.hasOwn` (keeping its moved-owner-check FP-trap purpose) and the
+watch line covers the hardened lookup. Verified PASS solo and in the full
+suite.
 
-The suite last held FP=0 on 2026-07-08 (`auto-optimize-results.tsv`), under
-that era's model — the judge-validation set (24/24 cells) was also scored
-then. This is the model-drift pattern: today's auditors slice findings at
-finer granularity, and the judge's collapse rule no longer absorbs it.
+## FIXED: shadow-01 answer key granularity
 
-**Why this did not block the v0.22 release:** the gate fails at baseline,
-so reverting the v0.22 template change (one conditional paragraph, inert
-without its `SPECULATIVE TESTS IN FLIGHT:` prompt line — which eval prompts
-never carry) would not make the gate pass; catch-rate is perfect on both
-versions; and the extra "FPs" are re-slicings of planted defects, not
-findings on clean code (shadow-03 excepted — pre-existing).
+`planted_vulns` packed two sensitive fields (`verified`, `plan`) into one
+list entry; under the literal-length rule the judge counted 1 where the
+hand score said 2. Split into two entries (same root pick() bug, two
+fields, two contract entries). Judge and hand scores now agree 4/4 on it.
 
-**Fix needed (deferred, see docs/deferred-items.md):** recalibrate the
-judge's collapse rule (same file:line + same root defect → one catch
-regardless of axis slicing), re-validate `judge-validation/` under the
-current model, and re-examine shadow-03's answer key. Until then, treat
-`catch-rate` as the trustworthy number and hand-read FP failures before
-attributing them.
+## FIXED: judge output-parse strictness
+
+All seven eval runners now take the LAST `{…}` line of the judge reply
+before parsing, so a prose preamble cannot fail a fixture.
+
+## Judge variance (open, bounded — the attribution discipline)
+
+One full run showed a single FP on shadow-02-header-role; a KEEP_WORK
+rerun PASSed cleanly (auditor filed exactly the planted P0, judge 0 FP),
+and earlier full runs had shadow-02 green. Same class as
+`eval/review/KNOWN-ISSUES.md`'s history: fixture-random, non-reproducing
+judge/auditor variance under 2026-08 models. Discipline: an FP-gate
+failure is attributed to a template change ONLY after (a) a baseline A/B
+under the same model and (b) a KEEP_WORK rerun of the failing fixture —
+a non-reproducing FP is variance; a reproducing one gets its record read
+(shadow-03 shows it can be the fixture, not the auditor). Re-validate
+`judge-validation/` whenever `rubric.md` changes.
