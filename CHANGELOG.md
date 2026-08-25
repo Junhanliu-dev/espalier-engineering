@@ -73,7 +73,10 @@ the claim-by-claim code review that reshaped it).
   line-anchored (the v0.22 certificate-read lesson applied); the
   test-count parse takes the LAST summary match in both serial and
   parallel sections; `espalier-stats.sh` no longer truncates multi-word
-  status labels.
+  status labels; `rebuild-commit-index.sh`'s squash-SHA extraction drops
+  its awk interval regex — mawk (the Debian/Ubuntu default awk) matched
+  it but set RLENGTH to the interval minimum, truncating every indexed
+  squash SHA to 7 chars on those hosts.
 - Migration #32: `scripts/migrate-v0.22.1-to-v0.23.0.sh` — refreshes 10
   pure-copy files (backups `.pre-v0.23.bak`) and anchored-edits the 3
   agent files, 2 rules files, 2 substituted SKILLs, and

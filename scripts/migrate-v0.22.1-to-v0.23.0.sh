@@ -39,12 +39,13 @@
 #     test-count parse.
 #
 # Mechanics:
-#   - Refresh 10 pure-copy files from templates (backup-on-diff →
+#   - Refresh 11 pure-copy files from templates (backup-on-diff →
 #     <file>.pre-v0.23.bak): pipeline.md; the espalier, espalier-fix,
 #     espalier-map, espalier-maprun, espalier-grill, espalier-requirements,
-#     espalier-doctor SKILLs; espalier/hooks/espalier-stats.sh and
-#     espalier/hooks/maprun-dispatch.sh (skipped silently when a pre-maprun
-#     install has no such hook).
+#     espalier-doctor SKILLs; espalier/hooks/espalier-stats.sh,
+#     espalier/hooks/rebuild-commit-index.sh (mawk squash-SHA truncation
+#     fix), and espalier/hooks/maprun-dispatch.sh (skipped silently when a
+#     pre-maprun install has no such hook).
 #   - Anchored edits into the SUBSTITUTED per-project files (never
 #     wholesale-copied): harness-coder / harness-reviewer / harness-security,
 #     production-standards / security-standards / coding-standards, the
@@ -99,6 +100,7 @@ GRILL_MARK='mode=score'
 REQ_MARK='GRILLED (light)'
 DOC_MARK='Config Advisories'
 STATS_MARK='untiered'
+RIDX_MARK='split($0, cols, /[^a-f0-9]+/)'
 CODER_MARK='Contract entry point (post-panel dispatch mode)'
 READ_MARK='Write It Readable'
 CSTD_MARK='Readable by Default'
@@ -129,6 +131,7 @@ grep -qF "$GRILL_MARK" espalier/skills/espalier-grill/SKILL.md     2>/dev/null |
 grep -qF "$REQ_MARK"   espalier/skills/espalier-requirements/SKILL.md 2>/dev/null || mark "espalier-requirements tier verdict"
 [ -f espalier/skills/espalier-doctor/SKILL.md ] && { grep -qF "$DOC_MARK" espalier/skills/espalier-doctor/SKILL.md 2>/dev/null || mark "espalier-doctor config advisory"; }
 grep -qF "$STATS_MARK" espalier/hooks/espalier-stats.sh            2>/dev/null || mark "espalier-stats tier split + nudge"
+grep -qF "$RIDX_MARK"  espalier/hooks/rebuild-commit-index.sh      2>/dev/null || mark "rebuild-commit-index mawk-safe squash extraction"
 handled "$CODER_MARK" espalier/agents/harness-coder.md    coder-fold      || mark "coder fold (contract-only entry point)"
 handled "$REV_MARK"   espalier/agents/harness-reviewer.md reviewer-fold   || mark "reviewer fold (test review at Stage 4)"
 handled "$SEC_MARK"   espalier/agents/harness-security.md security-fold   || mark "security test-file scope stance"
@@ -149,14 +152,14 @@ fi
 
 if [ "$DRY_RUN" = yes ]; then
   log "DRY RUN — missing markers:$missing"
-  log "DRY RUN — would refresh 10 pure-copy files (backup-on-diff → .pre-v0.23.bak)"
+  log "DRY RUN — would refresh 11 pure-copy files (backup-on-diff → .pre-v0.23.bak)"
   log "DRY RUN — would anchored-edit agents/rules/coding/testing + pre-push-gate.sh (skip-with-record if customised)"
   exit 0
 fi
 
 if [ "$SKIP_PROMPT" != yes ]; then
   echo "This migration will:"
-  echo "  - refresh pipeline.md, 7 SKILL files, espalier-stats.sh, and maprun-dispatch.sh from templates (backups: <file>.pre-v0.23.bak)"
+  echo "  - refresh pipeline.md, 7 SKILL files, espalier-stats.sh, rebuild-commit-index.sh, and maprun-dispatch.sh from templates (backups: <file>.pre-v0.23.bak)"
   echo "  - anchored-edit the 3 agent files, 3 rules files, 2 substituted SKILLs, and pre-push-gate.sh (customised files skipped, never mangled)"
   echo "  - write NO config keys (test-mode absent = folded; legacy speculative-tests honored)"
   printf "Proceed? [y/N] "
@@ -185,6 +188,8 @@ refresh "$TPL/skills/espalier-requirements.md" espalier/skills/espalier-requirem
   && refresh "$TPL/skills/espalier-doctor.md"  espalier/skills/espalier-doctor/SKILL.md
 refresh "$HTPL/espalier-stats.sh"              espalier/hooks/espalier-stats.sh
 chmod +x espalier/hooks/espalier-stats.sh 2>/dev/null || true
+refresh "$HTPL/rebuild-commit-index.sh"        espalier/hooks/rebuild-commit-index.sh
+chmod +x espalier/hooks/rebuild-commit-index.sh 2>/dev/null || true
 if [ -f espalier/hooks/maprun-dispatch.sh ]; then
   refresh "$HTPL/maprun-dispatch.sh"           espalier/hooks/maprun-dispatch.sh
   chmod +x espalier/hooks/maprun-dispatch.sh 2>/dev/null || true
@@ -669,6 +674,7 @@ grep -qF "$MAP_MARK"   espalier/skills/espalier-map/SKILL.md       || fail="$fai
 grep -qF "$GRILL_MARK" espalier/skills/espalier-grill/SKILL.md     || fail="$fail espalier-grill-SKILL"
 grep -qF "$REQ_MARK"   espalier/skills/espalier-requirements/SKILL.md || fail="$fail espalier-requirements-SKILL"
 grep -qF "$STATS_MARK" espalier/hooks/espalier-stats.sh            || fail="$fail espalier-stats"
+grep -qF "$RIDX_MARK"  espalier/hooks/rebuild-commit-index.sh      || fail="$fail rebuild-commit-index"
 [ -n "$fail" ] && die "post-migration verification failed for:$fail"
 
 handled "$CODER_MARK" espalier/agents/harness-coder.md    coder-fold    || die "post-migration verification failed: coder lacks '$CODER_MARK'"

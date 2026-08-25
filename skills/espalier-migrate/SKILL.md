@@ -365,8 +365,9 @@ version. Up to THIRTY-TWO migrations may apply, always in this order:
    meaning — intent names, guard clauses, small functions, comments
    last) plus coding-standards' "Readable by Default"; the reviewer's
    Readability Review gains `structure:` and the magic-constant
-   declaration-comment check. Refreshes 10
-   pure-copy files (backups `.pre-v0.23.bak`) and anchored-edits
+   declaration-comment check. Refreshes 11
+   pure-copy files (backups `.pre-v0.23.bak`, incl. the mawk-safe
+   rebuild-commit-index squash extraction) and anchored-edits
    coder/reviewer/security, the 3
    rules files, the espalier-coding/espalier-testing SKILLs, and
    `pre-push-gate.sh` (anchored `Current Stage:` read + last-match test
