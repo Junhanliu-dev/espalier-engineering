@@ -169,6 +169,8 @@ for fixture in "$FIXTURES"/*.md; do
     echo "$fid: judge FAILED TO EXECUTE after $CLAUDE_RETRIES tries (infra, not scoring)"
     infra_fail_count=$((infra_fail_count + 1)); continue
   fi
+  # Take the LAST JSON-object line — a prose preamble must not fail the fixture.
+  line="$(printf '%s\n' "$line" | grep -E '^\{.*\}[[:space:]]*$' | tail -1)"
 
   # KNOWN-ISSUES #2: normalise fenced/prose-wrapped judge output to bare JSON before parsing.
   line="$(json_extract "$line")"

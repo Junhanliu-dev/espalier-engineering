@@ -51,12 +51,25 @@ misses AND false alarms on clean code.
 - **No convention invention.** The reviewer must judge against ReviewApp's actual
   `coding-standards.md` / `engineering-structure.md`, not generic opinions. A finding
   citing a rule that isn't in those files is a false positive.
-- **Harness-world findings are genuine.** The eval project contains ONLY the file
+- **Harness-world findings are genuine.** The eval project contains ONLY the file(s)
   under review — sibling modules (`../errors`, `../logger`, repositories, services)
   and `requirements.md` deliberately do not exist. A finding that reports a
   missing/unverifiable sibling module, an unverified cross-module contract, or a
   destructive step lacking requirements.md authorization is a genuine observation of
   that world, NEVER a false positive.
+- **Test-coverage findings on code-only fixtures are genuine (v0.23 folded
+  reviewer).** The reviewer's Stage-4 duty now includes the test checklist, and
+  a fixture whose body carries no test files has no test tree by harness design.
+  A P1/P2 finding that the change lacks tests or failure-mode tests is a genuine
+  observation of that world — NEVER a false positive, and not a catch either
+  (unless the fixture's `planted_issues` names it). On a `clean` fixture, ignore
+  test-coverage-only P1s when deciding `verdict_match` — they gate like the
+  advisory notes above. A fixture that DOES ship test files (a combined
+  code+tests fixture) scores test findings normally against its answer key.
+- **Tautological-test catches match by meaning.** A planted
+  `{rule: tautological-test}` is caught by any P0/P1 finding that the named test
+  asserts the current/masked behaviour instead of the intended rule, regardless
+  of wording.
 
 ## Discipline
 - If the review-record is empty/malformed/missing: `caught:0, false_positives:0,

@@ -155,6 +155,8 @@ for fixture in "$FIXTURES"/*.md; do
     results="${results}${fid}\t${bucket}\tPASS\tERR\tFAIL\n"
     fail_count=$((fail_count + 1)); continue
   fi
+  # Take the LAST JSON-object line — a prose preamble must not fail the fixture.
+  line="$(printf '%s\n' "$line" | grep -E '^\{.*\}[[:space:]]*$' | tail -1)"
   verdict="$(printf '%s' "$line" | sed -E 's/.*"verdict":"([A-Z]+)".*/\1/')"
 
   if [ "$verdict" = "PASS" ]; then

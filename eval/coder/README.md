@@ -57,8 +57,10 @@ shadow: false
 ```
 
 ## Discipline
-- Reach 20–30 fixtures. Seed is 4 (a service method, an external-call timeout, a
-  scope-guard, an overbuild trap). All `shadow: false`.
+- Reach 20–30 fixtures. Seed is 5 (a service method, an external-call timeout, a
+  scope-guard, an overbuild trap, and a `folded: true` code+tests task — the
+  v0.23 folded coder duty; the judge then also scores `tests_written` /
+  `tests_meaningful`). All `shadow: false`.
 - Shadow subset from real tickets once the set grows.
 - Validate the judge heavily — generative scoring is the least reliable; confirm
   agreement with hand scores before trusting the gate.

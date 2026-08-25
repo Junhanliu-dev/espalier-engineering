@@ -59,9 +59,11 @@ that cite a rule not in the project.
 
 ## Discipline (same as eval/grill, eval/security)
 
-- Reach 20–30 fixtures. Seed is 8 (6 violation across the rule families — incl.
+- Reach 20–30 fixtures. Seed is 9 (6 violation across the rule families — incl.
   the new-dependency P1 and the readability cryptic-exported-name P1 — + 2
-  clean, one guarding minimalism-severity inflation).
+  clean, one guarding minimalism-severity inflation, + 1 combined code+tests
+  fixture: `=== FILE: ===` multi-file body scoring the v0.23 folded reviewer's
+  test checklist against a planted tautological test).
 - Shadow subset (~⅓) authored from real PRs / by non-authors. This seed is all
   `shadow: false`.
 - Validate the judge (≥ 75% agreement), especially on severity-downgrade calls.
