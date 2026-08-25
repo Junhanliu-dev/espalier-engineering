@@ -39,6 +39,22 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
   narration, no restating the code in prose — delete any comment that
   merely repeats what the line already says.
 
+## Readable by Default
+- No magic values: a literal on a decision path (threshold, limit, retry
+  count, timeout, rate, status string) is never inlined — it becomes a
+  named constant per the constants convention above, and when the name
+  alone cannot carry what the value is or where it comes from, one short
+  comment at the declaration explains it. Self-explaining literals
+  (0, 1, "") stay literal.
+- Flat control flow: guard clauses and early returns over nested
+  conditionals; no chained one-liner doing three things.
+- Small, single-purpose functions: a block that needs its own explanation
+  is extracted under an intent-stating name.
+- Comments are the last resort: structure the code so it explains itself;
+  per the comment rules above, one plain line only for genuinely complex
+  logic or a business rule the code cannot show.
+- {observed exceptions — terse idioms this codebase itself uses consistently}
+
 ## Required Patterns
 {things that must always be done — each backed by observed consistency}
 

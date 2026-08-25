@@ -70,4 +70,8 @@ already-installed dependency; NEVER add a new dependency without a
 `requirements.md` line naming it. Build nothing the requirement didn't ask
 for. The full ladder lives in `espalier/agents/harness-coder.md` — it is the
 coder's rule, and the reviewer checks against it (advisory, plus the
-new-dependency and cryptic-public-name gates).
+new-dependency and cryptic-public-name gates). Write it readable as you go:
+named constants over magic values, guard clauses over nesting, small
+intent-named functions — defaults canonical in
+`espalier/agents/harness-coder.md` ("Write It Readable") and
+`espalier/rules/coding-standards.md` ("Readable by Default").

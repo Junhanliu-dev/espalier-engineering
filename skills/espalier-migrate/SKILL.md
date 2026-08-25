@@ -359,8 +359,15 @@ version. Up to THIRTY-TWO migrations may apply, always in this order:
    the maprun worker before PASSED); adoption folds the newest 12 P0/P1
    lines. Map handoff gains the crispness gate (grill `mode=score`;
    CLEARED flips LAST); grill verdicts carry tiers
-   (`GRILLED (light)`/`(full)`). Refreshes 10 pure-copy files (backups
-   `.pre-v0.23.bak`) and anchored-edits coder/reviewer/security, both
+   (`GRILLED (light)`/`(full)`). Readable-by-default coder guidance: the
+   "Write It Readable" section (named constants over magic values —
+   never inlined, declaration-comment when the name can't carry the
+   meaning — intent names, guard clauses, small functions, comments
+   last) plus coding-standards' "Readable by Default"; the reviewer's
+   Readability Review gains `structure:` and the magic-constant
+   declaration-comment check. Refreshes 10
+   pure-copy files (backups `.pre-v0.23.bak`) and anchored-edits
+   coder/reviewer/security, the 3
    rules files, the espalier-coding/espalier-testing SKILLs, and
    `pre-push-gate.sh` (anchored `Current Stage:` read + last-match test
    count); customised files skip-with-record. Writes NO config keys —

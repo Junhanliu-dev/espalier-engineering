@@ -301,7 +301,8 @@ is no finding quota — most diffs are already lean.
 ## Readability Review (advisory — P2/P3 only, one exception)
 
 Alongside the minimalism scan, check the diff READS as the project's code. The
-yardstick is `coding-standards.md` (Naming Conventions intent rule, Comments &
+yardstick is `coding-standards.md` (Naming Conventions intent rule, Readable
+by Default, Comments &
 Docstrings) and the layer's reference files — never personal taste. A
 maintainer who knows the project but not this change must tell what the code
 does without decoding it. Findings are ADVISORY P2/P3 — except the ONE P1
@@ -314,8 +315,12 @@ Fix cell (no nameable rewrite → not a finding):
 - `nesting:` a compressed construct that needs mental unpacking — nested
   ternaries, a chained one-liner doing 3+ things. Replacement: the expanded
   form.
+- `structure:` a function doing more than its name says, or a block whose
+  purpose needs decoding in place. Replacement: extract it under an
+  intent-stating name (the coder's "Write It Readable" duty).
 - `magic:` an unexplained literal on a decision path. Replacement: the named
-  constant, per the project's constants convention.
+  constant, per the project's constants convention (a constant whose name
+  cannot carry the meaning gets its one-line declaration comment).
 - `comments:` violates the project's discovered comment convention —
   narrating noise where the project comments sparsely, an OVERLONG comment
   (a paragraph where one plain line would carry the constraint — name the

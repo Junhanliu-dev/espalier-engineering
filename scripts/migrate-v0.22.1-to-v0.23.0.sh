@@ -27,6 +27,12 @@
 #     lines into the slice's requirements.
 #   - Crispness gate: the map handoff scores each drafted slice (grill
 #     mode=score) and refuses would-be-full slices; CLEARED flips LAST.
+#   - Readable by default: the coder gains a "Write It Readable" section
+#     (named constants over magic values, intent names, guard clauses,
+#     small functions, comments last); coding-standards gains the matching
+#     "Readable by Default" defaults; the espalier-coding SKILL points at both;
+#     the reviewer's Readability Review gains the `structure:` tag and the
+#     magic-constant declaration-comment check.
 #   - Grill verdicts carry their tier: GRILLED (light) / GRILLED (full).
 #   - espalier-stats: tier split + adoption nudge; espalier-doctor: config
 #     advisory; pre-push-gate: anchored Current Stage read + last-match
@@ -41,8 +47,8 @@
 #     install has no such hook).
 #   - Anchored edits into the SUBSTITUTED per-project files (never
 #     wholesale-copied): harness-coder / harness-reviewer / harness-security,
-#     production-standards / security-standards, the espalier-coding and
-#     espalier-testing SKILLs, and pre-push-gate.sh. A customised file
+#     production-standards / security-standards / coding-standards, the
+#     espalier-coding and espalier-testing SKILLs, and pre-push-gate.sh. A customised file
 #     missing its anchor is skipped with a record in
 #     espalier/.migrations-skipped, never mangled.
 #   - Writes NO config keys: test-mode absent = folded (legacy
@@ -94,6 +100,10 @@ REQ_MARK='GRILLED (light)'
 DOC_MARK='Config Advisories'
 STATS_MARK='untiered'
 CODER_MARK='Contract entry point (post-panel dispatch mode)'
+READ_MARK='Write It Readable'
+CSTD_MARK='Readable by Default'
+CSKL2_MARK='Write it readable as you go'
+REV2_MARK='`structure:`'
 REV_MARK='## Test Review (folded Stage 4 / serial Stage 6)'
 SEC_MARK='fixture-data leakage'
 PROD_MARK='a coding-stage duty'
@@ -127,6 +137,10 @@ handled "$SSTD_MARK"  espalier/rules/security-standards.md   sstd-fold    || mar
 handled "$CSKL_MARK"  espalier/skills/espalier-coding/SKILL.md  coding-fold  || mark "espalier-coding stage re-point"
 handled "$TSKL_MARK"  espalier/skills/espalier-testing/SKILL.md testing-fold || mark "espalier-testing re-point"
 handled "$GATE_MARK"  espalier/hooks/pre-push-gate.sh gate-fold            || mark "pre-push anchored stage read + last-match count"
+handled "$READ_MARK"  espalier/agents/harness-coder.md coder-readable      || mark "coder readable-by-default section"
+handled "$CSTD_MARK"  espalier/rules/coding-standards.md cstd-readable     || mark "coding-standards Readable by Default"
+handled "$CSKL2_MARK" espalier/skills/espalier-coding/SKILL.md coding-readable || mark "espalier-coding readable pointer"
+handled "$REV2_MARK"  espalier/agents/harness-reviewer.md rev-readable        || mark "reviewer structure: tag + magic-constant comment check"
 
 if [ -z "$missing" ]; then
   log "already at v0.23.0 (every marker present). Nothing to do."
@@ -143,7 +157,7 @@ fi
 if [ "$SKIP_PROMPT" != yes ]; then
   echo "This migration will:"
   echo "  - refresh pipeline.md, 7 SKILL files, espalier-stats.sh, and maprun-dispatch.sh from templates (backups: <file>.pre-v0.23.bak)"
-  echo "  - anchored-edit the 3 agent files, 2 rules files, 2 substituted SKILLs, and pre-push-gate.sh (customised files skipped, never mangled)"
+  echo "  - anchored-edit the 3 agent files, 3 rules files, 2 substituted SKILLs, and pre-push-gate.sh (customised files skipped, never mangled)"
   echo "  - write NO config keys (test-mode absent = folded; legacy speculative-tests honored)"
   printf "Proceed? [y/N] "
   read -r ans
@@ -259,6 +273,69 @@ EOF
   fi
 fi
 
+# 2a2. coder — the readable-by-default section + constraints pointer.
+if ! handled "$READ_MARK" "$CODER" coder-readable; then
+  OF_HEAD='## Output Format (when task complete)'
+  if grep -qF -- "$OF_HEAD" "$CODER" 2>/dev/null; then
+    backup_once "$CODER"
+    cat > "$BLK" << 'EOF'
+## Write It Readable (while writing, not at review)
+
+Code is read far more often than written — produce the version a
+maintainer new to the change parses without decoding. The reviewer flags
+violations (`naming:` / `nesting:` / `magic:` tags); write it right the
+first time. A documented project convention always outranks any default
+here — match the project, don't fight it:
+
+1. **No magic values.** A literal on a decision path — a threshold, limit,
+   retry count, timeout, fee rate, status string — is NEVER inlined: it
+   becomes a NAMED constant per the project's constants convention, named
+   for what the value MEANS (`MAX_LOGIN_ATTEMPTS`,
+   `FREE_SHIPPING_THRESHOLD_CENTS`), living where the project keeps such
+   constants. If the name alone cannot carry what the value is or where
+   it comes from, ONE short comment at the declaration explains it — that
+   is exactly the comment budget's allowed case (a domain fact the code
+   cannot show). Self-explaining literals stay literal: 0 as a start
+   index, 1 as a step, `""` as empty.
+2. **Names state intent.** A reader who has not opened the body can tell
+   what an identifier holds or does. No `data2`, `tmp`, `proc` on
+   anything that outlives a few lines; a function name says what it does,
+   and a `getX` never mutates.
+3. **Flat beats clever.** Guard clauses and early returns over nested
+   conditionals; one step per line over a chained one-liner doing three
+   things; the boring explicit form over the compressed construct that
+   needs mental unpacking.
+4. **Small, single-purpose functions.** A function does the one thing its
+   name says. When a block inside needs its own explanation, extract it
+   under an intent-stating name — the call site then reads as prose.
+5. **Comments are the last resort, not the fix.** The comment budget in
+   Your Constraints is unchanged: default NO comment, ONE plain line only
+   for genuinely complex logic or a business rule the code cannot show (a
+   why, an invariant, a domain fact). If a comment is forming, first try
+   a better name or an extraction — most comments are a naming failure.
+
+EOF
+    tmp="$CODER.v023tmp"; cp "$CODER" "$tmp"
+    awk -v blk="$BLK" '
+      $0 == "## Output Format (when task complete)" && !done {
+        while ((getline line < blk) > 0) print line
+        close(blk); done=1
+      }
+      $0 == "- Report what you did in structured format when done" && !bul {
+        print "- Readable by default: named constants over magic values, intent-stating"
+        print "  names, guard clauses over nesting — see \"Write It Readable\" below. A"
+        print "  documented project convention outranks these defaults."
+        bul=1
+      }
+      { print }
+    ' "$tmp" > "$CODER"
+    rm -f "$tmp"
+    log "inserted the readable-by-default coder section"
+  else
+    record_skip coder-readable "$CODER" "the Output Format heading"
+  fi
+fi
+
 # 2b. reviewer — in-flight exclusion out; test checklist in; abuse check re-scoped.
 REV=espalier/agents/harness-reviewer.md
 if ! handled "$REV_MARK" "$REV" reviewer-fold; then
@@ -324,6 +401,34 @@ EOF
     log "folded the reviewer (test checklist at Stage 4; abuse check at the delta review)"
   else
     record_skip reviewer-fold "$REV" "the v0.22 reviewer anchors"
+  fi
+fi
+
+# 2b2. reviewer — Readability Review gains `structure:` + the magic-constant
+#      declaration-comment check.
+if ! handled "$REV2_MARK" "$REV" rev-readable; then
+  MAGIC_LINE='- `magic:` an unexplained literal on a decision path. Replacement: the named'
+  if grep -qF -- "$MAGIC_LINE" "$REV" 2>/dev/null; then
+    backup_once "$REV"
+    tmp="$REV.v023tmp"; cp "$REV" "$tmp"
+    awk '
+      $0 == "- `magic:` an unexplained literal on a decision path. Replacement: the named" && !done {
+        print "- `structure:` a function doing more than its name says, or a block whose"
+        print "  purpose needs decoding in place. Replacement: extract it under an"
+        print "  intent-stating name (the coder'\''s \"Write It Readable\" duty)."
+        done=1
+      }
+      $0 == "  constant, per the project'\''s constants convention." {
+        print "  constant, per the project'\''s constants convention (a constant whose name"
+        print "  cannot carry the meaning gets its one-line declaration comment)."
+        next
+      }
+      { print }
+    ' "$tmp" > "$REV"
+    rm -f "$tmp"
+    log "extended the reviewer Readability Review (structure: tag + constant-comment check)"
+  else
+    record_skip rev-readable "$REV" "the stock magic: tag line"
   fi
 fi
 
@@ -401,6 +506,44 @@ if ! handled "$SSTD_MARK" "$SSTD" sstd-fold; then
   fi
 fi
 
+# 2e2. coding-standards — the Readable by Default section.
+CSTD=espalier/rules/coding-standards.md
+if ! handled "$CSTD_MARK" "$CSTD" cstd-readable; then
+  RP_HEAD='## Required Patterns'
+  if grep -qF -- "$RP_HEAD" "$CSTD" 2>/dev/null; then
+    backup_once "$CSTD"
+    cat > "$BLK" << 'EOF'
+## Readable by Default
+- No magic values: a literal on a decision path (threshold, limit, retry
+  count, timeout, rate, status string) is never inlined — it becomes a
+  named constant per the constants convention above, and when the name
+  alone cannot carry what the value is or where it comes from, one short
+  comment at the declaration explains it. Self-explaining literals
+  (0, 1, "") stay literal.
+- Flat control flow: guard clauses and early returns over nested
+  conditionals; no chained one-liner doing three things.
+- Small, single-purpose functions: a block that needs its own explanation
+  is extracted under an intent-stating name.
+- Comments are the last resort: structure the code so it explains itself;
+  per the comment rules above, one plain line only for genuinely complex
+  logic or a business rule the code cannot show.
+
+EOF
+    tmp="$CSTD.v023tmp"; cp "$CSTD" "$tmp"
+    awk -v blk="$BLK" '
+      $0 == "## Required Patterns" && !done {
+        while ((getline line < blk) > 0) print line
+        close(blk); done=1
+      }
+      { print }
+    ' "$tmp" > "$CSTD"
+    rm -f "$tmp"
+    log "inserted the Readable by Default section into coding-standards"
+  else
+    record_skip cstd-readable "$CSTD" "the Required Patterns heading"
+  fi
+fi
+
 # 2f. espalier-coding SKILL — stage references re-pointed.
 CSKL=espalier/skills/espalier-coding/SKILL.md
 if ! handled "$CSKL_MARK" "$CSKL" coding-fold; then
@@ -434,6 +577,29 @@ EOF
     log "re-pointed espalier-coding stage sections"
   else
     record_skip coding-fold "$CSKL" "the v0.22 stage-section anchors"
+  fi
+fi
+
+# 2f2. espalier-coding SKILL — readable-as-you-go pointer.
+if ! handled "$CSKL2_MARK" "$CSKL" coding-readable; then
+  GATES_LINE='new-dependency and cryptic-public-name gates).'
+  if grep -qF -- "$GATES_LINE" "$CSKL" 2>/dev/null; then
+    backup_once "$CSKL"
+    tmp="$CSKL.v023tmp"; cp "$CSKL" "$tmp"
+    awk '
+      { print }
+      index($0, "new-dependency and cryptic-public-name gates).") && !done {
+        print "Write it readable as you go: named constants over magic values, guard"
+        print "clauses over nesting, small intent-named functions — defaults canonical in"
+        print "`espalier/agents/harness-coder.md` (\"Write It Readable\") and"
+        print "`espalier/rules/coding-standards.md` (\"Readable by Default\")."
+        done=1
+      }
+    ' "$tmp" > "$CSKL"
+    rm -f "$tmp"
+    log "appended the readable-as-you-go pointer to espalier-coding"
+  else
+    record_skip coding-readable "$CSKL" "the solution-selection gates line"
   fi
 fi
 
@@ -512,6 +678,10 @@ handled "$PROD_MARK"  espalier/rules/production-standards.md prod-fold  || die "
 handled "$SSTD_MARK"  espalier/rules/security-standards.md   sstd-fold  || die "post-migration verification failed: security-standards not re-pointed"
 handled "$CSKL_MARK"  espalier/skills/espalier-coding/SKILL.md  coding-fold  || die "post-migration verification failed: espalier-coding not re-pointed"
 handled "$TSKL_MARK"  espalier/skills/espalier-testing/SKILL.md testing-fold || die "post-migration verification failed: espalier-testing not re-pointed"
+handled "$READ_MARK"  espalier/agents/harness-coder.md coder-readable || die "post-migration verification failed: coder lacks the Write It Readable section"
+handled "$CSTD_MARK"  espalier/rules/coding-standards.md cstd-readable || die "post-migration verification failed: coding-standards lacks Readable by Default"
+handled "$CSKL2_MARK" espalier/skills/espalier-coding/SKILL.md coding-readable || die "post-migration verification failed: espalier-coding lacks the readable pointer"
+handled "$REV2_MARK"  espalier/agents/harness-reviewer.md rev-readable || die "post-migration verification failed: reviewer lacks the structure: readability tag"
 handled "$GATE_MARK"  "$GATE" gate-fold || die "post-migration verification failed: gate lacks the anchored stage read"
 bash -n "$GATE" || die "post-migration verification failed: pre-push-gate.sh no longer parses (restore from $GATE.pre-v0.23.bak)"
 bash -n espalier/hooks/espalier-stats.sh || die "post-migration verification failed: espalier-stats.sh no longer parses"

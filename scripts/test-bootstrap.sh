@@ -1509,7 +1509,12 @@ assert "32c pipeline + agents + rules + testing/coding re-pointed" \
    && grep -qF 'a coding-stage duty' '$TPL32/rules/production-standards.md' \
    && grep -qF 'contract delta' '$TPL32/rules/security-standards.md' \
    && grep -qF 'folded test-writing duty' '$TPL32/skills/espalier-coding.md' \
-   && grep -qF 'contract delta review' '$TPL32/skills/espalier-testing.md'"
+   && grep -qF 'contract delta review' '$TPL32/skills/espalier-testing.md' \
+   && grep -qF 'Write It Readable' '$TPL32/agents/harness-coder.md' \
+   && grep -qF 'Readable by Default' '$TPL32/rules/coding-standards.md' \
+   && grep -qF 'Write it readable as you go' '$TPL32/skills/espalier-coding.md' \
+   && grep -qF -- '- \`structure:\`' '$TPL32/agents/harness-reviewer.md' \
+   && grep -qF 'one-line declaration comment' '$TPL32/agents/harness-reviewer.md'"
 assert "32d digest + crispness + tier + nudge + maprun boundary markers" \
   "grep -qF 'Known failure patterns (from sibling slices)' '$TPL32/skills/espalier.md' \
    && grep -qF 'findings/' '$TPL32/skills/espalier-map.md' \
@@ -1580,6 +1585,10 @@ unchanged.
 When reviewing tests, verify EVERY listed field has a passing negative test.
 This is enforced
 coverage, not a suggestion.
+
+## Readability Review (advisory — P2/P3 only, one exception)
+- `magic:` an unexplained literal on a decision path. Replacement: the named
+  constant, per the project's constants convention.
 V221REV
 cat > "$TMP/espalier/agents/harness-security.md" << 'V221SEC'
 If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
@@ -1652,6 +1661,13 @@ gate_parallel_section() {
 echo "All gates passed. Push allowed."
 exit 0
 V221GATE
+cat > "$TMP/espalier/rules/coding-standards.md" << 'V221CSTD'
+## Comments & Docstrings
+- Density: sparse.
+
+## Required Patterns
+- Service returns the project's Result type.
+V221CSTD
 M23_OUT=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 M23_RC=$?
 assert "32h apply lands every v0.23 marker + backups" \
@@ -1666,6 +1682,10 @@ assert "32h apply lands every v0.23 marker + backups" \
    && grep -qF 'contract delta' '$TMP/espalier/rules/security-standards.md' \
    && grep -qF 'folded test-writing duty' '$TMP/espalier/skills/espalier-coding/SKILL.md' \
    && grep -qF 'contract delta review' '$TMP/espalier/skills/espalier-testing/SKILL.md' \
+   && grep -qF 'Write It Readable' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'Readable by Default' '$TMP/espalier/rules/coding-standards.md' \
+   && grep -qF -- '- \`structure:\`' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF 'one-line declaration comment' '$TMP/espalier/agents/harness-reviewer.md' \
    && grep -qF 'untiered' '$TMP/espalier/hooks/espalier-stats.sh' \
    && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.23.bak' ] \
    && [ -f '$TMP/espalier/hooks/pre-push-gate.sh.pre-v0.23.bak' ]"

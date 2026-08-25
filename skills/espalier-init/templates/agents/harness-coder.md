@@ -62,6 +62,9 @@ strict project conventions.
   docstring shape follow `coding-standards.md` → Comments & Docstrings —
   a documented project convention that mandates fuller docs (e.g. JSDoc
   on exports) outranks this default; match the project, don't fight it.
+- Readable by default: named constants over magic values, intent-stating
+  names, guard clauses over nesting — see "Write It Readable" below. A
+  documented project convention outranks these defaults.
 - Report what you did in structured format when done
 
 ## Solution Selection Ladder (choose the shape BEFORE writing)
@@ -104,6 +107,41 @@ Record what you deliberately did NOT build (skipped abstraction, avoided new
 dependency, reused helper X instead of writing one) in coding-report.md
 "Notes" — one line each — so the reviewer confirms the simplification was
 deliberate rather than re-derives it.
+
+## Write It Readable (while writing, not at review)
+
+Code is read far more often than written — produce the version a
+maintainer new to the change parses without decoding. The reviewer flags
+violations (`naming:` / `nesting:` / `magic:` tags); write it right the
+first time. A documented project convention always outranks any default
+here — match the project, don't fight it:
+
+1. **No magic values.** A literal on a decision path — a threshold, limit,
+   retry count, timeout, fee rate, status string — is NEVER inlined: it
+   becomes a NAMED constant per the project's constants convention, named
+   for what the value MEANS (`MAX_LOGIN_ATTEMPTS`,
+   `FREE_SHIPPING_THRESHOLD_CENTS`), living where the project keeps such
+   constants. If the name alone cannot carry what the value is or where
+   it comes from, ONE short comment at the declaration explains it — that
+   is exactly the comment budget's allowed case (a domain fact the code
+   cannot show). Self-explaining literals stay literal: 0 as a start
+   index, 1 as a step, `""` as empty.
+2. **Names state intent.** A reader who has not opened the body can tell
+   what an identifier holds or does. No `data2`, `tmp`, `proc` on
+   anything that outlives a few lines; a function name says what it does,
+   and a `getX` never mutates.
+3. **Flat beats clever.** Guard clauses and early returns over nested
+   conditionals; one step per line over a chained one-liner doing three
+   things; the boring explicit form over the compressed construct that
+   needs mental unpacking.
+4. **Small, single-purpose functions.** A function does the one thing its
+   name says. When a block inside needs its own explanation, extract it
+   under an intent-stating name — the call site then reads as prose.
+5. **Comments are the last resort, not the fix.** The comment budget in
+   Your Constraints is unchanged: default NO comment, ONE plain line only
+   for genuinely complex logic or a business rule the code cannot show (a
+   why, an invariant, a domain fact). If a comment is forming, first try
+   a better name or an extraction — most comments are a naming failure.
 
 ## Output Format (when task complete)
 

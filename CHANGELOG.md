@@ -56,6 +56,19 @@ the claim-by-claim code review that reshaped it).
 - **Context pack earlier:** assembled in the same orchestrator turn that
   presents the Requirements Approval Gate (re-derived on an Edit that
   changes the layer set) — one turn saved per run.
+- **Readable by default (coder).** Writing human-readable code becomes a
+  stated coder duty: named constants over magic values on decision paths,
+  intent-stating names, guard clauses over nesting, small single-purpose
+  functions, and comments as the last resort — one plain line, only for
+  genuinely complex logic or a business rule the code cannot show — always
+  subordinate to the project's own discovered conventions.
+  `coding-standards.md` gains the matching "Readable by Default" section,
+  and the reviewer's Readability Review enforces it: the existing
+  `naming:`/`nesting:`/`magic:` tags plus a new `structure:` tag (a
+  function doing more than its name says — extract it) and a
+  magic-constant check (a constant whose name cannot carry the meaning
+  gets its one-line declaration comment); the espalier-coding SKILL
+  points at both. Migration #32 carries the inserts.
 - **Hygiene:** `pre-push-gate.sh`'s `Current Stage:` read is now
   line-anchored (the v0.22 certificate-read lesson applied); the
   test-count parse takes the LAST summary match in both serial and
