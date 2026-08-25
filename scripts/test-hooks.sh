@@ -956,7 +956,7 @@ printf -- '---\nticket: 003\ntype: task\nstatus: open\n---\n'       > "$TMP/espa
 OUT=$( cd "$TMP" && bash "$STATS" )
 assert "17b lane counts + statuses"      "echo \"\$OUT\" | grep -qF 'feat**: 2' && echo \"\$OUT\" | grep -q 'IN_PROGRESS=1 COMPLETE=1'"
 assert "17c code-round distribution"     "echo \"\$OUT\" | grep -q 'code rounds: n=3 min=1 median=1 mean=1.67 max=3'"
-assert "17d grill verdict mix"           "echo \"\$OUT\" | grep -q 'GRILLED=1  crisp=1  no-grill=0  non-interactive=0'"
+assert "17d grill verdict mix"           "echo \"\$OUT\" | grep -q 'GRILLED=1 (light=0 full=0 untiered=1)  crisp=1  no-grill=0  non-interactive=0'"
 assert "17e cohort split"                "echo \"\$OUT\" | grep -q 'charted feats:   1' && echo \"\$OUT\" | grep -q 'uncharted feats: 1'"
 assert "17f cohort round means differ"   "echo \"\$OUT\" | grep -q 'charted code rounds: n=1 min=1' && echo \"\$OUT\" | grep -q 'uncharted code rounds: n=1 min=3'"
 assert "17g fix echo lands on uncharted" "echo \"\$OUT\" | grep -q 'against-charted=0 against-uncharted=1 unlinked=0'"
@@ -1057,6 +1057,72 @@ printf 'hook-parallel-gates: yes\n' > "$TMP2/espalier/.espalier-config"
 ( cd "$TMP2" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMP2/err.txt" )
 assert "19e parallel zero-test-count blocks" \
   "[ $? -eq 2 ] && grep -q 'No tests found' '$TMP2/err.txt'"
+
+# 19j (v0.23): the count parse takes the LAST summary match — an intermediate
+# "N tests" progress line before a "0 passed" summary must still block, and a
+# real final total must win over an early progress line.
+TMPJ=$(mktemp -d -t hooks-t19j.XXXX)
+make_repo "$TMPJ"
+make_gate22 "$TMPJ" "true" "true" "printf '5 tests\\n0 passed\\n'"
+state_file "$TMPJ" feat 2026-08-11-lastcount 7 IN_PROGRESS
+( cd "$TMPJ" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMPJ/err.txt" )
+assert "19j last-match count: 0-passed summary blocks despite earlier '5 tests' line" \
+  "[ $? -eq 2 ] && grep -q 'No tests found' '$TMPJ/err.txt'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMPJ"
+
+# 19k (v0.23): the Current Stage read is line-anchored — a Stage History note
+# QUOTING "Current Stage: 2" in prose must not shadow the real Status line.
+TMPK=$(mktemp -d -t hooks-t19k.XXXX)
+make_repo "$TMPK"
+make_gate22 "$TMPK" "true" "true" "echo '3 passed'"
+mkdir -p "$TMPK/espalier/changes/feat/2026-08-11-anchor"
+cat > "$TMPK/espalier/changes/feat/2026-08-11-anchor/pipeline-state.md" << 'ANCH'
+# Pipeline State: anchor
+
+## Status
+- Current Stage: 7
+- Status: IN_PROGRESS
+
+## Stage History
+| Stage | Status | Timestamp | Notes |
+|-------|--------|-----------|-------|
+| 4 | ROUND 1 FAIL | ts | note quoting Current Stage: 2 in prose |
+ANCH
+( cd "$TMPK" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMPK/err.txt" )
+assert "19k anchored stage read ignores prose quoting a lower stage" "[ $? -eq 0 ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMPK"
+
+# ─── T20: espalier-stats.sh — v0.23 tier split + adoption nudge + digest math ─
+echo "T20: espalier-stats v0.23 (grill tiers + nudge)"
+STATS="$HOOKS_SRC/espalier-stats.sh"
+TMP20=$(mktemp -d -t hooks-t20.XXXX)
+make_repo "$TMP20"
+mkdir -p "$TMP20/espalier/changes/feat/2026-08-20-t1" \
+         "$TMP20/espalier/changes/feat/2026-08-21-t2" \
+         "$TMP20/espalier/changes/feat/2026-08-22-t3"
+printf -- '- Status: COMPLETE\n| 1 | PASSED | ts | GRILLED (light) |\n## Commits\n| Stage | SHA | Files |\n| 7 | aaa | x |\n' \
+  > "$TMP20/espalier/changes/feat/2026-08-20-t1/pipeline-state.md"
+printf -- '- Status: COMPLETE\n| 1 | PASSED | ts | GRILLED (full) |\n## Commits\n| Stage | SHA | Files |\n| 7 | bbb | y |\n' \
+  > "$TMP20/espalier/changes/feat/2026-08-21-t2/pipeline-state.md"
+printf -- '- Status: COMPLETE\n| 1 | PASSED | ts | GRILLED |\n## Commits\n| Stage | SHA | Files |\n| 7 | ccc | z |\n' \
+  > "$TMP20/espalier/changes/feat/2026-08-22-t3/pipeline-state.md"
+OUT=$( cd "$TMP20" && bash "$STATS" )
+assert "20a tier split counts light/full/untiered" \
+  "echo \"\$OUT\" | grep -q 'GRILLED=3 (light=1 full=1 untiered=1)'"
+assert "20b nudge fires: key absent + 3 push rows" \
+  "echo \"\$OUT\" | grep -q 'hook-parallel-gates not set'"
+printf 'hook-parallel-gates: no\n' > "$TMP20/espalier/.espalier-config"
+OUT=$( cd "$TMP20" && bash "$STATS" )
+assert "20c nudge silent when the key is present (any value)" \
+  "! echo \"\$OUT\" | grep -q 'hook-parallel-gates not set'"
+rm -f "$TMP20/espalier/.espalier-config"
+rm -rf "$TMP20/espalier/changes/feat/2026-08-22-t3"
+OUT=$( cd "$TMP20" && bash "$STATS" )
+assert "20d nudge silent below 3 gated pushes" \
+  "! echo \"\$OUT\" | grep -q 'hook-parallel-gates not set'"
+assert "20e stats stays read-only with the nudge section" \
+  "[ ! -f '$TMP20/espalier/.espalier-config' ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP20"
 
 # 19f-h: dependency-audit cache. package-lock WITHOUT package.json → no audit
 # tool runs, but the cache records the manifest hash; a seeded matching-hash

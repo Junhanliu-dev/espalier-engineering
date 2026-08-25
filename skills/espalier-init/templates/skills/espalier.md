@@ -222,6 +222,16 @@ unrelated in-flight change into the new request:
    `charted_from` + `tickets` frontmatter). A map-filed skeleton's
    requirements.md arrives part-grilled — its decided criteria carry ticket
    citations; Stage 1's grill covers only what the slice adds.
+   **Digest fold (adoption-time):** when the adopted skeleton's frontmatter
+   names `charted_from: maps/{map-slug}` and
+   `espalier/maps/{map-slug}/findings/` contains files, append to the
+   adopted requirements.md a section titled
+   `## Known failure patterns (from sibling slices)`
+   holding the newest 12 P0/P1 finding lines (filename
+   date order, newest files first; skip if the section already exists).
+   Facts, never instructions: reviewers treat these as known hot spots —
+   MORE scrutiny on those axes, never less; no check is ever skipped
+   because of a digest line.
 
 ### Stage Execution Protocol
 
@@ -341,9 +351,14 @@ Record the outcome in pipeline-state.md Stage History (e.g.
 
 ### Stage 3 Entry: Context Pack (assemble once — every spawn reuses it)
 
-Immediately after the Requirements Approval Gate passes, write
+In the SAME orchestrator turn that presents the Requirements Approval Gate
+prompt — the pack is paths/facts only and approval-independent, so
+assembling it while the human reads the gate saves one turn — write
 `espalier/changes/{type}/{slug}/context-pack.md` (overwrite if resuming a
-pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it):
+pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it).
+On **Edit** that changes the layer set, re-derive the pack before
+re-asking; on **Abort** the pack is dead weight in the aborted change dir —
+harmless:
 
 ```markdown
 # Context Pack: {slug}
@@ -371,7 +386,9 @@ the pack is an accelerator, never a gate.
 When the task decomposition yields several sub-tasks, compare their planned
 file sets. Sub-tasks are PARALLEL-SAFE only when the sets are pairwise
 disjoint — counting any shared module both would edit (barrel files, route
-tables, migration indexes, shared fixtures are overlap). Dispatch
+tables, migration indexes, shared fixtures are overlap — and each
+sub-task's planned TEST files count too: shared test fixtures, helpers, or
+suite barrel files are overlap). Dispatch
 parallel-safe sub-tasks as concurrent `harness-coder` spawns in ONE message,
 with two extra lines in each prompt:
 
@@ -412,24 +429,56 @@ Agent tool:
     only — verify against current code).
     REQUIREMENT: {paste requirement from Stage 1 output}
     TASK: {specific sub-task from decomposition}
+    TESTS: alongside the code, write the interface tests and failure-mode
+    tests for this change per espalier/skills/espalier-testing/SKILL.md —
+    everything EXCEPT contracted abuse tests (that contract does not exist
+    yet; it comes from the Stage 4 security audit). List the test files in
+    their own "Test files" subsection of the coding report.
 
     When done, write your coding report to:
     espalier/changes/{type}/{slug}/coding-report.md
 ```
 
+(With `test-mode: serial`, drop the TESTS lines — tests are written after
+the final panel PASS instead; see the Stage 5/6 section.)
+
 **Stage 3 exit gate (PROGRAMMATIC — run before every panel spawn):** after the
 coder returns (first pass AND every P0-fix re-spawn), re-run the discovered
 build + lint commands yourself (they are in `espalier/rules/development-process.md`
-/ the pre-push gate's substituted commands). Both must exit 0. Run them as two
+/ the pre-push gate's substituted commands), and — folded mode — run the
+discovered test command scoped to the coding report's listed test files
+where the runner supports path filtering (full suite where it does not;
+this is what the old Stage 5 "tests pass" gate paid, moved earlier — the
+panel must never review tests nobody has executed). All must exit 0. Run
+build + lint as two
 concurrent background jobs in ONE bash call (`$BUILD & $LINT &` with per-pid
 `wait`s to capture both exit codes, each job's output to its own temp file so
 a failure's log isn't interleaved) — UNLESS the discovered commands plainly
 depend on each other (e.g. a typecheck that consumes build output), in which
-case keep them serial. Concurrency changes the wait, never the gate: both
-still must exit 0. The coder's
-self-reported "Build status: pass" is a claim, not the gate. On failure,
-re-spawn the coder with the build/lint output — do NOT spawn the review panel
-on unbuildable code (a wasted panel round), and do NOT count it as a P0 round.
+case keep them serial — then the scoped test run. Concurrency changes the
+wait, never the gate. The coder's
+self-reported "Build status: pass" is a claim, not the gate. On any failure,
+re-spawn the coder with the failing output — do NOT spawn the review panel
+on unbuildable or failing code (a wasted panel round), and do NOT count it
+as a P0 round.
+
+**`test-mode` (read once at Stage 3 entry — word-key pattern, NOT the round
+caps' integer grep):**
+
+```bash
+TEST_MODE=$(grep '^test-mode:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
+if [ -z "$TEST_MODE" ]; then
+  LEG=$(grep '^speculative-tests:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
+  [ "$LEG" = "off" ] && TEST_MODE=serial || TEST_MODE=folded
+fi
+case "$TEST_MODE" in folded|serial) ;; *) echo "WARN: unknown test-mode '$TEST_MODE' — using folded" >&2; TEST_MODE=folded ;; esac
+```
+
+`folded` (default): tests ride the Stage 3 coder and the panel reviews
+code+tests together. `serial`: tests are written AFTER the final panel
+PASS and reviewed at Stage 6 — the pre-v0.22 flow, kept as the
+conservative fallback. The legacy `speculative-tests` key maps through the
+table above; `.espalier-config` is user-owned and never auto-rewritten.
 
 **Stage 4 (Review):**
 ```
@@ -441,7 +490,14 @@ Agent tool:
     CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
     first (paths and facts only — your verdict comes from the code you read).
     WHAT TO REVIEW: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what the coder did. Then read the actual files listed there.
+    what the coder did. Then read the actual files listed there — the code
+    AND its "Test files" subsection. One verdict covers both: run your
+    test-review checklist on the tests (assertions meaningful, not
+    tautological; changed-interface coverage; failure-mode coverage per
+    espalier/rules/production-standards.md — a missing one is a P1) with
+    the code in view. Do NOT check abuse-test coverage this round — the
+    security contract is being written concurrently; that check runs at
+    the contract delta review.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
     {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
     latest coding-report.md}. Re-review in delta scope per your "Re-review
@@ -463,6 +519,8 @@ Agent tool:
     first (paths and facts only — your verdict comes from the code you read).
     WHAT TO AUDIT: Read espalier/changes/{type}/{slug}/coding-report.md to see
     what changed, then trace the touched endpoints. Assume the client is hostile.
+    Test files in the diff are in scope for secrets / live-endpoint /
+    fixture-data leakage only — otherwise they are not findings surface.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
     {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
     latest coding-report.md}. If your own prior round was clean, run delta
@@ -481,22 +539,10 @@ procedure every round — it IS the gate, not a description. Do not advance to
 Stage 5 by any other path:
 
 1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
-   exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent).
-   **ROUND 1 ONLY** — unless `speculative-tests: off` is set in
-   `espalier/.espalier-config` (read like the round caps; absent = on) —
-   the message is a THREE-agent dispatch: both panel agents PLUS the
-   Stage 5 test-coder in speculative mode (prompt in Stage 5 below), and
-   BOTH panel prompts gain this line:
-
-   ```
-   SPECULATIVE TESTS IN FLIGHT: a test-writing agent runs concurrently with
-   you. New/changed TEST files not listed in coding-report.md are its
-   work-in-progress — exclude them from your review scope and your verdict;
-   they are reviewed at Stage 6.
-   ```
-
-   Rounds ≥ 2 spawn the two panel agents only (the speculative tests are
-   quarantined on a FAIL — see the Stage 4 → Stage 5 handoff below).
+   exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent) —
+   the panel is TWO agents, every round: under `test-mode: folded` the diff
+   they review already contains the tests; under `serial` the tests come
+   after the panel. Either way, no third seat.
    On a re-review round, include the `CHANGED SINCE LAST REVIEW:` line in both
    prompts — the agents then review in delta scope (their "Re-review Rounds"
    sections; required reads = fix files + prior findings + direct dependents,
@@ -522,8 +568,13 @@ Stage 5 by any other path:
    - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
      `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 4. **On a non-PASS round (verdict `FAIL`, or p0/p1 > 0) →** snapshot both
-   sentinel lines into pipeline-state.md Stage History
-   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2 p1=0; security: PASS p0=0 p1=0 |`).
+   sentinel lines into pipeline-state.md Stage History, appending in the
+   same notes cell one bracketed finding line per FAILING agent — its top
+   finding as `[{P-sev} {≤80-char summary}]`:
+   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2 p1=0 [P0 access.filter.update missing on update]; security: PASS p0=0 p1=0 |`).
+   One bracket per failing agent, ≤80 chars each — this snapshot is the
+   findings digest's only source: both records are overwritten next round,
+   so finding text survives nowhere else.
    Check the cap BEFORE re-spawning: if the counter already equals
    `max-code-rounds` (default 3, read from `espalier/.espalier-config` via
    `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
@@ -532,134 +583,102 @@ Stage 5 by any other path:
    set `- Status: ESCALATED` and add a Stage History row
    `| 4 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
    Otherwise re-spawn `harness-coder` with the combined findings (a Stage 3
-   action — its programmatic build/lint gate applies), increment the shared
+   action — its build/lint/test exit gate applies; code and test findings
+   share this ONE loop, tests looping as ordinary files in the diff), increment the shared
    round counter, and return to step 1. After snapshotting a ROUND row, also
    update the `Review Rounds:` numerators in pipeline-state.md — a resumed
    session recounts rounds from this line plus the ROUND rows, never from
    memory.
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
-   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate, THEN run the
-   "Stage 4 Post-Review" drift processing below and the "Stage 4 → Stage 5
-   handoff" protocol (both ride the same Step-1 bash). The exit gate requires BOTH
+   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate (command in
+   the Stage 5/6 section below), THEN run the "Stage 4 Post-Review" drift
+   processing below — it must finish BEFORE any contract delta-review spawn
+   (that spawn overwrites the review-record.md the parse reads) — then the
+   Stage 5/6 contract flow. The exit gate requires BOTH
    clean — never one agent's pass alone. A security P0/P1 shares the correctness
    `max-code-rounds` round counter.
 
-**Stage 5 (Testing — speculative, dispatched WITH the round-1 panel):**
+### Stage 5/6 (folded): the contract phase
 
-The test-coder joins the ROUND-1 Stage 4 message as the third concurrent
-agent (see Stage 4 step 1). Its speculative prompt:
+Under `test-mode: folded` the interface/failure-mode tests were written at
+Stage 3 and reviewed by the Stage 4 panel; Stages 5/6 exist only for the
+security abuse-test contract. Stage numbers are an interface —
+`pre-push-gate.sh` parses `Current Stage:` as an integer (≥ 7 to push),
+`espalier-stats.sh` buckets by stage number, and maprun parses it too — so
+keep `Current Stage:` monotonic 3→4→5→6→7 and never remove a row.
 
-```
-Agent tool:
-  prompt: |
-    You are the harness-coder in testing mode.
-    Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
-
-    SPECULATIVE DISPATCH: a review panel is running concurrently on this code.
-    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
-    first (paths and facts only — verify against current code).
-    WHAT TO TEST: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what was implemented. Write the interface tests and failure-mode tests
-    for those changes NOW.
-    Do NOT read security-record.md this pass — it may be mid-write; the
-    contracted abuse tests are a separate phase after the panel returns.
-    REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-test.md
-    — never touch coding-report.md (the panel is reading it). List EVERY
-    file you create under "Files created" — the orchestrator's
-    quarantine/discard mechanics operate on that list.
-    Run ONLY scoped invocations of the test files you write; no whole-tree
-    builds, no dependency installs.
-```
-
-With `speculative-tests: off`, skip the joint dispatch and instead run this
-prompt AFTER Stage 4 passes, without the speculative deltas (append directly
-to coding-report.md, read security-record.md for the contract) — the
-pre-v0.22 serial flow, verbatim.
-
-### Stage 4 → Stage 5 handoff (sequencing protocol — MANDATORY ordering)
-
-Races are the failure mode here: calls in one message run concurrently, so
-file-writing bash and file-reading spawns must never share a message.
-
-**Step 1 — orchestrator-local bash, ONE invocation, no agent in flight**
-(right after the joint dispatch resolves and the Stage 4 gate read is done):
-
-1. Escalation detector against the PART file:
-   `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/{type}/{slug}/coding-report.part-test.md`
-   — runs on EVERY path below (the signal describes the change's
-   testability, which survives any discard); on a hit, surface it to the
-   human like the fix lane's Stage 5 late-escalation signal.
-2. **Panel PASS (both sentinels p0=0 p1=0):** append the part file's content
-   to coding-report.md — guarded by a content-presence grep so a crash
-   between append and delete cannot double-append — then DELETE the part
-   file. Run the Stage 4 Post-Review drift/convention parse in this same
-   invocation (it must finish BEFORE any Stage 6 spawn — Stage 6 overwrites
-   the review-record.md it parses).
-3. **Panel FAIL / p0/p1 > 0:** QUARANTINE the speculative tests — move every
-   file listed in the part file's "Files created" to
-   `espalier/changes/{type}/{slug}/.speculative-tests/` (relative paths
-   preserved) and move the part file beside them. The tree the pre-round
-   build/lint gate, the next panel round, and the coder re-spawn see now
-   carries ZERO speculative artifacts — stale tests referencing renamed
-   symbols would otherwise break the whole-tree build/lint gate, and build
-   failures do not increment `max-code-rounds`, so that wedge would be
-   uncapped.
-4. **ESCALATION_REQUIRED (either agent):** quarantine as in 3, then the
-   escalation protocol unchanged — plus one line naming the quarantined
-   files so the human decides with full information.
-
-**Step 2 — test completion, ONE spawn alone in its message, after the FINAL
-panel PASS:**
-
-- No fix round + no contract → nothing to spawn; Stage 5 is complete (the
-  appended part IS the test report). Serial test cost ≈ zero.
-- No fix round + non-empty contract → one test-coder re-spawn:
-  "CONTRACT PHASE: read espalier/changes/{type}/{slug}/security-record.md —
-  for EVERY field in its `## Security-Sensitive Fields` contract, write the
-  negative abuse test it names (tamper the value → assert rejected → assert
-  store unchanged). Append the test report to coding-report.md."
-- Any fix round happened → the orchestrator RESTORES the quarantined files
-  first (moves them back to their tree paths), then one re-spawn:
-  reconcile against "code changed since your tests: {the fix rounds' files
-  from coding-report.md}", append the test report to coding-report.md, AND
-  carry the CONTRACT PHASE block when the contract is non-empty — one
-  spawn, never two.
-
-**Contract detection (deterministic):** after the final PASS,
+**Contract detection (deterministic, right after the final panel PASS):**
 `grep -q '^## Security-Sensitive Fields' espalier/changes/{type}/{slug}/security-record.md`
 decides empty vs non-empty.
 
-**Step 3 — Stage 6 dispatch, alone in its message.** HARD RULE: never issue
-a bash that writes coding-report.md or review-record.md in the same message
-as an agent spawn that reads or writes that file. Step-1 bash runs with zero
-agents in flight; Steps 2 and 3 are single-spawn messages.
+- **No contract (non-sensitive happy path — ZERO post-panel spawns):** in
+  one bash, write both rows —
+  `| 5 | SKIPPED | {ts} | folded: no contract |` and
+  `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |` — set
+  `Current Stage: 7`, and proceed to Stage 7.
+- **Non-empty contract (sensitive change):**
+  1. Write `| 5 | IN_PROGRESS | {ts} | contract phase |`, then ONE
+     test-coder spawn, alone in its message: "CONTRACT PHASE: read
+     espalier/changes/{type}/{slug}/security-record.md — for EVERY field in
+     its `## Security-Sensitive Fields` contract, write the negative abuse
+     test it names (tamper the value → assert rejected → assert store
+     unchanged). Append the test report to coding-report.md."
+  2. Re-run the Stage 3 exit gate (build + lint + scoped test run — the
+     contract tests must build and PASS before anyone reviews them).
+  3. **Contract delta review (Stage 6):** ONE `harness-reviewer` spawn,
+     alone in its message, delta scope = the contract test files +
+     security-record.md. Its job is the abuse-coverage check: every
+     contracted field has a passing test (tamper → rejected → store
+     unchanged) — a missing or happy-path-only one is a P0. Freshness-check
+     review-record.md as at Stage 4. The gate read is SINGLE-record (one
+     reviewer, one sentinel): `V=$(grep '^VERDICT:' <record> | tail -1)` —
+     advance only on PASS/PASS_WITH_FIXES with p0=0 p1=0.
+  4. **Contract-phase FAIL routing:**
+     - fix touches ONLY test files → contract loop: re-spawn the coder in
+       CONTRACT PHASE mode with the findings, re-run the exit gate, delta
+       review again — under `max-test-rounds` (read
+       `grep '^max-test-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`,
+       default 3; cap-before-respawn — at the cap, escalate:
+       `| 6 | ESCALATED | {ts} | {reason, round count} |`).
+     - fix must touch ANY non-test file (an abuse test failed because the
+       CODE is vulnerable) → that is a security-relevant code change: route
+       back to a FULL Stage 4 panel round under `max-code-rounds`
+       (cap-before-respawn applies — code counter already at its cap →
+       escalate immediately; no second counter, no reset). After the panel
+       passes again, re-run contract detection and this phase.
+  5. **On delta-review PASS:** refresh the certificate (same command as
+     below — it now covers the contract tests) and write
+     `| 6 | PASSED | {ts} | contract delta review |`.
 
-**Round accounting (unchanged):** the speculative write, the
-restore/reconcile re-spawn, and the contract phase are all Stage 5 actions —
-none increments `max-test-rounds` (that counts Stage 6 verdict loops only).
-`max-code-rounds` semantics are untouched.
+**Certificate (write at the final panel PASS; refresh at delta-review
+PASS):** `git add -A` (so new files count), then record in
+pipeline-state.md, overwriting any prior value —
+`Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+where `<Base-Ref>` is the SHA recorded at Stage 3 entry (never overwritten
+on a re-spawn). The Stage 7 push gate blocks unless this fingerprint still
+matches the pushed code.
 
-**State bookkeeping & crash recovery:** `Current Stage:` stays 4 during the
-joint dispatch (it IS the Stage 4 round); write the Stage 5 row at the
-Step-1 append / Step-2 spawn. On a resume into Stage 4:
-- an orphan `coding-report.part-test.md` (tree or quarantine dir) → delete
-  the part file AND every file its "Files created" list names, wherever
-  they sit — the post-panel flow re-derives tests from scratch. Deleting
-  the FILES matters: the Stage 4 certificate's `git add -A` would
-  otherwise sweep unlisted, unreviewed tests into the fingerprint.
-- speculative test files WITHOUT a part file (crash mid-write — nothing to
-  enumerate from) → never guess-delete: surface ONE line ("possible orphan
-  speculative tests: {untracked files matching the project's test layout
-  that coding-report.md does not list} — review or delete before
-  continuing") and wait. UNATTENDED runs must not hang: set
-  `- Status: ESCALATED`, record the candidate list in a Stage History row,
-  and stop — never continue past artifacts the orchestrator cannot
-  enumerate.
-- a `.speculative-tests/` quarantine dir on a resumed change → delete it
-  (its part file sits beside it, so enumeration is exact).
+**Crash recovery (folded — no part-files, no quarantine):** tests are
+ordinary tracked files listed in coding-report.md. A resume into Stage 4
+re-runs the exit gate then the panel. A resume into Stage 5/6 where the
+certificate no longer matches the tree means the contract spawn wrote
+tests before the crash — re-run contract detection, re-run the exit gate,
+re-spawn the delta review, refresh the certificate.
 
-**Stage 6 (Test Review):**
+**`test-mode: serial` (the conservative fallback):** Stage 3 carries no
+TESTS duty; after the final panel PASS, one test-coder spawn writes the
+interface tests, failure-mode tests, AND the contracted abuse tests
+(reading security-record.md), appending directly to coding-report.md; then
+Stage 6 below reviews them as its own fixpoint loop. Stage 5/6 rows record
+normally — no SKIPPED rows in serial mode. This is the pre-v0.22 flow.
+
+**Sequencing (HARD RULE, both modes):** never issue a bash that writes
+coding-report.md or review-record.md in the same message as an agent spawn
+that reads or writes that file. Bookkeeping bash runs with zero agents in
+flight; every spawn above is alone in its message.
+
+**Stage 6 (serial mode only — Test Review):**
 ```
 Agent tool:
   prompt: |
@@ -688,14 +707,15 @@ Agent tool:
     End the file with your VERDICT sentinel line.
 ```
 
-Stage 6 uses the same record semantics as Stage 4: freshness-check
+Serial Stage 6 uses the same record semantics as Stage 4: freshness-check
 review-record.md against its baseline, snapshot each round's sentinel into
 Stage History. (Stage 4's final record is overwritten here — its verdicts live
 in Stage History and the certificate.)
 
-**Gate read (deterministic).** From EACH record:
+**Gate read (deterministic — SINGLE record: one reviewer runs here).** From
+review-record.md:
 `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
-- `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+- `ESCALATION_REQUIRED` → do NOT advance
   and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
   (fix lane: the late-escalation prompt; full lane: escalate to the human with
   the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
@@ -703,7 +723,7 @@ in Stage History and the certificate.)
 - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
   with the combined findings and loop (counter + `max-test-rounds` cap
   unchanged).
-- Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+- Advance ONLY when the record's last sentinel has verdict word `PASS` or
   `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 
 Stage 6's loop cap is `max-test-rounds`. Check the cap BEFORE re-spawning: if
@@ -1010,13 +1030,22 @@ At stages marked with human checkpoint in pipeline.md:
 
 When Stage 10 passes:
 - Update pipeline-state.md with final status: COMPLETE
-- Commit the espalier bookkeeping (`git add espalier/changes/{type}/{slug}
-  && git commit -m 'chore(espalier): close {slug}'`) so the next change starts
-  from a clean tree.
+- **Map-charted changes** (requirements.md frontmatter has
+  `charted_from: maps/{map-slug}`), BEFORE the bookkeeping commit:
+  1. **Findings digest:** if Stage History recorded `ROUND {n} FAIL` rows,
+     write their bracketed finding lines (one per line, P-severity prefix
+     kept) to
+     `espalier/maps/{map-slug}/findings/{YYYY-MM-DD}-{type}-{kebab}.md` —
+     this change's own date/type/kebab; skip if the file already exists.
+     One writer per file: merge-safe by construction.
+  2. Update that map's Spawned Changes row to COMPLETE. If EVERY row is now
+     COMPLETE, OFFER (AskUserQuestion — never auto-flip) setting the map's
+     `status: CLEARED → BUILT`. On an unattended run, skip the offer and
+     leave one line in the summary instead.
+- Commit the espalier bookkeeping — a charted change stages its map dir in
+  the SAME commit, so the digest + Spawned-Changes update ride with it:
+  `git add espalier/changes/{type}/{slug}` (+ `git add espalier/maps/{map-slug}`
+  when charted) `&& git commit -m 'chore(espalier): close {slug}'` — the
+  next change starts from a clean tree.
 - Summarize: files changed, tests added, review findings addressed
 - Report total rounds and rollbacks
-- **Map-charted changes:** if this change's `requirements.md` frontmatter has
-  `charted_from: maps/{map-slug}` — update that map's Spawned Changes row to
-  COMPLETE. If EVERY row in the table is now COMPLETE, OFFER (AskUserQuestion
-  — never auto-flip) setting the map's `status: CLEARED → BUILT`. On an
-  unattended run, skip the offer and leave one line in the summary instead.

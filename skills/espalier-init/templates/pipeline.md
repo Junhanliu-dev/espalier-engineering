@@ -49,22 +49,30 @@ lanes route into it rather than through it:
 ### 3. Coding Implementation
 - **Trigger:** Requirements approved
 - **Load:** Spawn `harness-coder` agent (see espalier/agents/harness-coder.md)
-- **Execute:** Sub-agent implements per task decomposition
+- **Execute:** Sub-agent implements per task decomposition — under
+  `test-mode: folded` (the default) it ALSO writes the change's interface
+  and failure-mode tests alongside the code (contracted abuse tests
+  excepted — that contract does not exist until Stage 4's security audit)
 - **Gate (PROGRAMMATIC):** all sub-tasks done + the ORCHESTRATOR re-runs the
   discovered build and lint commands itself and both exit 0 — the coder's
   self-reported "Build status: pass" is a claim, not the gate. The two runs
   may execute as concurrent background jobs in one bash call (per-pid exit
   codes, per-job output) unless the commands plainly depend on each other —
-  concurrency changes the wait, never the gate. A failing
-  build/lint re-run goes straight back to the coder WITHOUT spawning the Stage 4
+  concurrency changes the wait, never the gate. Folded mode ALSO runs the
+  discovered test command scoped to the coder's listed test files (full
+  suite where the runner cannot path-filter) — the old Stage 5 "tests
+  pass" gate, moved earlier: the panel never reviews unexecuted tests. A failing
+  build/lint/test re-run goes straight back to the coder WITHOUT spawning the Stage 4
   panel (a panel round on unbuildable code is wasted).
 - **Constraint:** One sub-agent invocation per sub-task. Sub-tasks whose
   planned file sets are pairwise DISJOINT (including any shared module both
   would touch — barrel files, route tables, migration indexes count as
   overlap) MAY be dispatched concurrently in one message; any overlap or
   uncertainty → serial. See the espalier skill → "Parallel Sub-Tasks".
-- **Context pack (first entry only):** before the first coder spawn, the
-  orchestrator assembles `espalier/changes/{type}/{slug}/context-pack.md`
+- **Context pack (assembled once — in the orchestrator turn that presents
+  the Requirements Approval Gate; paths/facts only, approval-independent;
+  re-derived on an Edit that changes the layer set):**
+  `espalier/changes/{type}/{slug}/context-pack.md`
   (see the espalier skill → "Stage 3 Entry: Context Pack") — every Stage 3-6
   spawn is pointed at it so no sub-agent re-derives the touched layers,
   specs, rules, and reference files. Paths and facts only, never
@@ -79,6 +87,11 @@ lanes route into it rather than through it:
 - **Review panel:** every review round runs TWO fresh agents on the CURRENT diff, spawned
   concurrently — `harness-reviewer` (correctness / conventions, → review-record.md)
   and `harness-security` (trust boundary — never trust frontend data, → security-record.md).
+  Folded mode: the diff already contains the Stage 3 tests — the reviewer's
+  verdict covers code AND tests (assertions meaningful, changed-interface
+  + failure-mode coverage); abuse-test coverage waits for the Stage 6
+  contract delta review, where the contract exists. The security agent
+  reads test files for secrets/live-endpoint/fixture-data leakage only.
 - **Loop — repeat until exit:**
   1. Spawn the FRESH panel on the CURRENT diff. On a re-review round, also hand each
      agent the "changed since last review" set — the fix's files from the latest
@@ -138,60 +151,60 @@ lanes route into it rather than through it:
   OVERWRITTEN each round (each reflects the current round only, so the orchestrator
   never reads a stale prior-round verdict). Before overwriting begins, the
   orchestrator snapshots each round's two sentinel lines into pipeline-state.md
-  Stage History (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2; security: PASS p0=0 |`),
-  so round history survives the overwrite.
+  Stage History, appending one bracketed finding line per FAILING agent
+  (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2 [P0 {≤80-char summary}]; security: PASS p0=0 |`),
+  so round history AND finding text survive the overwrite — this snapshot
+  is the map findings digest's only source.
 
-### 5. Test Writing
-- **Trigger:** dispatched SPECULATIVELY with the round-1 Stage 4 panel (a
-  3-agent message; `speculative-tests: off` in `espalier/.espalier-config`
-  restores the serial post-review dispatch) — and COMPLETED after the final
-  panel PASS via the espalier skill's "Stage 4 → Stage 5 handoff" (guarded
-  part-file append; contract phase / restore-reconcile as one spawn). On a
-  panel FAIL the speculative tests are QUARANTINED under the change dir, so
-  every later gate, panel round, and coder re-spawn sees a tree with zero
-  speculative artifacts.
-- **Load:** Spawn `harness-coder` agent with testing skill
-- **Execute:** Write tests for changed interfaces. ALSO write the negative abuse
-  test named by EVERY entry in security-record.md's `## Security-Sensitive Fields`
-  contract (tamper the value → assert rejected → assert persistent store unchanged).
-- **Gate:** Tests exist for every changed public interface + tests pass + every
-  contracted sensitive field has its abuse test
+### 5. Contract Phase (folded) / Test Writing (serial)
+- **Folded (`test-mode: folded`, the default — read via
+  `grep '^test-mode:' espalier/.espalier-config | awk '{print $2}'`;
+  absent key honors legacy `speculative-tests`: `off` → serial, else
+  folded):** the interface/failure-mode tests were written at Stage 3 and
+  reviewed at Stage 4. This stage exists only for the security abuse-test
+  contract — detection:
+  `grep -q '^## Security-Sensitive Fields'` on security-record.md after
+  the final panel PASS. No contract → record
+  `| 5 | SKIPPED | {ts} | folded: no contract |` and advance. Non-empty →
+  ONE `harness-coder` CONTRACT PHASE spawn writes the contracted abuse
+  tests (tamper the value → assert rejected → assert persistent store
+  unchanged), then the Stage 3 exit gate re-runs — the contract tests
+  must build and PASS before anyone reviews them.
+- **Serial (`test-mode: serial`):** after the final panel PASS, one spawn
+  writes the interface tests + failure-mode tests + contracted abuse
+  tests — the pre-v0.22 flow. Gate: tests exist for every changed public
+  interface + tests pass + every contracted field has its abuse test.
 
-### 6. Test Review
-- **Trigger:** Tests written
-- **Load:** Spawn `harness-reviewer` agent
-- **Execute:** Review tests for meaningfulness + security abuse-test coverage +
-  failure-mode coverage (production-standards: every NEW external-call path has a
-  dependency-failure test — missing one is a P1)
-- **Gate:** Tests are meaningful (not just "passes"), cover edge cases, AND every
-  field in security-record.md's `## Security-Sensitive Fields` contract has a
-  passing abuse test (tamper → rejected → store unchanged). A missing one is a P0.
-  Same record semantics as Stage 4: the reviewer OVERWRITES review-record.md with
-  a `VERDICT:` sentinel; the orchestrator freshness-checks it.
-  **Gate read (deterministic).** From EACH record:
-  `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
-  - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
-    and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
-    (fix lane: the late-escalation prompt; full lane: escalate to the human with
-    the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
-    still an escalation.
-  - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
-    with the combined findings and loop (counter + `max-test-rounds` cap unchanged).
-  - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
-    `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
-- **Loop:** same fixpoint rule as Stage 4 — a non-PASS verdict sends the tests
-  back to Stage 5 (re-spawn coder), then **re-review**; never exit on the fix
-  report alone. On a round ≥ 2 the orchestrator hands the reviewer the
-  changed-since-last-review set (the test files the Stage 5 re-spawn touched);
-  the re-review runs in DELTA SCOPE per the agent's "Re-review Rounds" section
-  — a floor, not a ceiling; the whole-change verdict rule is unchanged.
-- **Certificate (on PASS):** re-run the Stage 4 fingerprint (it now covers the added
-  tests) and overwrite `Reviewed-Diff` in pipeline-state.md — the push gate compares
-  against this value.
-- **Limit:** Max `max-test-rounds` rounds (default 3, from `espalier/.espalier-config`)
-  → escalate. Check the cap BEFORE re-spawning: if the counter already equals
-  `max-test-rounds`, escalate to the human immediately — the coder is NOT
-  re-spawned and no further review round runs.
+### 6. Contract Delta Review (folded) / Test Review (serial)
+- **Folded, no contract:** record
+  `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |` and advance.
+  `Current Stage:` stays monotonic 3→4→5→6→7 — the push gate's integer
+  parse, stats, and maprun's readers depend on the rows existing.
+- **Folded, non-empty contract:** ONE `harness-reviewer` spawn in delta
+  scope (the contract test files + security-record.md) verifies every
+  contracted field has a passing abuse test (tamper → rejected → store
+  unchanged) — a missing or happy-path-only one is a P0.
+  **Gate read (deterministic, SINGLE record):**
+  `V=$(grep '^VERDICT:' <record> | tail -1)` — advance only on
+  PASS/PASS_WITH_FIXES with p0=0 p1=0; freshness-check as at Stage 4; an
+  `ESCALATION_REQUIRED` runs the escalation protocol, never advances.
+  **FAIL routing:** a fix touching ONLY test files → contract loop
+  (re-spawn coder in CONTRACT PHASE, re-run the exit gate, delta review
+  again) under `max-test-rounds` (default 3; check the cap BEFORE
+  re-spawning). A fix that must touch any NON-test file — the code itself
+  is vulnerable → a security-relevant code change: route back to a FULL
+  Stage 4 panel round under `max-code-rounds` (cap-before-respawn; no
+  second counter), then re-run the contract phase.
+- **Serial:** spawn `harness-reviewer` on the Stage 5 tests — same
+  fixpoint rule as Stage 4 (single-record gate read; a non-PASS verdict
+  sends the tests back to Stage 5, then re-review — never exit on the fix
+  report alone; delta scope on rounds ≥ 2 per the agent's "Re-review
+  Rounds" section, a floor not a ceiling; whole-change verdict rule
+  unchanged). Limit: `max-test-rounds` (default 3), checked BEFORE
+  re-spawning — at the cap escalate; the coder is NOT re-spawned.
+- **Certificate (on PASS, both modes):** re-run the Stage 4 fingerprint
+  (it now covers the added tests) and overwrite `Reviewed-Diff` in
+  pipeline-state.md — the push gate compares against this value.
 
 ### 7. Code Push
 - **Trigger:** Tests reviewed
@@ -225,7 +238,8 @@ lanes route into it rather than through it:
   `.drift-state.tsv`, writes only the change's `doc-patches.md` — CI-
   independent and notify-only). The gate still reads the same final values.
 - **Rollback:**
-  - `total_tests == 0` → Stage 5
+  - `total_tests == 0` → Stage 3 (folded — tests are a Stage 3 duty;
+    under `test-mode: serial` → Stage 5)
   - Compile/build failure → Stage 3
   - Lint failure → Stage 3
 - **Output:** espalier/changes/{type}/{slug}/ci-result.md
@@ -292,6 +306,10 @@ to 3 if the file or key is missing.
 | Requirements | `max-req-rounds` | 3 | Human decision |
 | Code | `max-code-rounds` | 3 | Human decision |
 | Test | `max-test-rounds` | 3 | Human decision |
+
+Under `test-mode: folded`, code+test findings share the `max-code-rounds`
+loop (they are one diff); `max-test-rounds` counts contract delta-review
+rounds only, and a code-touching contract fix consumes `max-code-rounds`.
 
 ## Multi-Developer Maintenance
 

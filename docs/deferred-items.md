@@ -16,8 +16,14 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 
 ## Items deferred from v0.21.0 (trigger updated in v0.22.0)
 
-- **Fold interface-test writing into Stage 3; merge Stage 5/6 into the review panel.** The largest remaining per-run TOKEN saving (~2 cold starts + one fixpoint loop). v0.22.0's speculative Stage 5 already captures most of the WALL-CLOCK saving without restructuring the stage contract, so the fold's remaining value is token cost. Design sketch in `docs/pipeline-speed-plan.md` → Deferred; v0.22 design in `docs/pipeline-speed-plan-v2.md` §11.
-  - **Trigger to revisit (updated)**: `espalier-stats.sh` Stage-durations field data showing (a) most runs pass Stage 4 in 1 round AND (b) spawn cold-start time still dominates agent-phase wall-clock AFTER the v0.22 overlap shipped.
+- **Fold interface-test writing into Stage 3; merge Stage 5/6 into the review panel.** ~~Deferred~~ **SHIPPED in v0.23.0** (`test-mode: folded`, the round-economy release — design + field evidence in `docs/pipeline-speed-plan-v3.md`). The trigger fired on 2026-08-24 field data: (a) 8/11 post-v0.22 changes passed Stage 4 in 1 round, (b) the Stage 6 spawn (~235s median) was the last stage-machinery tail. `test-mode: serial` remains the per-repo fallback.
+
+## Items deferred from v0.23.0
+
+- **Model tiering per seat.** Run cheaper models on mechanical seats once quality parity is proven. (Recorded here for the first time in v0.23.0 — earlier releases carried it only in the speed-plan docs.)
+  - **Trigger to revisit**: eval parity under the candidate model across coder/review/security suites, with `--model` pinned everywhere headless (a fable-default headless run safeguard-refuses agentic prompts).
+- **maprun Spawned-Changes COMPLETE flip.** Workers stop at Stage 6 and the master never updates map.md at merge, so Spawned-Changes rows stay stale for maprun-built maps (pre-existing; surfaced by the v0.23 digest review). Natural home: the master's merge/completion step.
+  - **Trigger to revisit**: a BUILT-map offer that never fires on a maprun-built map, or the first user report of stale Spawned-Changes rows.
 
 ## Items deferred (acceptable as-is for v0.2.0)
 

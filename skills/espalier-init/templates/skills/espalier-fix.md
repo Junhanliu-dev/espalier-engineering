@@ -23,8 +23,8 @@ Do NOT use for:
 | 1 | Bug Requirements | Slimmer than feat reqs |
 | 3 | Coding | Same |
 | 4 | Code Review | Same |
-| 5 | Test Writing | Same |
-| 6 | Test Review | Same |
+| 5 | Contract Phase (folded) / Test Writing (serial) | Same |
+| 6 | Contract Delta Review (folded) / Test Review (serial) | Same |
 | 7 | Push | Same + back-link write |
 
 Skipped from full pipeline:
@@ -189,7 +189,7 @@ For each match read its `pipeline-state.md` Status (and tombstones at
 | Match exists, Status: IN_PROGRESS | Resume that fix. Announce "Resuming fix/{matched-slug} from Stage {N}". |
 | Match exists, terminal Status (COMPLETE / ABORTED / ABORTED_LATE / ESCALATED / ESCALATED_LATE) | **Prompt user** (below) — a same-name fix on a new day is usually a *new* dated folder, but confirm intent. |
 | Match exists, Status: PARTIAL_FIX | **Prompt user** (below) |
-| Match exists, Status: FILED | Offer to adopt/start it — the skeleton was filed by a partial fix; adopting = set `- Status: IN_PROGRESS` and begin at Stage 1 with its inherited frontmatter. |
+| Match exists, Status: FILED | Offer to adopt/start it — the skeleton was filed by a partial fix; adopting = set `- Status: IN_PROGRESS` and begin at Stage 1 with its inherited frontmatter (a `charted_from:` skeleton also gets the digest fold — see the espalier skill's FILED-skeleton scan). |
 | Only `TOMBSTONE.md` exists (legacy migration) | Follow tombstone pointer; ask user "fix/{matched-slug} was migrated to feat/{target}. New fix at fix/{slug}, or work on feat/{target} instead?" |
 
 Collision prompt (use `AskUserQuestion`):
@@ -597,7 +597,8 @@ Layers predicted), so a best pre-code estimate is mandatory, not optional.
 the draft above is written. Grill interrogates the root cause and reproduction
 (adaptive depth — a well-anchored bug with a clean repro is skipped), verifies the
 claimed cause against the code, and writes its findings into the `## Root Cause`
-and `## Reproduction` sections. Record its verdict for pipeline-state.md.
+and `## Reproduction` sections. Record its verdict (`GRILLED (light)` /
+`GRILLED (full)` / `SKIPPED: <reason>`) for pipeline-state.md.
 
 **Escalation Gate (Stage 1):** see "Escalation Gates" section below.
 
@@ -653,7 +654,11 @@ headless run auto-approves (record it in the Stage History).
 
 ## Stage 3: Coding
 
-**Context pack (first entry only):** before the first coder spawn, write
+**Context pack (assembled in the SAME turn that presents this lane's
+Requirements Approval Gate — paths/facts only, approval-independent; on an
+Edit that changes the layer set, re-derive before re-asking; if it is
+missing at Stage 3 entry — a resumed old change — write it before the
+first coder spawn):** write
 `espalier/changes/fix/{slug}/context-pack.md` — the fix-lane version is
 small: the requirement path, the layers involved and their spec paths (both
 already in requirements.md's `## Layers involved` / `## Files likely
@@ -679,18 +684,56 @@ paths and facts only, verify against current code.
 REQUIREMENT: {paste requirement summary from Stage 1}
 CAUSED BY: {caused_by list — read those changes' requirements + coding-report + review-record}
 TASK: Fix the bug described above. Stay within the file(s) identified.
+TESTS: alongside the fix, write NOW (per espalier/skills/espalier-testing/SKILL.md):
+1. A regression test that reproduces the original bug (must FAIL on the
+   pre-fix code; PASS on the current code — the orchestrator verifies the
+   FAIL half mechanically against Base-Ref at the exit gate).
+2. A test from the original feature's spec (proves the causing feature
+   still works — read its requirements.md acceptance criteria).
+3. For every NEW external-call path the fix introduces, a failure-mode
+   test per espalier/rules/production-standards.md.
+Everything EXCEPT contracted abuse tests (that contract does not exist
+yet). List the test files in their own "Test files" subsection of the
+coding report. If a meaningful test requires touching files OUTSIDE the
+fix's scope (>2 additional files or crossing a layer boundary), append
+the Test Scope Signal block per harness-coder.md — do NOT silently
+expand scope.
 
 When done, write your coding report to:
 espalier/changes/fix/{slug}/coding-report.md
 ```
 
-**Stage 3 exit gate (PROGRAMMATIC):** after the coder returns (first pass and
-every re-spawn), re-run the discovered build + lint yourself; both must exit 0
-before the panel spawns. Run them as two concurrent background jobs in ONE
-bash call (per-pid `wait`s capture both exit codes; per-job temp-file output)
-unless the discovered commands plainly depend on each other — concurrency
-changes the wait, never the gate. The coder's self-reported status is a claim,
-not the gate. A failure returns to the coder without a panel round.
+(With `test-mode: serial`, drop the TESTS lines — tests are written after
+the final panel PASS instead; see Stage 5/6. The mode read is the espalier
+skill's Stage 3 `test-mode` block — word-key grep with the
+`speculative-tests` legacy mapping.)
+
+**Stage 3 exit gate (PROGRAMMATIC — one protocol, every coder return):**
+after the coder returns (first pass and every re-spawn):
+
+1. re-run the discovered build + lint yourself as two concurrent background
+   jobs in ONE bash call (per-pid `wait`s capture both exit codes; per-job
+   temp-file output) unless the discovered commands plainly depend on each
+   other — concurrency changes the wait, never the gate;
+2. **folded:** run the discovered test command scoped to the coding
+   report's listed test files where the runner supports path filtering
+   (full suite where it does not) — the old Stage 5 "tests pass" gate,
+   moved earlier so the panel never reviews unexecuted tests;
+3. **folded:** run the regression verification below — it RE-RUNS on every
+   coder return (a fix round can rewrite the regression test) and
+   re-appends its `- REGRESSION_VERIFIED:` line; readers take the LAST
+   line. The panel sees the result BEFORE round 1;
+4. **scope detectors:** the reactive escalation gate counts **non-test
+   files only** toward its `>5 files / >2 layers` thresholds (the fold
+   moved test files into this diff — counting them would trip the gate on
+   former Stage-5 work), and
+   `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/fix/{slug}/coding-report.md`
+   fires the late-escalation prompt (the signal kept its own detector; it
+   just moved here with the work).
+
+All must exit 0 / not fire before the panel spawns. The coder's
+self-reported status is a claim, not the gate. A build/lint/test failure
+returns to the coder without a panel round and without counting a P0 round.
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
@@ -707,16 +750,15 @@ without spawning the panel and without counting a P0 round.
 
 1. **Baseline BOTH records** (`espalier/changes/fix/{slug}/review-record.md` and
    `.../security-record.md` — exists? size/mtime), then spawn the FRESH panel on
-   the CURRENT diff in ONE message. **ROUND 1 ONLY** — unless
-   `speculative-tests: off` is set in `espalier/.espalier-config` (absent =
-   on) — the message is a THREE-agent dispatch: both panel agents PLUS the
-   Stage 5 test-coder in speculative mode (prompt in Stage 5 below), and
-   BOTH panel prompts gain the line: `SPECULATIVE TESTS IN FLIGHT: a
-   test-writing agent runs concurrently with you. New/changed TEST files
-   not listed in coding-report.md are its work-in-progress — exclude them
-   from your review scope and your verdict; they are reviewed at Stage 6.`
-   Rounds ≥ 2 spawn the two panel agents only (a FAIL quarantines the
-   speculative tests — see Stage 5's handoff). Pass each agent the `CONTEXT PACK:` line
+   the CURRENT diff in ONE message — TWO agents, every round. Folded: the
+   diff already contains the tests; the reviewer's prompt adds "REVIEW THE
+   TESTS TOO, in the same verdict: the `- REGRESSION_VERIFIED:` last line
+   in coding-report.md (`false` = P0 — the test does not capture the bug);
+   assertions meaningful, not tautological; original-feature coverage;
+   failure-mode coverage (missing = P1). Abuse-test coverage waits for the
+   contract delta review." The security prompt adds: "Test files are in
+   scope for secrets / live-endpoint / fixture-data leakage only." Pass
+   each agent the `CONTEXT PACK:` line
    (`espalier/changes/fix/{slug}/context-pack.md` — read first; paths and
    facts only, verify against current code), `ROUND: {n}`, AND the
    `CAUSAL CONTEXT` line (the `caused_by` slugs + "verify the fix does not
@@ -745,8 +787,11 @@ without spawning the panel and without counting a P0 round.
      with `p0=0` is still an escalation.
    - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
      with the combined findings and loop (counter + `max-code-rounds` cap
-     unchanged): snapshot both sentinels into pipeline-state.md Stage History,
-     re-spawn with the combined findings, then **return to step 1 and re-review
+     unchanged): snapshot both sentinels into pipeline-state.md Stage History
+     — appending in the same notes cell one bracketed finding line per
+     FAILING agent (`[{P-sev} {≤80-char summary}]`; this snapshot is the
+     findings digest's only source — the records are overwritten next
+     round), re-spawn with the combined findings, then **return to step 1 and re-review
      the new diff with the whole panel.** Never advance to Stage 5 on the
      coder's fix report alone — a fix is never the last action before the gate;
      a clean panel is. Each non-PASS round increments the counter. Check the cap
@@ -833,90 +878,52 @@ row-append-only — columns `date · change_slug · pattern_key · location · s
 When a `pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`)
 it is a promotion candidate, surfaced at the next Stage 0 pre-flight.
 
-## Stage 5: Test Writing (speculative — dispatched WITH the round-1 panel)
+## Stage 5/6 (folded): the contract phase
 
-Unless `speculative-tests: off` is set in `espalier/.espalier-config`
-(absent = on), the test-coder joins the ROUND-1 Stage 4 message as the
-third concurrent agent (see Stage 4 step 1). Speculative prompt:
+Run the espalier skill's "Stage 5/6 (folded): the contract phase" protocol
+— it is shared verbatim: contract detection
+(`grep -q '^## Security-Sensitive Fields' espalier/changes/fix/{slug}/security-record.md`
+after the final panel PASS); no contract → both SKIPPED rows
+(`| 5 | SKIPPED | {ts} | folded: no contract |`,
+`| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |`), `Current Stage: 7`,
+zero post-panel spawns; non-empty contract → contract spawn → exit-gate
+re-run → contract delta review → FAIL routing (test-only fixes loop under
+`max-test-rounds`; code-touching fixes route to a FULL Stage 4 panel round
+under `max-code-rounds`, cap-before-respawn, no second counter) →
+certificate refresh. Fix-lane deltas:
 
-```
-You are the harness-coder in TESTING MODE.
-Read espalier/agents/harness-coder.md AND espalier/skills/espalier-testing/SKILL.md.
+- the contract delta review prompt also carries the `CAUSAL CONTEXT:` line
+  (the `caused_by` slugs);
+- an escalation at the cap here sets `- Status: ESCALATED_LATE` (the fix's
+  code is already committed at Stage 3 — the late-escalation path), with
+  the `| 6 | ESCALATED | {ts} | {reason, round count} |` row;
+- the `TEST_SCOPE_INFLATION` detector already ran at the Stage 3 exit gate
+  (its new home) — a `LATE_ESCALATION_GATE:` line means STOP and run the
+  "Late-Escalation Prompt" (below) via `AskUserQuestion`; the bash only
+  detects, the prompt is yours.
 
-SPECULATIVE DISPATCH: a review panel is running concurrently on this code.
-CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
-paths and facts only, verify against current code.
-WHAT WAS BUILT: Read espalier/changes/fix/{slug}/coding-report.md.
-ORIGINAL CAUSE (for regression test scope): {paste caused_by entries}
+**`test-mode: serial`:** after the final panel PASS, one test-coder spawn
+writes the regression + original-feature + failure-mode tests PLUS the
+contracted abuse tests (reading security-record.md's
+`## Security-Sensitive Fields`), appending directly to coding-report.md —
+then the serial Stage 6 review below. The signal greps run against
+coding-report.md, exactly as pre-v0.22.
 
-Write NOW — everything EXCEPT the contracted abuse tests:
-1. A regression test that reproduces the original bug (must FAIL on the
-   pre-fix code; PASS on the current code — the orchestrator verifies the
-   FAIL half mechanically against Base-Ref once the tests are final).
-2. A test from the original feature's spec (proves the causing feature
-   still works — read its requirements.md acceptance criteria).
-3. For every NEW external-call path the fix introduced, a failure-mode test
-   (dependency times out / errors → decided failure behaviour, no partial
-   write) per espalier/rules/production-standards.md.
+### Stage 3 exit gate — regression verification (PROGRAMMATIC — proves the test earns its keep)
 
-Do NOT read security-record.md this pass — it may be mid-write; the
-contracted abuse tests are a separate phase after the panel returns.
-REPORT TARGET: espalier/changes/fix/{slug}/coding-report.part-test.md —
-never touch coding-report.md (the panel is reading it). List EVERY file
-you create under "Files created" — the orchestrator's quarantine/discard
-mechanics operate on that list.
-Run ONLY scoped invocations of the test files you write; no whole-tree
-builds, no dependency installs.
-
-If a meaningful test requires touching files OUTSIDE the fix's scope (>2
-additional files or crossing a layer boundary), append the Test Scope
-Signal block to your part-file report per harness-coder.md instructions —
-do NOT silently expand scope.
-```
-
-With `speculative-tests: off`: run the pre-v0.22 serial flow after Stage 4
-passes — the same required list PLUS the contracted abuse tests (read
-security-record.md's `## Security-Sensitive Fields`), appending directly
-to coding-report.md.
-
-**Handoff protocol:** identical to the espalier skill's "Stage 4 → Stage 5
-handoff" — Step-1 single-bash with no agent in flight (detector on the
-part file, then PASS: guarded append to coding-report.md + delete the part
-file + the drift parse; FAIL/ESCALATION: quarantine the listed files to
-`espalier/changes/fix/{slug}/.speculative-tests/` with the part file
-beside them); Step-2 completion spawn ALONE in its message after the final
-PASS (contract phase and/or restore-reconcile — one spawn, never two);
-Step-3 Stage 6 alone. Same round accounting (Stage 5 actions never
-increment `max-test-rounds`) and the same crash-recovery rules, including
-the unattended posture: never hang on the no-list orphan case — set
-`- Status: ESCALATED` with the candidate list recorded and stop.
-
-The Stage 5 escalation detector runs at Step 1 on EVERY path (the signal
-describes the fix's testability, which survives any discard):
-
-```bash
-PART="espalier/changes/fix/${SLUG}/coding-report.part-test.md"
-if grep -q "^- TEST_SCOPE_INFLATION: true" "$PART" 2>/dev/null; then
-  echo "LATE_ESCALATION_GATE: stage=5 (test scope inflation)"
-fi
-```
-
-(With `speculative-tests: off` the signal lands in coding-report.md — grep
-that instead, exactly as pre-v0.22.) A `LATE_ESCALATION_GATE:` line on
-stdout means STOP and run the "Stage 5/6 Late-Escalation Prompt" (below)
-with that stage's context. The prompt is an `AskUserQuestion` the
-orchestrator issues — a human gate, not a shell helper; the bash above only
-detects, it never prompts.
-
-### Stage 5 regression verification (PROGRAMMATIC — proves the test earns its keep)
-
-**When:** after the LAST test-writing spawn has returned, with the test
-files in their final in-tree locations — NEVER in the same message as a
-test-writing spawn (a verification racing a rewrite certifies the wrong
-tree). Happy path: inside the Step-1 bash right after the part append; any
-fix round: after the Step-2 restore/reconcile spawn; contract-phase-only:
-after the contract spawn (uniform rather than clever — the contract spawn
-does not touch the regression test, but one rule beats two).
+**When (folded):** at the Stage 3 exit gate, on EVERY coder return — a fix
+round can rewrite the regression test, so the check RE-RUNS each time and
+RE-APPENDS its `- REGRESSION_VERIFIED:` line; readers take the LAST line
+(`grep '^- REGRESSION_VERIFIED:' coding-report.md | tail -1`, the sentinel
+pattern). Never in the same message as a coder spawn (a verification
+racing a rewrite certifies the wrong tree). The panel therefore sees the
+result BEFORE its first verdict.
+**Skip condition:** each verified run also appends
+`- REGRESSION_VERIFIED_SCOPE: {hash}` (the bash below); when the current
+scope hash equals the last recorded one AND `Base-Ref` is unchanged, skip
+the worktree half and re-append the previous result marked `(cached)`.
+(With `test-mode: serial`: run it once, after the last test-writing spawn,
+before Stage 6 — as pre-v0.23.)
 
 A regression test that passes on BOTH the fixed and the pre-fix code proves
 nothing — and a test that merely ERRORS at `Base-Ref` (missing deps in a fresh
@@ -987,9 +994,14 @@ else
   fi
   rm -f "$OUT_NOW"
 fi
+
+# Scope hash — the skip condition's recorded fact (folded mode re-runs).
+REG_SCOPE=$( (for t in $REG_TESTS; do printf '%s %s\n' "$t" "$(git hash-object "$t" 2>/dev/null)"; done) | sort | git hash-object --stdin )
+echo "- REGRESSION_VERIFIED_SCOPE: $REG_SCOPE" >> "$COD"
 ```
 
-A `REGRESSION_VERIFIED: false` is a P0 the Stage 6 reviewer must catch — the
+A `REGRESSION_VERIFIED: false` is a P0 the round-1 panel reviewer must
+catch (folded; the Stage 6 reviewer in serial mode) — the
 "regression test" does not reproduce the bug (or fails on the fixed code) and
 would not catch a recurrence. `skipped` keeps its existing Stage 6 meaning:
 the reviewer verifies the assertions capture the bug by reading them. (One
@@ -997,7 +1009,12 @@ deliberate bias: a bug whose pre-fix symptom IS a load-time error — e.g. the
 fix repairs a syntax error — classifies as `skipped`, not `true`; the check
 errs toward human eyes, never toward false certification.)
 
-## Stage 6: Test Review
+## Stage 6 (serial mode only): Test Review
+
+Folded mode has no separate Stage 6 review — the contract delta review in
+the Stage 5/6 section above IS Stage 6, and non-sensitive changes write
+the SKIPPED rows there. The block below runs only under
+`test-mode: serial`.
 
 Spawn `harness-reviewer`:
 
@@ -1053,18 +1070,18 @@ reviewer's Escalation Reason block. Detection is bash; the prompt is yours.
 review-record.md against its baseline each round, snapshot each round's
 sentinel into Stage History.
 
-**Gate read (deterministic).** From EACH record:
+**Gate read (deterministic — SINGLE record: one reviewer runs here).** From
+review-record.md:
 `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
-- `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT advance
+- `ESCALATION_REQUIRED` → do NOT advance
   and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
-  (fix lane: the late-escalation prompt; full lane: escalate to the human with
-  the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
+  (the late-escalation prompt). An `ESCALATION_REQUIRED` with `p0=0` is
   still an escalation.
 - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → send the tests back to
   Stage 5 (re-spawn `harness-coder`) with the combined findings and loop
   (counter + `max-test-rounds` cap unchanged), then **re-review** — never exit
   on the fix report alone.
-- Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
+- Advance ONLY when the record's last sentinel has verdict word `PASS` or
   `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 
 Check the cap BEFORE re-spawning: if the counter already equals
@@ -1161,7 +1178,8 @@ EOF
 
 ## Escalation Gates
 
-Four gates: predictive (Stage 1), reactive (Stage 3), test-scope (Stage 5), reviewer-flagged (Stage 6).
+Four gates: predictive (Stage 1), reactive (Stage 3), test-scope (Stage 3
+exit — folded; Stage 5 — serial), reviewer-flagged (any review round).
 
 ### Stage 1 Gate (predictive)
 After reqs written, parse for:
@@ -1177,12 +1195,12 @@ After reqs written, parse for:
 After coder returns:
 | Signal | Threshold | Source |
 |--------|-----------|--------|
-| Files modified + created | > 5 | coding-report.md |
-| Layers touched | > 2 | coding-report.md |
+| Files modified + created | > 5 (**non-test files only** — the fold moves test files into this diff; counting them would trip the gate on former Stage-5 work) | coding-report.md |
+| Layers touched | > 2 (non-test files only, same reason) | coding-report.md |
 | Coder reported "scope creep" | any | coding-report.md notes |
 | Build fail crossing modules | any | coding-report.md build status |
 
-### Stage 5 Gate (test scope)
+### Test-Scope Gate (Stage 3 exit — folded; Stage 5 — serial)
 If coding-report.md contains:
 ```
 ### Test Scope Signal
@@ -1190,7 +1208,7 @@ If coding-report.md contains:
 ```
 → fire late-escalation prompt.
 
-### Stage 6 Gate (reviewer)
+### Reviewer-Flagged Gate (any review round — Stage 4 / contract delta / serial Stage 6)
 If review-record.md `**Verdict:** ESCALATION_REQUIRED` → fire late-escalation prompt with reviewer's Escalation Reason context.
 
 ### Stage 1/3 Prompt (clean migration possible)
@@ -1297,8 +1315,16 @@ Stage 7, it writes back to the partial fix's pipeline-state.md
 
 When Stage 7 passes:
 - Update own `pipeline-state.md` Status: COMPLETE (or PARTIAL_FIX if option 3).
-- Commit the espalier bookkeeping (`git add espalier/changes/fix/{slug}
-  && git commit -m 'chore(espalier): close {slug}'`) so the next change starts
+- **Map-charted fixes** (requirements.md frontmatter has
+  `charted_from: maps/{map-slug}` — rare in this lane, same contract as the
+  full lane): if Stage History recorded `ROUND {n} FAIL` rows, write their
+  bracketed finding lines to
+  `espalier/maps/{map-slug}/findings/{YYYY-MM-DD}-fix-{kebab}.md` (skip if
+  it exists), update the map's Spawned Changes row, and stage the map dir
+  in the bookkeeping commit below.
+- Commit the espalier bookkeeping (`git add espalier/changes/fix/{slug}`
+  + `git add espalier/maps/{map-slug}` when charted
+  `&& git commit -m 'chore(espalier): close {slug}'`) so the next change starts
   from a clean tree.
 - Summarize: original cause, fix files, regression tests added.
 - Report total rounds and any escalation gates tripped (even if user chose to override).

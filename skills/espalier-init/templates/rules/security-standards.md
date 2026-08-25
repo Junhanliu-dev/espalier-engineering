@@ -79,8 +79,10 @@ change reads or writes, there MUST be a negative test that:
    `422`), and
 3. asserts the **persistent store is unchanged**.
 
-The `harness-security` audit emits the exact list of fields requiring such a test;
-Stage 5 writes them and Stage 6 blocks if any is missing.
+The `harness-security` audit emits the exact list of fields requiring such a
+test; the post-panel contract phase writes them and the contract delta
+review blocks if any is missing (serial test-mode: Stage 5 writes, Stage 6
+blocks).
 
 ## Project-Specific Security Conventions
 

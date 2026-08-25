@@ -38,7 +38,8 @@ rejected → assert persistent store unchanged**:
 - assert the persisted store did NOT change
 
 A happy-path test does NOT satisfy the contract. See
-`espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at Stage 6 —
+`espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at the
+contract delta review (serial test-mode: Stage 6) —
 a contracted field with no abuse test is a P0.
 
 ## Failure-Mode Tests (every NEW external-call path)
@@ -53,7 +54,8 @@ assert the DECIDED failure behaviour from `espalier/rules/production-standards.m
 - the failure is visible (error-level log emitted, per the project's logger)
 
 Use the project's mock/fixture conventions above to simulate the failure.
-Enforced at Stage 6 — a new external call with no failure-mode test is a P1.
+Enforced at review (the Stage 4 panel under folded test-mode; Stage 6 in
+serial) — a new external call with no failure-mode test is a P1.
 
 ## What NOT to Test
 - Private internals (test via public interface)

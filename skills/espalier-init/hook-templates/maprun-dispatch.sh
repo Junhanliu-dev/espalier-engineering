@@ -237,7 +237,9 @@ $OUTCOME_REL and stop.
 
 HARD RULES — these are not negotiable:
 
-1. STAGES 1 THROUGH 6 ONLY. Stop after Stage 6 (test review) passes. Do NOT run
+1. STAGES 1 THROUGH 6 ONLY. Stop once the Stage 6 row is written — a
+   'SKIPPED | folded' row or a delta-review PASS both count (the espalier
+   skill's stage-row rules). Do NOT run
    Stage 7 (push), 8, 9 or 10. Commit your work to the current branch locally.
 2. NEVER run 'git push'. Push is blocked at git config level in this worktree;
    attempting it wastes a turn and fails.
@@ -245,7 +247,8 @@ HARD RULES — these are not negotiable:
    again by the run master; the answers are cited in requirements.md. Treat
    --no-grill as given.
 4. READ SCOPE. You may read: your change folder ($CHANGE_REL/), espalier/rules/,
-   espalier/wiki/, this map's decision tickets under espalier/maps/, and the
+   espalier/wiki/, this map's decision tickets and findings/ digest under
+   espalier/maps/, and the
    source tree. You may NOT read other espalier/changes/ folders — sibling
    slices are other workers' business and reading them pollutes your run.
 5. THE CHANGE FOLDER IS THE TICKET. Read $CHANGE_REL/requirements.md and treat
@@ -261,7 +264,12 @@ HARD RULES — these are not negotiable:
    map tickets, or espalier/rules/ — do NOT guess and do NOT stall. Write the
    question to $QUESTION_REL, then write the single word PARKED to
    $OUTCOME_REL and STOP immediately.
-8. On finishing Stage 6 cleanly, write the single word PASSED to $OUTCOME_REL.
+8. On finishing Stage 6 cleanly (its row written — SKIPPED or PASS): FIRST,
+   if requirements.md frontmatter has charted_from: and your Stage History
+   recorded ROUND FAIL rows, write their bracketed finding lines (one per
+   line) to espalier/maps/<map-slug>/findings/{YYYY-MM-DD}-feat-<kebab>.md
+   — skip if the file already exists — and commit it with your work. THEN
+   write the single word PASSED to $OUTCOME_REL.
    If the pipeline escalates (review rounds exhausted, or an agent returns
    ESCALATION_REQUIRED), write ESCALATED to $OUTCOME_REL, the reason
    underneath, and STOP.
@@ -362,7 +370,7 @@ while :; do
   elif [ "\$stage" -lt 5 ]; then
     boundary="the Stage 4 panel passes and the Reviewed-Diff certificate is recorded"
   else
-    boundary="Stage 6 passes (then write the PASSED sentinel per the contract)"
+    boundary="the Stage 6 row is written, SKIPPED-or-PASS (then the findings digest if charted, then the PASSED sentinel per the contract)"
   fi
   legf=\$(mktemp)
   printf '\nTHIS LEG ONLY: continue the pipeline from the stage recorded in pipeline-state.md. STOP and end your session cleanly once %s. Do NOT write the outcome sentinel except as rules 7-8 direct (PASSED only after Stage 6; PARKED/ESCALATED/MISBASED whenever their conditions occur, any leg). A fresh session continues from pipeline-state.md after you exit.\n' "\$boundary" > "\$legf"

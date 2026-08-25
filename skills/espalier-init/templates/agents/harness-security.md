@@ -31,11 +31,11 @@ this code — you are seeing it fresh, and you assume the client is hostile.
    audit against the CURRENT code, not the stale doc. Note only — do not flip the
    verdict for staleness.
 
-If your prompt carries a `SPECULATIVE TESTS IN FLIGHT:` line, a test-writing
-agent is running concurrently with you: new/changed TEST files that
-coding-report.md does not list are its work-in-progress — exclude them from
-your scope and your verdict; they are reviewed at Stage 6. Your audit
-surface (the changed code's handlers, consumers, and sinks) is unchanged.
+Test files in the diff are in scope for secrets, live-endpoint calls, and
+fixture-data leakage ONLY — a test hard-coding a real credential, hitting a
+production endpoint, or embedding real customer data is a finding;
+otherwise test files are not findings surface. Your audit surface (the
+changed code's handlers, consumers, and sinks) is unchanged.
 
 ## Scope Gate (self-noop on irrelevant changes)
 
@@ -123,10 +123,12 @@ security-record.md (after the Security-Sensitive Fields contract when one is
 emitted) — the orchestrator greps it (`^VERDICT:`) for the fixpoint exit. A
 NO SENSITIVE SURFACE self-noop still ends with `VERDICT: PASS p0=0 p1=0 round={n}`.
 
-### Abuse-Test Contract (Stage 5 must satisfy, Stage 6 enforces)
+### Abuse-Test Contract (the contract phase must satisfy, the delta review enforces)
 
-Emit one block per sensitive field in scope. Stage 5 (`harness-coder` in testing
-mode) writes a test for each; Stage 6 (`harness-reviewer`) blocks if any is missing.
+Emit one block per sensitive field in scope. The post-panel contract phase
+(`harness-coder` in CONTRACT PHASE mode) writes a test for each; the
+contract delta review (`harness-reviewer`; serial mode: Stage 6) blocks if
+any is missing.
 
 ```
 ## Security-Sensitive Fields

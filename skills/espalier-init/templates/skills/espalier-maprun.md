@@ -336,8 +336,10 @@ keep running without you; the human invokes the next pass.
 Every worker is spawned with these rules and must honour all of them. They are
 embedded in the dispatch prompt; this is the reference.
 
-1. **Stages 1–6 only.** Stop after Stage 6 passes. Never Stage 7 (push), 8, 9
-   or 10. Commit locally to the ticket branch.
+1. **Stages 1–6 only.** Stop once the Stage 6 row is written — a
+   `SKIPPED | folded` row or a delta-review PASS both count (the espalier
+   skill's stage-row rules). Never Stage 7 (push), 8, 9 or 10. Commit
+   locally to the ticket branch.
 2. **The change folder is the ticket.** Adopt
    `espalier/changes/feat/<slug>/` — read its `requirements.md` as THE
    requirements document and keep its `pipeline-state.md` current
@@ -349,7 +351,8 @@ embedded in the dispatch prompt; this is the reference.
    instruction: an autonomous agent cannot talk its way past it.
 4. **No grill.** Requirements were grilled by the map and again by the master.
 5. **Read scope.** Its change folder, `espalier/rules/`, `espalier/wiki/`,
-   the map's decision tickets, and the source tree — never sibling
+   the map's decision tickets and `findings/` digest under
+   `espalier/maps/`, and the source tree — never sibling
    `espalier/changes/` folders, and it has no access to the master's `plan/`
    directory at all.
 6. **Exactly one outcome sentinel**, written last, to
@@ -357,6 +360,14 @@ embedded in the dispatch prompt; this is the reference.
    `PASSED` · `ESCALATED` (reason underneath) · `PARKED` (question written to
    `.maprun-question.md` beside it first — reap carries it to the master) ·
    `MISBASED` (skeleton missing — reaped as an escalation).
+   Before writing `PASSED` only: if requirements.md frontmatter has
+   `charted_from: maps/{map-slug}` and Stage History recorded
+   `ROUND {n} FAIL` rows, first write their bracketed finding lines (one
+   per line) to
+   `espalier/maps/{map-slug}/findings/{YYYY-MM-DD}-feat-{kebab}.md` — skip
+   if the file exists — and commit it with the ticket branch. One writer
+   per file, so the integration merge can never conflict;
+   later-dispatched workers inherit it through the integration branch.
 7. **Never guess in place of asking.** Park instead.
 8. **Verify before resuming.** `pipeline-state.md` may claim more than the
    worktree contains (a predecessor died mid-write). Correct it down to what

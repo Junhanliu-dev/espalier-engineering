@@ -48,6 +48,9 @@ espalier/maps/{YYYY-MM-DD}-{kebab}/       # date prefix: lexical sort == chronol
 │   ├── 001-{kebab}.md                    # one file per ticket (file-per-key: two sessions
 │   ├── 002-{kebab}.md                    #  on different tickets can never merge-conflict)
 │   └── ...
+├── findings/                             # per-slice review-finding digests, written when a
+│   └── {YYYY-MM-DD}-{type}-{kebab}.md    #  spawned change finishes (one writer per file —
+│                                         #  merge-safe; folded into later slices at adoption)
 └── assets/                               # research findings, prototype pointers — linked, never pasted
 ```
 
@@ -259,8 +262,9 @@ map concurrently — claims exist for exactly that.
    REMOVED from the fog section — a patch lives as fog or ticket, never both.
    If the answer invalidates existing open tickets, update or close them and
    say so. New research tickets fire immediately (the exemption).
-6. **Cleared check.** No open tickets AND an empty Not-yet-specified → the map
-   is CLEARED: run the Handoff below in this same session.
+6. **Cleared check.** No open tickets AND an empty Not-yet-specified → run
+   the Handoff below in this same session (it flips `status: CLEARED` as
+   its LAST step, after every slice passes the crispness gate).
 7. **Marker down, commit, stop** — report the resolution gist, what
    graduated, and the next frontier by name.
 
@@ -270,11 +274,19 @@ A cleared map is linked decisions, not a build plan. Collapse it into
 implementation slices and file each as a change skeleton `/espalier` already
 knows how to adopt:
 
-1. Set `status: CLEARED` in map.md.
-2. **Slice the destination** into implementation changes a single `/espalier`
+1. **Slice the destination** into implementation changes a single `/espalier`
    run can hold — each slice ≤ ~5 files expected (the espalier-requirements
    decomposition rule), ordered so earlier slices unblock later ones.
-3. For each slice, create `espalier/changes/feat/{YYYY-MM-DD}-{kebab}/`:
+2. **Score each drafted slice (crispness gate).** Draft each slice's
+   requirement text (step 3's content), then invoke `espalier-grill` in
+   `mode=score` on the draft. `skip`/`light` → file it (step 3) — `light`
+   is fine: Stage 1's grill is cheap at that tier and slices legitimately
+   add detail. Would-be-`full` → do NOT file it: the map is not actually
+   clear there — create the grilling/decision tickets the fog implies
+   (create-then-wire, cap check applies), leave `status: IN_PROGRESS`, and
+   report which slice was refused and why. The handoff resumes when those
+   tickets close.
+3. For each passing slice, create `espalier/changes/feat/{YYYY-MM-DD}-{kebab}/`:
    - `requirements.md` — draft: goal line, the acceptance-criteria lines the
      relevant Resolutions already settled (with their citations), scope
      in/out, and frontmatter:
@@ -288,14 +300,17 @@ knows how to adopt:
    - `pipeline-state.md` from `espalier/changes/_template/pipeline-state.md`
      with `- Status: FILED` added under `## Status`.
 4. Add every slice to the map's Spawned Changes table (`FILED`).
-5. Tell the user BOTH run options: one at a time — `/espalier <slice 1
+5. **Set `status: CLEARED` in map.md — LAST, only when every slice scored
+   `skip`/`light` and is filed.** A refusal in step 2 means the map stays
+   `IN_PROGRESS`; a "cleared" map must never carry unfiled fog.
+6. Tell the user BOTH run options: one at a time — `/espalier <slice 1
    requirement>` … (the pipeline's FILED-skeleton scan adopts each folder,
    and Stage 1 starts from the drafted requirements, already part-grilled by
    the map) — or the whole map at once with `/espalier-maprun <map-slug> plan`
    then `/espalier-maprun <map-slug>` passes (headless workers drive every
    slice through stages 1–6 in isolated worktrees; see
    `espalier/skills/espalier-maprun/SKILL.md`).
-6. When later `/espalier` runs (or an `/espalier-maprun` completion) complete a
+7. When later `/espalier` runs (or an `/espalier-maprun` completion) complete a
    spawned change, they may offer to flip this map's status to `BUILT` once
    every row is COMPLETE. (Offer — never auto-flip.)
 

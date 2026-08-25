@@ -4,9 +4,11 @@ description: >-
   Implementation agent for {project_name} — writes code that follows the
   project's Espalier rules, layer specs, and Solution Selection Ladder
   (conventions first, correctness within them, clarity then brevity break ties).
-  Spawned by the pipeline at Stage 3 (implementation), re-spawned on Stage 4/6
-  fix rounds, and run in testing mode at Stage 5 (writes tests + contracted
-  security abuse tests). One task at a time; never reviews its own code.
+  Spawned by the pipeline at Stage 3 (implementation — under folded
+  test-mode this includes writing the change's interface/failure-mode
+  tests with the code), re-spawned on review fix rounds, and run in
+  CONTRACT PHASE mode for contracted security abuse tests. One task at a
+  time; never reviews its own code.
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
@@ -109,15 +111,18 @@ deliberate rather than re-derives it.
 ## Coding Report
 - Files created: {list}
 - Files modified: {list}
+- Test files: {list — ALWAYS its own line: the exit gate's scoped test
+  run, the review panel, and the escalation detectors key off this split}
 - Layers touched: {list}
 - Build status: {pass/fail}
 - Lint status: {pass/fail}
 - Notes: {anything the reviewer should pay attention to}
 ```
 
-### Test-mode self-report (fix lane Stage 5 only)
+### Test Scope Signal (fix lane)
 
-When running in test-writing mode under `/espalier-fix` Stage 5 AND a meaningful
+When writing the fix's tests (a Stage 3 duty under folded test-mode; the
+serial test pass otherwise) AND a meaningful
 test for the change requires scope inflation beyond the fix's committed files,
 include this addendum in your coding-report.md:
 
@@ -216,35 +221,24 @@ Never spread a raw request body into a persistence call — bind an explicit
 allow-list. Record each sensitive field you handled and the control you applied in
 coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
 
-### Writing Abuse Tests (Stage 5)
+### Writing Abuse Tests (contract phase)
 
-When you run in testing mode (Stage 5), read the `## Security-Sensitive Fields`
+When you run in CONTRACT PHASE mode, read the `## Security-Sensitive Fields`
 contract in `espalier/changes/{type}/{slug}/security-record.md` (emitted by the
 Stage 4 auditor). For EACH field listed, write the negative test named in its
 `abuse_test`: tamper the value, assert the request is rejected, and assert the
-persistent store is unchanged. A contracted field with no such test is a Stage 6
-blocker — do not skip one. See `espalier/skills/espalier-security/SKILL.md` for
-the recipe.
+persistent store is unchanged. A contracted field with no such test blocks
+the contract delta review (serial mode: Stage 6) — do not skip one. See
+`espalier/skills/espalier-security/SKILL.md` for the recipe.
 
-### Speculative & Contract entry points (Stage 5 dispatch modes)
+### Contract entry point (post-panel dispatch mode)
 
-Testing mode has two prompt-marked entry points beyond the classic
-post-review dispatch:
-
-- **`SPECULATIVE DISPATCH:`** — you run CONCURRENTLY with the round-1
-  review panel. Write everything EXCEPT the contracted abuse tests. Do NOT
-  read security-record.md (it may be mid-write). Write your report to the
-  prompt's `REPORT TARGET:` part file, never to coding-report.md (the
-  panel is reading it), and list EVERY file you create under "Files
-  created" — the orchestrator's quarantine/discard mechanics operate on
-  that exact list, so an unlisted file is an unmanaged file. Run only
-  scoped invocations of your new test files; no whole-tree builds, no
-  dependency installs.
 - **`CONTRACT PHASE:`** — the panel has passed. Read security-record.md's
-  `## Security-Sensitive Fields` and write the named abuse tests. When the
-  prompt also carries "code changed since your tests", first reconcile the
-  restored speculative tests against those files. Append your test report
-  to coding-report.md normally.
+  `## Security-Sensitive Fields` and write the named abuse tests — nothing
+  else. Append your test report to coding-report.md normally. (Under
+  folded test-mode this is the ONLY post-panel test dispatch: the
+  interface/failure-mode tests were your own Stage 3 duty, written with
+  the code and reviewed with it.)
 
 ## Production-Aware Coding (do this WHILE writing, not only at review)
 
@@ -275,10 +269,11 @@ Record each NFR mechanism you applied (timeout value, pagination bound, dedupe
 key, migration phase) in coding-report.md "Notes" — the reviewer confirms it
 rather than re-derives it.
 
-### Writing Failure-Mode Tests (Stage 5)
+### Writing Failure-Mode Tests (testing duty)
 
-In testing mode, for each NEW external-call path this change introduced, write
+When writing tests (a Stage 3 duty under folded test-mode; the serial test
+pass otherwise), for each NEW external-call path this change introduced, write
 at least one failure-mode test: make the dependency fail (timeout / error /
 garbage response) and assert the decided failure behaviour occurs — fallback
 used or error propagated with context, and no partial write persisted. Missing
-failure-mode coverage on a new external call is a P1 at Stage 6.
+failure-mode coverage on a new external call is a P1 at review.
