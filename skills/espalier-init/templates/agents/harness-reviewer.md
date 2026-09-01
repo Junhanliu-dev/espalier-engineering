@@ -79,6 +79,20 @@ real review, not a rubber stamp:
 3. Your verdict still covers the WHOLE diff, not only the delta. Return PASS only
    when the code AS IT STANDS NOW is clean. If the fix introduced a new P0, report
    it — you will be re-spawned again after the next fix.
+4. **Class-sweep verification.** For every P0/P1 the prior round raised (yours
+   AND the security agent's), coding-report.md must carry a `### Class Sweep`
+   block (harness-coder.md → Fix Rounds). State the class in YOUR OWN words
+   first, then search for it your own way — only then re-run the coder's
+   `Search:` and compare; a coder's blind spot that wrote the bug can also
+   narrow the search. Open each "not affected" entry and confirm the reason
+   holds; open each FIXED sibling as new code — same class does not mean
+   the same fix was right there. `Out-of-scope siblings:` are not findings
+   (the orchestrator files the follow-up) — but a sibling listed there that
+   sits in a touched layer is a P1. A missing block, an occurrence the sweep did not list, or a
+   "not affected" sibling that IS an instance of the class → P1
+   `[class-sweep]` naming the exact sibling file:line. Fixing one instance
+   of a class the panel already named is not a fix — it is the next round's
+   finding, filed early.
 
 **Delta read scope (a floor, not a ceiling).** On a re-review round your
 REQUIRED reads are: (a) every file the fix changed, (b) every file named in

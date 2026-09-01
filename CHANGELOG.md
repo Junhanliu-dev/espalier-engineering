@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.23.1 — 2026-09-01
+
+Patch: **class sweep** — fix rounds fix the defect CLASS, not the flagged
+line. Field data from a real v0.23.0 install (48 changes): Stage 4 was the
+long pole (median 25 min vs Stage 3's 8), and most second/third panel
+rounds re-found the SAME defect one hop from the line just fixed —
+`money-lists` (filterable reverse, 3 rounds), `quoting-lists` (untransacted
+money columns, 4 rounds), `job-lists`, `review-lists`, the open-redirect
+refactor (fix bypassed in round 2). Each hop cost a full 2-agent round.
+Same gates, sentinels, round caps, certificates, and human checkpoints;
+`code rounds` mean (1.15 at baseline) is the number to watch.
+
+- `harness-coder.md` — new `## Fix Rounds: Fix the Class, Not the
+  Instance`: on a `FIX ROUND {n}:` prompt, per P0/P1 the coder (1) names
+  the violated property, (2) enumerates every sibling inside the change's
+  scope — touched layers plus the generated surfaces they feed — recording
+  the search, (3) fixes each on its own read (same class ≠ same fix) or
+  names it NOT-an-instance / OUT-OF-SCOPE, (4) re-checks production seeds
+  and tests on the fix. Reports one `### Class Sweep` block per finding
+  with an `Out-of-scope siblings:` line the orchestrator files as a
+  follow-up. Solution Selection Ladder and the task-scope rule still bind
+  — never a repo-wide refactor inside a feature change.
+- `harness-reviewer.md` — Re-review Rounds step 4: states the class in its
+  own words and searches independently before re-running the coder's
+  search; opens every "not affected" claim and every fixed sibling; a
+  missing block, an unlisted sibling, or a wrong claim is a P1
+  `[class-sweep]` naming the exact `file:line`.
+- `harness-security.md` — Re-review Rounds step 4: the same check for its
+  own findings — a bypass of the fix or an unlisted sibling door is a P1.
+- `pipeline.md`, `espalier` + `espalier-fix` SKILLs — the Stage 4
+  re-spawn prompt opens with the `FIX ROUND {n}:` header.
+- Migration #33: `scripts/migrate-v0.23.0-to-v0.23.1.sh` — refreshes the 3
+  pure copies; anchored-inserts the 3 agent sections, EXTRACTED from the
+  templates at run time so a migrated install is byte-identical to a fresh
+  one (a drifted template dies rather than writing an empty block);
+  customised files skip-with-record; backups `.pre-v0.23.1.bak`.
+
 ## 0.23.0 — 2026-08-25
 
 Minor: **round economy** — the third speed release, designed against field

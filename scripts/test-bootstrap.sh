@@ -1698,6 +1698,116 @@ M23_RERUN=$( cd "$TMP" && bash "$MIGRATE23" --yes --plugin-dir="$SCRIPT_DIR/.." 
 assert "32j re-run is a no-op" "echo \"\$M23_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
+# ─── Test 33: v0.23.1 class sweep — templates + migration ─────────────────
+echo "Test 33: v0.23.1 class sweep (fix rounds fix the class + migration)"
+MIGRATE231="$SCRIPT_DIR/migrate-v0.23.0-to-v0.23.1.sh"
+TPL33="$SCRIPT_DIR/../skills/espalier-init/templates"
+TMP=$(mktemp -d -t smoke33.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+
+assert "33a templates carry the class-sweep text (coder section, both panel checks, FIX ROUND header in all 3 lane files)" \
+  "grep -qF '## Fix Rounds: Fix the Class, Not the Instance' '$TPL33/agents/harness-coder.md' \
+   && grep -qF '### Class Sweep' '$TPL33/agents/harness-coder.md' \
+   && grep -qF -- '- Out-of-scope siblings:' '$TPL33/agents/harness-coder.md' \
+   && grep -qF '**Class-sweep verification.**' '$TPL33/agents/harness-reviewer.md' \
+   && grep -qF '[class-sweep]' '$TPL33/agents/harness-reviewer.md' \
+   && grep -qF '**Class-sweep verification (your own findings).**' '$TPL33/agents/harness-security.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TPL33/pipeline.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TPL33/skills/espalier.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TPL33/skills/espalier-fix.md'"
+assert "33b sweep is scope-bounded (touched layers; ladder + task-scope rule still bind) — no repo-wide licence" \
+  "grep -qF 'the layers this change touches plus the generated surfaces they feed' '$TPL33/agents/harness-coder.md' \
+   && grep -qF 'Never widen a feature change into a repo-wide refactor' '$TPL33/agents/harness-coder.md' \
+   && grep -qF 'does not mean same fix' '$TPL33/agents/harness-coder.md'"
+assert "33c installed pure copies carry the FIX ROUND header after bootstrap" \
+  "grep -qF 'FIX ROUND {n}:' '$TMP/espalier/pipeline.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TMP/espalier/skills/espalier/SKILL.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
+
+# Stub agent files (simulate_llm_writes) have no stock anchors: first run
+# skip-with-records all three agent edits, exit 0, pure copies stay fresh.
+M231_SKIP=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M231_SKIP_RC=$?
+assert "33d stub agent files skip-with-record (exit 0)" \
+  "[ $M231_SKIP_RC -eq 0 ] \
+   && grep -qF 'v0.23.1-coder-class-sweep' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.23.1-reviewer-class-sweep' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.23.1-security-class-sweep' '$TMP/espalier/.migrations-skipped'"
+M231_SKIP2=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "33e re-run after skip-with-record is a no-op" \
+  "echo \"\$M231_SKIP2\" | grep -qi 'nothing to do'"
+
+# Seed stock v0.23.0-shaped agent files carrying the anchors, drop the FIX
+# ROUND header from one pure copy, then migrate for real.
+rm -f "$TMP/espalier/.migrations-skipped"
+cat > "$TMP/espalier/agents/harness-coder.md" << 'V230CODER'
+## You Must NOT
+
+- Review your own code (that's the reviewer's job)
+- Add features not in the requirements
+
+## Editing Discipline
+
+Modify files with the `Edit` tool (exact-string replacement); create new files
+with `Write`.
+V230CODER
+cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V230REV'
+## Re-review Rounds (you may be re-spawned on a fix)
+
+1. You will be handed the "changed since last review" set.
+3. Your verdict still covers the WHOLE diff, not only the delta. Return PASS only
+   when the code AS IT STANDS NOW is clean. If the fix introduced a new P0, report
+   it — you will be re-spawned again after the next fix.
+
+**Delta read scope (a floor, not a ceiling).** On a re-review round your
+REQUIRED reads are the fix files.
+V230REV
+cat > "$TMP/espalier/agents/harness-security.md" << 'V230SEC'
+## Re-review Rounds (you may be re-spawned on a fix)
+
+1. You will get the "changed since last review" set — scrutinize it hardest.
+3. Your verdict covers the WHOLE change, not just the delta. PASS only when the
+   code AS IT STANDS NOW trusts no sensitive client value.
+
+**Delta mode (when YOUR prior round was clean).** If your last sentinel on
+this change was PASS.
+V230SEC
+grep -vF 'FIX ROUND {n}:' "$TMP/espalier/pipeline.md" > "$TMP/pipe.stripped" && mv "$TMP/pipe.stripped" "$TMP/espalier/pipeline.md"
+M231_OUT=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M231_RC=$?
+assert "33f apply lands every v0.23.1 marker + backups; stripped pure copy refreshed" \
+  "[ $M231_RC -eq 0 ] \
+   && grep -qF '## Fix Rounds: Fix the Class, Not the Instance' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF '**Class-sweep verification.**' '$TMP/espalier/agents/harness-reviewer.md' \
+   && grep -qF '**Class-sweep verification (your own findings).**' '$TMP/espalier/agents/harness-security.md' \
+   && grep -qF 'FIX ROUND {n}:' '$TMP/espalier/pipeline.md' \
+   && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.23.1.bak' ] \
+   && [ -f '$TMP/espalier/agents/harness-reviewer.md.pre-v0.23.1.bak' ] \
+   && [ -f '$TMP/espalier/agents/harness-security.md.pre-v0.23.1.bak' ] \
+   && [ -f '$TMP/espalier/pipeline.md.pre-v0.23.1.bak' ] \
+   && ! grep -qF 'v0.23.1-' '$TMP/espalier/.migrations-skipped' 2>/dev/null"
+# Placement: coder section sits between You Must NOT and Editing Discipline;
+# reviewer/security step 4 follows step 3's closing line directly.
+FR_LN=$(grep -n '^## Fix Rounds' "$TMP/espalier/agents/harness-coder.md" | cut -d: -f1)
+ED_LN=$(grep -n '^## Editing Discipline' "$TMP/espalier/agents/harness-coder.md" | cut -d: -f1)
+YM_LN=$(grep -n '^## You Must NOT' "$TMP/espalier/agents/harness-coder.md" | cut -d: -f1)
+assert "33g placement: You Must NOT < Fix Rounds < Editing Discipline; panel step 4 directly after step 3" \
+  "[ \"$YM_LN\" -lt \"$FR_LN\" ] && [ \"$FR_LN\" -lt \"$ED_LN\" ] \
+   && grep -A1 're-spawned again after the next fix.' '$TMP/espalier/agents/harness-reviewer.md' | grep -qF '4. **Class-sweep verification.**' \
+   && grep -A1 'trusts no sensitive client value.' '$TMP/espalier/agents/harness-security.md' | grep -qF '4. **Class-sweep verification (your own findings).**'"
+# Identity: the migrated sections are byte-equal to the template sections
+# (the script extracts them from the templates rather than embedding a copy).
+ext33() { awk -v s="$2" -v e="$3" '!i&&index($0,s){i=1} i{print} i&&index($0,e){exit}' "$1"; }
+assert "33h migrated sections are byte-identical to the template sections" \
+  "diff <(ext33 '$TMP/espalier/agents/harness-coder.md' '## Fix Rounds' 'the round repeats.') <(ext33 '$TPL33/agents/harness-coder.md' '## Fix Rounds' 'the round repeats.') >/dev/null \
+   && diff <(ext33 '$TMP/espalier/agents/harness-reviewer.md' 'Class-sweep verification.' 'filed early.') <(ext33 '$TPL33/agents/harness-reviewer.md' 'Class-sweep verification.' 'filed early.') >/dev/null \
+   && diff <(ext33 '$TMP/espalier/agents/harness-security.md' 'Class-sweep verification (your' 'is still open.') <(ext33 '$TPL33/agents/harness-security.md' 'Class-sweep verification (your' 'is still open.') >/dev/null"
+M231_RERUN=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "33i re-run is a no-op" "echo \"\$M231_RERUN\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

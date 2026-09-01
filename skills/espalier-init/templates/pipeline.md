@@ -104,7 +104,10 @@ lanes route into it rather than through it:
      changed, build/lint re-runs whole-tree before every round, and the
      Reviewed-Diff fingerprint blocks unreviewed edits at push.
   2. **Non-PASS verdict (word `FAIL`, or p0/p1 > 0) from EITHER agent →** re-spawn
-     `harness-coder` with the combined findings (a Stage 3 action), then **return
+     `harness-coder` with the combined findings under a `FIX ROUND {n}:` header
+     (it fixes the defect CLASS — every sibling of each P0/P1, reported as a
+     `### Class Sweep` block the panel re-verifies — not the flagged line; see
+     harness-coder.md → Fix Rounds) (a Stage 3 action), then **return
      to step 1 and re-review the NEW diff with the whole panel.** Never advance to
      Stage 5 on the coder's fix report alone — a fix is never the last action
      before the gate; a clean panel is. Each non-PASS round increments the counter.
