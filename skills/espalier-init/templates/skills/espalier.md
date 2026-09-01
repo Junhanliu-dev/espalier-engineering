@@ -585,7 +585,11 @@ Stage 5 by any other path:
    Otherwise re-spawn `harness-coder` with the combined findings (a Stage 3
    action — its build/lint/test exit gate applies; code and test findings
    share this ONE loop, tests looping as ordinary files in the diff), increment the shared
-   round counter, and return to step 1. After snapshotting a ROUND row, also
+   round counter, and return to step 1. The re-spawn prompt's first line is
+   `FIX ROUND {n}: for every P0/P1 below run the Class Sweep
+   (harness-coder.md → Fix Rounds) — fix every sibling of the defect
+   class, not the flagged line; one `### Class Sweep` block per finding in
+   coding-report.md.` — the panel verifies the sweep next round. After snapshotting a ROUND row, also
    update the `Review Rounds:` numerators in pipeline-state.md — a resumed
    session recounts rounds from this line plus the ROUND rows, never from
    memory.

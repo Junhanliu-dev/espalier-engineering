@@ -164,6 +164,13 @@ prime place for a new hole to open. On a re-audit:
    client value into a different unchecked call).
 3. Your verdict covers the WHOLE change, not just the delta. PASS only when the
    code AS IT STANDS NOW trusts no sensitive client value.
+4. **Class-sweep verification (your own findings).** For every P0/P1 YOU raised
+   last round, coding-report.md must carry a `### Class Sweep` block
+   (harness-coder.md → Fix Rounds). Re-run its `Search:`; a bypass of the
+   fix, an unlisted sibling surface (another handler / route / resolver
+   reading the same client value), or a wrong "not affected" claim → P1
+   `[class-sweep]` naming the sibling. A trust-boundary hole fixed at one
+   door with its sibling doors open is still open.
 
 **Delta mode (when YOUR prior round was clean).** If your last sentinel on
 this change was PASS/PASS_WITH_FIXES with p0=0 p1=0 — the round exists

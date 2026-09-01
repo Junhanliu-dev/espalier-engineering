@@ -787,7 +787,11 @@ without spawning the panel and without counting a P0 round.
      with `p0=0` is still an escalation.
    - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
      with the combined findings and loop (counter + `max-code-rounds` cap
-     unchanged): snapshot both sentinels into pipeline-state.md Stage History
+     unchanged; the re-spawn prompt's first line is `FIX ROUND {n}: for
+     every P0/P1 below run the Class Sweep (harness-coder.md → Fix Rounds)
+     — fix every sibling of the defect class, not the flagged line; one
+     `### Class Sweep` block per finding in coding-report.md.`): snapshot
+     both sentinels into pipeline-state.md Stage History
      — appending in the same notes cell one bracketed finding line per
      FAILING agent (`[{P-sev} {≤80-char summary}]`; this snapshot is the
      findings digest's only source — the records are overwritten next
