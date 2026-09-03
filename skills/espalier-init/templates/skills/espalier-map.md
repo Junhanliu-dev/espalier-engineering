@@ -61,6 +61,9 @@ espalier/maps/{YYYY-MM-DD}-{kebab}/       # date prefix: lexical sort == chronol
 map: {slug}
 status: IN_PROGRESS        # IN_PROGRESS | CLEARED | BUILT | ABANDONED
 started: {ISO timestamp}
+# retirement maps only (charted from a /espalier-simplify row):
+# simplify_from: wiki/simplify-survey.md#{n}
+# survey_commit: {sha}
 ---
 
 # Map: {title}
@@ -214,6 +217,13 @@ hand-resolves nothing** — it is one session's work, and it stops.
    destination is one or two sharp lines. The destination fixes the scope
    every later ticket is measured against. Scope it to a bounded epic — "the
    whole product" is the waterfall trap; slice V1 out of it.
+   **Retirement maps.** An idea of the form `retire: {boundary}
+   (simplify-survey #{n})` comes from a `/espalier-simplify` row too large
+   for one session: copy `simplify_from: wiki/simplify-survey.md#{n}` and
+   `survey_commit:` (from the survey page header) into map.md's frontmatter,
+   seed the Destination from that row's proof record (its `Cut:` and
+   `Consequence:` lines), and treat its `Protected:` line as Out of scope
+   unless a grilling ticket explicitly decides otherwise.
 3. **Map the frontier, breadth-first.** Fan out across the space — open
    decisions, first steps takeable now, suspected fog. Do NOT go deep on any
    one thread. **No-fog exit:** if this surfaces no fog — the route is already
@@ -297,6 +307,15 @@ knows how to adopt:
      tickets: [NNN, NNN]
      ---
      ```
+     On a retirement map (map.md carries `simplify_from:`), ALSO copy
+     `simplify_from:` and `survey_commit:` into every slice's frontmatter
+     and add a `## Retired Surface` section listing the entries of the
+     candidate's cut boundary THIS slice owns (one identifier per line) —
+     the pipeline's simplification machinery (the `SIMPLIFICATION CHANGE:`
+     spawn header, the coder's whole-boundary discipline, the reviewer's
+     independent re-search, the withdraw rule, the Completion doc flags)
+     then fires per slice. Slices stay under `espalier/changes/feat/` — the
+     run lane's executor reads that path.
    - `pipeline-state.md` from `espalier/changes/_template/pipeline-state.md`
      with `- Status: FILED` added under `## Status`.
 4. Add every slice to the map's Spawned Changes table (`FILED`).

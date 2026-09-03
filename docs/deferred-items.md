@@ -27,6 +27,13 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 - **Migration #23 (v0.15→v0.16) is order-broken for pre-v0.18 installs under the current plugin.** Its Step 3 `bootstrap --wire-only` runs the CURRENT validator, whose checks 59-62 (map skill/guard, maprun skill/engine) fail on an install that has not yet run migrations #25/#26 — the chain dies at its own first step. Field workaround (2026-08-25, portal.cneaustralia): run #25 and #26 first (they install the current pure-copy lanes), then #23/#24, then #27+ — every script is marker-guarded so the reorder is safe. Proper fix: #23 pre-seeds missing pure-copy skills from templates (write-if-absent) before wiring, or wire-only validation renders not-yet-migrated lane checks as pending-skips.
   - **Trigger to revisit**: the next pre-v0.18 install that needs migrating, or the next release that touches migration #23 / the wire-only validator.
 
+## Items deferred from v0.24.0
+
+- **`eval/simplify/` harness.** The simplify scout prompt (proof records, evidence ladder, protected-surface refusal) ships without an LLM-judged eval; the v0.24.0 gate is the bootstrap/migration suite plus the reviewer's independent re-search at Stage 4.
+  - **Trigger to revisit**: the first field report of a `[simplify-consumer]` P0 (a HIGH candidate the panel proved wrong), or any edit to the Scout Prompt in `templates/skills/espalier-simplify.md`.
+- **maprun-built retirement slices never reach Completion.** A retirement map (`/espalier-map retire: … (simplify-survey #n)`) keeps its slices under `feat/`, so `/espalier-maprun` drives them unchanged and the worker's `SIMPLIFICATION CHANGE:` machinery fires — but workers stop at Stage 6 and the master has no completion step, so the Completion doc flags (`simplify: <name> retired …` → `/espalier-prune`) never run for those slices. Same missing step as the Spawned-Changes COMPLETE flip above; until it exists, run `/espalier-doctor --since <survey commit>` once the map is BUILT.
+  - **Trigger to revisit**: implementing the master's merge/completion step (fold the doc-flag grep in with the COMPLETE flip), or the first retirement map driven by maprun.
+
 ## Items deferred (acceptable as-is for v0.2.0)
 
 - **`harness-fix.md` "Before Starting" step 1** references `harness/pipeline.md` even though fix lane has its own stage overview (7 stages: 0–7, no Stage 2). Slightly redundant but not wrong — pipeline.md is the canonical Stage 3-7 contract.

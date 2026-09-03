@@ -213,15 +213,22 @@ unrelated in-flight change into the new request:
    alone) → resume the single in-flight change; if several are in flight,
    list them and ask which one via `AskUserQuestion`.
 5. Before creating a new folder, also scan
-   `espalier/changes/feat/*/pipeline-state.md` for `Status: FILED` skeletons
-   (root-cause feats filed by a fix lane's PARTIAL_FIX exit, or slices filed
-   by a cleared `/espalier-map` handoff); if the new requirement's kebab tail
-   OR its text mentions the skeleton's slug stem, ADOPT the skeleton folder
-   instead of creating a new one (set its `- Status: IN_PROGRESS` and start
-   from Stage 1 with its inherited `caused_by` / `filed_from_partial_fix` /
-   `charted_from` + `tickets` frontmatter). A map-filed skeleton's
-   requirements.md arrives part-grilled — its decided criteria carry ticket
-   citations; Stage 1's grill covers only what the slice adds.
+   `espalier/changes/feat/*/pipeline-state.md` AND
+   `espalier/changes/refactor/*/pipeline-state.md` for `Status: FILED`
+   skeletons (root-cause feats filed by a fix lane's PARTIAL_FIX exit,
+   slices filed by a cleared `/espalier-map` handoff — a retirement map's
+   slices carry `simplify_from` as well — or cuts filed by
+   `/espalier-simplify` under `refactor/`); if the new requirement's kebab
+   tail OR its text mentions the skeleton's slug stem, ADOPT the skeleton
+   folder instead of creating a new one (set its `- Status: IN_PROGRESS` and
+   start from Stage 1 with its inherited `caused_by` /
+   `filed_from_partial_fix` / `charted_from` + `tickets` / `simplify_from` +
+   `survey_commit` frontmatter). A map-filed skeleton's requirements.md
+   arrives part-grilled — its decided criteria carry ticket citations;
+   Stage 1's grill covers only what the slice adds. A simplify-filed
+   skeleton arrives with its proof record and `## Retired Surface` list —
+   the grill covers only what the record leaves open (accepting the stated
+   consequence IS the product question; expect it to be asked).
    **Digest fold (adoption-time):** when the adopted skeleton's frontmatter
    names `charted_from: maps/{map-slug}` and
    `espalier/maps/{map-slug}/findings/` contains files, append to the
@@ -434,6 +441,10 @@ Agent tool:
     everything EXCEPT contracted abuse tests (that contract does not exist
     yet; it comes from the Stage 4 security audit). List the test files in
     their own "Test files" subsection of the coding report.
+    {On a change whose requirements.md carries simplify_from: add:}
+    SIMPLIFICATION CHANGE: requirements.md is a cut filed by
+    /espalier-simplify — apply your "Simplification Changes: Retire the
+    Whole Obligation" section and report a "### Retired Surface" block.
 
     When done, write your coding report to:
     espalier/changes/{type}/{slug}/coding-report.md
@@ -502,6 +513,10 @@ Agent tool:
     {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
     latest coding-report.md}. Re-review in delta scope per your "Re-review
     Rounds" section.
+    {On a change whose requirements.md carries simplify_from: add:}
+    SIMPLIFICATION CHANGE: read requirements.md "## Retired Surface" and run
+    your "Simplification Review" section — your own re-search of every
+    retired name BEFORE reading the coder's residue search.
 
     Write (OVERWRITE) your review to:
     espalier/changes/{type}/{slug}/review-record.md
@@ -593,6 +608,23 @@ Stage 5 by any other path:
    update the `Review Rounds:` numerators in pipeline-state.md — a resumed
    session recounts rounds from this line plus the ROUND rows, never from
    memory.
+   **Simplification changes (`simplify_from:` in requirements.md) — a
+   `[simplify-consumer]` or `[simplify-protected]` P0 is never fixed
+   around.** Re-spawn the coder ONCE with the finding; its only legitimate
+   outcomes are (a) the consumer is itself provably dead — it widens
+   `## Retired Surface` in requirements.md under the same proof discipline
+   and the panel re-verifies next round, or (b) it restores the boundary
+   fully (the cut reverted, nothing half-removed) and reports
+   `- Missed consumer:` ≠ `none`. On (b) do not loop: set
+   `- Status: ABORTED`, add
+   `| 4 | ABORTED | {ts} | simplify: missed consumer {file:line} |`,
+   rewrite that candidate's row in
+   `espalier/wiki/simplify-survey.md` (the `#{n}` in `simplify_from:`)
+   from `refactor/{slug}` to `LEAD — missed consumer: {file:line}` so the
+   next survey starts from the fact, commit both
+   (`chore(espalier): abort {slug} — missed consumer`), and tell the
+   user. A cut is proved or withdrawn — never patched into a partial
+   delete.
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
    (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate (command in
@@ -1046,6 +1078,22 @@ When Stage 10 passes:
      COMPLETE, OFFER (AskUserQuestion — never auto-flip) setting the map's
      `status: CLEARED → BUILT`. On an unattended run, skip the offer and
      leave one line in the summary instead.
+- **Simplification changes** (requirements.md frontmatter has
+  `simplify_from:`), BEFORE the bookkeeping commit — flag the docs that
+  still describe the retired surface (the post-merge detector keys off
+  paths, so a doc naming a deleted function by name would otherwise stay
+  green): for every identifier under requirements.md `## Retired Surface`,
+  `grep -rlwF --` it (whole word; skip entries shorter than 4 characters
+  — `id`, `run` — they would flag every doc) across `espalier/wiki/*.md`,
+  `espalier/rules/*.md`, and `espalier/skills/espalier-coding/specs/*.md`
+  (skip `wiki/simplify-survey.md` and `wiki/security-audit.md` —
+  regenerated pages), and for each hit:
+  `. espalier/hooks/drift-helpers.sh && mark_stale "<doc>" "$(git rev-parse HEAD)" "simplify: <name> retired in refactor/{slug}"`.
+  Surface ONE line — `{N} doc(s) describe retired surface — flagged; refresh
+  with /espalier-prune --all-stale (your own flags: prune's feature-branch
+  escape hatch applies)` — and, when other `simplify_from` changes have
+  completed since this one's `survey_commit`, add `run /espalier-doctor
+  --since {survey_commit}`. Notify-only: never edit a doc here.
 - Commit the espalier bookkeeping — a charted change stages its map dir in
   the SAME commit, so the digest + Spawned-Changes update ride with it:
   `git add espalier/changes/{type}/{slug}` (+ `git add espalier/maps/{map-slug}`

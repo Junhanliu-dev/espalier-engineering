@@ -1,8 +1,8 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 48 checks when only claude is targeted, 53 with codex, 58 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 53 checks when only claude is targeted, 58 with codex, 63 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
 >
-> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Checks 57-58 are unconditional base checks appended after the platform blocks (base numbering 1-46, 57-58 — non-contiguous so shipped platform IDs stay stable). Claude-only installs print exactly 48 lines.
+> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Checks 57-63 are unconditional base checks appended after the platform blocks (base numbering 1-46, 57-63 — non-contiguous so shipped platform IDs stay stable). Claude-only installs print exactly 53 lines.
 
 > **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
@@ -13,7 +13,7 @@ After all generation and wiring is complete, validate end-to-end.
 | # | Check name | What it runs | How to fix a failure |
 |---|-----------|--------------|----------------------|
 | 1 | rules-load | `ls .claude/rules/espalier-*.md` | Re-run bootstrap Stage 5 (`--wire-only`) to recreate the rule symlinks |
-| 2 | skills-load | `ls -d .claude/skills/espalier-coding … espalier-audit` (all 12 skill symlinks, incl. bare `espalier`) | Re-run bootstrap Stage 5; a missing source folder means the Phase 2/Stage 3 write was skipped |
+| 2 | skills-load | `ls -d .claude/skills/espalier-coding … espalier-audit` (all 15 skill symlinks, incl. bare `espalier`) | Re-run bootstrap Stage 5; a missing source folder means the Phase 2/Stage 3 write was skipped |
 | 3 | agents-load | `ls .claude/agents/harness-coder.md harness-reviewer.md harness-security.md` | Re-run bootstrap Stage 5; missing source = Phase 2 agent write skipped |
 | 4 | hooks-configured | `grep -q "espalier/hooks" .claude/settings.json` | Re-run bootstrap Stage 8 (settings merge) |
 | 5 | symlinks-valid | `[ -L .claude/rules/espalier-structure.md ] && [ -e … ]` | Broken link → the target rule file is missing; re-run Phase 2 write, then Stage 5 |
@@ -58,20 +58,25 @@ After all generation and wiring is complete, validate end-to-end.
 | 44 | wiki-external-services | `test -f espalier/wiki/external-services.md` | Re-run espalier-init Phase 2 (scout 1.10 → wiki write) |
 | 45 | rules-development-process | `test -f espalier/rules/development-process.md` | Re-run espalier-init Phase 2 (LLM write) |
 | 46 | layer-boundaries-hook | `test -f && test -x espalier/hooks/check-layer-boundaries.sh` | Phase 2 writes it for typescript/python/go; `--lang=unsupported` makes bootstrap write a no-op; `chmod +x` if present but not executable |
-| 47 | codex-skills-load *(codex only)* | `ls -d .agents/skills/espalier-coding … espalier-audit` (all 12 skill symlinks) | Re-run bootstrap Stage 5 with `--platforms=codex` (or `claude,codex`) |
+| 47 | codex-skills-load *(codex only)* | `ls -d .agents/skills/espalier-coding … espalier-audit` (all 15 skill symlinks) | Re-run bootstrap Stage 5 with `--platforms=codex` (or `claude,codex`) |
 | 48 | codex-symlinks-valid *(codex only)* | `[ -L .agents/skills/espalier ] && [ -e … ]` | Broken link → source skill folder missing; re-run Stage 3/Phase 2, then Stage 5 |
 | 49 | codex-agents-toml *(codex only)* | `name = "harness-…"` present in all three `.codex/agents/harness-*.toml` | Re-run bootstrap Stage 8c (delete the bad file first — stage is write-if-absent) |
 | 50 | codex-hooks-configured *(codex only)* | `grep -q "espalier/hooks" .codex/config.toml` | Re-run bootstrap Stage 8b; if a stale `ESPALIER HOOKS` marker exists without the commands, delete the block and re-run |
 | 51 | codex-agentsmd *(codex only)* | `grep -q "## Espalier" AGENTS.md` | Re-run bootstrap Stage 7b |
-| 52 | copilot-skills-load *(copilot only)* | `ls -d .github/skills/espalier-coding … espalier-audit` (all 12 skill symlinks) | Re-run bootstrap Stage 5 with copilot in `--platforms` |
+| 52 | copilot-skills-load *(copilot only)* | `ls -d .github/skills/espalier-coding … espalier-audit` (all 15 skill symlinks) | Re-run bootstrap Stage 5 with copilot in `--platforms` |
 | 53 | copilot-symlinks-valid *(copilot only)* | `[ -L .github/skills/espalier ] && [ -e … ]` | Broken link → source skill folder missing; re-run Stage 3/Phase 2, then Stage 5 |
 | 54 | copilot-agents *(copilot only)* | `name: harness-…` present in all three `.github/agents/harness-*.agent.md` | Re-run bootstrap Stage 8d (delete the bad file first — stage is write-if-absent) |
 | 55 | copilot-hooks-json *(copilot only)* | `espalier-gates.json` parses as JSON, references `copilot-hook-adapter`, and the adapter is executable | Re-run bootstrap Stage 8e (delete the bad file first); `chmod +x espalier/hooks/copilot-hook-adapter.sh` |
 | 56 | copilot-instructions *(copilot only)* | `grep -q "## Espalier" .github/copilot-instructions.md` | Re-run bootstrap Stage 7c |
 | 57 | gitattributes-union | `grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes` | Re-run bootstrap Stage 10 (the only shipped union attribute — never add one for .conventions.tsv or .doctor-stamp) |
 | 58 | canonical-ref-keys | `canonical-remote:` + `canonical-branch:` non-empty in `espalier/.espalier-config` | Re-run bootstrap Stage 9 (appends missing keys; preserves present values) |
+| 59 | map-skill | `.claude/skills/espalier-map/SKILL.md` present with `name: espalier-map` | Re-run bootstrap Stages 3 + 5 |
+| 60 | map-guard | `espalier/hooks/map-guard.sh` executable and registered in `.claude/settings.json` | Re-run bootstrap Stages 4 + 8 |
+| 61 | maprun-skill | `.claude/skills/espalier-maprun/SKILL.md` present with `name: espalier-maprun` | Re-run bootstrap Stages 3 + 5 |
+| 62 | maprun-engine | `maprun.py` present; `maprun-{dispatch,merge,integration,verify}.sh` executable | Re-run bootstrap Stage 4 (engine files are write-if-absent — delete a broken one first) |
+| 63 | simplify-skill | `.claude/skills/espalier-simplify/SKILL.md` present with `name: espalier-simplify` | Re-run bootstrap Stages 3 + 5 |
 
-When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 48 (claude-only) / 53 (+codex) / 58 (+copilot); 57-58 run on every platform set.
+When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 53 (claude-only) / 58 (+codex) / 63 (+copilot); 57-63 run on every platform set.
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

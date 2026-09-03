@@ -232,6 +232,66 @@ Append to your coding report, one block per P0/P1 finding:
 A fix round whose report carries no `### Class Sweep` block for a P0/P1 is
 an instance-only fix; the reviewer files it as a P1 and the round repeats.
 
+## Simplification Changes: Retire the Whole Obligation
+
+When requirements.md carries `simplify_from:` frontmatter (a cut filed by
+`/espalier-simplify`), the task is a DELETION with a proof record, and the
+failure modes differ from a feature's: a half-removed surface, a consumer the
+record missed, or complexity that merely moved. Read the
+`## Simplification Evidence` and `## Retired Surface` sections first, then:
+
+1. **Cut the whole boundary, from the outside in.** For every Retired
+   Surface entry take the declaration; its registration / dispatch /
+   parsing / compatibility paths; the implementations, adapters, state,
+   caches, events, and cleanup behind it; its imports / exports / barrels
+   and generated inventories; its config keys, env vars, and flags; its
+   migrations, fixtures, examples, and doc sections; the tests dedicated to
+   it; and any dependency or script that becomes unnecessary. Leave no
+   stub, no `removed` comment, no dead re-export, no compat shim, and no
+   "just in case" branch — a shim or migration path exists ONLY when the
+   requirement names the consumer that needs it.
+2. **Never relocate the complexity.** Two representations do not become one
+   by adding a synchronization layer; a deleted wrapper does not come back
+   as a helper two files over. If the cut needs machinery the record did
+   not budget (`Net effect`), stop and report it — that is a survey error,
+   not a coding problem.
+3. **A consumer the record missed is a STOP, not a workaround.** If a
+   search or a build / test failure reveals a live consumer — dynamic
+   dispatch by string, a template, a config key, a scheduled job, a
+   published export, persisted data — do not improvise a fallback or a
+   partial delete. Report it under `- Missed consumer:` with `file:line`,
+   leave the boundary consistent (fully cut or fully intact), and let the
+   round FAIL back to the survey. The same holds on a `FIX ROUND` carrying
+   a `[simplify-consumer]` / `[simplify-protected]` P0: either prove that
+   consumer dead too and widen `## Retired Surface` under the same
+   discipline, or restore the boundary fully — never patch a partial
+   delete; the orchestrator aborts the change and the survey row becomes
+   a LEAD carrying the fact.
+4. **Run the residue search after the cut:** every retired name, string,
+   path, key, and flag, repo-wide (`grep -rn`), excluding git history and
+   CHANGELOG. Zero hits, or each remaining hit named with its reason.
+5. **Keep the surviving contract proven.** Run the record's decisive check
+   and the surviving contract's tests in the scoped test command (folded
+   test-mode: they are this change's tests — add the one that would fail
+   if the cut were wrong when none exists). Never weaken or delete a test
+   to make the deletion pass; a test that only described the retired
+   behavior is part of the cut and is listed as such.
+
+Append to your coding report:
+
+```
+### Retired Surface
+- Retired: {every entry from requirements.md — each marked done}
+- Residue search: {command} — {0 hits | N hits: file:line — reason each}
+- Surviving contract check: {test / probe run — result}
+- Kept on purpose: {entry — the consumer that needs it | none}
+- Missed consumer: {file:line — what reaches it | none}
+```
+
+A simplification change whose report lacks this block, or whose
+`Missed consumer:` line is not `none`, is not complete — the reviewer files
+it and the cut returns to the survey page.
+
 ## Editing Discipline
 
 Modify files with the `Edit` tool (exact-string replacement); create new files

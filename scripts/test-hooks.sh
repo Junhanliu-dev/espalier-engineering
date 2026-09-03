@@ -1154,6 +1154,64 @@ assert "19i expired TTL forces a fresh run (no replay)" \
   "! grep -q 'stale-ttl-marker' '$TMP3/err.txt'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$TMP2" "$TMP3"
 
+# ─── T21: espalier-stats.sh — simplify-lane echo (v0.24) ───────────────────
+echo "T21: espalier-stats simplify-lane echo"
+STATS="$HOOKS_SRC/espalier-stats.sh"
+TMP21=$(mktemp -d -t hooks-t21.XXXX)
+make_repo "$TMP21"
+mkdir -p "$TMP21/espalier/changes"
+OUT=$( cd "$TMP21" && bash "$STATS" )
+assert "21a degrades to none without simplify-filed changes" \
+  "echo \"\$OUT\" | grep -q 'none — no simplify-filed changes yet'"
+mkdir -p "$TMP21/espalier/changes/refactor/2026-09-03-a" \
+         "$TMP21/espalier/changes/refactor/2026-09-03-b" \
+         "$TMP21/espalier/changes/feat/2026-09-03-c"
+# a: survey-filed cut, withdrawn after a missed consumer (2 code rounds)
+printf -- '---\nsimplify_from: wiki/simplify-survey.md#1\nsurvey_commit: abc1234\n---\n# refactor: retire x\n' \
+  > "$TMP21/espalier/changes/refactor/2026-09-03-a/requirements.md"
+cat > "$TMP21/espalier/changes/refactor/2026-09-03-a/pipeline-state.md" << 'S21A'
+# Pipeline State: retire x
+
+## Status
+- Current Stage: 4
+- Status: ABORTED
+- Total Rollbacks: 0
+- Review Rounds: req=1/3, code=2/3, test=0/3
+
+## Stage History
+| Stage | Status | Timestamp | Notes |
+|-------|--------|-----------|-------|
+| 4 | ROUND 1 FAIL | 2026-09-03T01:00:00Z | reviewer: FAIL p0=1 p1=0 [P0 [simplify-consumer] src/jobs.ts:12 string dispatch]; security: PASS p0=0 p1=0 |
+| 4 | ABORTED | 2026-09-03T01:30:00Z | simplify: missed consumer src/jobs.ts:12 |
+S21A
+# b: hand-written refactor (no simplify_from), clean in 1 round
+printf -- '# refactor: rename y\n' > "$TMP21/espalier/changes/refactor/2026-09-03-b/requirements.md"
+printf -- '- Status: COMPLETE\n- Total Rollbacks: 1\n- Review Rounds: req=1/3, code=1/3, test=1/3\n' \
+  > "$TMP21/espalier/changes/refactor/2026-09-03-b/pipeline-state.md"
+# c: retirement-map slice under feat/ carrying simplify_from, clean
+printf -- '---\ncharted_from: maps/2026-09-01-retire-v1\nsimplify_from: wiki/simplify-survey.md#2\nsurvey_commit: abc1234\n---\n# feat: retire v1 export\n' \
+  > "$TMP21/espalier/changes/feat/2026-09-03-c/requirements.md"
+printf -- '- Status: COMPLETE\n- Total Rollbacks: 0\n- Review Rounds: req=1/3, code=1/3, test=1/3\n' \
+  > "$TMP21/espalier/changes/feat/2026-09-03-c/pipeline-state.md"
+BEFORE21=$( cd "$TMP21" && git status --porcelain )
+OUT=$( cd "$TMP21" && bash "$STATS" )
+AFTER21=$( cd "$TMP21" && git status --porcelain )
+assert "21b cohort sizes: 2 simplify-filed (refactor/ + feat/ slice) vs 1 hand-written refactor" \
+  "echo \"\$OUT\" | grep -q '^simplify-filed changes: 2$' && echo \"\$OUT\" | grep -q '^hand-written refactors: 1$'"
+assert "21c code-round distributions per cohort" \
+  "echo \"\$OUT\" | grep -q 'simplify-filed code rounds: n=2 min=1 median=1.5 mean=1.50 max=2' \
+   && echo \"\$OUT\" | grep -q 'hand-written refactor code rounds: n=1 min=1 median=1 mean=1.00 max=1'"
+assert "21d rollbacks per cohort" \
+  "echo \"\$OUT\" | grep -q 'simplify-filed rollbacks: n=2 min=0 median=0 mean=0.00 max=0' \
+   && echo \"\$OUT\" | grep -q 'hand-written refactor rollbacks: n=1 min=1 median=1 mean=1.00 max=1'"
+assert "21e statuses, withdrawn count, tag count" \
+  "echo \"\$OUT\" | grep -q 'simplify-filed statuses: ABORTED=1 COMPLETE=1' \
+   && echo \"\$OUT\" | grep -q 'withdrawn (missed consumer): 1' \
+   && echo \"\$OUT\" | grep -q 'simplify tags in review snapshots: 1'"
+assert "21f stats stays read-only (working tree unchanged by the run)" \
+  "[ \"\$BEFORE21\" = \"\$AFTER21\" ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP21"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

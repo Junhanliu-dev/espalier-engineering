@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.21.1-2ea44f" alt="version v0.21.1"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.24.0-2ea44f" alt="version v0.24.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>
@@ -59,6 +59,7 @@ espalier/
 | `/espalier-fix <bug>` | Slimmer bug-fix lane that auto-links each fix to the change that caused it |
 | `/espalier-ask <question>` | Read-only Q&A — answers from your docs, verified against the code, every claim sourced |
 | `/espalier-audit` | Repo-wide security audit of *existing* code; findings hand off into fix runs |
+| `/espalier-simplify [scope]` | Evidence-first simplification survey of *existing* code — proven cuts file as refactor changes the pipeline runs; the docs that described them get flagged for prune |
 | `/espalier-map <idea>` | Plan work bigger than one session (epics, greenfield) as a decision map |
 | `/espalier-maprun` | Execute a cleared map: headless workers in isolated worktrees, reviewable slice PRs |
 | `/espalier-doctor` / `/espalier-prune` | Detect doc drift / refresh a stale doc (gated) |
@@ -150,7 +151,7 @@ Init is a one-time ~$2–5 on a medium repo (Opus main + Sonnet scouts + cache).
 
 ## Latest release
 
-**v0.21.0 — pipeline speed, same gates.** The pipeline's quality machinery is untouched (separate coder/reviewer/security agents, fresh panel round after every fix, programmatic gates); what shrinks is the redundant work: a per-change **context pack** assembled once and reused by every sub-agent spawn, **delta-scoped re-review rounds** (required reads = fix + prior findings + dependents; expandable on any suspicion), **parallel dispatch** for disjoint sub-tasks, **push-target pre-authorization** at the approval gate, and light-tier grill questions batched when provably independent. Details in the [CHANGELOG](./CHANGELOG.md).
+**v0.24.0 — the simplify lane.** `/espalier-simplify` surveys the *existing* code for accidental complexity — dead surface, split truth, ownerless abstractions, relay layers, feature fossils — with read-only scouts per discovered layer and a **proof record** per candidate (consumer map, cut boundary, consequence, decisive check, net effect). Fewer lines are evidence, never the objective; "already justified" is a valid result, and protected surface (authorization, input trust, data-loss guards, stored-format compatibility) is never an incidental cut. Proven cuts file as `refactor` changes the normal pipeline runs: the coder retires the whole boundary, the reviewer independently re-searches every retired name, and the docs that described it get flagged for `/espalier-prune`. Cuts too big for one session become retirement maps (`/espalier-map retire: …`), `espalier-stats.sh` reports simplify-filed cuts against hand-written refactors, and `/espalier-ask` reads the survey for "why does this still exist". Method adapted from [tt-a1i/simplify-codebase](https://github.com/tt-a1i/simplify-codebase) (MIT). Details in the [CHANGELOG](./CHANGELOG.md).
 
 Full history and migration guides: [CHANGELOG.md](./CHANGELOG.md) · upgrade any install with `/espalier-migrate`.
 
