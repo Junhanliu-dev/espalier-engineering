@@ -14,6 +14,8 @@
 #   - grill verdict mix (GRILLED / SKIPPED: crisp / --no-grill / non-interactive)
 #   - charted vs uncharted feats (requirements.md charted_from:) — code rounds,
 #     rollbacks, and the fix echo (fix-lane caused_by pointing at each cohort)
+#   - simplify-filed changes (requirements.md simplify_from:) vs hand-written
+#     refactors — code rounds, rollbacks, withdrawn cuts, simplify tags
 #   - per-map ticket/fog/session/spawned-change state (espalier/maps/)
 #   - convention divergence hotspots (conv_fold, when drift-helpers is present)
 
@@ -272,6 +274,59 @@ $rb"
   echo "  (normalize by cohort size before comparing — charted=$charted_n uncharted=$uncharted_n)"
 else
   echo "none — no feat changes yet"
+fi
+echo
+
+# ── Simplify-filed changes ───────────────────────────────────────────────────
+# simplify-lane echo: every change whose requirements.md carries
+# simplify_from: (a cut filed by /espalier-simplify under refactor/, or a
+# retirement-map slice under feat/) against hand-written refactors.
+echo "## Simplify-filed changes (simplify-lane echo)"
+echo
+if [ -d "$CH" ] && ls "$CH"/*/*/requirements.md >/dev/null 2>&1 \
+   && grep -l '^simplify_from:' "$CH"/*/*/requirements.md >/dev/null 2>&1; then
+  s_n=0; h_n=0
+  s_code=""; h_code=""; s_rb=""; h_rb=""
+  s_status=""; withdrawn=0; tags=0
+  for rf in "$CH"/*/*/requirements.md; do
+    dir=$(dirname "$rf"); sf="$dir/pipeline-state.md"
+    [ -f "$sf" ] || continue
+    code=$(sed -n -E 's/^- Review Rounds:.* code=([0-9]+)\/.*/\1/p' "$sf" | head -1)
+    rb=$(sed -n -E 's/^- Total Rollbacks: ([0-9]+).*/\1/p' "$sf" | head -1)
+    if grep -q '^simplify_from:' "$rf" 2>/dev/null; then
+      s_n=$((s_n + 1))
+      [ -n "$code" ] && s_code="$s_code
+$code"
+      [ -n "$rb" ] && s_rb="$s_rb
+$rb"
+      s_status="$s_status
+$(_last_status "$sf")"
+      w=$(grep -c 'simplify: missed consumer' "$sf" 2>/dev/null); withdrawn=$((withdrawn + ${w:-0}))
+      t=$(grep -c '\[simplify-' "$sf" 2>/dev/null); tags=$((tags + ${t:-0}))
+    elif [ "$(basename "$(dirname "$dir")")" = "refactor" ]; then
+      h_n=$((h_n + 1))
+      [ -n "$code" ] && h_code="$h_code
+$code"
+      [ -n "$rb" ] && h_rb="$h_rb
+$rb"
+    fi
+  done
+  echo "simplify-filed changes: $s_n"
+  echo "hand-written refactors: $h_n"
+  printf '%s\n' "$s_code" | grep -v '^$' | _stat_dist "  simplify-filed code rounds"
+  printf '%s\n' "$h_code" | grep -v '^$' | _stat_dist "  hand-written refactor code rounds"
+  printf '%s\n' "$s_rb"   | grep -v '^$' | _stat_dist "  simplify-filed rollbacks"
+  printf '%s\n' "$h_rb"   | grep -v '^$' | _stat_dist "  hand-written refactor rollbacks"
+  st_line=$(printf '%s\n' "$s_status" | grep -v '^$' | sort | uniq -c | awk '{ printf "%s=%s ", $2, $1 }')
+  echo "  simplify-filed statuses: ${st_line:-none}"
+  echo "  withdrawn (missed consumer): $withdrawn"
+  echo "  simplify tags in review snapshots: $tags"
+  echo "  (Quality reads: withdrawn = the survey record was wrong — a rising"
+  echo "  rate means the scout prompt needs tightening; simplify-filed code"
+  echo "  rounds at or below hand-written refactors means the proof record is"
+  echo "  doing its job.)"
+else
+  echo "none — no simplify-filed changes yet"
 fi
 echo
 

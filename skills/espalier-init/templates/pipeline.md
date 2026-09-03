@@ -2,8 +2,8 @@
 
 ## Lanes above and beside this pipeline
 
-This file defines the FULL pipeline (`/espalier`, 10 stages). Two related
-lanes route into it rather than through it:
+This file defines the FULL pipeline (`/espalier`, 10 stages). Related lanes
+route into it rather than through it:
 
 - `/espalier-fix` — the slim bug lane (7 stages, no Stage 2).
 - `/espalier-map` — multi-session planning for efforts too big for one
@@ -17,6 +17,14 @@ lanes route into it rather than through it:
   integration branch, and relays worker questions to the human. Stages 7–10
   remain a deliberate human act on the assembled branch. See
   `espalier/skills/espalier-maprun/SKILL.md`.
+- `/espalier-simplify` — the evidence-first simplification survey of the
+  EXISTING code. Read-only: it ranks accidental complexity with a proof
+  record per candidate into `espalier/wiki/simplify-survey.md` and files
+  proven cuts as `Status: FILED` skeletons under `espalier/changes/refactor/`
+  (`simplify_from:` frontmatter) that THIS pipeline adopts and runs — the
+  coder retires the whole boundary, the panel re-proves every retired name,
+  and Completion flags the docs that described it for `/espalier-prune`. See
+  `espalier/skills/espalier-simplify/SKILL.md`.
 
 ## Stages
 

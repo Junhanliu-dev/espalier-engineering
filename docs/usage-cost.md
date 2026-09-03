@@ -72,6 +72,7 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 | `/espalier-doctor` (periodic drift scan) | LIGHT-MEDIUM — re-scouts a handful of artifacts |
 | `/espalier-ask <question>` (read-only Q&A) | LIGHT — reads a few docs + verifies against code; no sub-agents |
 | `/espalier-audit [path]` (repo-wide security audit) | LIGHT-MEDIUM — 1-4 read-only auditors over the security surface + one wiki write |
+| `/espalier-simplify [scope]` (simplification survey) | MEDIUM — 1-4 read-only scouts over the layer partitions + one wiki write; each filed cut is a full `/espalier` refactor run on top |
 | `/espalier-map` (chart or one-ticket session) | LIGHT-MEDIUM — one grill conversation or a few research scouts per session; no coding agents |
 | `/espalier-maprun` (one master pass) | LIGHT master + HEAVY workers — the pass itself is a few state reads + question relays; each dispatched worker is a full headless `/espalier` run (budget ≈ N × pipeline cost, spread over hours) |
 | `/espalier-migrate` | LIGHT — script-driven, low LLM usage |

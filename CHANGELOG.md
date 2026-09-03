@@ -1,5 +1,146 @@
 # Changelog
 
+## 0.24.0 — 2026-09-03
+
+Minor: **the simplify lane** — `/espalier-simplify`, an evidence-first
+simplification survey of the EXISTING code. Method adapted from
+`tt-a1i/simplify-codebase` (MIT): prove first, then delete; reduce the facts,
+states, and contracts a team must keep coherent — line count is evidence,
+never the objective, and "already justified" is a valid result. The
+enforcement layer is Espalier's: the survey is read-only, every cut is a
+normal `refactor` change through `/espalier` (approval gate, coder,
+two-agent panel, exit gates, push gate), and the docs that described the
+retired surface are flagged for `/espalier-prune`. Suites: bootstrap
+311/311, hooks 173/173; validation is 53/58/63 by platform set (new
+check 63).
+
+- **`/espalier-simplify [scope]`** (new pure-copy skill `espalier-simplify`)
+  — Broad (whole repo, or a path), or Focused (a lead in the user's words).
+  Step 1 establishes the contract from the espalier docs FIRST — layer map,
+  trust boundary + production controls (protected surface), external
+  services, data models, critical paths, per-layer specs, decision history
+  in `changes/*/requirements.md`, the prior survey's decisions — then reads
+  git state and generated / vendored / published surfaces; a doc the code
+  contradicts is flagged (`simplify-verify:`), never edited. Step 2 spawns
+  ≤ 4 batches of read-only scouts, one partition per discovered layer plus
+  a cross-cutting one (config / flags / deps / scripts / CI / tests / docs),
+  grouped by ownership. Each scout hunts with ten lenses (dormant contract,
+  split truth, ownerless flexibility, relay layer, parallel state machine,
+  boundary theater, local infrastructure, support drag, feature fossil, and
+  the implementation-shape guardrail — a test / scan / snapshot / import
+  ban / CI check that pins layout, literal source text, or a historical
+  implementation identity without owning behavior; adapted, narrowed, from
+  upstream PR #3, still open at release: espalier's own rules, layer specs,
+  and shipped hooks are ACTIVE policy and never candidates, and provenance
+  — "AI-written", a "defensive" label — is a hint, never evidence), climbs
+  the evidence ladder (smell → static lead → consumer map → contract
+  proof → behavior proof), classifies every hit (runtime / support /
+  uncertain), proves cuts below file granularity, and returns proof records
+  (candidate, burden, reachability, rationale, cut, consequence, protected,
+  confidence / risk, proof, net effect). Step 3 classes every record HIGH
+  (contract proof, no protected surface, decisive check named, net effect
+  positive) / LEAD (one named fact missing) / JUSTIFIED (a consumer or a
+  current decision owns it), ranks confidence before benefit, and keeps one
+  candidate per ownership boundary (a shape guardrail and the implementation
+  it described are separate cuts — retiring one is never authority to retire
+  the other). Step 4
+  writes `espalier/wiki/simplify-survey.md` (OVERWRITE; Coverage,
+  Candidates table with live Status, Proof Records, Justified, Unresolved
+  leads) and commits it. Step 5 (interactive only) offers the HIGH rows via
+  one multiSelect and files each selected cut as a `Status: FILED` skeleton
+  under `espalier/changes/refactor/{date}-{kebab}/` — `requirements.md`
+  with `simplify_from:` + `survey_commit:` frontmatter, the proof record, a
+  `## Retired Surface` list, and acceptance criteria naming the residue
+  search, the decisive check, and the accepted consequence — the same
+  handoff shape `/espalier-map` uses; one fresh session per cut is the
+  default, starting the first now is offered; each draft passes grill's
+  `mode=score` crispness gate first (would-be-`full` → stays LEAD), a
+  boundary too large for one session stays `LEAD — needs a map` pointing
+  at `/espalier-map retire: …`, and rule-owned constructs are `JUSTIFIED`
+  (the rule changes through promotion, never through a cut). Protected surface
+  (authorization, input trust, data-loss guards, stored-format / migration
+  compatibility, quiescence cleanup, every `security-standards.md` /
+  `production-standards.md` control) is never an incidental cut: a
+  candidate touching it stays LEAD until the user directs it and the
+  requirement says so. Unattended runs write the page and file nothing.
+- **Pipeline adoption** (`espalier` SKILL, pure copy) — the FILED-skeleton
+  scan now covers `espalier/changes/refactor/` and inherits `simplify_from`
+  + `survey_commit`; a simplify-filed skeleton's grill covers only what the
+  record leaves open (accepting the consequence IS the product question).
+  **Completion** gains the doc hook: for every `## Retired Surface`
+  identifier, grep `espalier/wiki/`, `espalier/rules/`, and the layer specs
+  and `mark_stale` each doc that still describes it (reason
+  `simplify: <name> retired in refactor/{slug}`) — the post-merge detector
+  keys off paths and would leave a doc naming a deleted function green —
+  then point at `/espalier-prune --all-stale` (your own flags: the
+  feature-branch escape hatch applies) and, after a batch, at
+  `/espalier-doctor --since <survey commit>` (re-scouts only the touched
+  layers). Notify-only; nothing edits a doc. The Stage 3 / Stage 4 spawn
+  prompts carry an explicit `SIMPLIFICATION CHANGE:` header on these
+  changes (the `FIX ROUND {n}:` pattern — the trigger never depends on an
+  agent noticing frontmatter), and the Stage 4 loop gains the withdraw
+  rule: a `[simplify-consumer]` / `[simplify-protected]` P0 is never fixed
+  around — one coder re-spawn either widens the boundary with the consumer
+  proved dead or restores it fully; on restore the change is ABORTED, the
+  survey row becomes `LEAD — missed consumer: file:line`, and the user is
+  told. A cut is proved or withdrawn, never patched into a partial delete.
+- **`harness-coder.md`** — new `## Simplification Changes: Retire the Whole
+  Obligation` (on `simplify_from:` changes): cut the whole boundary from the
+  outside in (declaration → registration / dispatch → implementation /
+  state / events → imports / exports / generated inventories → config /
+  flags → migrations / fixtures / docs → dedicated tests → deps / scripts),
+  no stubs / shims / dead re-exports unless the requirement names the
+  consumer; never relocate complexity; a consumer the record missed is a
+  STOP reported under `- Missed consumer:` — never a workaround; residue
+  search after the cut; the surviving contract stays proven (never weaken a
+  test to make a deletion pass). Reports a `### Retired Surface` block.
+- **`harness-reviewer.md`** — new `## Simplification Review`: the panel is
+  the second, independent proof — re-search every retired name (production,
+  tests, dynamic surfaces, external / persisted) BEFORE reading the coder's
+  residue search; a live consumer is a **P0 `[simplify-consumer]`**;
+  leftovers a **P1 `[simplify-residue]`**; complexity moved not removed a
+  **P1 `[simplify-relocate]`**; a retired protected control the requirement
+  never named a **P0 `[simplify-protected]`**; a weakened surviving test a
+  **P1 `[simplify-proof]`**; a missing block or a non-`none` missed
+  consumer a P1.
+- **Retirement maps** (`espalier-map` SKILL) — a survey row too large for
+  one session routes to `/espalier-map retire: {boundary} (simplify-survey
+  #n)`: map.md copies the row's `simplify_from` + `survey_commit`, seeds the
+  Destination from the proof record, treats the record's protected
+  surface as Out of scope unless a ticket decides otherwise, and the
+  handoff copies both keys plus a per-slice `## Retired Surface` into every
+  slice — the pipeline's simplification machinery fires per slice, and the
+  slices stay under `feat/` so `/espalier-maprun` drives them unchanged. A
+  later survey shows such a row as `map: {slug} ({status})`.
+- **`espalier-stats.sh`** — new "Simplify-filed changes (simplify-lane
+  echo)" section: simplify-filed changes (any lane dir, by `simplify_from:`)
+  vs hand-written refactors — code-round and rollback distributions,
+  terminal statuses, withdrawn cuts (`simplify: missed consumer` rows), and
+  `[simplify-…]` tags in review snapshots (the reviewer now leads the
+  Problem cell with the tag so the 80-char snapshot carries it). Withdrawn
+  rate is the eval trigger recorded in `docs/deferred-items.md`.
+- **`/espalier-ask`** — `why` questions also read `wiki/simplify-survey.md`:
+  Justified rows are kept-on-purpose decisions naming the owning rule or
+  consumer; Candidates rows mean the surface is slated to go.
+- **Wiring** — `espalier-simplify` joins `ESPALIER_SKILL_NAMES` (symlinked
+  on claude / codex / copilot); `pipeline.md` lanes note; `agent.md` Config
+  Index gains the Simplify row; the CLAUDE.md / AGENTS.md /
+  copilot-instructions Espalier sections gain the lane line. Validation:
+  checks 2 / 47 / 52 lists extended, new 63 (simplify skill wired + name
+  parity); totals 53 / 58 / 63.
+- Migration #34: `scripts/migrate-v0.23.1-to-v0.24.0.sh` — installs the
+  skill + per-platform symlinks; refreshes the 5 pure copies (`pipeline.md`,
+  the espalier / espalier-map / espalier-ask SKILLs, `espalier-stats.sh`;
+  backups `.pre-v0.24.bak`); anchored-inserts the coder / reviewer sections and the
+  agent.md row, EXTRACTED from the templates at run time (migrated ==
+  fresh); grep-guarded lane line in each wired instruction file (after the
+  audit line; appended when that line was customised away); customised
+  files skip-with-record. No config keys, no hooks, no gitignore entries.
+- Deferred (`docs/deferred-items.md`): an `eval/simplify/` harness for the
+  scout prompt (trigger: the stats withdrawn rate); the master-side
+  Completion step for maprun-built retirement slices (doc flags ride the
+  same missing step as the Spawned-Changes COMPLETE flip).
+
 ## 0.23.1 — 2026-09-01
 
 Patch: **class sweep** — fix rounds fix the defect CLASS, not the flagged

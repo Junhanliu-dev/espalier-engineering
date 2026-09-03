@@ -30,6 +30,7 @@ following the Espalier structure below.
 | Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator, 7 stages (0–7, no Stage 2) | Via /espalier-fix |
 | Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
 | Audit    | espalier/skills/espalier-audit/ | Repo-wide security audit → wiki/security-audit.md | Via /espalier-audit |
+| Simplify | espalier/skills/espalier-simplify/ | Evidence-first simplification survey → wiki/simplify-survey.md; proven cuts filed as refactor skeletons for /espalier | Via /espalier-simplify |
 | Doctor   | espalier/skills/espalier-doctor/ | Periodic drift scan of espalier/ artifacts vs the code | Via /espalier-doctor |
 | Prune    | espalier/skills/espalier-prune/ | Refresh stale rules/wiki/hooks flagged by drift detection | Via /espalier-prune |
 

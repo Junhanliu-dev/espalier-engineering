@@ -59,7 +59,7 @@ The wiki is `espalier/wiki/`; rules are `espalier/rules/`; history is
 |------|-----------------------------------|-----------|
 | where | `wiki/critical-paths.md`, `wiki/architecture.md`, `rules/engineering-structure.md` (file placement / layer layout) | codebase search |
 | how | `wiki/architecture.md`, `wiki/data-models.md`, `wiki/external-services.md`, `rules/coding-standards.md` (conventions + invariants), layer specs in `skills/espalier-coding/specs/` | code read |
-| why | `espalier/changes/*/*/requirements.md`, `espalier/changes/*/*/review-record.md`, `rules/*` | `git log` |
+| why | `espalier/changes/*/*/requirements.md`, `espalier/changes/*/*/review-record.md`, `rules/*`, `wiki/simplify-survey.md` (Justified rows = kept-on-purpose decisions naming the owning rule or consumer; Candidates rows = surface slated to go — say so when the asked-about thing is one) | `git log` |
 | what-changed | `changes/` (folders are `YYYY-MM-DD-<slug>` — sort to get chronology), `espalier/.commit-index.tsv` | `git log` |
 
 `espalier/.commit-index.tsv` is gitignored and lazily built — it may not
