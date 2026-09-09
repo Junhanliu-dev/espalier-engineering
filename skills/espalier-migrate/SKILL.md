@@ -1049,6 +1049,49 @@ elif [ -d "espalier" ]; then
   fi
 fi
 
+# Supersession floor. Every probe above greps a historical phrase, and later
+# releases retire phrases (v0.22.1 replaced the comment-brevity line, v0.23.0
+# folded the speculative dispatch, v0.25.0 rewrote pipeline.md and the lane
+# SKILLs and moved the reviewer's abuse-coverage step into a mode file) — so
+# a CURRENT install can fail an OLD probe. An install carrying a later
+# release's own markers reached it through this chain or a fresh init: every
+# earlier step is applied or recorded, and its script would now re-insert
+# text the later release retired. The floor is the newest release whose
+# distinctive markers are present; every flag BELOW it is forced to no. The
+# floor release's own flag stays as probed — its script is the current one
+# and re-runs safely. Floor markers are phrases no later release retires.
+FLOOR=""
+if [ -f espalier/agents/modes/repo-audit.md ] && [ -f espalier/skills/espalier/stages/3-coding.md ] \
+   && grep -qF 'stages/3-coding.md' espalier/skills/espalier/SKILL.md 2>/dev/null; then
+  FLOOR=NEEDS_V0250_PATCH
+elif [ -f espalier/skills/espalier-simplify/SKILL.md ] \
+     && grep -qF '## Simplification Review' espalier/agents/harness-reviewer.md 2>/dev/null; then
+  FLOOR=NEEDS_V0240_PATCH
+elif grep -qF '### Class Sweep' espalier/agents/harness-coder.md 2>/dev/null; then
+  FLOOR=NEEDS_V0231_PATCH
+elif grep -qF 'Stage 5/6 (folded)' espalier/skills/espalier/SKILL.md 2>/dev/null; then
+  FLOOR=NEEDS_V0230_PATCH
+elif grep -qF 'the default is NO comment' espalier/agents/harness-coder.md 2>/dev/null; then
+  FLOOR=NEEDS_V0221_PATCH
+elif grep -qF 'dep-audit-cache' espalier/hooks/pre-push-gate.sh 2>/dev/null; then
+  FLOOR=NEEDS_V0220_PATCH
+fi
+if [ -n "$FLOOR" ]; then
+  for f in NEEDS_V01_V02 NEEDS_V03_V04 NEEDS_V04_V05 NEEDS_V05_PATCH NEEDS_V05_V06 \
+           NEEDS_V06_V07 NEEDS_V07_V08 NEEDS_V08_PATCH NEEDS_V082_PATCH NEEDS_V09_MINOR \
+           NEEDS_V091_PATCH NEEDS_V092_PATCH NEEDS_V093_PATCH NEEDS_V094_PATCH \
+           NEEDS_V0100_PATCH NEEDS_V0110_PATCH NEEDS_V0120_PATCH NEEDS_V0130_PATCH \
+           NEEDS_V0131_PATCH NEEDS_V0132_PATCH NEEDS_V0140_PATCH NEEDS_V0150_PATCH \
+           NEEDS_V0160_PATCH NEEDS_V0170_PATCH NEEDS_V0180_PATCH NEEDS_V0190_PATCH \
+           NEEDS_V0200_PATCH NEEDS_V0210_PATCH NEEDS_V0211_PATCH NEEDS_V0220_PATCH \
+           NEEDS_V0221_PATCH NEEDS_V0230_PATCH NEEDS_V0231_PATCH NEEDS_V0240_PATCH \
+           NEEDS_V0250_PATCH; do
+    [ "$f" = "$FLOOR" ] && break
+    eval "$f=no"
+  done
+  echo "floor: $FLOOR markers present — every earlier step is superseded (applied or recorded)."
+fi
+
 if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V04_V05" = no ] && [ "$NEEDS_V05_PATCH" = no ] \
    && [ "$NEEDS_V05_V06" = no ] && [ "$NEEDS_V06_V07" = no ] \
