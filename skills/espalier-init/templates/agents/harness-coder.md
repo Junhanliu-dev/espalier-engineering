@@ -172,6 +172,7 @@ here — match the project, don't fight it:
 - Build status: {pass/fail}
 - Lint status: {pass/fail}
 - Docs: {scoped docs whose claim you edited, by path | none}
+- Commits: {sha — subject, one per line, oldest first | "none — {reason}" when work is left uncommitted | under PARALLEL DISPATCH: "- Commit: {message}" instead}
 - Notes: {anything the reviewer should pay attention to}
 ```
 
@@ -223,6 +224,9 @@ Do NOT set this signal if you can write a meaningful test within the original fi
 - Skip the build/lint check
 - Modify files outside the task scope
 - Add features not in the requirements
+- Land the whole task as one commit at the end, `git add -A`, rewrite a
+  commit a panel round has seen, or run git at all under PARALLEL DISPATCH
+  (see Commit Discipline)
 
 ## Fix Rounds: Fix the Class, Not the Instance
 
@@ -256,9 +260,11 @@ Hand off only at a clean point:
    the reason. Under PARALLEL DISPATCH (your prompt carries it) you never
    run the build: the clean point is every touched file syntactically
    complete, and the orchestrator gates the combined tree.
-3. Write your report fresh (overwrite) — coding-report.md, or the REPORT
-   TARGET part file your prompt names — with everything done so far, then
-   a `## Handoff` block:
+3. Commit the finished units (Commit Discipline) — a handoff never leaves
+   finished work uncommitted; under PARALLEL DISPATCH write the `- Commit:`
+   line instead. Then write your report fresh (overwrite) — coding-report.md,
+   or the REPORT TARGET part file your prompt names — with everything done
+   so far, then a `## Handoff` block:
    - Done: {files, one line each — what it now does}
    - Remaining: {ordered; per file; the hard part named with what you tried}
    - Facts: {verified facts the next coder must not re-derive — each with
@@ -301,6 +307,51 @@ or restructure a doc, never add a section for the feature you built, never
 paste doc text into the report. List touched docs by path under `- Docs:`
 in the report. Drift beyond your change is Stage 8.5's (notify) and
 `/espalier-prune`'s, not yours.
+
+## Commit Discipline: Small, Atomic, Named
+
+You commit your own work, as you go — never the whole task as one commit at
+the end, and never leave it for the orchestrator to sweep up with `git add
+-A`. A commit is one bounded unit at a clean point: the build passes, lint
+passes where it exists, the tests you wrote for that unit pass.
+
+1. **One unit per commit.** One seam — a schema list with its hooks and
+   tests; one screen with its hook and its documents; one resolver with its
+   tests. A refactor that prepares the change is its own commit BEFORE the
+   behaviour change. Tests ride in the commit of the code they prove; a
+   test file that stands alone (a regression test, a contracted abuse
+   test) is its own `test(...)` commit. Generated output (the pack's
+   Grep-only files) is its own commit. A scoped-doc claim edit (Docs, under
+   Editing Discipline) is its own `docs(...)` commit. Small is a seam, not
+   a line count — there is no number.
+2. **Message per the project's convention.** `espalier/rules/
+   development-process.md` → Commit Conventions is the shape (Conventional
+   Commits where the log says so: `type(scope): subject`, imperative,
+   subject ≤ 72 characters); the body says WHY when the subject cannot —
+   the criterion it satisfies — and cites the change as `{type}/{slug}`.
+   No tool attribution trailer unless the project convention asks for one.
+   Fix round: `fix({scope}): {the class you closed} (review round {n})`,
+   one commit per defect class. Contract phase: `test({scope}): abuse
+   tests for {fields}`. Handoff: commit the finished units first (Handoff
+   step 3).
+3. **Stage by path.** `git add {files of this unit}` — never `git add -A`,
+   never `espalier/` (the orchestrator's bookkeeping commit owns the
+   change's records), never a file you did not touch.
+4. **Never rewrite what a panel saw.** Amend or rebase only a commit no
+   review round has read; from round 1 on, every fix is a new commit. The
+   pipeline never squashes — squash-merge is the pull request's policy, and
+   the post-merge hook maps it back.
+5. **Under PARALLEL DISPATCH, no git.** Coders share one working tree; the
+   index lock and cross-part commits make it unsafe. Put `- Commit:
+   {message}` in your part; the orchestrator commits each part's files as
+   one commit after the wave, in dispatch order.
+
+List every commit under `- Commits:` in the report (sha — subject, oldest
+first); work you had to leave uncommitted is `none — {reason}` — the exit
+gate does not require a clean tree, Stage 7 does, and the orchestrator will
+commit it under your message. The reviewer sees the commits with the diff;
+a commit that bundles unrelated seams, or a message off the convention, is
+an advisory `commits:` row.
 
 ## Change Impact Analysis (do this BEFORE writing code)
 

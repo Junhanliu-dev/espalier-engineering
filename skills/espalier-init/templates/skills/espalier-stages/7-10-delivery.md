@@ -20,18 +20,44 @@ clean for the Stage 7 gate and never leaves an automation-written file
 uncommitted. (The legacy `espalier/.conventions.tsv` is read-only to this
 plugin version — it is never written, so there is nothing of it to stage.)
 
+### Stage 7: What Is Still Uncommitted
+
+The coder committed its units as it went (harness-coder.md → Commit
+Discipline), so by Stage 7 the working tree holds at most two kinds of
+uncommitted paths. Handle each by path — never `git add -A`, never one
+"everything" commit, and never squash or rebase the coder's commits (the
+pipeline pushes them as made; squash-merge is the pull request's policy and
+the post-merge hook maps it back):
+
+1. Code the coder left uncommitted (its report says `- Commits: none —
+   {reason}`, or a parallel wave's parts were never committed): commit it
+   as one commit per part / unit with the message the report carries
+   (`- Commit:` line, or the coder's subject for the unit) — the
+   orchestrator names it from the report, it does not invent scope.
+2. The change's records (`espalier/changes/{type}/{slug}/`, plus
+   `espalier/conventions/` when this run wrote there — staged above):
+   one `chore(espalier): {slug} — pipeline records` commit. Completion adds
+   its own `chore(espalier): close {slug}` afterwards.
+
+Then push. The Stage 7 gate (clean tree, branch convention, pre-push hook,
+certificate) is unchanged.
+
 ### Stage 7 Commit Recording
 
-After `git push` at Stage 7 succeeds, capture the commit SHA + files changed and
-append to the state file's Commits table.
+After `git push` at Stage 7 succeeds, record EVERY commit of the change —
+`Base-Ref..HEAD`, oldest first, one row each — in the state file's Commits
+table (the fix lane's reverse lookup blames a line to ONE commit, so every
+commit must resolve to this change).
 
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
 > the orchestrator at Stage Execution entry. Substitute them when running the snippet.
 
 ```bash
-SHA=$(git rev-parse HEAD)
-FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ',' | sed 's/,$//')
 STATE="espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
+BASE_REF=$(grep '^Base-Ref:' "$STATE" | tail -1 | awk '{print $2}')
+# Every commit of the change, oldest first; a missing Base-Ref (a pre-v0.25
+# change resumed here) falls back to HEAD alone.
+if [ -n "$BASE_REF" ]; then SHAS=$(git rev-list --reverse "${BASE_REF}..HEAD"); else SHAS=$(git rev-parse HEAD); fi
 
 # Ensure section exists
 if ! grep -q "^## Commits" "$STATE"; then
@@ -43,16 +69,14 @@ if ! grep -q "^## Commits" "$STATE"; then
 EOF
 fi
 
-# Idempotency: skip if this stage+SHA pair already recorded
-if ! grep -qE "^\| 7 \| ${SHA} " "$STATE"; then
-  echo "| 7 | $SHA | $FILES |" >> "$STATE"
-fi
-
-# Self-heal reverse-lookup cache (silently no-op if helpers absent)
-[ -f espalier/hooks/lookup-helpers.sh ] && {
-  . espalier/hooks/lookup-helpers.sh
-  _cache_append "$SHA" "${TYPE}/${SLUG}" "original"
-}
+[ -f espalier/hooks/lookup-helpers.sh ] && . espalier/hooks/lookup-helpers.sh
+for SHA in $SHAS; do
+  FILES=$(git diff-tree --no-commit-id --name-only -r "$SHA" | tr '\n' ',' | sed 's/,$//')
+  # Idempotency: skip if this stage+SHA pair already recorded
+  grep -qE "^\| 7 \| ${SHA} " "$STATE" || echo "| 7 | $SHA | $FILES |" >> "$STATE"
+  # Self-heal reverse-lookup cache (silently no-op if helpers absent)
+  type _cache_append >/dev/null 2>&1 && _cache_append "$SHA" "${TYPE}/${SLUG}" "original"
+done
 ```
 
 This commit-record is read at fix-time by `/espalier-fix` Stage 0 reverse lookup,

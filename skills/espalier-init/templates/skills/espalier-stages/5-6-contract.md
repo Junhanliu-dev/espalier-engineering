@@ -36,8 +36,9 @@ decides empty vs non-empty.
      `## Security-Sensitive Fields` block of security-record.md) — for EVERY
      field listed, write the negative abuse
      test it names (tamper the value → assert rejected → assert store
-     unchanged). Write your coding report fresh to coding-report.md — the
-     earlier report is in coding-log/."
+     unchanged). Commit them as `test({scope}): abuse tests for {fields}`
+     (Commit Discipline). Write your coding report fresh to
+     coding-report.md — the earlier report is in coding-log/."
   2. Re-run the Stage 3 exit gate (`exit_gate`, `stages/3-coding.md` —
      build + lint + scoped test run; the contract tests must build and PASS
      before anyone reviews them).

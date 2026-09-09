@@ -345,6 +345,13 @@ Fix cell (no nameable rewrite → not a finding):
   restructured, or given a new section for the feature where one
   present-tense line at the false claim would do (the coder's Docs duty
   under Editing Discipline). Replacement: the one-line edit.
+- `commits:` a commit that bundles unrelated seams (a refactor with the
+  behaviour change it prepares, two screens, generated output with its
+  source, `espalier/` records with code) or a message off the project's
+  Commit Conventions (`espalier/rules/development-process.md`) — the
+  coder's Commit Discipline. Read `git log --oneline <Base-Ref>..HEAD`
+  beside the diff. Replacement: the split, or the message. Advisory P3;
+  never a reason to fail a round.
 
 The same row rule as the Minimalism Review: one row per finding — tag,
 `path:line`, the concrete rewrite — ranked by what the coder gains; no

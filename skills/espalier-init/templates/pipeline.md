@@ -56,8 +56,9 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Load:** the context pack (`context-pack.md` — paths and facts only, written in the approval-gate turn), then spawn `harness-coder` (espalier/agents/harness-coder.md); under `test-mode: folded` (default) the coder also writes the change's interface and failure-mode tests
 - **Gate (PROGRAMMATIC, every coder return):** `- HANDOFF: true` on the report → archive it to `coding-log/` and continue with a fresh coder (the panel never sees a handoff report); then `exit_gate` — the discovered build and lint exit 0 and, folded, the discovered tests scoped to the report's listed test files pass (exit 1 = red → back to the coder without a panel round; exit 2 / 3 = run the gate by hand). The coder's self-reported "Build status: pass" is a claim, not the gate.
 - **Constraint:** one spawn per sub-task; sub-tasks with pairwise-disjoint planned file sets may run concurrently, any overlap → serial; `report_archive` before every coder spawn after the first (`coding-report.md` is the CURRENT spawn's report)
+- **Commits:** the coder commits each bounded unit at a clean point (one seam per commit, message per `espalier/rules/development-process.md` → Commit Conventions, staged by path — harness-coder.md → Commit Discipline); under PARALLEL DISPATCH no coder runs git — the orchestrator commits each part's files as one commit after the wave
 - **Baseline (first entry only):** `Base-Ref: $(git rev-parse HEAD)` in pipeline-state.md — never overwritten on a re-spawn
-- **Output:** code + espalier/changes/{type}/{slug}/coding-report.md (+ coding-log/)
+- **Output:** code as atomic commits since `Base-Ref` + espalier/changes/{type}/{slug}/coding-report.md (`- Commits:`; + coding-log/)
 - **Procedure:** espalier skill → stages/3-coding.md
 
 ### 4. Code Review (fixpoint loop — a two-agent review panel, re-review after EVERY fix)
@@ -94,7 +95,8 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Trigger:** Stage 6 done
 - **Gate (PROGRAMMATIC):** clean working tree (all staged/committed); branch name matches convention; no merge conflicts; the pre-push hook (`espalier/hooks/pre-push-gate.sh`) passes — `Current Stage:` ≥ 7 and `Reviewed-Diff` matches
 - **Human checkpoint:** confirm the push target — SKIPPED when `- Push-Target:` was pre-authorized at the approval gate (`ASK` or missing → prompt here)
-- **Output:** `## Commits` row (Stage 7, SHA, files) in pipeline-state.md — read by `/espalier-fix` reverse lookup; the convention index staged; the PARTIAL_FIX reverse-link when applicable
+- **Commits:** the coder's commits are pushed as made — the pipeline never squashes or rebases them (squash-merge is the pull request's policy; the post-merge hook maps it back); code left uncommitted is committed by path under the report's message, the change's records as one `chore(espalier):` commit
+- **Output:** `## Commits` rows — one per commit in `Base-Ref..HEAD` (Stage 7, SHA, files) in pipeline-state.md — read by `/espalier-fix` reverse lookup; the convention index staged; the PARTIAL_FIX reverse-link when applicable
 - **Procedure:** espalier skill → stages/7-10-delivery.md
 
 ### 8. CI Verification

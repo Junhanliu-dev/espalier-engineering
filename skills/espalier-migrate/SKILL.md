@@ -479,7 +479,15 @@ version. Up to THIRTY-FIVE migrations may apply, always in this order:
    Mode) become heading + one-line pointer in the body and live verbatim in
    `espalier/agents/modes/{fix-round, simplification, re-review, repo-audit,
    stage6-abuse-coverage}.md`, named first on the mode prompt lines (`FIX
-   ROUND {n}: read espalier/agents/modes/fix-round.md first …`). Validation
+   ROUND {n}: read espalier/agents/modes/fix-round.md first …`). Commit
+   Discipline: the coder commits one bounded unit per commit at a clean
+   point (message per `development-process.md` → Commit Conventions,
+   staged by path, never under PARALLEL DISPATCH — the orchestrator commits
+   each part after the wave), lists them under `- Commits:`; Stage 7 commits
+   only what is left, by path, never squashes, and records every commit in
+   `Base-Ref..HEAD`; the reviewer's advisory `commits:` tag; the fix lane's
+   late-escalation revert covers the range; `development-process.md` gains
+   the atomic-commits bullet in its managed block. Validation
    checks 64 `context-helpers`, 65 `spawn-protocols`, 66 `stage-procedures`;
    totals 56 / 61 / 66 by platform set.
    Mechanical: `scripts/migrate-v0.24.0-to-v0.25.0.sh`.
