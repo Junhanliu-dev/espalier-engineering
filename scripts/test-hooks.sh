@@ -1366,17 +1366,24 @@ cat > "$CH22/pipeline-state.md" << 'S22'
 | 3 | RESUMED | 2026-09-09T11:00:00Z | fresh session |
 | 3 | HANDOFF 1 | 2026-09-09T11:30:00Z | 2 remaining; next: b.ts |
 | 4 | PASSED | 2026-09-09T12:00:00Z | reviewer: PASS p0=0 p1=0; security: PASS p0=0 p1=0 |
+
+## Commits
+| Stage | SHA | Files |
+|-------|-----|-------|
+| 7 | 0123abc | src/a.ts,src/a.test.ts |
+| 7 | 4567def | src/b.ts |
 S22
 mkdir -p "$TMP22/espalier/changes/fix/2026-09-09-b"
 printf -- '- Status: COMPLETE\n\n## Stage History\n| Stage | Status | Timestamp | Notes |\n|---|---|---|---|\n| 3 | IN_PROGRESS | 2026-09-09T10:00:00Z | |\n' > "$TMP22/espalier/changes/fix/2026-09-09-b/pipeline-state.md"
 touch "$TMP22/espalier/changes/fix/2026-09-09-b/coding-report.md"
 ( cd "$TMP22" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm rows >/dev/null )
 OUT=$( cd "$TMP22" && bash espalier/hooks/espalier-stats.sh )
-assert "22m stats spawn shape: spawns 3/1, handoffs 1/0, parts 1, resumes 1/0; the RESUMED gap is human wait; workspace docs listed" \
+assert "22m stats spawn shape: spawns 3/1, handoffs 1/0, parts 1, resumes 1/0, commits 2/0; the RESUMED gap is human wait; workspace docs listed" \
   "echo \"\$OUT\" | grep -q '^coder spawns per change: n=2 min=1 median=2 mean=2.00 max=3$' \
    && echo \"\$OUT\" | grep -q '^handoffs per change: n=2 min=0 median=0.5 mean=0.50 max=1$' \
    && echo \"\$OUT\" | grep -q '^parallel parts per change: n=1 min=1 median=1 mean=1.00 max=1$' \
    && echo \"\$OUT\" | grep -q '^fresh-session resumes per change: n=2 min=0 median=0.5 mean=0.50 max=1$' \
+   && echo \"\$OUT\" | grep -q '^commits per change (Stage 7 rows): n=2 min=0 median=1 mean=1.00 max=2$' \
    && echo \"\$OUT\" | grep -q 'feat\*\* totals: human-wait=3600s agent-work=3600s' \
    && echo \"\$OUT\" | grep -q '^- backend/src/orders/CLAUDE.md — 1 KB — last change 20' \
    && echo \"\$OUT\" | grep -q '^- CLAUDE.md — 1 KB'"
