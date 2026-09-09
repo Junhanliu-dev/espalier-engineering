@@ -116,6 +116,7 @@ description: smoke
 tools: Read, Write
 ---
 ## Handoff: Finish Bounded, Hand Off Clean
+## Commit Discipline: Small, Atomic, Named
 - Spec applied: smoke
 - HANDOFF: true
 EOF
@@ -1931,6 +1932,7 @@ an instance-only fix; the reviewer files it as a P1 and the round repeats.
 Modify files with the `Edit` tool (exact-string replacement); create new files
 with `Write`.
 ## Handoff: Finish Bounded, Hand Off Clean
+## Commit Discipline: Small, Atomic, Named
 - Spec applied: smoke
 - HANDOFF: true
 V231CODER
@@ -2119,6 +2121,7 @@ seed_v024_install() {  # DIR — a v0.24.0-shaped install with stub LLM files
   show skills/espalier-init/templates/skills/espalier-testing.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/skills/espalier-testing/SKILL.md"
   show skills/espalier-init/templates/agent.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agent.md"
   show skills/espalier-init/templates/rules/engineering-structure.md > "$dir/espalier/rules/engineering-structure.md"
+  show skills/espalier-init/templates/rules/development-process.md > "$dir/espalier/rules/development-process.md"
   show skills/espalier-init/templates/pipeline.md > "$dir/espalier/pipeline.md"
   show skills/espalier-init/templates/scout-prompts.md > "$dir/espalier/.scout-prompts.md"
   for sk in espalier espalier-fix espalier-requirements espalier-grill espalier-map espalier-audit espalier-ask espalier-simplify espalier-prune espalier-doctor; do
@@ -2160,6 +2163,7 @@ else
      && diff <(ext35 '$TPL35/skills/espalier-testing.md') '$TMP/espalier/skills/espalier-testing/SKILL.md' >/dev/null \
      && diff <(ext35 '$TPL35/agent.md') '$TMP/espalier/agent.md' >/dev/null \
      && diff '$TPL35/rules/engineering-structure.md' '$TMP/espalier/rules/engineering-structure.md' >/dev/null \
+     && diff '$TPL35/rules/development-process.md' '$TMP/espalier/rules/development-process.md' >/dev/null \
      && cmp -s '$TPL35/skills/espalier.md' '$TMP/espalier/skills/espalier/SKILL.md' \
      && cmp -s '$TPL35/skills/espalier-stages/4-panel.md' '$TMP/espalier/skills/espalier/stages/4-panel.md' \
      && cmp -s '$TPL35/agents/modes/fix-round.md' '$TMP/espalier/agents/modes/fix-round.md' \
@@ -2197,7 +2201,7 @@ make_smoke_repo "$TMP"
 simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
 ( cd "$TMP" \
-  && grep -v 'Handoff\|Spec applied\|HANDOFF' espalier/agents/harness-coder.md > a.tmp && mv a.tmp espalier/agents/harness-coder.md \
+  && grep -v 'Handoff\|Spec applied\|HANDOFF\|Commit Discipline' espalier/agents/harness-coder.md > a.tmp && mv a.tmp espalier/agents/harness-coder.md \
   && grep -v 'spec-unread' espalier/agents/harness-reviewer.md > b.tmp && mv b.tmp espalier/agents/harness-reviewer.md \
   && grep -v '^grep-only-paths' espalier/.espalier-config > c.tmp && mv c.tmp espalier/.espalier-config )
 M250_SKIP=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
@@ -2241,6 +2245,27 @@ assert "35p pipeline.md is the contract: ten frozen headings + 8.5, a Procedure 
    && ! grep -qF 'rebuild-commit-index.sh' '$TPL35/pipeline.md' && grep -qF 'rebuild-commit-index.sh' '$TPL35/skills/espalier-prune.md' \
    && grep -qi 'keep both lines' '$TPL35/skills/espalier-prune.md' && grep -qF '## Multi-Developer Maintenance' '$TPL35/pipeline.md' \
    && grep -qF 'stages/' '$TPL35/agent.md'"
+assert "35r commit discipline: coder section + report line + no-git-under-dispatch bullet + handoff commit step; reviewer commits: tag; COMMITS prompt lines (both lanes); wave commits per part; fix-round + contract commits; Stage 7 leftovers by path, never squashed, every commit recorded; fix-lane revert range; rule bullet; stats row" \
+  "grep -qF '## Commit Discipline: Small, Atomic, Named' '$TPL35/agents/harness-coder.md' \
+   && grep -qF -- '- Commits: {sha — subject' '$TPL35/agents/harness-coder.md' \
+   && grep -qF 'run git at all under PARALLEL DISPATCH' '$TPL35/agents/harness-coder.md' \
+   && grep -qF '3. Commit the finished units (Commit Discipline)' '$TPL35/agents/harness-coder.md' \
+   && grep -qF 'never \`git add -A\`' '$TPL35/agents/harness-coder.md' \
+   && grep -qF -- '- \`commits:\` a commit that bundles unrelated seams' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF 'COMMITS: commit each bounded unit at a clean point' '$TPL35/skills/espalier-stages/3-coding.md' \
+   && grep -qF 'do NOT run git' '$TPL35/skills/espalier-stages/3-coding.md' \
+   && grep -qF 'commit each part'\"'\"'s files as ONE commit' '$TPL35/skills/espalier-stages/3-coding.md' \
+   && grep -qF 'never amend a commit this' '$TPL35/skills/espalier-stages/4-panel.md' \
+   && grep -qF 'COMMITS: {git log --oneline <Base-Ref>..HEAD}' '$TPL35/skills/espalier-stages/4-panel.md' \
+   && grep -qF 'abuse tests for {fields}' '$TPL35/skills/espalier-stages/5-6-contract.md' \
+   && grep -qF '### Stage 7: What Is Still Uncommitted' '$TPL35/skills/espalier-stages/7-10-delivery.md' \
+   && grep -qF 'rev-list --reverse' '$TPL35/skills/espalier-stages/7-10-delivery.md' \
+   && grep -qF 'never squashes' '$TPL35/pipeline.md' \
+   && grep -qF 'COMMITS: commit each bounded unit' '$TPL35/skills/espalier-fix.md' \
+   && grep -qF 'git revert --no-edit {Base-Ref}..HEAD' '$TPL35/skills/espalier-fix.md' \
+   && grep -qF 'rev-list --reverse' '$TPL35/skills/espalier-fix.md' \
+   && grep -qF 'Pipeline commits are atomic' '$TPL35/rules/development-process.md' \
+   && grep -qF 'commits per change (Stage 7 rows)' '$HTPL35/espalier-stats.sh'"
 TMP=$(mktemp -d -t smoke35r.XXXX)
 make_smoke_repo "$TMP"
 simulate_llm_writes "$TMP" typescript
