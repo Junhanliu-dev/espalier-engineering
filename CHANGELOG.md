@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.25.1 — 2026-09-10
+
+Patch: **migrate-detection floor.** `/espalier-migrate`'s version detection
+probes grep historical phrases, and later releases retire phrases — v0.22.1
+replaced the comment-brevity line, v0.23.0 folded the speculative dispatch,
+v0.25.0 rewrote `pipeline.md` and the lane SKILLs and moved the reviewer's
+abuse-coverage step into a mode file — so a CURRENT install failed OLD
+probes: on a v0.25.0 install the skill reported v0.13.1, v0.17.0, v0.21.1,
+and v0.22.0 as needed, and those scripts would have re-inserted retired
+text. Detection now ends with a **supersession floor**: the newest release
+whose distinctive markers are present (`modes/` + `stages/` + the router
+naming them for v0.25.0; the simplify SKILL + Simplification Review for
+v0.24.0; Class Sweep; the Stage 5/6 fold; the no-comment default; the
+dep-audit cache) forces every flag below it to `no` — an install carrying
+a later release reached it through the chain or a fresh init, and the
+floor release's own script stays re-runnable. Skill-only: no install file
+changes, no migration script, nothing to run on an existing install. Test
+35 gains three assertions that run the skill's detection block as-is
+against a fresh v0.25.0 install, a real v0.24.0 install before migration
+(only v0.25.0 flagged), and the same install after migration ("Already
+fully up to date").
+
 ## 0.25.0 — 2026-09-10
 
 Minor: **quality-first context** — every agent works with its instructions
