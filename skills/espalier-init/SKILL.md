@@ -77,7 +77,8 @@ project-root/
 │   │   ├── espalier-testing/SKILL.md
 │   │   ├── espalier-requirements/SKILL.md
 │   │   ├── espalier-grill/SKILL.md             # Stage 1 interrogation (invoked by espalier + espalier-fix)
-│   │   ├── espalier/SKILL.md                   # main pipeline orchestrator (slash: /espalier)
+│   │   ├── espalier/SKILL.md                   # main pipeline orchestrator — the ROUTER (slash: /espalier)
+│   │   ├── espalier/stages/*.md                # per-stage procedure files, read at stage entry (v0.25; pure copies)
 │   │   ├── espalier-fix/SKILL.md               # bug-fix lane, 7 stages (0–7, no Stage 2); slash: /espalier-fix
 │   │   ├── espalier-prune/SKILL.md             # stale-artifact refresh (slash: /espalier-prune)
 │   │   ├── espalier-doctor/SKILL.md            # periodic drift scan (slash: /espalier-doctor)
@@ -87,6 +88,7 @@ project-root/
 │   │   ├── espalier-maprun/SKILL.md               # map batch executor (slash: /espalier-maprun)
 │   │   └── espalier-simplify/SKILL.md             # simplification survey lane (slash: /espalier-simplify)
 │   ├── agents/                     # harness-coder.md, harness-reviewer.md, harness-security.md (agent names kept for stability)
+│   │   └── modes/                  # fix-round, simplification, re-review, repo-audit, stage6-abuse-coverage — mode text read when a prompt names it (v0.25; pure copies)
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
 │   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh, maprun.py + maprun-*.sh (run-lane engine)
 │   ├── pipeline.md

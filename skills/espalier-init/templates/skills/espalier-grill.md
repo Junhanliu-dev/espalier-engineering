@@ -159,13 +159,12 @@ Scan for three collision classes (the last three rows of Step 1's signal table):
 | Wiki duplication | the requirement re-implements a capability `wiki/` already documents (e.g. a new HTTP client where `external-services.md` documents one) |
 | Unstated ripple | the requirement touches a `wiki/` critical-path or data-model whose documented downstream is not in the requirement (e.g. "add a field to Order" when `critical-paths.md` shows Order feeding three consumers) |
 
-Reading `rules/`/`wiki/` does NOT count against Step 2's ≤ 8 code-read budget — they are
-the curated map, and consulting them is the whole point. Scope wiki reads to the
-requirement's surface; skim rules.
+Reading `rules/`/`wiki/` is always allowed — they are the curated map, and consulting
+them is the whole point. Scope wiki reads to the requirement's surface; skim rules.
 
 **Verify before you raise it.** A doc can be stale. Before treating a collision as real,
-confirm the cited convention still holds in the current code (this DOES draw from the
-≤ 8 code-read budget). If the doc contradicts the code, do not raise a false collision —
+confirm the cited convention still holds in the current code (read it — there is no
+read count). If the doc contradicts the code, do not raise a false collision —
 flag the doc as drifted instead, with the same helper `/espalier-ask` uses:
 
 ```bash
@@ -215,7 +214,12 @@ instead of a generic one.
 Rules for the loop:
 - **Answer from the codebase first.** If a question is answerable by reading the code
   (does helper X exist? what does the current cancel flow do?), read it — do not ask
-  the user. Budget: ≤ 8 file reads per session; if you would exceed it, ask instead.
+  the user. Read as much of the code as answering the question needs — there is no
+  count. Ask the user only for what the code cannot answer: product intent,
+  priorities, an unratified decision. A verified premise handed to the coder in
+  `requirements.md` and the pack's "Facts established" is worth more than a saved
+  read. (Every read lands in the orchestrator's own context — Stage 1 runs in the
+  main session; the approval gate's fresh-session offer is what releases them.)
 - **Verify premises.** When the input assumes current behaviour ("extend the existing
   X", "the bug is in Y"), check the code and surface any contradiction immediately.
 - **By mode** — `spec`: probe scope (in / out), false premises, edge cases, vague
@@ -234,7 +238,11 @@ Rules for the loop:
 ### Step 3 — Write the resolved input back
 
 Write every resolved decision into `requirements.md` inline, as it is resolved — not
-batched at the end:
+batched at the end. The contract file carries the DECISION, one clause in the
+criterion or scope line it resolves; the full question and answer go to
+`requirements-notes.md` beside it under `## Resolved by grill` (create the file
+on first write; link it once from the Requirement Summary as
+`Notes: requirements-notes.md`). Convention Notes stay in the contract.
 
 | Mode | Where |
 |------|-------|

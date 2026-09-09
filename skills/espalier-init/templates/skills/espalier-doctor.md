@@ -56,6 +56,26 @@ On completion, stamp the run and write a report:
 doctor_stamp "$(git rev-parse HEAD)"
 ```
 
+Before stamping, add the rules **contract drift** line — `awk` only, so it
+runs in `--quick` too:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+N=0; M=0
+for f in espalier/rules/*.md; do
+  n=$(contract_drift_lines "$f" | grep -c .); [ "$n" -gt 0 ] && { N=$((N + n)); M=$((M + 1)); }
+done
+echo "contract drift: $N line(s) in $M rule file(s)"
+```
+
+`contract_drift_lines FILE` lists the lines of a rule file that carry what
+the rules Writing Contract (`espalier/.scout-prompts.md`) keeps out — a
+commit SHA, a date, a PR number, a shell command, a history phrase — as
+`LINE<TAB>KIND<TAB>TEXT`. The report carries the total and the per-file
+lines; the Stage 0 pre-flight's STALE line gains ` · drift=N` when N > 0.
+Report only — the refresh is `/espalier-prune`, under its Removed-rules
+ledger, when the human chooses.
+
 `doctor_stamp` records the run in the gitignored `espalier/.doctor-last-run`, so
 `doctor_due()` resets for THIS clone. When the scan runs in the weekly
 maintenance lane, ALSO write the tracked shared stamp at session end —

@@ -31,6 +31,16 @@ the review skill/agent), runs `harness-reviewer` headless, scores the produced
 `review-record.md` with an LLM judge against `rubric.md`, aggregates. Gates on
 catch-rate ≥ 0.80, zero false positives, and verdict accuracy.
 
+## v0.25 disclosure fixtures (opt-in keys)
+
+`spec: services` copies `project/specs/services.md` into the throwaway project's
+coding skill and names it in the prompt; `report_extra: "<line>"` appends one
+line to the generated coding-report (e.g. a `- Spec applied:` citation the
+reviewer must verify against the spec — plan §7, `[spec-unread]`);
+`pending_template: vX.Y` skips the fixture unless `INCLUDE_PENDING=1`. Seed:
+`spec-unread-09` (clean code, a citation of a section that does not exist —
+expected an advisory `[spec-unread]` row; the v0.25 reviewer template ships the check).
+
 ## Fixture format
 
 ```yaml

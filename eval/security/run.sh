@@ -57,6 +57,7 @@ install_espalier() {
   mkdir -p "$proj/espalier/rules" "$proj/espalier/agents" \
            "$proj/espalier/skills/espalier-security" "$proj/espalier/wiki"
   sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-security.md"
+  mkdir -p "$proj/espalier/agents/modes" && cp "$TPL/agents/modes/"*.md "$proj/espalier/agents/modes/"   # v0.25 mode files (read when the prompt names one)
   sed -e 's/{project_name}/EvalApp/g' -e 's/{project}/EvalApp/g' "$SKILL_TPL" > "$proj/espalier/skills/espalier-security/SKILL.md"
   cp "$RULE_TPL" "$proj/espalier/rules/security-standards.md"
   printf '# Critical Paths\nEntry points: controllers / handlers / queue consumers in src/. No auth middleware unless shown in the change.\n' > "$proj/espalier/wiki/critical-paths.md"
@@ -124,7 +125,7 @@ run_repo_audit() {
   claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-security auditor in REPO-AUDIT MODE for EvalApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
-Read $proj/espalier/agents/harness-security.md and follow its '## Repo-Audit Mode' section EXACTLY (including reading the rule $proj/espalier/rules/security-standards.md and skill $proj/espalier/skills/espalier-security/SKILL.md it references). You are auditing EXISTING code, not a change — there is no coding-report.md and no changes/ dir.
+Read $proj/espalier/agents/harness-security.md and follow it EXACTLY; REPO-AUDIT MODE: read $proj/espalier/agents/modes/repo-audit.md first and follow its five deltas and output format (including reading the rule $proj/espalier/rules/security-standards.md and skill $proj/espalier/skills/espalier-security/SKILL.md it references). You are auditing EXISTING code, not a change — there is no coding-report.md and no changes/ dir.
 
 SURFACE FILES TO AUDIT (paths relative to $proj — the code as it stands NOW):
 $filelist

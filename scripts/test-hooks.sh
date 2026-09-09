@@ -1212,6 +1212,200 @@ assert "21f stats stays read-only (working tree unchanged by the run)" \
   "[ \"\$BEFORE21\" = \"\$AFTER21\" ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP21"
 
+# ─── T22: v0.25 context helpers (drift-helpers.sh) + stats spawn shape + maprun stage names ──
+echo "T22: v0.25 context helpers, stats spawn shape, maprun stage names"
+DH="$HOOKS_SRC/drift-helpers.sh"
+TMP22=$(mktemp -d -t hooks-t22.XXXX)
+make_repo "$TMP22"
+mkdir -p "$TMP22/espalier/hooks" "$TMP22/espalier/changes/feat/2026-09-09-a" \
+         "$TMP22/backend/src/orders" "$TMP22/frontend/src/__generated__" "$TMP22/frontend/src/pages"
+cp "$DH" "$TMP22/espalier/hooks/drift-helpers.sh"
+cp "$HOOKS_SRC/espalier-stats.sh" "$TMP22/espalier/hooks/espalier-stats.sh"
+printf 'grep-only-paths: __generated__/ schema.graphql\n' > "$TMP22/espalier/.espalier-config"
+head -c 2100 /dev/zero | tr '\0' 'x' > "$TMP22/frontend/src/__generated__/graphql.ts"
+echo 'type Q' > "$TMP22/schema.graphql"
+echo '# fe' > "$TMP22/frontend/CLAUDE.md"; echo '# be' > "$TMP22/backend/CLAUDE.md"
+echo '# be agents' > "$TMP22/backend/AGENTS.md"; echo '# orders' > "$TMP22/backend/src/orders/CLAUDE.md"
+echo '# root' > "$TMP22/CLAUDE.md"
+touch "$TMP22/backend/src/orders/a.test.ts" "$TMP22/backend/src/orders/b.test.ts"
+cat > "$TMP22/espalier/hooks/pre-push-gate.sh" << 'G22'
+#!/bin/bash
+run_build() {
+  echo building
+  { echo inner-group; true; }
+}
+gate_build_section() { :; }
+run_lint() {
+  true  # no lint command discovered at init
+}
+run_tests() {
+  cd backend && npm test
+}
+G22
+( cd "$TMP22" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm fixture >/dev/null )
+CH22="$TMP22/espalier/changes/feat/2026-09-09-a"
+printf '## Coding Report\n- Files modified: backend/src/orders/a.ts\n- Test files: backend/src/orders/a.test.ts, backend/src/orders/b.test.ts\n' > "$CH22/coding-report.md"
+
+# 22a report_archive: NN numbering, label sanitised, no-op when absent
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && report_archive "$CH22" "handoff-1" && printf 'r2\n' > "$CH22/coding-report.md" && report_archive "$CH22" "round1 fix" && report_archive "$CH22" "gone"; echo "rc=$?" )
+assert "22a report_archive numbers 01, 02; sanitises the label; no-op (rc 0) when no report exists" \
+  "[ -f '$CH22/coding-log/01-handoff-1.md' ] && [ -f '$CH22/coding-log/02-round1_fix.md' ] && [ ! -f '$CH22/coding-report.md' ] && echo \"\$OUT\" | grep -q 'rc=0'"
+printf '## Coding Report\n- Test files: backend/src/orders/a.test.ts, backend/src/orders/b.test.ts\n' > "$CH22/coding-report.md"
+
+# 22b contract_extract: block to the next heading, VERDICT dropped; exit 1 when absent
+printf '## Security Audit: a (round 1)\n**Verdict:** PASS\n### Summary\n- x\n\n## Security-Sensitive Fields\n- field: cartId\n  abuse_test: "a"\n\nVERDICT: PASS p0=0 p1=0 round=1\n' > "$CH22/security-record.md"
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && contract_extract "$CH22"; echo "rc=$?"; contract_extract "$TMP22/espalier/changes/feat/none"; echo "rc=$?" )
+assert "22b contract_extract writes the Security-Sensitive Fields block (no VERDICT line) and exits 1 when the record is absent" \
+  "[ \"\$(head -1 '$CH22/security-contract.md')\" = '## Security-Sensitive Fields' ] && grep -q 'field: cartId' '$CH22/security-contract.md' \
+   && ! grep -q '^VERDICT' '$CH22/security-contract.md' && ! grep -q 'Security Audit' '$CH22/security-contract.md' \
+   && echo \"\$OUT\" | grep -q 'rc=0' && echo \"\$OUT\" | grep -q 'rc=1'"
+
+# 22c req_shape_check: headings outside the contract set only; fenced headings skipped
+printf '# Feat\n## 1. Requirement Summary\n## 2. Acceptance Criteria\n## Design Rationale\n### Alternatives considered\n## Open Questions\n## Resolved by grill\n```\n## fenced\n```\n## Out of scope\n' > "$CH22/requirements.md"
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && req_shape_check "$CH22"; echo "rc=$?" )
+assert "22c req_shape_check lists only the three headings outside the contract set, always exit 0" \
+  "[ \"\$(echo \"\$OUT\" | grep -c 'requirements-notes.md')\" -eq 3 ] && echo \"\$OUT\" | grep -q '^Design Rationale → requirements-notes.md' \
+   && echo \"\$OUT\" | grep -q '^Resolved by grill → ' && ! echo \"\$OUT\" | grep -q 'fenced' && ! echo \"\$OUT\" | grep -q 'Acceptance' && echo \"\$OUT\" | grep -q 'rc=0'"
+
+# 22d grep_only_files: patterns from .espalier-config, tracked files, sizes in KB
+OUT=$( cd "$TMP22/backend" && . ../espalier/hooks/drift-helpers.sh && grep_only_files )
+assert "22d grep_only_files lists tracked matches with sizes, from any cwd" \
+  "echo \"\$OUT\" | grep -q '^frontend/src/__generated__/graphql.ts (3 KB)$' && echo \"\$OUT\" | grep -q '^schema.graphql (1 KB)$' && [ \"\$(echo \"\$OUT\" | grep -c .)\" -eq 2 ]"
+
+# 22e scoped_docs: root excluded, nearest last, de-duplicated, absolute paths accepted
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && scoped_docs backend/src/orders/a.ts frontend/src/pages/Home.tsx "$TMP22/backend/src/orders/b.ts" )
+assert "22e scoped_docs: nearest last, root CLAUDE.md excluded, de-duplicated across paths" \
+  "[ \"\$(echo \"\$OUT\" | tr '\n' ' ')\" = 'backend/AGENTS.md backend/CLAUDE.md backend/src/orders/CLAUDE.md frontend/CLAUDE.md ' ]"
+
+# 22f rule_bullets + the Removed-rules comm on a known pair
+printf '# R\n- Rule one: do X.\n  continued `a.ts:1`.\n  - nested detail\n- Rule two.\n| Tier | Rule |\n|------|------|\n| P0 | row rule |\nProse line.\n```\n- fenced bullet\n```\n' > "$TMP22/cur.md"
+printf '# R\n- Rule one: do X. continued `a.ts:1`. - nested detail\n| Tier | Rule |\n|---|---|\n| P0 | row rule |\n' > "$TMP22/new.md"
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && rule_bullets cur.md )
+REMOVED=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && comm -23 <(rule_bullets cur.md | sort) <(rule_bullets new.md | sort) )
+assert "22f rule_bullets folds continuation + nested lines, keeps table body rows, skips fences and prose; comm shows exactly the dropped rule" \
+  "[ \"\$(echo \"\$OUT\" | grep -c .)\" -eq 4 ] && echo \"\$OUT\" | grep -q '^Rule one: do X. continued \`a.ts:1\`. - nested detail$' \
+   && ! echo \"\$OUT\" | grep -q 'fenced' && ! echo \"\$OUT\" | grep -q 'Prose' && [ \"\$REMOVED\" = 'Rule two.' ]"
+
+# 22g contract_drift_lines: one SHA, one date, one shell line, one history phrase; clean lines silent
+printf '# Rules\n- one rule `a.ts:1`.\n- the commit abc1234 fixed it.\n- rotated on 2026-01-02.\n- run `npm test` first.\n- helper was deleted in v0.9.\n- decade facade (no digit, not a SHA).\n' > "$TMP22/drift.md"
+OUT=$( cd "$TMP22" && . espalier/hooks/drift-helpers.sh && contract_drift_lines drift.md )
+assert "22g contract_drift_lines tags sha / date / shell / history and nothing else" \
+  "[ \"\$(echo \"\$OUT\" | grep -c .)\" -eq 4 ] && echo \"\$OUT\" | grep -q \"^3	sha	\" && echo \"\$OUT\" | grep -q \"^4	date	\" \
+   && echo \"\$OUT\" | grep -q \"^5	shell	\" && echo \"\$OUT\" | grep -q \"^6	history	\""
+
+# 22h-l exit_gate: brace-depth extraction (inner group), scoped test command, exit 1 on a red job with its log path,
+# exit 2 naming a missing / unparseable function, exit 3 on the greenfield placeholder — under bash AND zsh (the
+# orchestrator may source the helpers from either).
+for SH22 in bash zsh; do
+  command -v "$SH22" >/dev/null 2>&1 || continue
+  DEF=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; _gate_fn_def espalier/hooks/pre-push-gate.sh run_build' )
+  SC=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; _gate_scoped_cmd "$(_gate_fn_def espalier/hooks/pre-push-gate.sh run_tests)" backend/src/orders/a.test.ts backend/src/orders/b.test.ts' )
+  GO=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; _gate_scoped_cmd "$(printf "run_tests() {\n  go test ./...\n}")" pkg/a/a_test.go pkg/b/b_test.go' )
+  CARGO=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; _gate_scoped_cmd "$(printf "run_tests() {\n  cargo test\n}")" a.rs' )
+  assert "22h [$SH22] _gate_fn_def keeps an inner brace group; scoped test command for npm-in-workspace and go packages; full suite (empty) for cargo" \
+    "[ \"\$(printf '%s\n' \"\$DEF\" | grep -c .)\" -eq 4 ] && printf '%s\n' \"\$DEF\" | grep -q 'inner-group' \
+     && [ \"\$SC\" = 'cd backend && npm test -- src/orders/a.test.ts src/orders/b.test.ts' ] \
+     && [ \"\$GO\" = 'go test ./pkg/a/ ./pkg/b/' ] && [ -z \"\$CARGO\" ]"
+  OUT=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  assert "22i [$SH22] exit_gate: build + lint green lines, tests red (2 files, npm absent → exit 1 with a log path)" \
+    "echo \"\$OUT\" | grep -q '^build: exit 0$' && echo \"\$OUT\" | grep -q '^lint: exit 0$' \
+     && echo \"\$OUT\" | grep -q '^tests: exit [1-9][0-9]* (2 files) — log: ' && echo \"\$OUT\" | grep -q 'rc=1'"
+  sed 's/^  cd backend \&\& npm test$/  true/' "$TMP22/espalier/hooks/pre-push-gate.sh" > "$TMP22/g.tmp" && mv "$TMP22/g.tmp" "$TMP22/espalier/hooks/pre-push-gate.sh"
+  OUT=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  assert "22j [$SH22] exit_gate green: exit 0, tests line says full suite (a bare true is not path-scopable)" \
+    "echo \"\$OUT\" | grep -q '^tests: exit 0 (full suite)$' && echo \"\$OUT\" | grep -q 'rc=0'"
+  sed 's/^  true  # no lint command discovered at init$/  echo lint-broken; false/' "$TMP22/espalier/hooks/pre-push-gate.sh" > "$TMP22/g.tmp" && mv "$TMP22/g.tmp" "$TMP22/espalier/hooks/pre-push-gate.sh"
+  OUT=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  LOG22=$(echo "$OUT" | sed -n 's/^lint: exit 1 — log: //p')
+  assert "22k [$SH22] exit_gate red lint: exit 1, per-job line with a log path holding the lint output; tests still run" \
+    "echo \"\$OUT\" | grep -q '^lint: exit 1 — log: ' && [ -n \"\$LOG22\" ] && grep -q 'lint-broken' \"\$LOG22\" && echo \"\$OUT\" | grep -q '^tests: exit 0' && echo \"\$OUT\" | grep -q 'rc=1'"
+  cp "$TMP22/espalier/hooks/pre-push-gate.sh" "$TMP22/gate.keep"
+  sed '/^run_lint()/,/^}/d' "$TMP22/espalier/hooks/pre-push-gate.sh" > "$TMP22/g.tmp" && mv "$TMP22/g.tmp" "$TMP22/espalier/hooks/pre-push-gate.sh"
+  OUT_MISSING=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  printf '#!/bin/bash\nrun_build() {\n  true\n}\nrun_lint() {\n  if then\n}\nrun_tests() {\n  true\n}\n' > "$TMP22/espalier/hooks/pre-push-gate.sh"
+  OUT_BAD=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  printf '#!/bin/bash\n# greenfield placeholder — real gate is written by /espalier-init Pass 2\nexit 0\n' > "$TMP22/espalier/hooks/pre-push-gate.sh"
+  OUT_GF=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  cp "$TMP22/gate.keep" "$TMP22/espalier/hooks/pre-push-gate.sh"; touch "$TMP22/espalier/.greenfield"
+  OUT_GF2=$( cd "$TMP22" && $SH22 -c '. espalier/hooks/drift-helpers.sh; exit_gate espalier/changes/feat/2026-09-09-a; echo "rc=$?"' )
+  rm -f "$TMP22/espalier/.greenfield"
+  assert "22l [$SH22] exit_gate: exit 2 naming run_lint when missing or unparseable; exit 3 on the placeholder gate and on the .greenfield marker" \
+    "echo \"\$OUT_MISSING\" | grep -q 'exit_gate: run_lint not found / not parseable' && echo \"\$OUT_MISSING\" | grep -q 'rc=2' \
+     && echo \"\$OUT_BAD\" | grep -q 'exit_gate: run_lint not found / not parseable' && echo \"\$OUT_BAD\" | grep -q 'rc=2' \
+     && echo \"\$OUT_GF\" | grep -q 'no gate yet' && echo \"\$OUT_GF\" | grep -q 'rc=3' \
+     && echo \"\$OUT_GF2\" | grep -q 'no gate yet' && echo \"\$OUT_GF2\" | grep -q 'rc=3'"
+  # restore the original gate (npm test body) for the next shell's pass
+  cat > "$TMP22/espalier/hooks/pre-push-gate.sh" << 'G22'
+#!/bin/bash
+run_build() {
+  echo building
+  { echo inner-group; true; }
+}
+gate_build_section() { :; }
+run_lint() {
+  true  # no lint command discovered at init
+}
+run_tests() {
+  cd backend && npm test
+}
+G22
+done
+
+# 22m stats spawn shape + RESUMED booked as human wait + workspace docs
+rm -rf "$CH22/coding-log"; mkdir -p "$CH22/coding-log"; touch "$CH22/coding-log/01-stage3-part1.md" "$CH22/coding-log/02-handoff-1.md"
+cat > "$CH22/pipeline-state.md" << 'S22'
+## Status
+- Status: COMPLETE
+- Total Rollbacks: 0
+- Review Rounds: req=1/3, code=1/3, test=0/3
+
+## Stage History
+| Stage | Status | Timestamp | Notes |
+|-------|--------|-----------|-------|
+| 2 | PASSED | 2026-09-09T10:00:00Z | Requirements approved by user |
+| 3 | RESUMED | 2026-09-09T11:00:00Z | fresh session |
+| 3 | HANDOFF 1 | 2026-09-09T11:30:00Z | 2 remaining; next: b.ts |
+| 4 | PASSED | 2026-09-09T12:00:00Z | reviewer: PASS p0=0 p1=0; security: PASS p0=0 p1=0 |
+S22
+mkdir -p "$TMP22/espalier/changes/fix/2026-09-09-b"
+printf -- '- Status: COMPLETE\n\n## Stage History\n| Stage | Status | Timestamp | Notes |\n|---|---|---|---|\n| 3 | IN_PROGRESS | 2026-09-09T10:00:00Z | |\n' > "$TMP22/espalier/changes/fix/2026-09-09-b/pipeline-state.md"
+touch "$TMP22/espalier/changes/fix/2026-09-09-b/coding-report.md"
+( cd "$TMP22" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm rows >/dev/null )
+OUT=$( cd "$TMP22" && bash espalier/hooks/espalier-stats.sh )
+assert "22m stats spawn shape: spawns 3/1, handoffs 1/0, parts 1, resumes 1/0; the RESUMED gap is human wait; workspace docs listed" \
+  "echo \"\$OUT\" | grep -q '^coder spawns per change: n=2 min=1 median=2 mean=2.00 max=3$' \
+   && echo \"\$OUT\" | grep -q '^handoffs per change: n=2 min=0 median=0.5 mean=0.50 max=1$' \
+   && echo \"\$OUT\" | grep -q '^parallel parts per change: n=1 min=1 median=1 mean=1.00 max=1$' \
+   && echo \"\$OUT\" | grep -q '^fresh-session resumes per change: n=2 min=0 median=0.5 mean=0.50 max=1$' \
+   && echo \"\$OUT\" | grep -q 'feat\*\* totals: human-wait=3600s agent-work=3600s' \
+   && echo \"\$OUT\" | grep -q '^- backend/src/orders/CLAUDE.md — 1 KB — last change 20' \
+   && echo \"\$OUT\" | grep -q '^- CLAUDE.md — 1 KB'"
+rm -rf "$TMP22/espalier/changes"; mkdir -p "$TMP22/espalier/changes/feat/2026-09-09-c"
+printf -- '- Status: IN_PROGRESS\n' > "$TMP22/espalier/changes/feat/2026-09-09-c/pipeline-state.md"
+OUT=$( cd "$TMP22" && bash espalier/hooks/espalier-stats.sh )
+assert "22n stats spawn shape degrades to none without coding reports" "echo \"\$OUT\" | grep -q 'none — no coding reports yet'"
+
+# 22o maprun _stage_names: literal `### N. ` (8.5 ignored, stage 8 = CI Verification); fallback labels when headings are missing
+mkdir -p "$TMP22/espalier/maps/m"
+cp "$TEMPLATES/pipeline.md" "$TMP22/espalier/pipeline.md"
+OUT=$( cd "$TMP22" && python3 -c "
+import sys, importlib.util
+spec = importlib.util.spec_from_file_location('maprun', '$HOOKS_SRC/maprun.py'); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+r = m.Run.__new__(m.Run); r.repo_root = lambda: '$TMP22'
+n = r._stage_names(); print(len(n), n[8], n[10])
+" 2>&1 )
+grep -v '^### 8\. \|^### 9\. \|^### 10\. ' "$TEMPLATES/pipeline.md" > "$TMP22/espalier/pipeline.md"
+OUT2=$( cd "$TMP22" && python3 -c "
+import sys, importlib.util
+spec = importlib.util.spec_from_file_location('maprun', '$HOOKS_SRC/maprun.py'); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+r = m.Run.__new__(m.Run); r.repo_root = lambda: '$TMP22'
+n = r._stage_names(); print(len(n), n[8], n[9], n[10])
+" 2>&1 )
+assert "22o maprun _stage_names: ten stages from the template, 8 = CI Verification (8.5 ignored); three deleted headings → fallback labels + one warning" \
+  "echo \"\$OUT\" | grep -q '^10 CI Verification User Confirmation$' \
+   && echo \"\$OUT2\" | grep -q 'missing stage heading(s) 8, 9, 10' && echo \"\$OUT2\" | grep -q '^10 CI Verification Deployment Verification User Confirmation$'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP22"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

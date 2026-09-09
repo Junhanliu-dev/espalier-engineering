@@ -10,6 +10,27 @@ under refresh; run each as an Agent/Task scout against the current codebase.
 > `references/discovery-checklist.md`. When a scout's JSON shape changes, edit
 > BOTH. Bootstrap copies this file to `espalier/.scout-prompts.md` in the target.
 
+## Writing Contract — rule files (espalier/rules/*.md)
+
+A rule file is read on every turn by every agent. It carries what a coder
+must DO and a reviewer must CHECK, nothing else. Every scout that renders a
+rule file, and every refresh `/espalier-prune` proposes, writes under it:
+- One bullet per rule, present tense; a rubric table row is one rule.
+- Exactly one citation per bullet: `path:line` of the shape to copy.
+- No counts, dates, commit SHAs, PR numbers, or shell commands. A number
+  that matters is re-derived by the doctor's scout, never stored.
+- No history ("was deleted", "used to", "no longer", "pre-v0.x"). A
+  surface that must not be copied is one line in `## Not Precedent`.
+- No walkthroughs: a flow that needs more than two lines lives in
+  `espalier/wiki/critical-paths.md` or the workspace CLAUDE.md; the rule
+  keeps one bullet and a pointer.
+- Universal seed text (severity tiers, required controls, taxonomy,
+  maintenance-commits anchor) is fixed and never rewritten by a scout.
+
+No budget enforces this: the prune gate shows the rules a refresh would
+remove (Removed rules ledger) and the doctor reports lines that drift from
+the contract; the human decides.
+
 ## Scout 1.2 — Architecture
 
 ```
@@ -24,10 +45,14 @@ Return JSON ONLY:
   "summary": "<=200 word prose summary",
   "structured": {
     "layers": [{"name": "<layer>", "dir": "<path>", "deps": ["<other layer>"]}],
-    "boundary_table": [{"from": "<layer>", "may_call": [...], "must_not_call": [...]}]
+    "boundary_table": [{"from": "<layer>", "may_call": [...], "must_not_call": [...]}],
+    "not_precedent": [{"path": "<file or dir>", "kind": "dead|legacy|transitional|generated", "clause": "<one clause: why it must not be copied>", "evidence": "file:line"}]
   },
   "evidence_files": ["<paths examined>"]
 }
+
+not_precedent lists surfaces a coder must NOT copy — each re-proved from the
+code NOW (an entry you cannot evidence is omitted, never carried forward).
 ```
 
 ## Scout 1.3 — Coding Patterns
@@ -37,6 +62,8 @@ Read 5-8 representative source files from different parts of the codebase.
 Extract: naming conventions (files/functions/types/constants), error-handling
 pattern, async style, type discipline, logging library + format, validation,
 comment conventions (density / docstring style / what earns a comment).
+Every pattern's example is one `file:line`, present tense — no history, no
+counts, no commands (rule-file Writing Contract).
 
 Return JSON ONLY:
 {
@@ -99,7 +126,8 @@ Return JSON ONLY:
 ```
 Compare 3+ files of the same "type" in each detected layer. Find patterns that
 are CONSISTENT across all of them — these are unwritten invariants. Also find
-patterns NEVER violated.
+patterns NEVER violated. Each entry is present tense with one `file:line`
+citation, no history (rule-file Writing Contract).
 
 Return JSON ONLY:
 {
@@ -192,7 +220,8 @@ FOUND"); (d) where request validation happens (library + layer); (e) existing
 security conventions the codebase already follows (e.g. "all controllers call
 requireOwner(ctx, id) before load", "prices come from PriceService.quote()"), each
 with a file:line. Then list fields on the money / identity / permission / owner /
-state axes, project-specific names included.
+state axes, project-specific names included. Each project_conventions entry is
+present tense with one `file:line`, no history (rule-file Writing Contract).
 
 Return JSON ONLY:
 {

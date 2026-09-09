@@ -26,3 +26,7 @@
 ## File Conventions
 - {naming pattern for each file type}
 - {where new files of type X should go}
+
+## Not Precedent
+<!-- ESPALIER NOT PRECEDENT v1 — managed anchor; evidence-refreshed, one line per entry, keep this comment -->
+- {path — kind (dead | legacy | transitional | generated) — one clause: why it must not be copied — evidence file:line}

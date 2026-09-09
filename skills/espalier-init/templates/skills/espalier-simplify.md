@@ -78,8 +78,10 @@ Read, in this order, and keep notes — this is the map every scout gets:
    representations, migrations, entry points.
 4. `espalier/skills/espalier-coding/specs/*.md` — the mandated per-layer
    shapes: a construct a spec mandates is never "ownerless flexibility".
-5. Decision history: `espalier/changes/*/*/requirements.md` (newest 20 —
-   folders sort chronologically) and `review-record.md` for anything naming
+5. Decision history: `espalier/changes/*/*/requirements.md` with its
+   `requirements-notes.md` (alternatives considered, what was settled for
+   next time; newest 20 — folders sort chronologically) and
+   `review-record.md` for anything naming
    the area; a prior `espalier/wiki/simplify-survey.md` (its `JUSTIFIED` rows
    and filed cuts are decisions, not leads to re-find);
    `espalier/wiki/security-audit.md` if present (`Controls Confirmed` are

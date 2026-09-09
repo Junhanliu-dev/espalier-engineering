@@ -47,7 +47,20 @@ NOT a bash script. For each file:
    clone; this retires it instead of nagging forever.
 5. **Else render the unified diff** and gate by file class with
    `AskUserQuestion`. Classify with `classify_file <path>` from
-   `drift-helpers.sh`:
+   `drift-helpers.sh`. For a rule file, render the **Removed rules** ledger
+   ABOVE the diff so a refresh can never silently drop a rule:
+
+   ```bash
+   . espalier/hooks/drift-helpers.sh
+   comm -23 <(rule_bullets "$CURRENT" | sort) <(rule_bullets "$PROPOSED" | sort)
+   ```
+
+   Show it as `Removed rules (N)` — one line per bullet or table row the
+   proposed render no longer carries — and the gate line as
+   `size: {current} KB → {proposed} KB` (information). A rule file is
+   rendered under the Writing Contract in `espalier/.scout-prompts.md`; the
+   ledger is what makes a refresh shrink instead of ratchet. Nothing refuses
+   on size or on count — `keep-old` / `edit` are the human's answer.
 
    | File class | Options | Default |
    |------------|---------|---------|
@@ -147,36 +160,52 @@ No stash, no branch switch — the feature checkout is untouched; suggest
 Contributors without push access use the same flow with a fork/PR branch —
 the weekly maintenance PR is still the destination.
 
-## Maintenance-Commit Conflict Recipe (prune vs prune)
+## Conflict Recipes (moved here from pipeline.md in v0.25)
 
-Two refreshes of the same doc on different branches conflict at merge. Never
-hand-merge scout prose:
+Three residual-conflict recipes; the lane table above says which lane each
+mechanism rides. Never hand-merge scout prose.
 
-1. **Inspect both sides** — diff the conflicting doc against each merge
-   parent to see which refresh is newer/fuller.
-2. **Take the newer refresh wholesale** — `git checkout --theirs -- <doc>`
-   (or `--ours` when yours is newer) and commit the merge.
-3. **Re-run `/espalier-prune <doc>` on the merged tree** — if the union of
-   both branches' code drifted the doc further, the scout diff shows it; an
-   empty diff confirms the kept side is current.
+### Maintenance-commit conflicts (prune vs prune)
 
-A modify/delete conflict on an espalier doc resolves as DELETION — the other
-side retired the doc; run `/espalier-doctor` afterwards if in doubt.
+1. Inspect both sides — diff the conflicting doc against each merge parent.
+2. Take the newer refresh wholesale: `git checkout --theirs -- <doc>` (or
+   `--ours` when yours is newer), commit the merge.
+3. Re-run `/espalier-prune <doc>` on the merged tree — an empty scout diff
+   confirms the kept side; a non-empty one shows what the union of both
+   branches' code changed.
 
-**Per-key convention files (`espalier/conventions/k-*.tsv`):** a same-key
-conflict is the race DETECTION, not a breakage. Two decisions (both sides
-flipped statuses) → pick the decision that should win, exactly like any
+A modify/delete conflict on an espalier doc resolves as DELETION (the other
+side retired the doc).
+
+### Per-key convention conflicts (`espalier/conventions/k-*.tsv`)
+
+A same-key conflict is the promotion race DETECTION, not a breakage. Two
+decisions (both sides flipped statuses) → pick the winning decision like any
 5-line conflict. An observation append against another append or against a
-status flip → **keep both lines** (the decided rows AND every fresh
-observation row) — nothing is ever lost, and `conv_fold` dedupes repeated
-observations at read time. The shared `espalier/.doctor-stamp` is one line:
+status flip → **keep both lines** — every decided row AND every fresh
+observation row survive; `conv_fold` dedupes repeated observations at read time,
+so nothing double-counts. The shared `espalier/.doctor-stamp` is one line:
 keep the newer line (or either `clean`).
+
+### Slug collisions across branches
+
+Two branches can mint the same `espalier/changes/{type}/{slug}/` folder on
+the same day; the merge shows add/add conflicts inside it. All in ONE commit:
+
+1. Rename the later-merging change's dir to the next free suffix:
+   `git mv espalier/changes/{type}/{slug} espalier/changes/{type}/{slug}-2`.
+2. Rebuild the reverse-lookup cache:
+   `bash espalier/hooks/rebuild-commit-index.sh`.
+3. Rewrite the old slug in every back-link that points at the renamed change:
+   `grep -l "{type}/{slug}" espalier/changes/*/*/pipeline-state.md`, then fix
+   each `## Follow-up Fixes` row from `{type}/{slug}` to `{type}/{slug}-2` —
+   otherwise those back-links point at the other branch's change.
 
 ## Scout Mapping
 
 | Artifact | Scout(s) |
 |----------|----------|
-| `rules/engineering-structure.md` | 1.2 |
+| `rules/engineering-structure.md` | 1.2 (+ `## Not Precedent` from its `not_precedent` array, see below) |
 | `rules/coding-standards.md` | 1.3 + 1.6 (merge before diff) |
 | `rules/development-process.md` | 1.5 |
 | `rules/security-standards.md` | 1.11 → discovered sections ONLY (see below) |
@@ -193,6 +222,14 @@ keep the newer line (or either `clean`).
 section (the `ESPALIER MAINTENANCE COMMITS v1` marker) is fixed policy text —
 scout 1.5 regenerates the discovered sections ONLY, and the two-way diff must
 show the marker section unchanged.
+
+`engineering-structure.md`'s `## Not Precedent` section (the
+`ESPALIER NOT PRECEDENT v1` managed anchor — every reader matches that token
+only) is refreshed from scout 1.2's `not_precedent` array and from nothing
+else: an entry the scout cannot re-prove is dropped, one it newly proves is
+added, one line per entry (`path — kind — clause — evidence file:line`).
+Negative knowledge is re-proved instead of decaying in prose; the anchor
+comment line is kept verbatim.
 
 The two always-loaded standards rules are MIXED files — universal seed text
 plus discovered cells. A refresh regenerates ONLY the discovered parts:

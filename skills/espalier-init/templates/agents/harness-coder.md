@@ -43,6 +43,18 @@ strict project conventions.
    CODE as ground truth, and do NOT refresh the doc yourself.
 7. Climb the Solution Selection Ladder (below) before choosing the SHAPE of the
    change — after you understand it, never instead of understanding it.
+8. Read once. A file already in your context is not Read again unless you or
+   the gate changed it. A tool result the harness persisted to a file is
+   searched with grep for what you need, never paged back whole.
+9. Grep-only files (the pack's `- Grep-only:` line — generated schemas,
+   bundles, lockfiles) are searched, never Read; if you need a symbol from
+   one, grep for the symbol.
+10. Scoped docs named in the pack (`- Scoped docs:`) — and any `CLAUDE.md` /
+    `AGENTS.md` above a file you create: grep each for the files you touch and
+    read those sections (offset/limit); never re-Read a doc the platform
+    already injected into your context (step 8). A claim there is a trap, an
+    invariant, a deliberate stub, or a rejected alternative: verify it against
+    the code before relying on it, as with the pack.
 
 ## Your Constraints
 
@@ -148,15 +160,43 @@ here — match the project, don't fight it:
 
 ```
 ## Coding Report
+- Prior reports: coding-log/ (read one only when this report cites it)
 - Files created: {list}
 - Files modified: {list}
 - Test files: {list — ALWAYS its own line: the exit gate's scoped test
   run, the review panel, and the escalation detectors key off this split}
 - Layers touched: {list}
+- Spec applied: espalier/skills/espalier-coding/specs/{layer}.md § {section} — {one clause: the shape followed}
+  (one entry per touched layer; `none — no spec for {layer}` with the reason
+  when the pack names no spec for it)
 - Build status: {pass/fail}
 - Lint status: {pass/fail}
+- Docs: {scoped docs whose claim you edited, by path | none}
 - Notes: {anything the reviewer should pay attention to}
 ```
+
+Write the report FRESH — overwrite, never append. It is the CURRENT spawn's
+report; every earlier spawn's report is one file in `coding-log/`, archived
+by the orchestrator before it spawned you (open one only when this report
+cites it). A fix-round report cites the archived report it responds to by
+path when it changes a decision recorded there.
+
+The `- Spec applied:` line is mandatory: cite the spec section whose shape
+you followed, one entry per touched layer. You cannot cite a section you did
+not open — the reviewer opens the cited section and checks the diff against
+it; a citation that names no existing section, or a diff that contradicts
+the cited shape, is an advisory `[spec-unread]` row.
+
+Report hygiene: a section with no content is one line (`- Staleness: none`);
+a section exists only when it has content; nothing the reader can run is
+restated — no test output beyond the count line the exit gate prints, no
+repeated build instructions (the pack has them); doc text is never pasted.
+Two lines are cumulative because gates key off them: `- Test files:` lists
+every test file of the change so far (the exit gate scopes its run to it),
+and a block the panel re-verifies each round — `### Class Sweep`,
+`### Retired Surface`, `### Test Scope Signal` — is carried into the current
+report when it still applies (cite the archived report it came from)
+(see Docs under Editing Discipline).
 
 ### Test Scope Signal (fix lane)
 
@@ -186,111 +226,56 @@ Do NOT set this signal if you can write a meaningful test within the original fi
 
 ## Fix Rounds: Fix the Class, Not the Instance
 
-When your prompt carries `FIX ROUND {n}:` you are being re-spawned on review
-panel findings. Field data: most second and third panel rounds find the SAME
-defect one hop away from the line just fixed — the reviewer named one
-instance, the coder fixed that instance, the sibling survived. Each such
-round costs a full 2-agent panel. Close the class in ONE round:
-
-1. **Name the class.** For every P0/P1 finding, write one line stating the
-   property that was violated, not the line that violated it — e.g.
-   "generated `*WhereInput` exposes a hidden reverse relation as filterable",
-   "money columns recomputed outside the acceptance transaction",
-   "client-supplied return URL reaches a navigation call unvalidated".
-2. **Enumerate the siblings.** Search for every other place the same
-   construct occurs: the same helper / decorator / access pattern / generated
-   surface across every touched layer AND the generated artifacts it feeds
-   (schema output, route tables, barrels). Record the search you ran and the
-   occurrence count — the reviewer re-runs it.
-3. **Fix every sibling inside the change's scope in this round** — scope =
-   the layers this change touches plus the generated surfaces they feed. For
-   each sibling you leave, name it and say which: (a) NOT an instance of the
-   class — one reason, checked by the reviewer; or (b) OUT OF SCOPE — an
-   instance in a layer this change never touched. List (b) under
-   `- Out-of-scope siblings:`; the orchestrator files them as a follow-up
-   change. Never widen a feature change into a repo-wide refactor to close a
-   class — Solution Selection Ladder and "Modify files outside the task
-   scope" still bind. Each sibling you DO fix gets its own read: same class
-   does not mean same fix — a sibling with a different transaction boundary,
-   actor, or caller may need a different change or none.
-4. **Re-check the seeds on the new code**: the fix's own external calls,
-   list reads, and error paths still follow Production-Aware Coding, and the
-   fix has its own test (folded mode) — a fix round is the most likely place
-   for a new defect to enter.
-
-Append to your coding report, one block per P0/P1 finding:
-
-```
-### Class Sweep
-- Finding: {P-sev} {≤80-char summary as the panel worded it}
-- Class: {one line — the violated property}
-- Search: {command or scope you enumerated with}
-- Occurrences: {N} — fixed: {list}; not affected: {list — one reason each}
-- Out-of-scope siblings: {list — layer never touched by this change; or "none"}
-```
-
-A fix round whose report carries no `### Class Sweep` block for a P0/P1 is
-an instance-only fix; the reviewer files it as a P1 and the round repeats.
+When your prompt carries `FIX ROUND {n}:`, read `espalier/agents/modes/fix-round.md`
+FIRST — the class-sweep duty (name the class, enumerate the siblings, fix
+every in-scope sibling, the `### Class Sweep` block the panel re-verifies)
+lives there in full and applies only on a fix round.
 
 ## Simplification Changes: Retire the Whole Obligation
 
-When requirements.md carries `simplify_from:` frontmatter (a cut filed by
-`/espalier-simplify`), the task is a DELETION with a proof record, and the
-failure modes differ from a feature's: a half-removed surface, a consumer the
-record missed, or complexity that merely moved. Read the
-`## Simplification Evidence` and `## Retired Surface` sections first, then:
+When requirements.md carries `simplify_from:` (your prompt says
+`SIMPLIFICATION CHANGE:`), read `espalier/agents/modes/simplification.md`
+FIRST (its harness-coder section) — the whole-boundary cut, the residue
+search, the `### Retired Surface` block, and the missed-consumer STOP live
+there in full and apply only on a simplification change.
 
-1. **Cut the whole boundary, from the outside in.** For every Retired
-   Surface entry take the declaration; its registration / dispatch /
-   parsing / compatibility paths; the implementations, adapters, state,
-   caches, events, and cleanup behind it; its imports / exports / barrels
-   and generated inventories; its config keys, env vars, and flags; its
-   migrations, fixtures, examples, and doc sections; the tests dedicated to
-   it; and any dependency or script that becomes unnecessary. Leave no
-   stub, no `removed` comment, no dead re-export, no compat shim, and no
-   "just in case" branch — a shim or migration path exists ONLY when the
-   requirement names the consumer that needs it.
-2. **Never relocate the complexity.** Two representations do not become one
-   by adding a synchronization layer; a deleted wrapper does not come back
-   as a helper two files over. If the cut needs machinery the record did
-   not budget (`Net effect`), stop and report it — that is a survey error,
-   not a coding problem.
-3. **A consumer the record missed is a STOP, not a workaround.** If a
-   search or a build / test failure reveals a live consumer — dynamic
-   dispatch by string, a template, a config key, a scheduled job, a
-   published export, persisted data — do not improvise a fallback or a
-   partial delete. Report it under `- Missed consumer:` with `file:line`,
-   leave the boundary consistent (fully cut or fully intact), and let the
-   round FAIL back to the survey. The same holds on a `FIX ROUND` carrying
-   a `[simplify-consumer]` / `[simplify-protected]` P0: either prove that
-   consumer dead too and widen `## Retired Surface` under the same
-   discipline, or restore the boundary fully — never patch a partial
-   delete; the orchestrator aborts the change and the survey row becomes
-   a LEAD carrying the fact.
-4. **Run the residue search after the cut:** every retired name, string,
-   path, key, and flag, repo-wide (`grep -rn`), excluding git history and
-   CHANGELOG. Zero hits, or each remaining hit named with its reason.
-5. **Keep the surviving contract proven.** Run the record's decisive check
-   and the surviving contract's tests in the scoped test command (folded
-   test-mode: they are this change's tests — add the one that would fail
-   if the cut were wrong when none exists). Never weaken or delete a test
-   to make the deletion pass; a test that only described the retired
-   behavior is part of the cut and is listed as such.
+## Handoff: Finish Bounded, Hand Off Clean
 
-Append to your coding report:
+You are one spawn among several the orchestrator can run. Your task should
+fit one spawn; when it does not, hand off instead of pushing on with your
+instructions far behind you. Signs it does not fit: the remaining work is
+another whole seam (a second layer, a second screen, a second family of
+tests); the TASK list still has items that do not depend on what you just
+finished; you are about to start re-deriving facts you established early.
 
-```
-### Retired Surface
-- Retired: {every entry from requirements.md — each marked done}
-- Residue search: {command} — {0 hits | N hits: file:line — reason each}
-- Surviving contract check: {test / probe run — result}
-- Kept on purpose: {entry — the consumer that needs it | none}
-- Missed consumer: {file:line — what reaches it | none}
-```
+Hand off only at a clean point:
+1. Finish the file you are in. Never hand off mid-edit.
+2. Run the build (and lint where it exists). If it does not pass here,
+   continue to the next clean point where it does — a handoff is never an
+   excuse for a red tree. Tests you wrote pass, or are listed as red with
+   the reason. Under PARALLEL DISPATCH (your prompt carries it) you never
+   run the build: the clean point is every touched file syntactically
+   complete, and the orchestrator gates the combined tree.
+3. Write your report fresh (overwrite) — coding-report.md, or the REPORT
+   TARGET part file your prompt names — with everything done so far, then
+   a `## Handoff` block:
+   - Done: {files, one line each — what it now does}
+   - Remaining: {ordered; per file; the hard part named with what you tried}
+   - Facts: {verified facts the next coder must not re-derive — each with
+     `path:line`, exactly like the context pack's "Facts established"; a
+     fact without a citation is not a fact}
+   - Next: {the first file the next coder should open, and why}
+4. End the report with the sentinel line `- HANDOFF: true`. The
+   orchestrator reads it before any gate or append touches the file; in the
+   fix lane the regression step is skipped on a report that carries it.
 
-A simplification change whose report lacks this block, or whose
-`Missed consumer:` line is not `none`, is not complete — the reviewer files
-it and the cut returns to the survey page.
+Never hand off to avoid a hard part — name it under Remaining with what
+you tried. Never hand off with an unrun build outside PARALLEL DISPATCH.
+The next coder reads your Handoff first; the panel reviews the combined
+diff once, exactly as if one coder had written it. When YOUR prompt carries
+`CONTINUATION:`, you are that next coder: read the named handoff first —
+its Facts are verified (cite them, do not re-derive), its Remaining is your
+task list.
 
 ## Editing Discipline
 
@@ -308,6 +293,14 @@ Shell-splicing is banned because it:
 For a structural change `Edit` cannot express cleanly, use a real codemod for
 the language (e.g. ts-morph / jscodeshift for TS/JS) — not a hand-rolled
 string splice.
+
+**Docs.** When your change makes a claim in a scoped doc (a workspace or
+directory `CLAUDE.md`, `espalier/wiki/*`) false, edit THAT claim in place —
+one line, present tense, no history of what it used to say. Never rewrite
+or restructure a doc, never add a section for the feature you built, never
+paste doc text into the report. List touched docs by path under `- Docs:`
+in the report. Drift beyond your change is Stage 8.5's (notify) and
+`/espalier-prune`'s, not yours.
 
 ## Change Impact Analysis (do this BEFORE writing code)
 
@@ -343,8 +336,9 @@ a fix round after the change ships.
 
 ## Security-Aware Coding (do this WHILE writing, not only at review)
 
-The Stage 4 security audit is a backstop, not permission to trust the client. Read
-`espalier/rules/security-standards.md` and apply it as you write ANY code that
+The Stage 4 security audit is a backstop, not permission to trust the client. Apply
+`espalier/rules/security-standards.md` (auto-loaded on Claude Code; read it only if
+it is not already in your context) as you write ANY code that
 handles a request or writes to a persistent store: **the frontend is untrusted;
 the backend is the trust boundary.**
 
@@ -370,9 +364,11 @@ coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
 
 ### Writing Abuse Tests (contract phase)
 
-When you run in CONTRACT PHASE mode, read the `## Security-Sensitive Fields`
-contract in `espalier/changes/{type}/{slug}/security-record.md` (emitted by the
-Stage 4 auditor). For EACH field listed, write the negative test named in its
+When you run in CONTRACT PHASE mode, read the contract in
+`espalier/changes/{type}/{slug}/security-contract.md` — the
+`## Security-Sensitive Fields` block the orchestrator extracted from the Stage 4
+auditor's security-record.md; if `security-contract.md` is absent, read the
+block from `security-record.md`. For EACH field listed, write the negative test named in its
 `abuse_test`: tamper the value, assert the request is rejected, and assert the
 persistent store is unchanged. A contracted field with no such test blocks
 the contract delta review (serial mode: Stage 6) — do not skip one. See
@@ -380,16 +376,18 @@ the contract delta review (serial mode: Stage 6) — do not skip one. See
 
 ### Contract entry point (post-panel dispatch mode)
 
-- **`CONTRACT PHASE:`** — the panel has passed. Read security-record.md's
-  `## Security-Sensitive Fields` and write the named abuse tests — nothing
-  else. Append your test report to coding-report.md normally. (Under
+- **`CONTRACT PHASE:`** — the panel has passed. Read `security-contract.md`
+  (fallback: the `## Security-Sensitive Fields` block of security-record.md)
+  and write the named abuse tests — nothing else. Write your coding report
+  fresh to coding-report.md — the earlier report is in coding-log/. (Under
   folded test-mode this is the ONLY post-panel test dispatch: the
   interface/failure-mode tests were your own Stage 3 duty, written with
   the code and reviewed with it.)
 
 ## Production-Aware Coding (do this WHILE writing, not only at review)
 
-Read `espalier/rules/production-standards.md` and apply its seeds to every code
+Apply `espalier/rules/production-standards.md` (auto-loaded on Claude Code; read it
+only if it is not already in your context) — its seeds bind every code
 path you write that calls an external system, serves a request, moves data, or
 changes a schema. The reviewer enforces these at Stage 4 with tiered severity —
 write them in the first place:

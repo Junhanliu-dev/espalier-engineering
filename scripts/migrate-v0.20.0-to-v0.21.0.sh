@@ -86,8 +86,9 @@ SKIPFILE="espalier/.migrations-skipped"
 # a customised skip for it — a declined customised file is handled-manual and
 # must never keep the migration from reaching "nothing to do" (the v0.10/v0.11
 # precedent).
-agent_ok() {  # $1 = marker, $2 = file, $3 = skip label
-  grep -qF "$1" "$2" 2>/dev/null || grep -qF "v0.21.0-$3" "$SKIPFILE" 2>/dev/null
+agent_ok() {  # $1 = marker, $2 = file, $3 = skip label — a v0.25+ install holds the delta-scope text in espalier/agents/modes/
+  grep -qF "$1" "$2" 2>/dev/null || grep -qsF "$1" espalier/agents/modes/*.md 2>/dev/null \
+    || grep -qF "v0.21.0-$3" "$SKIPFILE" 2>/dev/null
 }
 
 missing=""

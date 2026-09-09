@@ -171,7 +171,8 @@ Invoke the `espalier-grill` skill with `mode=decision`, `input_text` = the
 ticket's Question plus the map's Destination and relevant Decisions-so-far
 lines, and `reqs_path` = the ticket file. Decision mode keeps grill's
 machinery — sequential questions chosen by listing 3–5 divergent candidate
-answers and asking what eliminates most, the ≤ 8 code-read budget, and
+answers and asking what eliminates most, unlimited code reads (the code
+answers what it can; the user answers the rest), and
 **Step 1.5's rules/wiki cross-check** — so a decision that collides with an
 encoded convention (`espalier/rules/`, `espalier/wiki/`) is surfaced as a
 citation-carrying question BEFORE it locks. Resolutions land in the ticket's

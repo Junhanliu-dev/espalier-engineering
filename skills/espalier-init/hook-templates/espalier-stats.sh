@@ -16,6 +16,9 @@
 #     rollbacks, and the fix echo (fix-lane caused_by pointing at each cohort)
 #   - simplify-filed changes (requirements.md simplify_from:) vs hand-written
 #     refactors — code rounds, rollbacks, withdrawn cuts, simplify tags
+#   - spawn shape per change (v0.25): coder spawns, handoffs, parallel parts,
+#     fresh-session resumes — from coding-log/ and the HANDOFF / RESUMED rows
+#   - workspace docs (report-only): every CLAUDE.md / AGENTS.md with size + last change
 #   - per-map ticket/fog/session/spawned-change state (espalier/maps/)
 #   - convention divergence hotspots (conv_fold, when drift-helpers is present)
 
@@ -88,6 +91,59 @@ else
 fi
 echo
 
+# ── Spawn shape (per change) ─────────────────────────────────────────────────
+# v0.25: coding-report.md is the CURRENT spawn's report and every prior
+# spawn's report is one file in coding-log/ (archived by the orchestrator
+# before each later spawn), so coder spawns per change = 1 + coding-log
+# files. Handoffs = `| 3 | HANDOFF n |` rows (or *-handoff-*.md archives),
+# parts = *-stage3-part*.md archives, fresh-session resumes = RESUMED rows.
+# Every number degrades to `none` on an install without the new rows.
+echo "## Spawn shape (per change)"
+echo
+if [ -d "$CH" ] && ls "$CH"/*/*/pipeline-state.md >/dev/null 2>&1; then
+  spawns=""; handoffs=""; parts=""; resumes=""
+  for sf in "$CH"/*/*/pipeline-state.md; do
+    dir=$(dirname "$sf")
+    case "$dir" in */_template/*|*/_template) continue ;; esac
+    if [ -d "$dir/coding-log" ]; then
+      n_log=$(ls "$dir/coding-log" 2>/dev/null | grep -c '\.md$')
+      [ -f "$dir/coding-report.md" ] && spawns="$spawns
+$((n_log + 1))" || spawns="$spawns
+$n_log"
+      parts="$parts
+$(ls "$dir/coding-log" 2>/dev/null | grep -c 'stage3-part')"
+    elif [ -f "$dir/coding-report.md" ]; then
+      spawns="$spawns
+1"
+    fi
+    h=$(grep -cE '^\| 3 \| HANDOFF ' "$sf" 2>/dev/null); h=${h:-0}
+    if [ "$h" -eq 0 ] && [ -d "$dir/coding-log" ]; then
+      h=$(ls "$dir/coding-log" 2>/dev/null | grep -c -- '-handoff-')
+    fi
+    handoffs="$handoffs
+$h"
+    r=$(grep -cE '^\| [0-9]+ \| RESUMED ' "$sf" 2>/dev/null); r=${r:-0}
+    resumes="$resumes
+$r"
+  done
+  if [ -z "$(printf '%s\n' "$spawns" | grep -v '^$')" ]; then
+    echo "none — no coding reports yet"
+  else
+    printf '%s\n' "$spawns"   | grep -v '^$' | _stat_dist "coder spawns per change"
+    printf '%s\n' "$handoffs" | grep -v '^$' | _stat_dist "handoffs per change"
+    printf '%s\n' "$parts"    | grep -v '^$' | _stat_dist "parallel parts per change"
+    printf '%s\n' "$resumes"  | grep -v '^$' | _stat_dist "fresh-session resumes per change"
+    echo
+    echo "(Quality reads: handoffs are a coder finishing bounded work at a clean"
+    echo "point — a change that hands off habitually wants smaller sub-tasks at"
+    echo "decomposition; resumes are the human taking the stage-boundary offer."
+    echo "Pre-v0.25 changes have no coding-log/ and count as one spawn.)"
+  fi
+else
+  echo "none"
+fi
+echo
+
 # ── Stage durations ──────────────────────────────────────────────────────────
 echo "## Stage durations (from Stage History timestamps)"
 echo
@@ -109,7 +165,7 @@ import sys, re
 from datetime import datetime
 
 FORMATS = ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M")
-HUMAN = ("requirements approved", "approved by user", "delivery", "grilled", "skipped:")
+HUMAN = ("requirements approved", "approved by user", "delivery", "grilled", "skipped:", "resumed")
 UNATTENDED = ("non-interactive", "auto-")
 
 def parse_ts(s):
@@ -327,6 +383,31 @@ $rb"
   echo "  doing its job.)"
 else
   echo "none — no simplify-filed changes yet"
+fi
+echo
+
+# ── Workspace docs (report-only) ─────────────────────────────────────────────
+# Every CLAUDE.md / AGENTS.md in the repo with its size and last-change date.
+# Since Claude Code 2.1.259 a coder that Reads under a workspace gets that
+# workspace's doc chain injected whole; espalier does not own these docs —
+# the coder's Docs clause keeps their claims true, trimming them is the
+# owner's lever, and this row is how its effect is seen. No threshold.
+echo "## Workspace docs (report-only)"
+echo
+wd=$(git ls-files 2>/dev/null | grep -E '(^|/)(CLAUDE|AGENTS)\.md$')
+if [ -z "$wd" ]; then
+  echo "none — no CLAUDE.md / AGENTS.md tracked"
+else
+  printf '%s\n' "$wd" | while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    kb=$(( ($(wc -c < "$f") + 1023) / 1024 ))
+    last=$(git log -1 --format=%cs -- "$f" 2>/dev/null); [ -n "$last" ] || last="?"
+    echo "- $f — ${kb} KB — last change $last"
+  done
+  echo
+  echo "(The root instruction file is always loaded; a subdirectory doc is"
+  echo "injected whole on Claude Code when an agent Reads under it, and reaches"
+  echo "Codex / Copilot coders only through the pack's Scoped-docs line.)"
 fi
 echo
 

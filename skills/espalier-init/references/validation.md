@@ -1,8 +1,8 @@
 # Phase 11: Validation (Dry Run)
 
-> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 53 checks when only claude is targeted, 58 with codex, 63 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
+> **v0.4.0+ note:** Phase 11 runs via `scripts/bootstrap-espalier.sh` (Stage 11 of that script — 56 checks when only claude is targeted, 61 with codex, 66 with copilot: all but #25 in parallel, #25 run serially so its per-tier table reaches stdout). Normal flow invokes this automatically. Manual usage: `bash scripts/bootstrap-espalier.sh --validate-only --plugin-dir=...` to re-run only the validation block (e.g., after manual file edits); add `--ignore-drift` to downgrade check #25's expired-drift hard fail to a logged override.
 >
-> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Checks 57-63 are unconditional base checks appended after the platform blocks (base numbering 1-46, 57-63 — non-contiguous so shipped platform IDs stay stable). Claude-only installs print exactly 53 lines.
+> **Platform gating (v0.14.0/v0.15.0):** the platform set comes from `--platforms` unioned with `espalier/.platforms`. When claude is NOT targeted, checks 1-5 and 8 report `OK … (skipped — claude not targeted)`, and checks 13/14/29-33/35 swap their `.claude/…` paths for the `espalier/…` source equivalents. Checks 47-51 run when codex is targeted (skip-rendered when only copilot forces the range); checks 52-56 run only when copilot is targeted. Checks 57-66 are unconditional base checks appended after the platform blocks (base numbering 1-46, 57-66 — non-contiguous so shipped platform IDs stay stable). Claude-only installs print exactly 56 lines.
 
 > **This table mirrors bootstrap-espalier.sh Stage 11 — update BOTH in the same commit.**
 
@@ -45,7 +45,7 @@ After all generation and wiring is complete, validate end-to-end.
 | 31 | security-agent | `test -f .claude/agents/harness-security.md` | Re-run Phase 2 agent write + Stage 5 |
 | 32 | security-skill | `test -f .claude/skills/espalier-security/SKILL.md` | Re-run Phase 2 write + Stage 5 |
 | 33 | audit-skill | `test -f .claude/skills/espalier-audit/SKILL.md` | Re-run bootstrap Stages 3 + 5 |
-| 34 | audit-mode | `grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md` | The agent file is stale — re-run Phase 2 from the current template |
+| 34 | audit-mode (body heading + `modes/repo-audit.md`) | `grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md` | The agent file is stale — re-run Phase 2 from the current template |
 | 35 | production-rule | `[ -L .claude/rules/espalier-production.md ] && [ -e … ]` | Re-run Phase 2 (production-standards.md) + Stage 5 |
 | 36 | production-file | `test -f espalier/rules/production-standards.md` | Re-run espalier-init Phase 2 |
 | 37 | scout-prompts | `test -f espalier/.scout-prompts.md` | Re-run bootstrap Stage 3 |
@@ -75,8 +75,11 @@ After all generation and wiring is complete, validate end-to-end.
 | 61 | maprun-skill | `.claude/skills/espalier-maprun/SKILL.md` present with `name: espalier-maprun` | Re-run bootstrap Stages 3 + 5 |
 | 62 | maprun-engine | `maprun.py` present; `maprun-{dispatch,merge,integration,verify}.sh` executable | Re-run bootstrap Stage 4 (engine files are write-if-absent — delete a broken one first) |
 | 63 | simplify-skill | `.claude/skills/espalier-simplify/SKILL.md` present with `name: espalier-simplify` | Re-run bootstrap Stages 3 + 5 |
+| 64 | context-helpers | `drift-helpers.sh` defines `report_archive`, `contract_extract`, `exit_gate`, `grep_only_files`, `scoped_docs`; `grep-only-paths:` in `espalier/.espalier-config` | Re-run bootstrap Stage 4 (hooks) + Stage 9 (config append-if-missing) — or migration #35 |
+| 65 | spawn-protocols | coder template carries `## Handoff`, `- HANDOFF: true`, `- Spec applied:`; reviewer carries `[spec-unread]`; the espalier stage files + fix SKILL grep the sentinel and their pack templates carry `- Scoped docs:`; no `≤ 5 files` in espalier-requirements, no `≤ 8` read budget in espalier-grill / espalier-map (greenfield Pass 1: pending) | Re-run espalier-init Phase 2 for the agents; Stage 3 for the skills — or migration #35 (a customised agent file missing its anchor is recorded in `espalier/.migrations-skipped`) |
+| 66 | stage-procedures | every `espalier/skills/espalier/stages/{1-2-requirements,3-coding,4-panel,5-6-contract,7-10-delivery}.md` present and named by the router's Stage Execution Protocol; every `espalier/agents/modes/{fix-round,simplification,re-review,repo-audit,stage6-abuse-coverage}.md` present and named on a prompt line in the stage files / fix SKILL / audit SKILL | Re-run bootstrap Stage 3 (pure copies) — or migration #35 |
 
-When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 53 (claude-only) / 58 (+codex) / 63 (+copilot); 57-63 run on every platform set.
+When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 56 (claude-only) / 61 (+codex) / 66 (+copilot); 57-66 run on every platform set.
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from
 its `stale_first_seen` timestamp — fresh (<14d, silent), aging (14–30d, INFO),

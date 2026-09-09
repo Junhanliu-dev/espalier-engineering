@@ -27,6 +27,19 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 - **Migration #23 (v0.15→v0.16) is order-broken for pre-v0.18 installs under the current plugin.** Its Step 3 `bootstrap --wire-only` runs the CURRENT validator, whose checks 59-62 (map skill/guard, maprun skill/engine) fail on an install that has not yet run migrations #25/#26 — the chain dies at its own first step. Field workaround (2026-08-25, portal.cneaustralia): run #25 and #26 first (they install the current pure-copy lanes), then #23/#24, then #27+ — every script is marker-guarded so the reorder is safe. Proper fix: #23 pre-seeds missing pure-copy skills from templates (write-if-absent) before wiring, or wire-only validation renders not-yet-migrated lane checks as pending-skips.
   - **Trigger to revisit**: the next pre-v0.18 install that needs migrating, or the next release that touches migration #23 / the wire-only validator.
 
+## Items deferred from v0.25.0
+
+- **`espalier-fix.md` router split.** The espalier skill's router + `stages/` split landed in v0.25.0; the fix lane is a single-lane skill and stays one file.
+  - **Trigger to revisit**: the fix lane's Stage 3–7 text is the orchestrator's largest resident block on a fix run (`scripts/context-report.py`).
+- **Path-scoped `structure-<workspace>.md`** (r2 Track B of the context plan): context-only, quality-neutral.
+  - **Trigger to revisit**: the portal's `engineering-structure.md:47` class of four-way flip conflict recurring after a Track E prune, or a doctor cycle showing module-map rows dominate the file.
+- **Parallel contract-phase dispatch** (one test-coder per endpoint family, part files). An oversized contract phase hands off via the coder's Handoff protocol instead.
+  - **Trigger to revisit**: a contract phase that hands off more than once on a real change (`HANDOFF` rows inside Stage 5 in `espalier-stats.sh`).
+- **Workspace `CLAUDE.md` advisory** (not espalier-owned). The coder's Docs clause stops the growth engine and the pack's `- Scoped docs:` line delivers the docs in sections; `espalier-stats.sh` shows their sizes. A report-only doctor line on scoped-doc size waits for an owner decision on scope.
+  - **Trigger to revisit**: the `## Workspace docs` rows growing release over release.
+- **A quality signal from transcripts.** `scripts/context-report.py` can join coder spawns to the next panel round's P0/P1 counts once `HANDOFF` / `RESUMED` rows exist; the 24-round join available at release is too thin to claim anything.
+  - **Trigger to revisit**: the first release after `HANDOFF` rows appear in the field.
+
 ## Items deferred from v0.24.0
 
 - **`eval/simplify/` harness.** The simplify scout prompt (proof records, evidence ladder, protected-surface refusal) ships without an LLM-judged eval; the v0.24.0 gate is the bootstrap/migration suite plus the reviewer's independent re-search at Stage 4.
