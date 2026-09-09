@@ -50,7 +50,13 @@ Run this BEFORE Stage 1. Source the drift helpers:
 
 Gather all three signals BEFORE prompting:
 1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
-   into fresh / aging / stale / critical / expired.
+   into fresh / aging / stale / critical / expired. Beside it, information
+   only: `contract_drift_lines` summed over `espalier/rules/*.md` (awk, no
+   scout) — when the total N is above 0 the pre-flight line gains
+   ` · drift=N` (lines carrying a SHA, date, PR number, shell command, or
+   history phrase — the rules Writing Contract; `/espalier-doctor` reports
+   them per file, `/espalier-prune` refreshes under its Removed-rules
+   ledger). Never a prompt on its own.
 2. **CONV** — `conv_fold` (in `drift-helpers.sh`) folds the legacy
    `espalier/.conventions.tsv` AND any `espalier/conventions/*.tsv` per-key
    files into `key<TAB>diverges_count<TAB>status` lines; every key with status
@@ -86,9 +92,9 @@ line (an interrupted run leaves an inspectable trace, and the signals
 re-surface at the next invocation's pre-flight anyway — the sidecar is never
 cleared by deferral), and continue to Stage 1. The Requirements Approval
 Gate carries the maintenance question (its step 3b) — still BEFORE Stage 3,
-so a promotion decided there governs this run's coder. The weekly gardener
-rota (see /espalier-prune's Multi-Developer Discipline) remains the default
-owner of non-critical maintenance either way.
+so a promotion decided there governs this run's coder. The weekly
+gardener rota (see /espalier-prune's Multi-Developer Discipline) remains
+the default owner of non-critical maintenance either way.
 
 **Unattended runs (never prompt here):** when `interactivity_mode` (in
 `drift-helpers.sh`) returns `unattended`, do NOT issue the pre-flight
@@ -202,8 +208,11 @@ unrelated in-flight change into the new request:
    offer — see the fix lane's collision table). `FILED` skeletons are not
    resumed here; they are adopted by the FILED-skeleton scan (step 5 below).
    On a tail-matching `IN_PROGRESS` state file: read stage + history, announce
-   "Resuming {requirement} from Stage {N}", continue from that stage (do NOT
-   restart from 1).
+   "Resuming {requirement} from Stage {N}", append
+   `| {N} | RESUMED | {ts} | fresh session |` to Stage History (the row that
+   closes the gap — `espalier-stats.sh` books the time before it as human
+   wait, never agent work), and continue from that stage (do NOT restart
+   from 1).
 3. Non-matching in-flight state files do NOT block a new requirement. Start
    the new change normally and surface ONE line: "Note: {N} other in-flight
    change(s): {slugs} — resume each with /espalier <its requirement>." (The
@@ -249,598 +258,37 @@ For each stage:
    duration report floors minute-only legacy rows). Bookkeeping steps with no
    agent in flight may batch into one bash invocation (state write + record
    append + context read) — same file effects, fewer round-trips.
-3. **Load context:** Read the skill/agent file specified for this stage
+3. **Load context:** read this stage's PROCEDURE file now — it is the most
+   recent thing in your context when the stage starts — then the skill /
+   agent file `espalier/pipeline.md` names for the stage:
+
+   | Stage | Procedure: read `espalier/skills/espalier/stages/{file}` now, then run it |
+   |-------|------------------------------------------------------------------------|
+   | 1–2 | `stages/1-2-requirements.md` — Stage 1/2 loads, the Requirements Approval Gate (BLOCKING) with the push / deploy pre-authorization and the stage-boundary offer |
+   | 3 | `stages/3-coding.md` — Stage 3 Entry: Context Pack, sub-task sizing and parallel dispatch, the coder spawn, the Stage 3 exit gate (the `- HANDOFF: true` sentinel → archive → `exit_gate` → continuation), the `test-mode` read |
+   | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate + stage-boundary offer, post-review drift and convention index |
+   | 5–6 | `stages/5-6-contract.md` — Stage 5/6 (folded): the contract phase and delta review / test writing and test review (serial), the certificate, crash recovery |
+   | 7–10 | `stages/7-10-delivery.md` — convention-index staging, commit recording, the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check |
+
+   This file ROUTES; the stage files carry the procedure verbatim and
+   `espalier/pipeline.md` is the contract (trigger / load / gate / output /
+   limit per stage). A maprun worker (stages 1–6) never loads
+   `7-10-delivery.md`. Re-read a stage file only when the stage starts —
+   never re-Read one already in your context.
 4. **Execute:** Perform work or delegate to sub-agent
 5. **Verify gate:** Check the quality gate
 6. **Record:** Append result to pipeline-state.md
 7. **Decision:**
    - PASS → advance to next stage (EXCEPT the Stage 2 → Stage 3 transition: the
-     **Requirements Approval Gate** below must pass first — a Stage 2 PASS alone
-     does NOT authorize coding)
+     **Requirements Approval Gate** (`stages/1-2-requirements.md`) must pass
+     first — a Stage 2 PASS alone does NOT authorize coding)
    - FAIL → follow rollback path
    - HUMAN → pause and ask user (use AskUserQuestion tool)
-
-### Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
-
-MANDATORY. Must NOT be skipped on a PASS. Stages 1 (requirements written +
-grilled) and 2 (requirements review) finish WITHOUT writing any code. Do NOT
-chain Stage 1 → 2 → 3 automatically — that is the bug this gate closes. After
-Stage 2's gate passes (no P0/P1 reqs findings), HALT and get explicit user
-sign-off on `requirements.md` before Stage 3.
-
-1. Present a concise summary of the final `requirements.md`: the one-line goal,
-   the acceptance criteria, and anything the Stage 1 grill resolved or marked
-   out-of-scope.
-2. Ask with `AskUserQuestion`:
-
-   ```
-   Requirements are written and reviewed. Nothing has been coded yet.
-   Approve to start Stage 3 (Coding)?
-
-   Options:
-     1. Approve — proceed to coding.
-     2. Edit    — tell me what to change; I revise requirements.md and re-ask.
-     3. Abort   — stop here; leave requirements.md as a draft (Status: ABORTED).
-   ```
-
-3. In the SAME `AskUserQuestion` call, add a second question collecting the
-   Stage 7 push authorization — so a run whose gates all pass later doesn't
-   stall waiting for a human who has walked away:
-
-   ```
-   When Stage 7 (push) is reached and every gate passes, push to:
-     1. {current branch} → {default remote}   (pre-authorize)
-     2. Somewhere else — specify
-     3. Ask me again at Stage 7
-   ```
-
-   Record the choice as `- Push-Target: {branch → remote | ASK}` in
-   pipeline-state.md. Stage 7 then pushes a pre-authorized target without
-   re-prompting — the programmatic gates (clean tree, branch convention,
-   pre-push hook, certificate) still apply in full; only the redundant wait
-   is removed. `ASK` or a missing line → prompt at Stage 7 as before. This
-   pre-authorization NEVER extends to Stage 10 — delivery acceptance stays a
-   human act.
-
-3b. If Stage 0 recorded a `deferred-to-approval-gate` pre-flight summary,
-   add a THIRD question to the SAME `AskUserQuestion` call:
-
-   ```
-   Pre-flight noted: {N} stale doc(s) ({tiers}), {M} convention promotion
-   candidate(s), doctor {due|not due}.
-     1. Handle after this change (default — gardener rota covers it)
-     2. Pause & handle now — run /espalier-prune + convention decisions,
-        then continue to Stage 3
-     3. Ignore this run
-   ```
-
-   "Pause & handle now" runs the SAME mechanics as the Stage 0 prompt's
-   "Handle now" (Convention Promotion's race guard, per-key status flip,
-   isolated `docs:` commit) — relocated, not altered, and still before any
-   code is written.
-
-3c. ONLY when the discovered `## Deploy & Verification` section of
-   `espalier/rules/development-process.md` is configured (it does NOT read
-   "No deploy configuration discovered"), add a deploy question to the same
-   call:
-
-   ```
-   When Stage 9 (deploy verify) is reached and CI is green, deploy with the
-   discovered command to:
-     1. {discovered target/environment}   (pre-authorize)
-     2. Somewhere else — specify
-     3. Ask me again at Stage 9
-   ```
-
-   Record `- Deploy-Target: {target | ASK}` in pipeline-state.md. Stage 9
-   honors it (see pipeline.md Stage 9): a pre-authorized target deploys and
-   health-checks without re-prompting; `ASK`/missing prompts at Stage 9 as
-   today. The health-check gate, its rollback path, and the Stage 10 human
-   acceptance are untouched — like the push pre-auth, this removes only the
-   redundant wait, and it NEVER extends to Stage 10.
-
-4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
-   per the feedback, re-run the Stage 2 gate, and re-present this gate. On
-   **Abort**, write Status: ABORTED to pipeline-state.md and stop.
-
-**Non-interactive exception:** auto-approve ONLY when the run is EXPLICITLY
-unattended — `interactivity_mode` (in `drift-helpers.sh`) returns `unattended`,
-i.e. one of `CI` / `ESPALIER_UNATTENDED` / `ESPALIER_LOOP` / `ESPALIER_HEADLESS`
-is set. Do NOT key this off a bash TTY test: stdin has no TTY inside Claude Code
-even when the user is present, so a TTY check would silently auto-approve every
-interactive run — defeating the gate. If you (the orchestrator) can call
-`AskUserQuestion`, you ARE interactive and MUST prompt. Only on a genuinely
-headless run, record `requirements auto-approved (non-interactive)` in the Stage
-History and proceed.
-
-Record the outcome in pipeline-state.md Stage History (e.g.
-`| 2 | PASSED | … | Requirements approved by user |`).
-
-### Stage 3 Entry: Context Pack (assemble once — every spawn reuses it)
-
-In the SAME orchestrator turn that presents the Requirements Approval Gate
-prompt — the pack is paths/facts only and approval-independent, so
-assembling it while the human reads the gate saves one turn — write
-`espalier/changes/{type}/{slug}/context-pack.md` (overwrite if resuming a
-pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it).
-On **Edit** that changes the layer set, re-derive the pack before
-re-asking; on **Abort** the pack is dead weight in the aborted change dir —
-harmless:
-
-```markdown
-# Context Pack: {slug}
-- Requirement: espalier/changes/{type}/{slug}/requirements.md
-- Layers touched: {layer list, from the task decomposition}
-- Layer specs: espalier/skills/espalier-coding/specs/{layer}.md  (one line per touched layer)
-- Rules: espalier/rules/coding-standards.md · engineering-structure.md · security-standards.md · production-standards.md
-- Reference files: {1-2 existing files per touched layer that exemplify its conventions}
-- Build: {build command} · Lint: {lint command} · Tests: {test command}
-```
-
-Derive the layer list and reference files ONCE (from the requirement +
-`engineering-structure.md` + a quick glob of the touched layers) — this is
-exactly the discovery the coder, both panel agents, and the test spawns
-would otherwise EACH repeat from scratch. The pack lists PATHS AND FACTS
-only — never conclusions, never verdicts, never "this part is fine": every
-agent still reads the named files itself and trusts the current code over
-the pack. Add the `CONTEXT PACK:` line to EVERY Stage 3-6 spawn prompt (the
-prompt templates below carry it). A spawn that finds no pack (resumed old
-change, fix lane before its pack step) falls back to its own discovery —
-the pack is an accelerator, never a gate.
-
-### Parallel Sub-Tasks (Stage 3)
-
-When the task decomposition yields several sub-tasks, compare their planned
-file sets. Sub-tasks are PARALLEL-SAFE only when the sets are pairwise
-disjoint — counting any shared module both would edit (barrel files, route
-tables, migration indexes, shared fixtures are overlap — and each
-sub-task's planned TEST files count too: shared test fixtures, helpers, or
-suite barrel files are overlap). Dispatch
-parallel-safe sub-tasks as concurrent `harness-coder` spawns in ONE message,
-with two extra lines in each prompt:
-
-- `REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-{n}.md`
-  — parts, never `coding-report.md` directly.
-- `PARALLEL DISPATCH: do NOT run the build / test / dependency-install
-  commands — other coders share this working tree and concurrent runs
-  corrupt each other. Write code only; the orchestrator runs the exit gate
-  on the combined result.` (The coders' self-run build is a convenience
-  check, not a gate — the orchestrator's Stage 3 exit gate is, and it still
-  runs.)
-
-After ALL return, concatenate the parts into `coding-report.md` in sub-task
-order — KEEP the part files until the Stage 3 exit gate passes — and run the
-exit gate ONCE on the combined tree. A failure attributable to one sub-task
-re-spawns only that coder, again targeting ITS `coding-report.part-{n}.md`
-(never `coding-report.md` — an overwrite there would erase the other
-sub-tasks' reports that Stages 4-6 read); re-concatenate after the fix.
-Unclear attribution → re-run the failing sub-tasks serially (serial
-re-spawns may run the build themselves again). Only after the exit gate
-passes, delete the part files. Any overlap or uncertainty → serial dispatch,
-exactly as before. Parallelism changes DISPATCH only — the Stage 4 panel
-always reviews the COMBINED diff, and the review/gate contract is untouched.
-
-### Sub-Agent Delegation
-
-Stages 3-6 use sub-agents for separation of concerns:
-
-**Stage 3 (Coding):**
-```
-Agent tool:
-  prompt: |
-    You are the harness-coder.
-    Read espalier/agents/harness-coder.md for your full instructions.
-
-    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
-    first; it names the layers/specs/rules/reference files (paths and facts
-    only — verify against current code).
-    REQUIREMENT: {paste requirement from Stage 1 output}
-    TASK: {specific sub-task from decomposition}
-    TESTS: alongside the code, write the interface tests and failure-mode
-    tests for this change per espalier/skills/espalier-testing/SKILL.md —
-    everything EXCEPT contracted abuse tests (that contract does not exist
-    yet; it comes from the Stage 4 security audit). List the test files in
-    their own "Test files" subsection of the coding report.
-    {On a change whose requirements.md carries simplify_from: add:}
-    SIMPLIFICATION CHANGE: requirements.md is a cut filed by
-    /espalier-simplify — apply your "Simplification Changes: Retire the
-    Whole Obligation" section and report a "### Retired Surface" block.
-
-    When done, write your coding report to:
-    espalier/changes/{type}/{slug}/coding-report.md
-```
-
-(With `test-mode: serial`, drop the TESTS lines — tests are written after
-the final panel PASS instead; see the Stage 5/6 section.)
-
-**Stage 3 exit gate (PROGRAMMATIC — run before every panel spawn):** after the
-coder returns (first pass AND every P0-fix re-spawn), re-run the discovered
-build + lint commands yourself (they are in `espalier/rules/development-process.md`
-/ the pre-push gate's substituted commands), and — folded mode — run the
-discovered test command scoped to the coding report's listed test files
-where the runner supports path filtering (full suite where it does not;
-this is what the old Stage 5 "tests pass" gate paid, moved earlier — the
-panel must never review tests nobody has executed). All must exit 0. Run
-build + lint as two
-concurrent background jobs in ONE bash call (`$BUILD & $LINT &` with per-pid
-`wait`s to capture both exit codes, each job's output to its own temp file so
-a failure's log isn't interleaved) — UNLESS the discovered commands plainly
-depend on each other (e.g. a typecheck that consumes build output), in which
-case keep them serial — then the scoped test run. Concurrency changes the
-wait, never the gate. The coder's
-self-reported "Build status: pass" is a claim, not the gate. On any failure,
-re-spawn the coder with the failing output — do NOT spawn the review panel
-on unbuildable or failing code (a wasted panel round), and do NOT count it
-as a P0 round.
-
-**`test-mode` (read once at Stage 3 entry — word-key pattern, NOT the round
-caps' integer grep):**
-
-```bash
-TEST_MODE=$(grep '^test-mode:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
-if [ -z "$TEST_MODE" ]; then
-  LEG=$(grep '^speculative-tests:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
-  [ "$LEG" = "off" ] && TEST_MODE=serial || TEST_MODE=folded
-fi
-case "$TEST_MODE" in folded|serial) ;; *) echo "WARN: unknown test-mode '$TEST_MODE' — using folded" >&2; TEST_MODE=folded ;; esac
-```
-
-`folded` (default): tests ride the Stage 3 coder and the panel reviews
-code+tests together. `serial`: tests are written AFTER the final panel
-PASS and reviewed at Stage 6 — the pre-v0.22 flow, kept as the
-conservative fallback. The legacy `speculative-tests` key maps through the
-table above; `.espalier-config` is user-owned and never auto-rewritten.
-
-**Stage 4 (Review):**
-```
-Agent tool:
-  prompt: |
-    You are the harness-reviewer.
-    Read espalier/agents/harness-reviewer.md for your full instructions.
-
-    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
-    first (paths and facts only — your verdict comes from the code you read).
-    WHAT TO REVIEW: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what the coder did. Then read the actual files listed there — the code
-    AND its "Test files" subsection. One verdict covers both: run your
-    test-review checklist on the tests (assertions meaningful, not
-    tautological; changed-interface coverage; failure-mode coverage per
-    espalier/rules/production-standards.md — a missing one is a P1) with
-    the code in view. Do NOT check abuse-test coverage this round — the
-    security contract is being written concurrently; that check runs at
-    the contract delta review.
-    ROUND: {n} — put round={n} in your VERDICT sentinel line.
-    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
-    latest coding-report.md}. Re-review in delta scope per your "Re-review
-    Rounds" section.
-    {On a change whose requirements.md carries simplify_from: add:}
-    SIMPLIFICATION CHANGE: read requirements.md "## Retired Surface" and run
-    your "Simplification Review" section — your own re-search of every
-    retired name BEFORE reading the coder's residue search.
-
-    Write (OVERWRITE) your review to:
-    espalier/changes/{type}/{slug}/review-record.md
-    End the file with your VERDICT sentinel line.
-```
-
-**Stage 4 (Security Audit — runs as a panel with the review above):**
-```
-Agent tool:
-  prompt: |
-    You are the harness-security auditor.
-    Read espalier/agents/harness-security.md for your full instructions.
-
-    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
-    first (paths and facts only — your verdict comes from the code you read).
-    WHAT TO AUDIT: Read espalier/changes/{type}/{slug}/coding-report.md to see
-    what changed, then trace the touched endpoints. Assume the client is hostile.
-    Test files in the diff are in scope for secrets / live-endpoint /
-    fixture-data leakage only — otherwise they are not findings surface.
-    ROUND: {n} — put round={n} in your VERDICT sentinel line.
-    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
-    latest coding-report.md}. If your own prior round was clean, run delta
-    mode per your "Re-review Rounds" section.
-
-    Write (OVERWRITE) your audit to:
-    espalier/changes/{type}/{slug}/security-record.md
-    End the file with your VERDICT sentinel line.
-```
-
-Stage 4 is a **review panel**: `harness-reviewer` (correctness / conventions /
-production readiness, → review-record.md) and `harness-security` (trust boundary,
-→ security-record.md) both run on the CURRENT diff. BOTH records are OVERWRITTEN
-each round and end with a machine-greppable `VERDICT:` sentinel. Run this
-procedure every round — it IS the gate, not a description. Do not advance to
-Stage 5 by any other path:
-
-1. **Baseline.** Note whether EACH of `review-record.md` and `security-record.md`
-   exists, and its size/mtime. Spawn BOTH agents in ONE message (concurrent) —
-   the panel is TWO agents, every round: under `test-mode: folded` the diff
-   they review already contains the tests; under `serial` the tests come
-   after the panel. Either way, no third seat.
-   On a re-review round, include the `CHANGED SINCE LAST REVIEW:` line in both
-   prompts — the agents then review in delta scope (their "Re-review Rounds"
-   sections; required reads = fix files + prior findings + direct dependents,
-   expandable on any suspicion; security runs delta mode when its own prior
-   round was clean). Both agents still return fresh current-round sentinels
-   and still own the whole-change verdict.
-2. **Completion check — BOTH files.** After both return, confirm EACH record was
-   written THIS round: it exists, differs from its baseline, and its last
-   `VERDICT:` line carries `round={n}` for the current round. A record that is
-   missing, unchanged, or lacks a current-round sentinel means THAT agent did not
-   complete — re-spawn that agent (once; a second failure → escalate to human).
-   Never treat a missing or stale record as a pass.
-3. **Gate read (deterministic).** From EACH record:
-   `V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
-   - `ESCALATION_REQUIRED` (either agent, either lane, any stage) → do NOT
-     advance and do NOT re-spawn: snapshot the sentinel, then run the escalation
-     protocol (fix lane: the late-escalation prompt; full lane: escalate to the
-     human with the agent's Escalation Reason block). An `ESCALATION_REQUIRED`
-     with `p0=0` is still an escalation.
-   - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
-     with the combined findings and loop (counter + `max-code-rounds` cap
-     unchanged).
-   - Advance ONLY when EVERY record's last sentinel has verdict word `PASS` or
-     `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
-4. **On a non-PASS round (verdict `FAIL`, or p0/p1 > 0) →** snapshot both
-   sentinel lines into pipeline-state.md Stage History, appending in the
-   same notes cell one bracketed finding line per FAILING agent — its top
-   finding as `[{P-sev} {≤80-char summary}]`:
-   (`| 4 | ROUND {n} FAIL | {ts} | reviewer: FAIL p0=2 p1=0 [P0 access.filter.update missing on update]; security: PASS p0=0 p1=0 |`).
-   One bracket per failing agent, ≤80 chars each — this snapshot is the
-   findings digest's only source: both records are overwritten next round,
-   so finding text survives nowhere else.
-   Check the cap BEFORE re-spawning: if the counter already equals
-   `max-code-rounds` (default 3, read from `espalier/.espalier-config` via
-   `grep '^max-code-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`; fall
-   back to 3 if the file or key is unset), escalate to the human immediately —
-   the coder is NOT re-spawned and no further panel round runs. Before stopping,
-   set `- Status: ESCALATED` and add a Stage History row
-   `| 4 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
-   Otherwise re-spawn `harness-coder` with the combined findings (a Stage 3
-   action — its build/lint/test exit gate applies; code and test findings
-   share this ONE loop, tests looping as ordinary files in the diff), increment the shared
-   round counter, and return to step 1. The re-spawn prompt's first line is
-   `FIX ROUND {n}: for every P0/P1 below run the Class Sweep
-   (harness-coder.md → Fix Rounds) — fix every sibling of the defect
-   class, not the flagged line; one `### Class Sweep` block per finding in
-   coding-report.md.` — the panel verifies the sweep next round. After snapshotting a ROUND row, also
-   update the `Review Rounds:` numerators in pipeline-state.md — a resumed
-   session recounts rounds from this line plus the ROUND rows, never from
-   memory.
-   **Simplification changes (`simplify_from:` in requirements.md) — a
-   `[simplify-consumer]` or `[simplify-protected]` P0 is never fixed
-   around.** Re-spawn the coder ONCE with the finding; its only legitimate
-   outcomes are (a) the consumer is itself provably dead — it widens
-   `## Retired Surface` in requirements.md under the same proof discipline
-   and the panel re-verifies next round, or (b) it restores the boundary
-   fully (the cut reverted, nothing half-removed) and reports
-   `- Missed consumer:` ≠ `none`. On (b) do not loop: set
-   `- Status: ABORTED`, add
-   `| 4 | ABORTED | {ts} | simplify: missed consumer {file:line} |`,
-   rewrite that candidate's row in
-   `espalier/wiki/simplify-survey.md` (the `#{n}` in `simplify_from:`)
-   from `refactor/{slug}` to `LEAD — missed consumer: {file:line}` so the
-   next survey starts from the fact, commit both
-   (`chore(espalier): abort {slug} — missed consumer`), and tell the
-   user. A cut is proved or withdrawn — never patched into a partial
-   delete.
-5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
-   the current code →** snapshot the two sentinel lines into Stage History
-   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate (command in
-   the Stage 5/6 section below), THEN run the "Stage 4 Post-Review" drift
-   processing below — it must finish BEFORE any contract delta-review spawn
-   (that spawn overwrites the review-record.md the parse reads) — then the
-   Stage 5/6 contract flow. The exit gate requires BOTH
-   clean — never one agent's pass alone. A security P0/P1 shares the correctness
-   `max-code-rounds` round counter.
-
-### Stage 5/6 (folded): the contract phase
-
-Under `test-mode: folded` the interface/failure-mode tests were written at
-Stage 3 and reviewed by the Stage 4 panel; Stages 5/6 exist only for the
-security abuse-test contract. Stage numbers are an interface —
-`pre-push-gate.sh` parses `Current Stage:` as an integer (≥ 7 to push),
-`espalier-stats.sh` buckets by stage number, and maprun parses it too — so
-keep `Current Stage:` monotonic 3→4→5→6→7 and never remove a row.
-
-**Contract detection (deterministic, right after the final panel PASS):**
-`grep -q '^## Security-Sensitive Fields' espalier/changes/{type}/{slug}/security-record.md`
-decides empty vs non-empty.
-
-- **No contract (non-sensitive happy path — ZERO post-panel spawns):** in
-  one bash, write both rows —
-  `| 5 | SKIPPED | {ts} | folded: no contract |` and
-  `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |` — set
-  `Current Stage: 7`, and proceed to Stage 7.
-- **Non-empty contract (sensitive change):**
-  1. Write `| 5 | IN_PROGRESS | {ts} | contract phase |`, then ONE
-     test-coder spawn, alone in its message: "CONTRACT PHASE: read
-     espalier/changes/{type}/{slug}/security-record.md — for EVERY field in
-     its `## Security-Sensitive Fields` contract, write the negative abuse
-     test it names (tamper the value → assert rejected → assert store
-     unchanged). Append the test report to coding-report.md."
-  2. Re-run the Stage 3 exit gate (build + lint + scoped test run — the
-     contract tests must build and PASS before anyone reviews them).
-  3. **Contract delta review (Stage 6):** ONE `harness-reviewer` spawn,
-     alone in its message, delta scope = the contract test files +
-     security-record.md. Its job is the abuse-coverage check: every
-     contracted field has a passing test (tamper → rejected → store
-     unchanged) — a missing or happy-path-only one is a P0. Freshness-check
-     review-record.md as at Stage 4. The gate read is SINGLE-record (one
-     reviewer, one sentinel): `V=$(grep '^VERDICT:' <record> | tail -1)` —
-     advance only on PASS/PASS_WITH_FIXES with p0=0 p1=0.
-  4. **Contract-phase FAIL routing:**
-     - fix touches ONLY test files → contract loop: re-spawn the coder in
-       CONTRACT PHASE mode with the findings, re-run the exit gate, delta
-       review again — under `max-test-rounds` (read
-       `grep '^max-test-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`,
-       default 3; cap-before-respawn — at the cap, escalate:
-       `| 6 | ESCALATED | {ts} | {reason, round count} |`).
-     - fix must touch ANY non-test file (an abuse test failed because the
-       CODE is vulnerable) → that is a security-relevant code change: route
-       back to a FULL Stage 4 panel round under `max-code-rounds`
-       (cap-before-respawn applies — code counter already at its cap →
-       escalate immediately; no second counter, no reset). After the panel
-       passes again, re-run contract detection and this phase.
-  5. **On delta-review PASS:** refresh the certificate (same command as
-     below — it now covers the contract tests) and write
-     `| 6 | PASSED | {ts} | contract delta review |`.
-
-**Certificate (write at the final panel PASS; refresh at delta-review
-PASS):** `git add -A` (so new files count), then record in
-pipeline-state.md, overwriting any prior value —
-`Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
-where `<Base-Ref>` is the SHA recorded at Stage 3 entry (never overwritten
-on a re-spawn). The Stage 7 push gate blocks unless this fingerprint still
-matches the pushed code.
-
-**Crash recovery (folded — no part-files, no quarantine):** tests are
-ordinary tracked files listed in coding-report.md. A resume into Stage 4
-re-runs the exit gate then the panel. A resume into Stage 5/6 where the
-certificate no longer matches the tree means the contract spawn wrote
-tests before the crash — re-run contract detection, re-run the exit gate,
-re-spawn the delta review, refresh the certificate.
-
-**`test-mode: serial` (the conservative fallback):** Stage 3 carries no
-TESTS duty; after the final panel PASS, one test-coder spawn writes the
-interface tests, failure-mode tests, AND the contracted abuse tests
-(reading security-record.md), appending directly to coding-report.md; then
-Stage 6 below reviews them as its own fixpoint loop. Stage 5/6 rows record
-normally — no SKIPPED rows in serial mode. This is the pre-v0.22 flow.
 
 **Sequencing (HARD RULE, both modes):** never issue a bash that writes
 coding-report.md or review-record.md in the same message as an agent spawn
 that reads or writes that file. Bookkeeping bash runs with zero agents in
 flight; every spawn above is alone in its message.
-
-**Stage 6 (serial mode only — Test Review):**
-```
-Agent tool:
-  prompt: |
-    You are the harness-reviewer reviewing tests.
-    Read espalier/agents/harness-reviewer.md for your instructions.
-
-    CONTEXT PACK: espalier/changes/{type}/{slug}/context-pack.md — read it
-    first (paths and facts only — your verdict comes from the tests you read).
-    WHAT TO REVIEW: The test files created in Stage 5.
-    Read espalier/changes/{type}/{slug}/coding-report.md for the list.
-    ROUND: {n} — put round={n} in your VERDICT sentinel line.
-    {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the
-    Stage 5 fix re-spawn touched, from the latest coding-report.md}.
-    Re-review in delta scope per your "Re-review Rounds" section.
-
-    Check: Are tests meaningful? Do they cover edge cases?
-    Do they match project testing patterns in espalier/skills/espalier-testing/SKILL.md?
-    Security coverage: does EVERY field in espalier/changes/{type}/{slug}/security-record.md's
-    `## Security-Sensitive Fields` contract have a passing abuse test
-    (tamper → rejected → store unchanged)? A missing one is a P0 → back to Stage 5.
-    Failure-mode coverage: does every NEW external-call path have a
-    dependency-failure test (per espalier/rules/production-standards.md)?
-    A missing one is a P1.
-
-    Write (OVERWRITE) your review to: espalier/changes/{type}/{slug}/review-record.md
-    End the file with your VERDICT sentinel line.
-```
-
-Serial Stage 6 uses the same record semantics as Stage 4: freshness-check
-review-record.md against its baseline, snapshot each round's sentinel into
-Stage History. (Stage 4's final record is overwritten here — its verdicts live
-in Stage History and the certificate.)
-
-**Gate read (deterministic — SINGLE record: one reviewer runs here).** From
-review-record.md:
-`V=$(grep '^VERDICT:' <record> | tail -1)`. Parse the verdict WORD and the counts.
-- `ESCALATION_REQUIRED` → do NOT advance
-  and do NOT re-spawn: snapshot the sentinel, then run the escalation protocol
-  (fix lane: the late-escalation prompt; full lane: escalate to the human with
-  the agent's Escalation Reason block). An `ESCALATION_REQUIRED` with `p0=0` is
-  still an escalation.
-- Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
-  with the combined findings and loop (counter + `max-test-rounds` cap
-  unchanged).
-- Advance ONLY when the record's last sentinel has verdict word `PASS` or
-  `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
-
-Stage 6's loop cap is `max-test-rounds`. Check the cap BEFORE re-spawning: if
-the counter already equals `max-test-rounds`, escalate to the human
-immediately — the coder is NOT re-spawned and no further panel round runs.
-Before stopping, set `- Status: ESCALATED` and add a Stage History row
-`| 6 | ESCALATED | {ts} | {reason, round count} |` in pipeline-state.md.
-Otherwise re-spawn, increment the counter, and loop. After snapshotting a
-ROUND row, also update the `Review Rounds:` numerators in pipeline-state.md —
-a resumed session recounts rounds from this line plus the ROUND rows, never
-from memory.
-
-### Stage 4 Post-Review: Drift & Convention Index
-
-After Stage 4 PASSES (step 5 above — BOTH panel agents returned zero P0 and the
-certificate is written), parse `review-record.md` for Convention Drift blocks (see
-`harness-reviewer.md`) and flag the affected rule files. Do NOT run this on a P0
-round: a malformed-drift P0 written back mid-loop would contaminate the next
-round's P0 count.
-
-> Variables in scope: `TYPE` and `SLUG` are the active change's type/slug.
-
-```bash
-. espalier/hooks/drift-helpers.sh
-REV="espalier/changes/${TYPE}/${SLUG}/review-record.md"
-[ -f "$REV" ] || exit 0
-SHA=$(git rev-parse HEAD)
-
-python3 espalier/hooks/parse-drift-blocks.py "$REV" \
-| while IFS=$'\t' read -r KIND RULE_FILE COUPLED; do
-  case "$KIND" in
-    DRIFT)
-      mark_stale "$RULE_FILE" "$SHA" "convention drift flagged in ${TYPE}/${SLUG} review"
-      LINE="convention_drift: $RULE_FILE"
-      [ -n "$COUPLED" ] && LINE="$LINE (coupled_with: $COUPLED)"
-      echo "$LINE" >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-      ;;
-    MALFORMED)
-      echo "convention_drift_malformed: $RULE_FILE (reviewer bundled blocks — drift NOT indexed)" \
-        >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-      ;;
-  esac
-done
-```
-
-A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
-Stage 4 has already PASSED when this parse runs, so there is no later round to
-fix it in this change — do NOT write a fake P0 into review-record.md (it would
-contaminate the Stage 6 gate read). Instead the malformed block is recorded in
-pipeline-state.md and surfaced to the user in ONE line ("a Convention Drift
-block was malformed and not indexed — the underlying drift will resurface via
-the post-merge detector or the next review that sees it"). `coupled_with`
-blocks resurface together at the next Stage 0 pre-flight (promote-together /
-reject-together / split).
-
-**Convention Observations → the convention index.** The reviewer also emits
-lower-bar Convention Observations (see `harness-reviewer.md`) — one per
-divergence, with NO aggregation key. The orchestrator assigns the key: a fresh
-isolated reviewer cannot (three reviews of one pattern would coin three keys and
-the count would never reach the threshold). For each Observation in
-`review-record.md`:
-
-1. Read existing keys: `. espalier/hooks/drift-helpers.sh && conv_fold | cut -f1`
-   (folds the legacy file AND the per-key files — never parse them yourself).
-2. Map the Observation's `description` to an existing `pattern_key`, or mint a
-   new kebab-case key.
-3. Append the row:
-
-```bash
-. espalier/hooks/drift-helpers.sh
-append_convention "${TYPE}/${SLUG}" "$PATTERN_KEY" "$LOCATION"
-```
-
-`append_convention` sanitizes every field and de-dupes on
-(change_slug, pattern_key, location), so re-running Stage 4 never inflates the
-count. Convention state is tracked and row-append-only — columns
-`date · change_slug · pattern_key · location · status` (+ optional 6th
-`coupled_with`); `status` ∈ `diverges | promoted | rejected | exception`. When a
-`pattern_key` reaches 3 deduped `diverges` observations (per `conv_fold`) it is
-a promotion candidate, surfaced at the next Stage 0 pre-flight (see Convention
-Promotion).
 
 ### State File Format
 
@@ -910,138 +358,6 @@ denominators (`{max-req-rounds}`, `{max-code-rounds}`, `{max-test-rounds}`) from
 back to 3 per key if the file or key is missing) — alongside the `{requirement}`
 / `{timestamp}` substitution. The denominators are the escalation limits as displayed.
 
-### Stage 7: Stage the Convention Index
-
-If this run appended an observation (Stage 4) or flipped a status
-(Convention Promotion), stage the per-key files into the Stage 7 commit
-alongside `espalier/changes/{type}/{slug}/*`:
-
-```bash
-[ -d espalier/conventions ] && git add espalier/conventions/
-```
-
-The per-key files are tracked; staging them here keeps the working tree
-clean for the Stage 7 gate and never leaves an automation-written file
-uncommitted. (The legacy `espalier/.conventions.tsv` is read-only to this
-plugin version — it is never written, so there is nothing of it to stage.)
-
-### Stage 7 Commit Recording
-
-After `git push` at Stage 7 succeeds, capture the commit SHA + files changed and
-append to the state file's Commits table.
-
-> Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
-> the orchestrator at Stage Execution entry. Substitute them when running the snippet.
-
-```bash
-SHA=$(git rev-parse HEAD)
-FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | tr '\n' ',' | sed 's/,$//')
-STATE="espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-
-# Ensure section exists
-if ! grep -q "^## Commits" "$STATE"; then
-  cat >> "$STATE" << EOF
-
-## Commits
-| Stage | SHA | Files |
-|-------|-----|-------|
-EOF
-fi
-
-# Idempotency: skip if this stage+SHA pair already recorded
-if ! grep -qE "^\| 7 \| ${SHA} " "$STATE"; then
-  echo "| 7 | $SHA | $FILES |" >> "$STATE"
-fi
-
-# Self-heal reverse-lookup cache (silently no-op if helpers absent)
-[ -f espalier/hooks/lookup-helpers.sh ] && {
-  . espalier/hooks/lookup-helpers.sh
-  _cache_append "$SHA" "${TYPE}/${SLUG}" "original"
-}
-```
-
-This commit-record is read at fix-time by `/espalier-fix` Stage 0 reverse lookup,
-and used by the post-merge hook for squash-merge mapping.
-
-### Stage 7 Reverse-link to PARTIAL_FIX (when applicable)
-
-If this feat's `requirements.md` frontmatter has `filed_from_partial_fix: fix/{slug}`
-(meaning it was filed as the root-cause for a partial fix), write back to the partial
-fix's pipeline-state.md so the audit chain closes:
-
-> Variables in scope: `TYPE` and `SLUG` are the active change's identifiers.
-
-```bash
-REQS="espalier/changes/${TYPE}/${SLUG}/requirements.md"
-FILED_FROM=$(grep '^filed_from_partial_fix:' "$REQS" 2>/dev/null | awk '{print $2}')
-
-if [ -n "$FILED_FROM" ]; then
-  PARTIAL_STATE="espalier/changes/${FILED_FROM}/pipeline-state.md"
-  if [ -f "$PARTIAL_STATE" ]; then
-    # Update Root Cause Status line
-    if [ "$(uname)" = "Darwin" ]; then
-      sed -i '' 's|^- Root Cause Status:.*$|- Root Cause Status: COMPLETE (verified '"$(date -u +%Y-%m-%d)"')|' "$PARTIAL_STATE"
-    else
-      sed -i    's|^- Root Cause Status:.*$|- Root Cause Status: COMPLETE (verified '"$(date -u +%Y-%m-%d)"')|' "$PARTIAL_STATE"
-    fi
-
-    if ! grep -q "^## Root Cause Addressed By" "$PARTIAL_STATE"; then
-      cat >> "$PARTIAL_STATE" << EOF
-
-## Root Cause Addressed By
-| Feat | Status | Date |
-|------|--------|------|
-EOF
-    fi
-    echo "| feat/${SLUG} | COMPLETE | $(date -u +%Y-%m-%d) |" >> "$PARTIAL_STATE"
-  fi
-fi
-```
-
-### Stage 8.5 — Doc Drift Check (notify-only)
-
-Runs as a sub-step between Stage 8 (CI verify) and Stage 9 (deploy). It edits no
-doc, prompts nothing, blocks nothing — it only surfaces drift this run may have
-caused. Because it is CI-independent (reads `.drift-state.tsv`, writes only
-this change's `doc-patches.md`), it MAY ride the same message as Stage 8's
-first CI watch call instead of waiting for CI to finish — see pipeline.md
-Stage 8's wait protocol.
-
-> "8.5" is a label, not a numeric stage. Do NOT write `Current Stage: 8.5` to
-> pipeline-state.md — it would break `pre-push-gate.sh`'s integer stage parse.
-> Record Stage 8.5 only in the Stage History notes.
-
-```bash
-. espalier/hooks/drift-helpers.sh
-STALE=$(stale_files)
-PATCHES="espalier/changes/${TYPE}/${SLUG}/doc-patches.md"
-
-if [ -z "$STALE" ]; then
-  echo "Stage 8.5: no drift."
-else
-  {
-    echo ""
-    echo "## Stage 8.5 Doc Drift (notify-only)"
-    echo "| File | Tier | Reason |"
-    echo "|------|------|--------|"
-    printf '%s\n' "$STALE" | while IFS= read -r f; do
-      [ -z "$f" ] && continue
-      tier=$(classify_tier "$f")
-      reason=$(awk -F'\t' -v x="$f" '$1==x {print $4; exit}' espalier/.drift-state.tsv)
-      echo "| $f | $tier | $reason |"
-    done
-  } >> "$PATCHES"
-  N=$(printf '%s\n' "$STALE" | grep -c .)
-  echo "Stage 8.5: $N stale doc(s) — run /espalier-prune to refresh. (Not blocking; pipeline continues.)"
-fi
-```
-
-`doc-patches.md` is a per-change artifact created on demand under
-`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Stage 8.5 touches no
-rule/wiki/spec file, so it cannot dirty a project-level doc. Advance to Stage 9
-regardless of the result. In-pipeline auto-apply is a v2 item — refresh stays a
-deliberate `/espalier-prune`.
-
 ### Rollback Protocol
 
 When a gate fails:
@@ -1061,6 +377,13 @@ At stages marked with human checkpoint in pipeline.md:
 - Use AskUserQuestion tool with options: Approve / Request Changes / Skip
 - "Skip" only allowed for stages 9-10
 - "Request Changes" triggers rollback with human's feedback as context
+
+Stage-boundary resume offers — after Stage 2 approval and after the Stage 4
+PASS (serial mode: after the Stage 6 PASS) — are `Continue here` /
+`Continue in a fresh session`, asked once, first option default, never on an
+unattended run. Nothing depends on the answer: the state is already on
+disk and Session Resumption is unchanged; a fresh session runs Stages 7–10
+with the change's state and the stage's procedure at the top of its context.
 
 ### Completion
 

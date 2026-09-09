@@ -32,6 +32,13 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BOOTSTRAP="$SCRIPT_DIR/bootstrap-espalier.sh"
 PLUGIN_DIR="$(cd "$SCRIPT_DIR/../skills/espalier-init" && pwd)"
+
+# Validation check totals per platform set. Bump these THREE lines when a
+# release adds checks — every total below derives from them (the hardcoded
+# totals were missed on two releases in a row).
+N_CLAUDE=56   # --platforms=claude (default)
+N_CODEX=61    # claude + codex
+N_ALL=66      # claude + codex + copilot
 PASS=0
 FAIL=0
 FAILED_TESTS=()
@@ -47,6 +54,14 @@ assert() {
     FAIL=$((FAIL + 1))
     FAILED_TESTS+=("$name")
   fi
+}
+
+# esp_all TPL_OR_INSTALL_ROOT — the espalier skill as one text: the router plus
+# its stage files (v0.25 split). Pass a templates dir ($TPLnn) or an installed
+# espalier/ dir.
+esp_all() {
+  if [ -f "$1/skills/espalier.md" ]; then cat "$1/skills/espalier.md" "$1"/skills/espalier-stages/*.md
+  else cat "$1/skills/espalier/SKILL.md" "$1"/skills/espalier/stages/*.md; fi
 }
 
 make_smoke_repo() {
@@ -91,13 +106,18 @@ description: smoke test
 EOF
   done
 
-  # Sub-agents (names kept as harness-coder/harness-reviewer)
+  # Sub-agents (names kept as harness-coder/harness-reviewer). The v0.25
+  # spawn-protocol markers (check 65) ride the stubs — Test 35's migration
+  # fixture strips them again to exercise the anchored edits.
   cat > "$dir/espalier/agents/harness-coder.md" << 'EOF'
 ---
 name: harness-coder
 description: smoke
 tools: Read, Write
 ---
+## Handoff: Finish Bounded, Hand Off Clean
+- Spec applied: smoke
+- HANDOFF: true
 EOF
   cat > "$dir/espalier/agents/harness-reviewer.md" << 'EOF'
 ---
@@ -105,6 +125,7 @@ name: harness-reviewer
 description: smoke
 tools: Read
 ---
+[spec-unread]
 EOF
   # v0.9.0 security substitution files (checks 30-32, 34)
   cat > "$dir/espalier/agents/harness-security.md" << 'EOF'
@@ -304,7 +325,7 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes --force >/dev/null 2>&1 )
 VAL_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --validate-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --yes 2>&1 )
 # Check that check numbers appear in order (1/24 before 2/24, etc.)
-FIRST=$(echo "$VAL_OUT" | grep -oE '\[[0-9]+/53\]' | head -3 | sed 's/\[//;s/\/53\]//' | tr '\n' ' ')
+FIRST=$(echo "$VAL_OUT" | grep -oE "\[[0-9]+/$N_CLAUDE\]" | head -3 | sed "s/\[//;s/\/$N_CLAUDE\]//" | tr '\n' ' ')
 assert "validation output sorted ascending"     "[ \"\$FIRST\" = '1 2 3 ' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -332,7 +353,7 @@ HP_IN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-l
 assert "12a Stage 9 logged hooksPath resolution" "echo \"\$HP_IN\" | grep -q 'core.hooksPath set'"
 assert "12a dispatcher at core.hooksPath dir"    "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.githooks/post-merge'"
 assert "12a nothing written to .git/hooks"       "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/53] OK'"
+assert "12a check 20 passed"                     "echo \"\$HP_IN\" | grep -qF '[20/$N_CLAUDE] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 12b — core.hooksPath set OUTSIDE the repo: bootstrap must refuse to install,
@@ -346,7 +367,7 @@ HP_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-
 assert "12b warns hooksPath outside repo"        "echo \"\$HP_OUT\" | grep -q 'points outside this repo'"
 assert "12b no dispatcher in outside dir"        "[ ! -f '$OUTSIDE/post-merge' ]"
 assert "12b no dispatcher in .git/hooks"         "[ ! -f '$TMP/.git/hooks/post-merge' ]"
-assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/53] FAIL'"
+assert "12b check 20 failed (honest red)"        "echo \"\$HP_OUT\" | grep -qF '[20/$N_CLAUDE] FAIL'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP" "$OUTSIDE"
 
 # ─── Test 13: --lang=unsupported writes a no-op boundary hook ─────────────
@@ -385,8 +406,8 @@ assert "14i coder agent toml"                "grep -q '^name = \"harness-coder\"
 assert "14j reviewer agent toml"             "[ -f '$TMP/.codex/agents/harness-reviewer.toml' ]"
 assert "14k security agent toml"             "[ -f '$TMP/.codex/agents/harness-security.toml' ]"
 assert "14l platforms persisted"             "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
-assert "14m validation total is 57"          "echo \"\$P_OUT\" | grep -q 'Validation: 58/58 passed'"
-assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/58] OK'"
+assert "14m validation total is $N_CODEX"      "echo \"\$P_OUT\" | grep -q 'Validation: $N_CODEX/$N_CODEX passed'"
+assert "14n codex checks ran"                "echo \"\$P_OUT\" | grep -qF '[47/$N_CODEX] OK'"
 assert "14o CLAUDE.md section still written" "grep -q '## Espalier' '$TMP/CLAUDE.md'"
 # TOML sanity: python tomllib parses the generated config + agent files.
 assert "14p config.toml parses"              "python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
@@ -416,7 +437,7 @@ assert "15b merge decision reused"           "echo \"\$W_OUT\" | grep -q \"reusi
 assert "15c platforms unioned to claude,codex" "grep -qx 'claude,codex' '$TMP/espalier/.platforms'"
 assert "15d codex wired"                     "[ -L '$TMP/.agents/skills/espalier' ] && grep -q 'ESPALIER HOOKS' '$TMP/.codex/config.toml'"
 assert "15e claude wiring untouched"         "[ -L '$TMP/.claude/skills/espalier' ] && grep -q 'espalier/hooks' '$TMP/.claude/settings.json'"
-assert "15f validation total is 57"          "echo \"\$W_OUT\" | grep -q 'Validation: 58/58 passed'"
+assert "15f validation total is $N_CODEX"      "echo \"\$W_OUT\" | grep -q 'Validation: $N_CODEX/$N_CODEX passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Test 16: codex-only install (no .claude litter, claude checks skip) ──
@@ -434,7 +455,7 @@ assert "16b no .claude dir created"          "[ ! -d '$TMP/.claude' ]"
 assert "16c no CLAUDE.md section"            "! grep -q '## Espalier' '$TMP/CLAUDE.md' 2>/dev/null"
 assert "16d codex fully wired"               "[ -L '$TMP/.agents/skills/espalier' ] && [ -f '$TMP/.codex/agents/harness-coder.toml' ] && grep -q '## Espalier' '$TMP/AGENTS.md'"
 assert "16e claude checks skipped OK"        "echo \"\$C_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
-assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: 58/58 passed'"
+assert "16f validation passes"               "echo \"\$C_OUT\" | grep -q 'Validation: $N_CODEX/$N_CODEX passed'"
 assert "16g platforms = codex"               "grep -qx 'codex' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -453,8 +474,8 @@ assert "17e hooks json valid + adapter wired"  "python3 -c 'import json; json.lo
 assert "17f adapter copied + executable"       "[ -x '$TMP/espalier/hooks/copilot-hook-adapter.sh' ]"
 assert "17g copilot-instructions section"      "grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "17h claude + codex wiring intact"      "[ -L '$TMP/.claude/skills/espalier' ] && [ -L '$TMP/.agents/skills/espalier' ]"
-assert "17i validation total is 62"            "echo \"\$A_OUT\" | grep -q 'Validation: 63/63 passed'"
-assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/63] OK'"
+assert "17i validation total is $N_ALL"        "echo \"\$A_OUT\" | grep -q 'Validation: $N_ALL/$N_ALL passed'"
+assert "17j copilot checks ran"                "echo \"\$A_OUT\" | grep -qF '[52/$N_ALL] OK'"
 # Idempotent re-run: sections/files not duplicated, user tuning preserved.
 echo "<!-- user tuning marker -->" >> "$TMP/.github/agents/harness-coder.agent.md"
 ( cd "$TMP" && bash "$BOOTSTRAP" --wire-only --lang=typescript --plugin-dir="$PLUGIN_DIR" --platforms=all --yes >/dev/null 2>&1 )
@@ -476,7 +497,7 @@ assert "18c no AGENTS.md written"            "[ ! -f '$TMP/AGENTS.md' ]"
 assert "18d copilot fully wired"             "[ -L '$TMP/.github/skills/espalier' ] && [ -f '$TMP/.github/agents/harness-coder.agent.md' ] && grep -q '## Espalier' '$TMP/.github/copilot-instructions.md'"
 assert "18e claude checks skipped OK"        "echo \"\$P_OUT\" | grep -qF 'OK   rules-load (skipped — claude not targeted)'"
 assert "18f codex checks skipped OK"         "echo \"\$P_OUT\" | grep -qF 'OK   codex-skills-load (skipped — codex not targeted)'"
-assert "18g validation total is 62"          "echo \"\$P_OUT\" | grep -q 'Validation: 63/63 passed'"
+assert "18g validation total is $N_ALL"      "echo \"\$P_OUT\" | grep -q 'Validation: $N_ALL/$N_ALL passed'"
 assert "18h platforms = copilot"             "grep -qx 'copilot' '$TMP/espalier/.platforms'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -575,8 +596,8 @@ WT_EXIT=$?
 assert "21a bootstrap from linked worktree exits 0"    "[ $WT_EXIT -eq 0 ]"
 assert "21b dispatcher installed in the COMMON hooks dir" \
   "grep -q 'ESPALIER_POSTMERGE_DISPATCH' '$TMP/.git/hooks/post-merge'"
-assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: 53/53 passed'"
-assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/53] OK'"
+assert "21c full validation passes in the worktree"    "echo \"\$WT_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed'"
+assert "21d check 20 passes in the worktree"           "echo \"\$WT_OUT\" | grep -qF '[20/$N_CLAUDE] OK'"
 [ "$KEEP" != "yes" ] && rm -rf "$WT" "$TMP"
 
 # ─── Test 22: migration v0.15.0 → v0.16.0 (synthetic fixture) ─────────────
@@ -649,7 +670,7 @@ assert "23f fix lane: unattended Stage 0 continues to Auto-Link Discovery" \
 assert "23g fix lane: cross-branch slug-collision pointer" \
   "grep -q 'Slug collisions across branches' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
 assert "23h pipeline: maintenance section + slug recipe" \
-  "grep -q 'Multi-Developer Maintenance' '$TMP/espalier/pipeline.md' && grep -q 'rebuild-commit-index.sh' '$TMP/espalier/pipeline.md'"
+  "grep -q 'Multi-Developer Maintenance' '$TMP/espalier/pipeline.md' && grep -q 'rebuild-commit-index.sh' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
 assert "23i development-process template: Maintenance Commits anchor" \
   "grep -q 'ESPALIER MAINTENANCE COMMITS v1' '$PLUGIN_DIR/templates/rules/development-process.md'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -671,7 +692,7 @@ assert "24c stamp-conflict one-liner present (keep the newer line)" \
 assert "24d prune skill names the gardener rota" \
   "grep -qi 'gardener' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
 assert "24e same-key observation-append playbook (keep both lines)" \
-  "grep -qi 'keep both lines' '$TMP/espalier/pipeline.md'"
+  "grep -qi 'keep both lines' '$TMP/espalier/skills/espalier-prune/SKILL.md'"
 assert "24f Stage 0 default flips to Proceed with rota pointer (full lane)" \
   "grep -qi 'gardener rota' '$TMP/espalier/skills/espalier/SKILL.md'"
 assert "24g Stage 0 default flips to Proceed with rota pointer (fix lane)" \
@@ -725,7 +746,7 @@ assert "25d settings.json map-guard entry" "grep -q 'map-guard' '$TMP/.claude/se
 assert "25e codex map-guard block"       "grep -q 'ESPALIER MAP GUARD v1' '$TMP/.codex/config.toml' && python3 -c 'import tomllib; tomllib.load(open(\"$TMP/.codex/config.toml\",\"rb\"))'"
 assert "25f copilot gates map-guard"     "grep -q 'map-guard' '$TMP/.github/hooks/espalier-gates.json' && python3 -c 'import json; json.load(open(\"$TMP/.github/hooks/espalier-gates.json\"))'"
 assert "25g max-open-tickets key"        "grep -q '^max-open-tickets: 9' '$TMP/espalier/.espalier-config'"
-assert "25h checks 59+60 pass"           "echo \"\$M25_OUT\" | grep -qF '[59/63] OK' && echo \"\$M25_OUT\" | grep -qF '[60/63] OK'"
+assert "25h checks 59+60 pass"           "echo \"\$M25_OUT\" | grep -qF '[59/$N_ALL] OK' && echo \"\$M25_OUT\" | grep -qF '[60/$N_ALL] OK'"
 assert "25i maps dir created"            "[ -d '$TMP/espalier/maps' ]"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -738,7 +759,7 @@ assert "25j greenfield bootstrap exits 0"  "[ $G25_RC -eq 0 ]"
 assert "25k .greenfield marker recorded"   "[ -f '$TMP/espalier/.greenfield' ]"
 assert "25l placeholder gate present"      "grep -q 'greenfield placeholder' '$TMP/espalier/hooks/pre-push-gate.sh'"
 assert "25m phase2 checks render as skips" "echo \"\$G25_OUT\" | grep -qF 'phase2-coding-skill (skipped — pending greenfield Pass 2)'"
-assert "25n greenfield validation passes"  "echo \"\$G25_OUT\" | grep -q 'Validation: 53/53 passed'"
+assert "25n greenfield validation passes"  "echo \"\$G25_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 25o-t: migration v0.17.0 → v0.18.0 fixture — strip v0.18 bits from a fresh
@@ -1144,8 +1165,8 @@ assert "28b pipeline.md carries delta-scope doctrine + push pre-auth" \
   "grep -qF 'DELTA SCOPE' '$TMP/espalier/pipeline.md' && grep -qF 'Push-Target' '$TMP/espalier/pipeline.md'"
 assert "28c agent TEMPLATES carry context-pack + delta sections" \
   "grep -qF 'CONTEXT PACK' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
-   && grep -qF 'Delta read scope' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-reviewer.md' \
-   && grep -qF 'Delta mode (when YOUR prior round was clean)' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-security.md'"
+   && grep -qF 'Delta read scope' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/modes/re-review.md' \
+   && grep -qF 'Delta mode (when YOUR prior round was clean)' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/modes/re-review.md'"
 assert "28d grill batching rule + fix-lane pack/pre-auth present" \
   "grep -qF 'pairwise INDEPENDENT' '$TMP/espalier/skills/espalier-grill/SKILL.md' \
    && grep -qF 'context-pack.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
@@ -1293,7 +1314,7 @@ assert "30b pipeline.md carries the folded contract + delta scope + CI wait + De
    && grep -qF 'Wait protocol' '$TMP/espalier/pipeline.md' \
    && grep -qF 'Deploy-Target' '$TMP/espalier/pipeline.md'"
 assert "30c Stage 6 prompts pass the delta line in both lanes" \
-  "grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier/SKILL.md' \
+  "esp_all '$TMP/espalier' | grep -qF 'CHANGED SINCE LAST REVIEW' \
    && grep -qF 'CHANGED SINCE LAST REVIEW' '$TMP/espalier/skills/espalier-fix/SKILL.md'"
 assert "30d agent TEMPLATES are past the speculative dispatch (v0.23 fold)" \
   "! grep -qF 'Speculative & Contract entry points' '$SCRIPT_DIR/../skills/espalier-init/templates/agents/harness-coder.md' \
@@ -1491,18 +1512,18 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
 
 assert "32a lane templates carry the fold (test-mode read, SKIPPED rows, FAIL routing)" \
-  "grep -qF 'test-mode' '$TPL32/skills/espalier.md' \
-   && grep -qF '| 5 | SKIPPED | {ts} | folded: no contract |' '$TPL32/skills/espalier.md' \
-   && grep -qF '| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |' '$TPL32/skills/espalier.md' \
-   && grep -qF 'route' '$TPL32/skills/espalier.md' \
-   && grep -qF 'FULL Stage 4 panel round' '$TPL32/skills/espalier.md' \
+  "esp_all '$TPL32' | grep -qF 'test-mode' \
+   && esp_all '$TPL32' | grep -qF '| 5 | SKIPPED | {ts} | folded: no contract |' \
+   && esp_all '$TPL32' | grep -qF '| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |' \
+   && esp_all '$TPL32' | grep -qF 'route' \
+   && esp_all '$TPL32' | grep -qF 'FULL Stage 4 panel round' \
    && grep -qF 'REGRESSION_VERIFIED_SCOPE' '$TPL32/skills/espalier-fix.md' \
    && grep -qF 'non-test files only' '$TPL32/skills/espalier-fix.md'"
 assert "32b legacy-key mapping rows present (absent→folded; off→serial; test-mode wins)" \
-  "grep -qF \"speculative-tests\" '$TPL32/skills/espalier.md' \
-   && grep -qF 'TEST_MODE=serial || TEST_MODE=folded' '$TPL32/skills/espalier.md' \
-   && grep -qF \"grep '^test-mode:'\" '$TPL32/skills/espalier.md' \
-   && grep -qF 'using folded' '$TPL32/skills/espalier.md'"
+  "esp_all '$TPL32' | grep -qF \"speculative-tests\" \
+   && esp_all '$TPL32' | grep -qF 'TEST_MODE=serial || TEST_MODE=folded' \
+   && esp_all '$TPL32' | grep -qF \"grep '^test-mode:'\" \
+   && esp_all '$TPL32' | grep -qF 'using folded'"
 assert "32c pipeline + agents + rules + testing/coding re-pointed" \
   "grep -qF 'Contract Phase (folded)' '$TPL32/pipeline.md' \
    && grep -qF 'folded — tests are a Stage 3 duty' '$TPL32/pipeline.md' \
@@ -1518,7 +1539,7 @@ assert "32c pipeline + agents + rules + testing/coding re-pointed" \
    && grep -qF -- '- \`structure:\`' '$TPL32/agents/harness-reviewer.md' \
    && grep -qF 'one-line declaration comment' '$TPL32/agents/harness-reviewer.md'"
 assert "32d digest + crispness + tier + nudge + maprun boundary markers" \
-  "grep -qF 'Known failure patterns (from sibling slices)' '$TPL32/skills/espalier.md' \
+  "esp_all '$TPL32' | grep -qF 'Known failure patterns (from sibling slices)' \
    && grep -qF 'findings/' '$TPL32/skills/espalier-map.md' \
    && grep -qF 'mode=score' '$TPL32/skills/espalier-map.md' \
    && grep -qF 'LAST, only when every slice' '$TPL32/skills/espalier-map.md' \
@@ -1711,18 +1732,18 @@ simulate_llm_writes "$TMP" typescript
 
 assert "33a templates carry the class-sweep text (coder section, both panel checks, FIX ROUND header in all 3 lane files)" \
   "grep -qF '## Fix Rounds: Fix the Class, Not the Instance' '$TPL33/agents/harness-coder.md' \
-   && grep -qF '### Class Sweep' '$TPL33/agents/harness-coder.md' \
-   && grep -qF -- '- Out-of-scope siblings:' '$TPL33/agents/harness-coder.md' \
-   && grep -qF '**Class-sweep verification.**' '$TPL33/agents/harness-reviewer.md' \
-   && grep -qF '[class-sweep]' '$TPL33/agents/harness-reviewer.md' \
-   && grep -qF '**Class-sweep verification (your own findings).**' '$TPL33/agents/harness-security.md' \
+   && grep -qF '### Class Sweep' '$TPL33/agents/modes/fix-round.md' \
+   && grep -qF -- '- Out-of-scope siblings:' '$TPL33/agents/modes/fix-round.md' \
+   && grep -qF '**Class-sweep verification.**' '$TPL33/agents/modes/re-review.md' \
+   && grep -qF '[class-sweep]' '$TPL33/agents/modes/re-review.md' \
+   && grep -qF '**Class-sweep verification (your own findings).**' '$TPL33/agents/modes/re-review.md' \
    && grep -qF 'FIX ROUND {n}:' '$TPL33/pipeline.md' \
-   && grep -qF 'FIX ROUND {n}:' '$TPL33/skills/espalier.md' \
+   && esp_all '$TPL33' | grep -qF 'FIX ROUND {n}:' \
    && grep -qF 'FIX ROUND {n}:' '$TPL33/skills/espalier-fix.md'"
 assert "33b sweep is scope-bounded (touched layers; ladder + task-scope rule still bind) — no repo-wide licence" \
-  "grep -qF 'the layers this change touches plus the generated surfaces they feed' '$TPL33/agents/harness-coder.md' \
-   && grep -qF 'Never widen a feature change into a repo-wide refactor' '$TPL33/agents/harness-coder.md' \
-   && grep -qF 'does not mean same fix' '$TPL33/agents/harness-coder.md'"
+  "grep -qF 'the layers this change touches plus the generated surfaces they feed' '$TPL33/agents/modes/fix-round.md' \
+   && grep -qF 'Never widen a feature change into a repo-wide refactor' '$TPL33/agents/modes/fix-round.md' \
+   && grep -qF 'does not mean same fix' '$TPL33/agents/modes/fix-round.md'"
 assert "33c installed pure copies carry the FIX ROUND header after bootstrap" \
   "grep -qF 'FIX ROUND {n}:' '$TMP/espalier/pipeline.md' \
    && grep -qF 'FIX ROUND {n}:' '$TMP/espalier/skills/espalier/SKILL.md' \
@@ -1730,6 +1751,10 @@ assert "33c installed pure copies carry the FIX ROUND header after bootstrap" \
 
 # Stub agent files (simulate_llm_writes) have no stock anchors: first run
 # skip-with-records all three agent edits, exit 0, pure copies stay fresh.
+# The v0.25 mode files are removed first: a real chain reaches #33 before #35
+# copies espalier/agents/modes/, and with them present #33 rightly treats the
+# class-sweep text as already delivered (handled, nothing to insert).
+rm -rf "$TMP/espalier/agents/modes"
 M231_SKIP=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 M231_SKIP_RC=$?
 assert "33d stub agent files skip-with-record (exit 0)" \
@@ -1803,9 +1828,9 @@ assert "33g placement: You Must NOT < Fix Rounds < Editing Discipline; panel ste
 # (the script extracts them from the templates rather than embedding a copy).
 ext33() { awk -v s="$2" -v e="$3" '!i&&index($0,s){i=1} i{print} i&&index($0,e){exit}' "$1"; }
 assert "33h migrated sections are byte-identical to the template sections" \
-  "diff <(ext33 '$TMP/espalier/agents/harness-coder.md' '## Fix Rounds' 'the round repeats.') <(ext33 '$TPL33/agents/harness-coder.md' '## Fix Rounds' 'the round repeats.') >/dev/null \
-   && diff <(ext33 '$TMP/espalier/agents/harness-reviewer.md' 'Class-sweep verification.' 'filed early.') <(ext33 '$TPL33/agents/harness-reviewer.md' 'Class-sweep verification.' 'filed early.') >/dev/null \
-   && diff <(ext33 '$TMP/espalier/agents/harness-security.md' 'Class-sweep verification (your' 'is still open.') <(ext33 '$TPL33/agents/harness-security.md' 'Class-sweep verification (your' 'is still open.') >/dev/null"
+  "diff <(ext33 '$TMP/espalier/agents/harness-coder.md' '## Fix Rounds' 'the round repeats.') <(ext33 '$TPL33/agents/modes/fix-round.md' '## Fix Rounds' 'the round repeats.') >/dev/null \
+   && diff <(ext33 '$TMP/espalier/agents/harness-reviewer.md' 'Class-sweep verification.' 'filed early.') <(ext33 '$TPL33/agents/modes/re-review.md' 'Class-sweep verification.' 'filed early.') >/dev/null \
+   && diff <(ext33 '$TMP/espalier/agents/harness-security.md' 'Class-sweep verification (your' 'is still open.') <(ext33 '$TPL33/agents/modes/re-review.md' 'Class-sweep verification (your' 'is still open.') >/dev/null"
 M231_RERUN=$( cd "$TMP" && bash "$MIGRATE231" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "33i re-run is a no-op" "echo \"\$M231_RERUN\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
@@ -1822,23 +1847,23 @@ simulate_llm_writes "$TMP" typescript
 M34_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=all --yes --force 2>&1 )
 assert "34a simplify skill copied + name parity"    "grep -q '^name: espalier-simplify' '$TMP/espalier/skills/espalier-simplify/SKILL.md'"
 assert "34b simplify skill linked (all three)"     "[ -L '$TMP/.claude/skills/espalier-simplify' ] && [ -L '$TMP/.agents/skills/espalier-simplify' ] && [ -L '$TMP/.github/skills/espalier-simplify' ]"
-assert "34c check 63 passes; total 63"             "echo \"\$M34_OUT\" | grep -qF '[63/63] OK' && echo \"\$M34_OUT\" | grep -q 'Validation: 63/63 passed'"
+assert "34c check 63 passes; total $N_ALL"        "echo \"\$M34_OUT\" | grep -qF '[63/$N_ALL] OK' && echo \"\$M34_OUT\" | grep -q 'Validation: $N_ALL/$N_ALL passed'"
 assert "34d instruction files carry the lane line (claude / codex / copilot)" \
   "grep -qF '/espalier-simplify' '$TMP/CLAUDE.md' && grep -qF '\$espalier-simplify' '$TMP/AGENTS.md' && grep -qF '/espalier-simplify' '$TMP/.github/copilot-instructions.md'"
 assert "34e templates carry the lane markers (coder section, reviewer section, agent.md row, pipeline lanes note, espalier SKILL refactor/ adoption + Completion doc flags)" \
   "grep -qF '## Simplification Changes: Retire the Whole Obligation' '$TPL34/agents/harness-coder.md' \
-   && grep -qF '### Retired Surface' '$TPL34/agents/harness-coder.md' \
-   && grep -qF -- '- Missed consumer:' '$TPL34/agents/harness-coder.md' \
+   && grep -qF '### Retired Surface' '$TPL34/agents/modes/simplification.md' \
+   && grep -qF -- '- Missed consumer:' '$TPL34/agents/modes/simplification.md' \
    && grep -qF '## Simplification Review' '$TPL34/agents/harness-reviewer.md' \
-   && grep -qF '[simplify-consumer]' '$TPL34/agents/harness-reviewer.md' \
-   && grep -qF '[simplify-protected]' '$TPL34/agents/harness-reviewer.md' \
+   && grep -qF '[simplify-consumer]' '$TPL34/agents/modes/simplification.md' \
+   && grep -qF '[simplify-protected]' '$TPL34/agents/modes/simplification.md' \
    && grep -qF 'Via /espalier-simplify |' '$TPL34/agent.md' \
    && grep -qF '/espalier-simplify' '$TPL34/pipeline.md' \
-   && grep -qF 'simplify_from' '$TPL34/skills/espalier.md' \
-   && grep -qF 'espalier/changes/refactor/*/pipeline-state.md' '$TPL34/skills/espalier.md' \
-   && grep -qF 'simplify: <name> retired in refactor/{slug}' '$TPL34/skills/espalier.md' \
-   && [ \"\$(grep -cF 'SIMPLIFICATION CHANGE:' '$TPL34/skills/espalier.md')\" -eq 2 ] \
-   && grep -qF 'simplify: missed consumer' '$TPL34/skills/espalier.md' \
+   && esp_all '$TPL34' | grep -qF 'simplify_from' \
+   && esp_all '$TPL34' | grep -qF 'espalier/changes/refactor/*/pipeline-state.md' \
+   && esp_all '$TPL34' | grep -qF 'simplify: <name> retired in refactor/{slug}' \
+   && [ \"\$(esp_all '$TPL34' | grep -cF 'SIMPLIFICATION CHANGE:')\" -eq 2 ] \
+   && esp_all '$TPL34' | grep -qF 'simplify: missed consumer' \
    && grep -qF 'simplify_from' '$TPL34/skills/espalier-map.md' \
    && grep -qF 'simplify-survey' '$TPL34/skills/espalier-ask.md' \
    && grep -qF 'simplify-lane echo' '$TPL34/../hook-templates/espalier-stats.sh'"
@@ -1905,6 +1930,9 @@ an instance-only fix; the reviewer files it as a P1 and the round repeats.
 
 Modify files with the `Edit` tool (exact-string replacement); create new files
 with `Write`.
+## Handoff: Finish Bounded, Hand Off Clean
+- Spec applied: smoke
+- HANDOFF: true
 V231CODER
 cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V231REV'
 ## Production-Readiness Review (enforce espalier/rules/production-standards.md)
@@ -1914,6 +1942,7 @@ Better log context, tighter bounds, and style-level improvements are P2/P3.
 ## Minimalism Review (advisory — P2/P3 only, one exception)
 
 After the checks above, scan the diff for over-building.
+[spec-unread]
 V231REV
 cat > "$TMP/espalier/agent.md" << 'V231AGENT'
 # Project Owner Agent
@@ -1950,13 +1979,277 @@ assert "34k placement: coder section between Fix Rounds and Editing Discipline; 
 # (the script extracts them from the templates rather than embedding a copy).
 ext34() { awk -v s="$2" -v e="$3" '!i&&index($0,s){i=1} i{print} i&&index($0,e){exit}' "$1"; }
 assert "34l migrated sections are byte-identical to the template sections" \
-  "diff <(ext34 '$TMP/espalier/agents/harness-coder.md' '## Simplification Changes' 'returns to the survey page.') <(ext34 '$TPL34/agents/harness-coder.md' '## Simplification Changes' 'returns to the survey page.') >/dev/null \
-   && diff <(ext34 '$TMP/espalier/agents/harness-reviewer.md' '## Simplification Review' 'is ever residue.') <(ext34 '$TPL34/agents/harness-reviewer.md' '## Simplification Review' 'is ever residue.') >/dev/null \
+  "diff <(ext34 '$TMP/espalier/agents/harness-coder.md' '## Simplification Changes' 'returns to the survey page.') <(ext34 '$TPL34/agents/modes/simplification.md' '## Simplification Changes' 'returns to the survey page.') >/dev/null \
+   && diff <(ext34 '$TMP/espalier/agents/harness-reviewer.md' '## Simplification Review' 'is ever residue.') <(ext34 '$TPL34/agents/modes/simplification.md' '## Simplification Review' 'is ever residue.') >/dev/null \
    && diff <(grep -F 'Via /espalier-simplify |' '$TMP/espalier/agent.md') <(grep -F 'Via /espalier-simplify |' '$TPL34/agent.md') >/dev/null"
 M240_RERUN=$( cd "$TMP" && bash "$MIGRATE240" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 assert "34m re-run is a no-op" "echo \"\$M240_RERUN\" | grep -qi 'nothing to do'"
-assert "34n validate-only passes on the migrated install (check 63 live, claude-only total 53)" \
-  "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: 53/53 passed' )"
+assert "34n validate-only passes on the migrated install (check 63 live, claude-only total $N_CLAUDE)" \
+  "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' )"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 35: v0.25.0 quality-first context — templates + install + migration ──
+echo "Test 35: v0.25.0 quality-first context (templates + install + migration)"
+MIGRATE250="$SCRIPT_DIR/migrate-v0.24.0-to-v0.25.0.sh"
+TPL35="$SCRIPT_DIR/../skills/espalier-init/templates"
+HTPL35="$SCRIPT_DIR/../skills/espalier-init/hook-templates"
+
+# 35a-e: templates carry the markers (no hard budget anywhere: the sizing
+# paragraph replaces the ≤ 5 files rule; the grill / map read budgets are gone).
+assert "35a coder template: Handoff protocol + sentinel + PARALLEL DISPATCH clause + Spec applied + Prior reports + Docs clause + reword lines + contract file" \
+  "grep -qF '## Handoff: Finish Bounded, Hand Off Clean' '$TPL35/agents/harness-coder.md' \
+   && grep -qF -- '- HANDOFF: true' '$TPL35/agents/harness-coder.md' \
+   && grep -qF 'Under PARALLEL DISPATCH' '$TPL35/agents/harness-coder.md' \
+   && grep -qF -- '- Spec applied:' '$TPL35/agents/harness-coder.md' \
+   && grep -qF -- '- Prior reports: coding-log/' '$TPL35/agents/harness-coder.md' \
+   && grep -qF '**Docs.** When your change makes a claim' '$TPL35/agents/harness-coder.md' \
+   && grep -qF '8. Read once.' '$TPL35/agents/harness-coder.md' \
+   && [ \"\$(grep -c '(auto-loaded on Claude Code; read it' '$TPL35/agents/harness-coder.md')\" -eq 2 ] \
+   && grep -qF 'security-contract.md' '$TPL35/agents/harness-coder.md'"
+assert "35b reviewer + security templates: reword lines, read-once / Grep-only / Scoped-docs / coding-log lines, [spec-unread], one-row advisory rule, docs: tag, contract file, Read-tool evidence" \
+  "grep -qF 'are auto-loaded into your' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF '3. Read once:' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF \"6. Earlier spawns' reports are in\" '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF '[spec-unread]' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF 'Each advisory finding is ONE row' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF -- '- \`docs:\` a doc diff' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF 'security-contract.md' '$TPL35/agents/modes/stage6-abuse-coverage.md' \
+   && grep -qF 'auto-loaded into your context on Claude Code' '$TPL35/agents/harness-security.md' \
+   && grep -qF 'a \`git diff\` in Bash is never' '$TPL35/agents/harness-security.md' \
+   && grep -qF '7. Scoped docs named in the pack' '$TPL35/agents/harness-security.md'"
+P35_GUARD="grep -q '^- HANDOFF: true' \"\$COD\""
+assert "35c espalier + fix SKILLs: sentinel detector, CONTINUATION, report_archive, exit_gate, contract_extract, req_shape_check, pack lines, resume offers, RESUMED row, fix-lane regression guard, all seven spawn lines reworded" \
+  "esp_all '$TPL35' | grep -qF \"grep -q '^- HANDOFF: true'\" \
+   && grep -qF \"grep -q '^- HANDOFF: true'\" '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF 'CONTINUATION:' && grep -qF 'CONTINUATION:' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF 'report_archive' && grep -qF 'report_archive' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF 'exit_gate' && grep -qF 'exit_gate' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF 'contract_extract' && grep -qF 'contract_extract' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF 'req_shape_check' && grep -qF 'req_shape_check' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF -- '- Scoped docs:' && grep -qF -- '- Scoped docs:' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF -- '- Grep-only:' && grep -qF -- '- Grep-only:' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF -- '- Facts established:' \
+   && esp_all '$TPL35' | grep -qF 'Continue in a fresh session' && grep -qF 'Continue in a fresh session' '$TPL35/skills/espalier-fix.md' \
+   && esp_all '$TPL35' | grep -qF '| RESUMED |' && grep -qF '| RESUMED |' '$TPL35/skills/espalier-fix.md' \
+   && grep -qF -- \"\$P35_GUARD\" '$TPL35/skills/espalier-fix.md' \
+   && [ \"\$(esp_all '$TPL35' | grep -c 'auto-loaded as')\" -eq 4 ] \
+   && [ \"\$(grep -c 'auto-loaded as' '$TPL35/skills/espalier-fix.md')\" -eq 2 ] \
+   && grep -qF 'auto-loaded' '$TPL35/skills/espalier-audit.md' \
+   && ! esp_all '$TPL35' | grep -q 'Read espalier/agents/harness-' \
+   && ! grep -q 'Read espalier/agents/harness-' '$TPL35/skills/espalier-fix.md' \
+   && ! grep -q 'Read espalier/agents/harness-security.md and follow' '$TPL35/skills/espalier-audit.md'"
+assert "35d no hard budget: ≤ 5 files gone from espalier-requirements (sizing paragraph + contract/notes in), ≤ 8 read budget gone from espalier-grill / espalier-map; notes readers in ask + simplify; testing SKILL contract file" \
+  "! grep -qF '≤ 5 files' '$TPL35/skills/espalier-requirements.md' \
+   && grep -qF 'Size each sub-task as one coder' '$TPL35/skills/espalier-requirements.md' \
+   && grep -qF 'Contract and notes' '$TPL35/skills/espalier-requirements.md' \
+   && ! grep -qF '≤ 8' '$TPL35/skills/espalier-grill.md' \
+   && grep -qF 'there is no' '$TPL35/skills/espalier-grill.md' \
+   && grep -qF 'Resolved by grill' '$TPL35/skills/espalier-grill.md' \
+   && ! grep -qF '≤ 8' '$TPL35/skills/espalier-map.md' \
+   && grep -qF 'unlimited code reads' '$TPL35/skills/espalier-map.md' \
+   && grep -qF 'requirements-notes.md' '$TPL35/skills/espalier-ask.md' \
+   && grep -qF 'requirements-notes.md' '$TPL35/skills/espalier-simplify.md' \
+   && grep -qF 'security-contract.md' '$TPL35/skills/espalier-testing.md' \
+   && esp_all '$TPL35' | grep -qF 'Size each sub-task as one coder'"
+assert "35e rules track + measurement: Writing Contract (scout-prompts + checklist mirror), not_precedent array, NOT PRECEDENT anchor, Removed rules (prune), contract drift (doctor + both pre-flights), agent.md row, pipeline.md, stats sections + resumed HUMAN marker, maprun fallback labels + literal regex, helpers defined" \
+  "grep -qF '## Writing Contract' '$TPL35/scout-prompts.md' \
+   && grep -qF 'not_precedent' '$TPL35/scout-prompts.md' \
+   && grep -qF '## Writing Contract' '$TPL35/../references/discovery-checklist.md' \
+   && grep -qF 'not_precedent' '$TPL35/../references/discovery-checklist.md' \
+   && grep -qF 'ESPALIER NOT PRECEDENT v1' '$TPL35/rules/engineering-structure.md' \
+   && grep -qF 'Removed rules' '$TPL35/skills/espalier-prune.md' \
+   && grep -qF 'rule_bullets' '$TPL35/skills/espalier-prune.md' \
+   && grep -qF 'not_precedent' '$TPL35/skills/espalier-prune.md' \
+   && grep -qF 'contract drift' '$TPL35/skills/espalier-doctor.md' \
+   && esp_all '$TPL35' | grep -qF 'contract_drift_lines' \
+   && grep -qF 'contract_drift_lines' '$TPL35/skills/espalier-fix.md' \
+   && grep -qF 'grep-only-paths' '$TPL35/agent.md' \
+   && grep -qF 'exit_gate' '$TPL35/pipeline.md' && grep -qF 'HANDOFF: true' '$TPL35/pipeline.md' \
+   && grep -qF 'Spawn shape (per change)' '$HTPL35/espalier-stats.sh' \
+   && grep -qF 'Workspace docs (report-only)' '$HTPL35/espalier-stats.sh' \
+   && grep -qF '\"resumed\")' '$HTPL35/espalier-stats.sh' \
+   && grep -qF 'STAGE_LABEL_FALLBACK' '$HTPL35/maprun.py' \
+   && grep -qF 'r\"^### (\\d+)\\. (.+?)\\s*\$\"' '$HTPL35/maprun.py' \
+   && for fn in report_archive contract_extract req_shape_check grep_only_files scoped_docs rule_bullets contract_drift_lines exit_gate; do grep -q \"^\$fn()\" '$HTPL35/drift-helpers.sh' || exit 1; done"
+
+# 35f: fresh installs — claude-only and all-platform totals, checks 64-65 live,
+# grep-only-paths written with its comment.
+TMP=$(mktemp -d -t smoke35.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+M35_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force 2>&1 )
+assert "35f fresh claude-only install: checks 64-65 pass, total $N_CLAUDE, grep-only-paths key + comment written" \
+  "echo \"\$M35_OUT\" | grep -qF '[64/$N_CLAUDE] OK   context-helpers' \
+   && echo \"\$M35_OUT\" | grep -qF '[65/$N_CLAUDE] OK   spawn-protocols' \
+   && echo \"\$M35_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' \
+   && grep -q '^grep-only-paths: __generated__/ schema.graphql schema.prisma$' '$TMP/espalier/.espalier-config' \
+   && grep -q '^# Grep-only files (v0.25)' '$TMP/espalier/.espalier-config' \
+   && grep -q '^scoped_docs()' '$TMP/espalier/hooks/drift-helpers.sh' \
+   && grep -qF 'STAGE_LABEL_FALLBACK' '$TMP/espalier/hooks/maprun.py'"
+M35_RERUN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=all --yes --force 2>&1 )
+assert "35g re-run with all platforms: total $N_ALL, config key appended once" \
+  "echo \"\$M35_RERUN\" | grep -q 'Validation: $N_ALL/$N_ALL passed' \
+   && [ \"\$(grep -c '^grep-only-paths:' '$TMP/espalier/.espalier-config')\" -eq 1 ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 35h-m: migration v0.24.0 → v0.25.0 on a REAL v0.24.0-shaped install — the
+# v0.24.0 templates are taken from this repo's own history (tag v0.24.0; the
+# release commit as fallback), so the anchored edits run against the byte-real
+# text they were written for.
+V024_REF=""
+for ref in v0.24.0 ec449be; do
+  if git -C "$SCRIPT_DIR/.." rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1; then V024_REF="$ref"; break; fi
+done
+seed_v024_install() {  # DIR — a v0.24.0-shaped install with stub LLM files
+  local dir="$1" show
+  show() { git -C "$SCRIPT_DIR/.." show "${V024_REF}:$1"; }
+  ( cd "$dir" && bash "$BOOTSTRAP" --copy-only --lang=typescript --plugin-dir="$PLUGIN_DIR" >/dev/null 2>&1 )
+  mkdir -p "$dir/espalier/rules" "$dir/espalier/agents" "$dir/espalier/wiki" \
+           "$dir/espalier/skills/espalier-coding" "$dir/espalier/skills/espalier-review" \
+           "$dir/espalier/skills/espalier-testing" "$dir/espalier/skills/espalier-security"
+  local f s sk h
+  for f in coding-standards development-process security-standards production-standards; do echo "# $f" > "$dir/espalier/rules/$f.md"; done
+  for s in espalier-coding espalier-review espalier-security; do printf -- '---\nname: %s\ndescription: smoke\n---\n' "$s" > "$dir/espalier/skills/$s/SKILL.md"; done
+  for f in architecture data-models critical-paths external-services; do echo "# $f" > "$dir/espalier/wiki/$f.md"; done
+  printf '#!/bin/bash\nrun_build() {\n  true\n}\nrun_lint() {\n  true\n}\nrun_tests() {\n  true\n}\n' > "$dir/espalier/hooks/pre-push-gate.sh"
+  printf '#!/bin/bash\nexit 0\n' > "$dir/espalier/hooks/check-layer-boundaries.sh"
+  show skills/espalier-init/templates/agents/harness-coder.md    | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-coder.md"
+  show skills/espalier-init/templates/agents/harness-reviewer.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-reviewer.md"
+  show skills/espalier-init/templates/agents/harness-security.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-security.md"
+  show skills/espalier-init/templates/skills/espalier-testing.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/skills/espalier-testing/SKILL.md"
+  show skills/espalier-init/templates/agent.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agent.md"
+  show skills/espalier-init/templates/rules/engineering-structure.md > "$dir/espalier/rules/engineering-structure.md"
+  show skills/espalier-init/templates/pipeline.md > "$dir/espalier/pipeline.md"
+  show skills/espalier-init/templates/scout-prompts.md > "$dir/espalier/.scout-prompts.md"
+  for sk in espalier espalier-fix espalier-requirements espalier-grill espalier-map espalier-audit espalier-ask espalier-simplify espalier-prune espalier-doctor; do
+    mkdir -p "$dir/espalier/skills/$sk"; show "skills/espalier-init/templates/skills/$sk.md" > "$dir/espalier/skills/$sk/SKILL.md"
+  done
+  for h in drift-helpers.sh maprun.py espalier-stats.sh; do show "skills/espalier-init/hook-templates/$h" > "$dir/espalier/hooks/$h"; done
+  ( cd "$dir" && bash "$BOOTSTRAP" --wire-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 || true )
+  grep -v '^grep-only-paths' "$dir/espalier/.espalier-config" > "$dir/c.tmp" && mv "$dir/c.tmp" "$dir/espalier/.espalier-config"
+  grep -v 'pre-v0' "$dir/.gitignore" > "$dir/g.tmp" && mv "$dir/g.tmp" "$dir/.gitignore"
+  mkdir -p "$dir/espalier/changes/feat/2026-09-09-x"
+  printf -- '- Status: IN_PROGRESS\n' > "$dir/espalier/changes/feat/2026-09-09-x/pipeline-state.md"
+  printf '# F\n## 1. Requirement Summary\n## Design rationale\n' > "$dir/espalier/changes/feat/2026-09-09-x/requirements.md"
+  printf '# Coding Standards\n- rule one `a.ts:1`\n- fixed in commit abc1234 on 2026-01-01\n' > "$dir/espalier/rules/coding-standards.md"
+  ( cd "$dir" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm v024 >/dev/null )
+}
+if [ -z "$V024_REF" ]; then
+  echo "  SKIP 35h-m (no v0.24.0 ref in this clone — shallow checkout?)"
+else
+  TMP=$(mktemp -d -t smoke35m.XXXX)
+  make_smoke_repo "$TMP"
+  seed_v024_install "$TMP"
+  M250_DRY=$( cd "$TMP" && bash "$MIGRATE250" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  assert "35h dry-run lists the missing markers and creates nothing" \
+    "echo \"\$M250_DRY\" | grep -q 'coder Handoff section' && echo \"\$M250_DRY\" | grep -q 'drift-helpers.sh context helpers' \
+     && ! grep -q '^scoped_docs()' '$TMP/espalier/hooks/drift-helpers.sh' && ! ls '$TMP'/espalier/*.pre-v0.25.bak >/dev/null 2>&1 \
+     && ! grep -q '^grep-only-paths' '$TMP/espalier/.espalier-config'"
+  RULE_SHA_BEFORE=$(git -C "$TMP" hash-object espalier/rules/coding-standards.md)
+  REQ_SHA_BEFORE=$(git -C "$TMP" hash-object espalier/changes/feat/2026-09-09-x/requirements.md)
+  ES_BEFORE=$(cat "$TMP/espalier/rules/engineering-structure.md")
+  M250_OUT=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  M250_RC=$?
+  ext35() { sed 's/{project_name}/Smoke/g' "$1"; }
+  assert "35i apply on a real v0.24.0 install: exit 0, no skip records, every anchored file byte-identical to its template, pure copies refreshed with backups, config key + gitignore pattern once" \
+    "[ $M250_RC -eq 0 ] \
+     && ! grep -qF 'v0.25.0-' '$TMP/espalier/.migrations-skipped' 2>/dev/null \
+     && diff <(ext35 '$TPL35/agents/harness-coder.md') '$TMP/espalier/agents/harness-coder.md' >/dev/null \
+     && diff <(ext35 '$TPL35/agents/harness-reviewer.md') '$TMP/espalier/agents/harness-reviewer.md' >/dev/null \
+     && diff <(ext35 '$TPL35/agents/harness-security.md') '$TMP/espalier/agents/harness-security.md' >/dev/null \
+     && diff <(ext35 '$TPL35/skills/espalier-testing.md') '$TMP/espalier/skills/espalier-testing/SKILL.md' >/dev/null \
+     && diff <(ext35 '$TPL35/agent.md') '$TMP/espalier/agent.md' >/dev/null \
+     && diff '$TPL35/rules/engineering-structure.md' '$TMP/espalier/rules/engineering-structure.md' >/dev/null \
+     && cmp -s '$TPL35/skills/espalier.md' '$TMP/espalier/skills/espalier/SKILL.md' \
+     && cmp -s '$TPL35/skills/espalier-stages/4-panel.md' '$TMP/espalier/skills/espalier/stages/4-panel.md' \
+     && cmp -s '$TPL35/agents/modes/fix-round.md' '$TMP/espalier/agents/modes/fix-round.md' \
+     && cmp -s '$TPL35/skills/espalier-fix.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+     && cmp -s '$TPL35/skills/espalier-grill.md' '$TMP/espalier/skills/espalier-grill/SKILL.md' \
+     && cmp -s '$HTPL35/drift-helpers.sh' '$TMP/espalier/hooks/drift-helpers.sh' \
+     && cmp -s '$HTPL35/maprun.py' '$TMP/espalier/hooks/maprun.py' \
+     && [ -f '$TMP/espalier/skills/espalier/SKILL.md.pre-v0.25.bak' ] \
+     && [ -f '$TMP/espalier/hooks/drift-helpers.sh.pre-v0.25.bak' ] \
+     && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.25.bak' ] \
+     && [ -f '$TMP/espalier/agents/modes/simplification.md' ] && [ -f '$TMP/espalier/skills/espalier/stages/7-10-delivery.md' ] \
+     && grep -qF 'modes/fix-round.md' '$TMP/espalier/agents/harness-coder.md' && ! grep -qF 'Enumerate the siblings' '$TMP/espalier/agents/harness-coder.md' \
+     && [ -x '$TMP/espalier/hooks/espalier-stats.sh' ] \
+     && [ \"\$(grep -c '^grep-only-paths:' '$TMP/espalier/.espalier-config')\" -eq 1 ] \
+     && [ \"\$(grep -c '^\\*\\.pre-v0\\.\\*\\.bak$' '$TMP/.gitignore')\" -eq 1 ]"
+  assert "35j report-only lines printed; rules (other than the appended Not Precedent anchor) and requirements byte-identical" \
+    "echo \"\$M250_OUT\" | grep -q 'requirement shape (espalier/changes/feat/2026-09-09-x): Design rationale → requirements-notes.md' \
+     && echo \"\$M250_OUT\" | grep -q 'rules contract drift: 1 line(s) in 1 rule file(s)' \
+     && [ \"\$(git -C '$TMP' hash-object espalier/rules/coding-standards.md)\" = '$RULE_SHA_BEFORE' ] \
+     && [ \"\$(git -C '$TMP' hash-object espalier/changes/feat/2026-09-09-x/requirements.md)\" = '$REQ_SHA_BEFORE' ] \
+     && [ \"\$(head -n \$(printf '%s\n' \"\$ES_BEFORE\" | wc -l | tr -d ' ') '$TMP/espalier/rules/engineering-structure.md')\" = \"\$ES_BEFORE\" ] \
+     && grep -qF 'ESPALIER NOT PRECEDENT v1' '$TMP/espalier/rules/engineering-structure.md'"
+  M250_RERUN=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  assert "35k re-run is a no-op" "echo \"\$M250_RERUN\" | grep -qi 'nothing to do'"
+  assert "35l validate-only passes on the migrated install (checks 64-65 live, claude-only total $N_CLAUDE)" \
+    "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' )"
+  [ "$KEEP" != "yes" ] && rm -rf "$TMP"
+fi
+
+# 35m-n: customised agent files (the simulate_llm_writes stubs, stripped of
+# their v0.25 marker lines) — anchored edits skip-with-record, everything
+# else lands, exit 0, re-run no-op.
+TMP=$(mktemp -d -t smoke35s.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+( cd "$TMP" \
+  && grep -v 'Handoff\|Spec applied\|HANDOFF' espalier/agents/harness-coder.md > a.tmp && mv a.tmp espalier/agents/harness-coder.md \
+  && grep -v 'spec-unread' espalier/agents/harness-reviewer.md > b.tmp && mv b.tmp espalier/agents/harness-reviewer.md \
+  && grep -v '^grep-only-paths' espalier/.espalier-config > c.tmp && mv c.tmp espalier/.espalier-config )
+M250_SKIP=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M250_SKIP_RC=$?
+assert "35m apply on stub agent files: anchored edits skip-with-record (v0.25.0-* labels, mode swaps included), config key lands, pure copies untouched, exit 0" \
+  "[ $M250_SKIP_RC -eq 0 ] \
+   && grep -qF 'v0.25.0-coder-handoff' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.25.0-coder-mode-fix-round' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.25.0-security-mode-repo-audit' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.25.0-reviewer-spec' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.25.0-security-before' '$TMP/espalier/.migrations-skipped' \
+   && grep -q '^grep-only-paths:' '$TMP/espalier/.espalier-config' \
+   && ! ls '$TMP'/espalier/skills/espalier/SKILL.md.pre-v0.25.bak >/dev/null 2>&1"
+M250_SKIP2=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "35n re-run after skip-with-record is a no-op" "echo \"\$M250_SKIP2\" | grep -qi 'nothing to do'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 35o-r: the router + stage files + agent mode files (v0.25.1's scope, folded
+# into v0.25.0): templates, a fresh install (check 66, the skill symlink
+# resolves to a directory holding stages/), and the migration's mode swaps.
+assert "35o router template names every stage file; each stage file holds its procedure; every mode file is named on a prompt line; the agent bodies keep heading + pointer; every historical marker phrase still resolves in the router" \
+  "for f in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do grep -qF \"stages/\$f.md\" '$TPL35/skills/espalier.md' && [ -f '$TPL35/skills/espalier-stages/'\$f.md ] || exit 1; done \
+   && grep -qF '### Requirements Approval Gate' '$TPL35/skills/espalier-stages/1-2-requirements.md' \
+   && grep -qF '### Stage 3 Entry: Context Pack' '$TPL35/skills/espalier-stages/3-coding.md' \
+   && grep -qF 'Stage 4 is a **review panel**' '$TPL35/skills/espalier-stages/4-panel.md' \
+   && grep -qF '### Stage 4 Post-Review' '$TPL35/skills/espalier-stages/4-panel.md' \
+   && grep -qF '### Stage 5/6 (folded): the contract phase' '$TPL35/skills/espalier-stages/5-6-contract.md' \
+   && grep -qF '### Stage 8.5' '$TPL35/skills/espalier-stages/7-10-delivery.md' \
+   && ! grep -qF '### Stage 8.5' '$TPL35/skills/espalier.md' \
+   && grep -qF '**Sequencing (HARD RULE, both modes):**' '$TPL35/skills/espalier.md' \
+   && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do [ -f '$TPL35/agents/modes/'\$m.md ] || exit 1; done \
+   && cat '$TPL35'/skills/espalier-stages/*.md '$TPL35/skills/espalier-fix.md' '$TPL35/skills/espalier-audit.md' > '$TPL35/../../../.t35cat' \
+   && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do grep -qF \"modes/\$m.md\" '$TPL35/../../../.t35cat' || exit 1; done; rm -f '$TPL35/../../../.t35cat' \
+   && grep -qF 'modes/fix-round.md' '$TPL35/agents/harness-coder.md' && grep -qF '## Fix Rounds: Fix the Class, Not the Instance' '$TPL35/agents/harness-coder.md' && ! grep -qF 'Enumerate the siblings' '$TPL35/agents/harness-coder.md' \
+   && grep -qF 'modes/re-review.md' '$TPL35/agents/harness-reviewer.md' && ! grep -qF 'Delta read scope' '$TPL35/agents/harness-reviewer.md' \
+   && grep -qF 'modes/repo-audit.md' '$TPL35/agents/harness-security.md' && grep -qF '## Repo-Audit Mode' '$TPL35/agents/harness-security.md' && ! grep -qF 'Batch verdict' '$TPL35/agents/harness-security.md' \
+   && for ph in 'gardener rota' 'Stage 3 Entry: Context Pack' 'Advance ONLY when EVERY record' 'Stage 5/6 (folded)' 'FIX ROUND {n}:' 'HANDOFF: true' 'simplify_from' 'charted_from' 'conv_fold' 'Requirements Approval Gate'; do grep -qF -- \"\$ph\" '$TPL35/skills/espalier.md' || exit 1; done"
+assert "35p pipeline.md is the contract: ten frozen headings + 8.5, a Procedure line per stage (11 incl. 8.5), the recipes live in espalier-prune, the maintenance note stays" \
+  "[ \"\$(grep -c '^### [0-9]*\\. ' '$TPL35/pipeline.md')\" -eq 10 ] && grep -q '^### 8.5 Doc Drift Check' '$TPL35/pipeline.md' \
+   && [ \"\$(grep -cF -- '- **Procedure:** espalier skill' '$TPL35/pipeline.md')\" -eq 11 ] \
+   && ! grep -qF 'rebuild-commit-index.sh' '$TPL35/pipeline.md' && grep -qF 'rebuild-commit-index.sh' '$TPL35/skills/espalier-prune.md' \
+   && grep -qi 'keep both lines' '$TPL35/skills/espalier-prune.md' && grep -qF '## Multi-Developer Maintenance' '$TPL35/pipeline.md' \
+   && grep -qF 'stages/' '$TPL35/agent.md'"
+TMP=$(mktemp -d -t smoke35r.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+M35R_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force 2>&1 )
+assert "35q fresh install: stages/ + modes/ copied, the espalier skill symlink resolves to a directory holding stages/, check 66 passes, total $N_CLAUDE" \
+  "[ -f '$TMP/espalier/skills/espalier/stages/4-panel.md' ] && [ -f '$TMP/espalier/agents/modes/re-review.md' ] \
+   && [ -d '$TMP/.claude/skills/espalier/stages' ] && [ -f '$TMP/.claude/skills/espalier/stages/3-coding.md' ] \
+   && echo \"\$M35R_OUT\" | grep -qF '[66/$N_CLAUDE] OK   stage-procedures' \
+   && echo \"\$M35R_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

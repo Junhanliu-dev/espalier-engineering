@@ -88,3 +88,31 @@ Plan limits are message-window based + opaque budget for sub-agent fan-out. Veri
 ## Check actuals
 
 After a run: `/cost` in Claude Code, or the `caveman-stats` skill (reads session log directly — no AI estimation).
+
+## Measuring context per install (scripts/context-report.py)
+
+`/cost` says what a session cost; `scripts/context-report.py` says where the tokens went, per agent type, for one install. It reads a Claude Code project directory (`~/.claude/projects/<slug>/` — every main session plus every `subagents/agent-*.jsonl` transcript under it). Stdlib only, a few seconds for a month of transcripts.
+
+```bash
+python3 scripts/context-report.py                                  # project dir of the current directory
+python3 scripts/context-report.py ~/.claude/projects/-Users-me-proj/ --since 2026-09-01 --until 2026-09-30
+python3 scripts/context-report.py PROJECT_DIR --repo ~/proj        # section 9 scans ~/proj/espalier/changes
+python3 scripts/context-report.py PROJECT_DIR --json               # same numbers, machine-readable
+python3 scripts/context-report.py PROJECT_DIR --bare               # first-turn context of main sessions only
+```
+
+"total" throughout is the context sent on every API call (input + cache creation + cache read), summed — the quantity that scales cost and latency. Sections:
+
+1. **Spend map** — per agent type (`harness-coder`, `harness-reviewer`, `harness-security`, `scout`, other subagents, and `orchestrator session` = a main session that spawned at least one agent): spawns, calls, first-turn context, peak, total per spawn (medians), sum, share.
+2. **Tail** — share of tokens processed while the context was already above 150k / 200k, share of spawns that peaked above 200k / 300k / 400k, and how much of the type's spend its top-20% spawns hold. The spawn-length signal.
+3. **Baseline share** — first-turn context × calls as a share of total (system prompt, global harness, rules and agent body, paid on every call), then tool results, own output and user text by linear residency.
+4. **Pack cohort** — coders that read a `context-pack.md` vs not: first-edit turn, calls, total per spawn.
+5. **Orchestrator sessions** — first-turn, peak, calls, compactions, task-notification sizes per agent type.
+6. **On-demand reads** — share of spawns that opened the phase skills, `specs/*.md`, a scoped `CLAUDE.md`.
+7. **Platform doc injection** — `attachment` records: `nested_memory` (the CLAUDE.md chain Claude Code injects when an agent Reads under a workspace) as spawns affected, KB per spawn and the files; plus the instructions, skill-listing, agent-listing, MCP and deferred-tool injections. Claude Code logs these from 2.1.227; older spawns show none.
+8. **Self re-read waste** — spawns that Read their own `espalier/agents/harness-*.md`, and duplicate Reads of one file inside a spawn.
+9. **Handoff / resume** — `HANDOFF` and `RESUMED` rows in `pipeline-state.md` and `coding-log/` files per change; `none` on an install without them.
+
+Every table prints `none` or `n=0` when the directory has no matching transcripts; malformed JSONL lines are skipped.
+
+`--bare` is the global-harness gauge. It prints the first-turn context of the main sessions per entrypoint (`cli` = interactive terminal, `sdk-cli` = headless `claude -p`, `sdk-py` = Agent SDK); subagents are excluded. In a project without espalier (this plugin repo itself) the `cli` row is the user-global harness alone — `~/.claude/CLAUDE.md`, rules, skill and agent listings, MCP instructions; in an espalier project it also carries the rules. To measure a trim: note the `cli` row, trim, start a session, run again with `--since` today's date. Same discipline for a template release: run the report on the weeks before and after and compare sections 1–3.

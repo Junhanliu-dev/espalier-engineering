@@ -58,7 +58,17 @@ run_review() {
   cp "$PROD_RULE_TPL" "$proj/espalier/rules/production-standards.md"
   cp "$SEC_RULE_TPL"  "$proj/espalier/rules/security-standards.md"
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$AGENT_TPL" > "$proj/espalier/agents/harness-reviewer.md"
+  mkdir -p "$proj/espalier/agents/modes" && cp "$TPL/agents/modes/"*.md "$proj/espalier/agents/modes/"   # v0.25 mode files (read when the prompt names one)
   sed -e 's/{project_name}/ReviewApp/g' -e 's/{project}/ReviewApp/g' "$REVIEW_SKILL_TPL" > "$proj/espalier/skills/espalier-review/SKILL.md"
+  # v0.25 disclosure fixtures (opt-in): `spec: <layer>` copies project/specs/<layer>.md
+  # into the coding skill's specs/ so the reviewer can verify a `- Spec applied:` citation.
+  local spec; spec="$(sed -n -E 's/^spec:[[:space:]]*//p' "$fixture" | head -1)"
+  local spec_clause=""
+  if [ -n "$spec" ]; then
+    mkdir -p "$proj/espalier/skills/espalier-coding/specs"
+    cp "$PROJECT/specs/$spec.md" "$proj/espalier/skills/espalier-coding/specs/$spec.md"
+    spec_clause=" The layer spec for src/$spec/ is $proj/espalier/skills/espalier-coding/specs/$spec.md — check the code, and any spec citation in the coding report, against it."
+  fi
 
   # Multi-file fixture support (v0.23 combined code+tests fixtures): a body
   # made of '=== FILE: <path> ===' blocks materializes one file per block;
@@ -91,11 +101,15 @@ run_review() {
   else
     printf '## Coding Report\n- Files created: %s\n- Layers touched: (inspect the file path)\n- Notes: the change under review.\n' "$file" > "$cdir/coding-report.md"
   fi
+  # `report_extra: "<line>"` appends one line to the generated coding-report —
+  # e.g. a `- Spec applied:` citation the reviewer must verify (v0.25 D.5).
+  local rextra; rextra="$(sed -n -E 's/^report_extra:[[:space:]]*//p' "$fixture" | head -1 | sed -E 's/^"(.*)"$/\1/')"
+  [ -n "$rextra" ] && printf '%s\n' "$rextra" >> "$cdir/coding-report.md"
 
   claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-reviewer for ReviewApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
-Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md, $proj/espalier/rules/engineering-structure.md, $proj/espalier/rules/production-standards.md, and $proj/espalier/skills/espalier-review/SKILL.md. Judge ONLY against those project rules, not generic opinions.
+Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md, $proj/espalier/rules/engineering-structure.md, $proj/espalier/rules/production-standards.md, and $proj/espalier/skills/espalier-review/SKILL.md.$spec_clause Judge ONLY against those project rules, not generic opinions.
 
 WHAT TO REVIEW: read $cdir/coding-report.md, then EVERY file it lists (under $proj/). When it lists test files, your verdict covers the tests too — run your test checklist on them with the code in view.
 
@@ -122,6 +136,11 @@ Output ONE line of compact JSON only, no prose:
 for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   [ -e "$fixture" ] || { echo "ERROR: no fixtures found"; exit 2; }
   fid="$(basename "$fixture" .md)"
+  # Fixtures that need a template feature not yet shipped carry
+  # `pending_template: vX.Y`; they run only with INCLUDE_PENDING=1.
+  if [ -n "$(sed -n -E 's/^pending_template:[[:space:]]*//p' "$fixture" | head -1)" ] && [ "${INCLUDE_PENDING:-0}" != "1" ]; then
+    echo "$fid: skipped (pending_template; INCLUDE_PENDING=1 to run)"; continue
+  fi
   kind="$(sed -n -E 's/^kind:[[:space:]]*//p' "$fixture" | head -1)"
 
   if ! run_review "$fixture" "$fid"; then

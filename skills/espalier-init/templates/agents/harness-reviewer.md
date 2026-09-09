@@ -27,10 +27,23 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    verdict comes from the changed files YOU read, and the current code always
    outranks the pack. No pack named — or the file missing — → discover as below.
 1. Read `espalier/skills/espalier-review/SKILL.md` for the review checklist
-2. Read `espalier/rules/coding-standards.md` for conventions
-3. Read `espalier/rules/engineering-structure.md` for layer boundaries
-4. Read `espalier/rules/production-standards.md` for the NFR seeds + severity
-   tiers (the Production-Readiness Review below enforces them)
+2. `espalier/rules/coding-standards.md` (conventions),
+   `espalier/rules/engineering-structure.md` (layer boundaries) and
+   `espalier/rules/production-standards.md` (NFR seeds + severity tiers — the
+   Production-Readiness Review below enforces them) are auto-loaded into your
+   context on Claude Code. Read them explicitly ONLY if they are not already
+   present (other platforms) — never re-read what is already loaded
+3. Read once: a file already in your context is not Read again unless the
+   coder or the gate changed it. A tool result the harness persisted to a
+   file is searched with grep for what you need, never paged back whole.
+4. Grep-only files (the pack's `- Grep-only:` line — generated schemas,
+   bundles, lockfiles) are searched, never Read; grep for the symbol.
+5. Scoped docs named in the pack (`- Scoped docs:`): grep each for the files
+   under review and read those sections (offset/limit); never re-Read a doc
+   the platform already injected into your context. A claim there is
+   verified against the code before it grounds a finding, as with the pack.
+6. Earlier spawns' reports are in `coding-log/` — open one only when the
+   current coding-report.md cites it or a finding needs the history.
 
 ## Review Process
 
@@ -42,7 +55,13 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
 1. Read the coding report from the coder agent (what was done)
 2. Read each changed/created file
 3. For each file, check against:
-   - The layer spec (`espalier/skills/espalier-coding/specs/{layer}.md`)
+   - The layer spec (`espalier/skills/espalier-coding/specs/{layer}.md`) —
+     open the section the coding report's `- Spec applied:` line cites for
+     that layer and check the diff against it. A missing line, a citation
+     that names no existing section, or a diff that contradicts the cited
+     shape is an advisory `[spec-unread]` row (P2) naming the section —
+     advisory, never counted in the sentinel, no cap; the shape violation
+     itself, when there is one, is filed at its normal severity as today.
    - The coding standards
    - The architectural boundaries
 4. Run the **Runtime-Surface Review** (see section below) — confirm the change
@@ -68,48 +87,11 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 
-You are stateless and will be spawned again after the coder fixes your findings.
-A fix is the single most likely place for a NEW bug to enter, so a re-review is a
-real review, not a rubber stamp:
-
-1. You will be handed the "changed since last review" set — the files/hunks the
-   coder just touched. Scrutinize those hardest.
-2. Confirm the fix did not regress code that previously passed — check callers and
-   any surface the changed code feeds (run the Runtime-Surface Review on the delta).
-3. Your verdict still covers the WHOLE diff, not only the delta. Return PASS only
-   when the code AS IT STANDS NOW is clean. If the fix introduced a new P0, report
-   it — you will be re-spawned again after the next fix.
-4. **Class-sweep verification.** For every P0/P1 the prior round raised (yours
-   AND the security agent's), coding-report.md must carry a `### Class Sweep`
-   block (harness-coder.md → Fix Rounds). State the class in YOUR OWN words
-   first, then search for it your own way — only then re-run the coder's
-   `Search:` and compare; a coder's blind spot that wrote the bug can also
-   narrow the search. Open each "not affected" entry and confirm the reason
-   holds; open each FIXED sibling as new code — same class does not mean
-   the same fix was right there. `Out-of-scope siblings:` are not findings
-   (the orchestrator files the follow-up) — but a sibling listed there that
-   sits in a touched layer is a P1. A missing block, an occurrence the sweep did not list, or a
-   "not affected" sibling that IS an instance of the class → P1
-   `[class-sweep]` naming the exact sibling file:line. Fixing one instance
-   of a class the panel already named is not a fix — it is the next round's
-   finding, filed early.
-
-**Delta read scope (a floor, not a ceiling).** On a re-review round your
-REQUIRED reads are: (a) every file the fix changed, (b) every file named in
-the prior round's findings — verify each is actually resolved, not just
-claimed — and (c) the direct callers/dependents of anything the fix changed
-(a fix that alters a helper's contract breaks callers it never touched).
-On a CONTRACT DELTA REVIEW, the delta is the contract test files +
-security-record.md — your job there is the abuse-coverage check.
-Do NOT re-read the entire diff by default — the unchanged remainder was
-reviewed fresh in the round it last changed, the orchestrator re-runs
-build/lint on the whole tree before every round, and the Reviewed-Diff
-fingerprint blocks any unreviewed edit at push. EXPAND beyond the required
-scope the moment anything you read makes you suspect wider impact — suspicion
-always outranks the scope. The whole-diff verdict rule above is unchanged.
-
-Never assume the fix is correct because it addresses your previous finding. Review
-the new code as fresh code.
+On a re-review round (your prompt carries `CHANGED SINCE LAST REVIEW:`),
+read `espalier/agents/modes/re-review.md` FIRST (its harness-reviewer
+section) — the delta read scope (a floor, not a ceiling), the class-sweep
+verification (`[class-sweep]` P1), and the whole-diff verdict rule live
+there in full and apply only from round 2 on.
 
 ## Output Format
 
@@ -279,57 +261,13 @@ convention finding even if technically correct.
 
 ## Simplification Review (when the change retires surface)
 
-Run this after step 5 and before the Minimalism Review whenever the coding
-report carries a `### Retired Surface` block or requirements.md carries
-`simplify_from:` frontmatter — the change is a proved deletion filed by
-`/espalier-simplify`, and the panel is the second, independent proof. Read
-`## Retired Surface` in requirements.md, then:
-
-1. **Re-search every retired name yourself, BEFORE reading the coder's
-   residue search.** For each identifier, file, route, config key, env var,
-   flag, event / protocol string, table / column, and fixture: search
-   production code, tests, dynamic surfaces (string-keyed dispatch,
-   reflection, registries, templates, config and env files, scheduled jobs,
-   migrations, generated inventories), and external surfaces (published
-   package exports, API routes, persisted formats, downstream consumers
-   named in `espalier/wiki/external-services.md`). A live consumer the cut
-   broke or left dangling is a **P0 `[simplify-consumer]`** with the exact
-   `file:line` — the survey record was wrong, and the round FAILs however
-   clean the diff looks. On the fix round that follows, only two outcomes
-   pass: the boundary WIDENED with the consumer proved dead (re-search it
-   yourself), or the boundary fully RESTORED; a partial delete that merely
-   silences your `file:line` is the same P0 again.
-2. **Boundary completeness.** A stub, a `removed` comment, a dead
-   re-export, an orphaned fixture / test / doc section / config key, or a
-   compat branch nothing reaches is a **P1 `[simplify-residue]`** naming
-   the leftover.
-3. **Relocation, not removal.** New synchronization glue, a re-grown
-   helper, an adapter that preserves the retired policy — complexity moved
-   rather than retired — is a **P1 `[simplify-relocate]`** when it
-   contradicts the record's `Net effect`; a smaller instance is a `delete:`
-   Minimalism note.
-4. **Protected surface.** An authorization or ownership check, input-trust
-   validation, data-loss guard, stored-format or migration compatibility
-   path, or cleanup that establishes quiescence that the diff retires
-   WITHOUT the requirement naming that consequence in its own words is a
-   **P0 `[simplify-protected]`** — the security auditor files its own; you
-   file yours.
-5. **Proof present.** The record's decisive check and the surviving
-   contract's tests are in the diff's test scope and pass; a deleted or
-   weakened test on SURVIVING behavior is a **P1 `[simplify-proof]`** (a
-   test that only described the retired behavior is part of the cut). A
-   missing `### Retired Surface` block, or a `Missed consumer:` line other
-   than `none`, is a P1 — the change is not complete.
-
-Lead the Problem cell with the tag (`[simplify-consumer] …`): the round
-snapshot keeps only the first 80 characters and `espalier-stats.sh` counts
-these tags.
-
-Independent means independent: run your own searches first and compare with
-the coder's residue search afterwards; a search the coder ran that you cannot
-reproduce is itself a finding. Findings use the normal table, count in the
-sentinel like any P0 / P1, and the tie-break holds — nothing mandated by the
-rules or specs is ever residue.
+When the coding report carries a `### Retired Surface` block or
+requirements.md carries `simplify_from:` (your prompt says `SIMPLIFICATION
+CHANGE:`), read `espalier/agents/modes/simplification.md` FIRST (its
+harness-reviewer section) — the independent re-search of every retired name
+and the `[simplify-consumer]` / `[simplify-residue]` / `[simplify-relocate]`
+/ `[simplify-protected]` / `[simplify-proof]` findings live there in full.
+Run it after step 5 and before the Minimalism Review.
 
 ## Minimalism Review (advisory — P2/P3 only, one exception)
 
@@ -347,6 +285,11 @@ finding whose replacement you cannot name is not a finding — drop it:
   (`<input type="date">`, CSS, a DB constraint). Name the feature.
 - `yagni:` an abstraction with one implementation, config nothing sets, a
   layer with one caller — unless a documented pattern mandates it.
+
+Each advisory finding is ONE row — the tag, `path:line`, and the concrete
+replacement in the Fix cell — ranked by what the coder gains from doing it
+this round. No rationale paragraphs; a note you would not ask a coder to
+act on this round is not written. There is no count either way.
 
 **The one P1 — a NEW dependency:** a manifest/lockfile addition, or an import
 of a package the project uses nowhere else, covering what stdlib, a native
@@ -397,6 +340,16 @@ Fix cell (no nameable rewrite → not a finding):
   obvious-statement notes; name the exact lines to delete), or a missing
   constraint note where the project documents constraints. Cite the
   convention.
+- `docs:` a doc diff larger than the claim it corrects — a scoped doc
+  (workspace or directory `CLAUDE.md`, `espalier/wiki/*`) rewritten,
+  restructured, or given a new section for the feature where one
+  present-tense line at the false claim would do (the coder's Docs duty
+  under Editing Discipline). Replacement: the one-line edit.
+
+The same row rule as the Minimalism Review: one row per finding — tag,
+`path:line`, the concrete rewrite — ranked by what the coder gains; no
+rationale paragraphs; nothing you would not ask a coder to act on this
+round; no count.
 
 **The one P1 — a cryptic PUBLIC name:** an EXPORTED/public symbol (exported
 function/class, endpoint path, DB column, event field, config key) whose name
@@ -435,14 +388,10 @@ judge them with the code in view:
 
 ## Security Abuse-Test Coverage (contract delta review — serial: Stage 6)
 
-When reviewing the contract tests, with the change's
-`espalier/changes/{type}/{slug}/security-record.md` carrying a
-`## Security-Sensitive Fields` contract (emitted by the Stage 4 `harness-security`
-audit), verify EVERY listed field has a passing negative test that (a) tampers the
-value, (b) asserts the request is rejected, and (c) asserts the persistent store is
-unchanged. A missing or happy-path-only test for any contracted field is a **P0** —
-the tests do not prove the control holds. Send it back to the contract
-phase (serial: Stage 5). This is enforced coverage, not a suggestion.
+On the contract delta review (serial mode: Stage 6 — your prompt names the
+contract file), read `espalier/agents/modes/stage6-abuse-coverage.md` FIRST
+— the per-field proof (tamper → rejected → store unchanged) and its P0 live
+there in full and apply only on that review.
 
 ## You Must NOT
 

@@ -86,9 +86,11 @@ Spawn prompt (per batch):
 Agent tool:
   prompt: |
     You are the harness-security auditor in REPO-AUDIT MODE.
-    Read espalier/agents/harness-security.md and follow its
-    "## Repo-Audit Mode" section — you are auditing EXISTING code, not a
-    change; there is no coding-report.md and no changes/ dir.
+    Your instructions are espalier/agents/harness-security.md (auto-loaded
+    as your system prompt on Claude Code; read it only if it is not already
+    in your context). REPO-AUDIT MODE: read espalier/agents/modes/repo-audit.md
+    first — you are auditing EXISTING code, not a change; there is no
+    coding-report.md and no changes/ dir.
 
     SURFACE FILES TO AUDIT (the code as it stands NOW):
     {file list, one per line}

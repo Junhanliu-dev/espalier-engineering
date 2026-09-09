@@ -80,9 +80,18 @@ STATS_MARK='simplify-lane echo'
 HTPL="$PLUGIN_DIR/skills/espalier-init/hook-templates"
 SKIPFILE="espalier/.migrations-skipped"
 
+# v0.25+ plugins keep the simplification sections in
+# espalier/agents/modes/simplification.md (the body carries the heading + a
+# pointer) and the SIMPLIFICATION CHANGE prompt lines in the espalier skill's
+# stages/ — extract from wherever the plugin holds them.
+_src_for() {  # TEMPLATE END-ANCHOR MODE-FILE → the file that carries the END anchor
+  if grep -qF -- "$2" "$1" 2>/dev/null; then printf '%s' "$1"; else printf '%s' "$3"; fi
+}
+CODER_SRC=$(_src_for "$TPL/agents/harness-coder.md"    "$CODER_END" "$TPL/agents/modes/simplification.md")
+REV_SRC=$(_src_for   "$TPL/agents/harness-reviewer.md" "$REV_END"   "$TPL/agents/modes/simplification.md")
 [ -f "$TPL/skills/espalier-simplify.md" ] \
-  && grep -qF "$CODER_MARK" "$TPL/agents/harness-coder.md" 2>/dev/null \
-  && grep -qF "$REV_MARK" "$TPL/agents/harness-reviewer.md" 2>/dev/null \
+  && grep -qF "$CODER_MARK" "$CODER_SRC" 2>/dev/null \
+  && grep -qF "$REV_MARK" "$REV_SRC" 2>/dev/null \
   && grep -qF "$ROW_MARK" "$TPL/agent.md" 2>/dev/null \
   && grep -qF "$ADOPT_MARK" "$TPL/skills/espalier.md" 2>/dev/null \
   && grep -qF "$MAP_MARK" "$TPL/skills/espalier-map.md" 2>/dev/null \
@@ -275,7 +284,7 @@ CODER=espalier/agents/harness-coder.md
 if ! handled "$CODER_MARK" "$CODER" coder-simplify; then
   ANCH='## Editing Discipline'
   if grep -qF -- "$ANCH" "$CODER" 2>/dev/null; then
-    extract_block "$TPL/agents/harness-coder.md" "$CODER_MARK" "$CODER_END"
+    extract_block "$CODER_SRC" "$CODER_MARK" "$CODER_END"
     insert_before "$CODER" "$ANCH"
     log "inserted coder Simplification Changes section"
   else
@@ -288,7 +297,7 @@ REV=espalier/agents/harness-reviewer.md
 if ! handled "$REV_MARK" "$REV" reviewer-simplify; then
   ANCH='## Minimalism Review (advisory'
   if grep -qF -- "$ANCH" "$REV" 2>/dev/null; then
-    extract_block "$TPL/agents/harness-reviewer.md" "$REV_MARK" "$REV_END"
+    extract_block "$REV_SRC" "$REV_MARK" "$REV_END"
     insert_before "$REV" "$ANCH"
     log "inserted reviewer Simplification Review section"
   else

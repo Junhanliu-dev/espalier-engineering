@@ -512,20 +512,41 @@ class Run:
                     out["say"] = line[3:].strip()
         return out
 
+    # The ten stage headings are frozen (`### N. Name`); a pipeline.md that
+    # parses to fewer than ten falls back to these labels per stage.
+    STAGE_LABEL_FALLBACK = {
+        1: "Requirements Analysis", 2: "Requirements Review",
+        3: "Coding Implementation", 4: "Code Review",
+        5: "Contract Phase (folded) / Test Writing (serial)",
+        6: "Contract Delta Review (folded) / Test Review (serial)",
+        7: "Code Push", 8: "CI Verification",
+        9: "Deployment Verification", 10: "User Confirmation",
+    }
+
     def _stage_names(self):
-        """Stage labels parsed from espalier/pipeline.md (### N. Name).
-        Missing file or headings → empty dict; the dashboard shows numbers."""
+        """Stage labels parsed from espalier/pipeline.md (`### N. Name` — a
+        literal integer, a literal `. `, so `### 8.5 Doc Drift Check` never
+        matches: it used to parse as stage 8 and overwrite CI Verification).
+        Missing file or headings → the frozen fallback labels; fewer than ten
+        parsed headings logs one warning and fills the gaps from the fallback."""
         if not hasattr(self, "_stage_name_cache"):
             names = {}
             p = os.path.join(self.repo_root(), "espalier", "pipeline.md")
             if os.path.isfile(p):
                 try:
-                    for m in re.finditer(r"^###\s*(\d+)\.\s*(.+?)\s*$",
+                    for m in re.finditer(r"^### (\d+)\. (.+?)\s*$",
                                          open(p, errors="replace").read(),
                                          re.M):
-                        names[int(m.group(1))] = m.group(2)
+                        names.setdefault(int(m.group(1)), m.group(2))
                 except OSError:
                     pass
+            missing = [n for n in self.STAGE_LABEL_FALLBACK if n not in names]
+            if missing and names:
+                print("maprun: espalier/pipeline.md is missing stage heading(s) %s — "
+                      "using fallback labels" % ", ".join(str(n) for n in missing),
+                      file=sys.stderr)
+            for n in missing:
+                names[n] = self.STAGE_LABEL_FALLBACK[n]
             self._stage_name_cache = names
         return self._stage_name_cache
 

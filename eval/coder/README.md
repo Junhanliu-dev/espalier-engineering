@@ -56,6 +56,23 @@ shadow: false
 <the task / requirement text>
 ```
 
+## v0.25 disclosure fixtures (opt-in keys)
+
+Frontmatter keys added with the quality-first context plan
+(`docs/quality-first-context-plan.md` §7). Fixtures without them run exactly as
+before, so the seed set's baseline is untouched.
+
+| key | effect |
+|---|---|
+| `spec: services` | copies `project/specs/services.md` into the throwaway project's `espalier/skills/espalier-coding/specs/`, names it in a pack-style prompt line, and script-checks the report's `- Spec applied:` line names an existing section (`spec-line=ok / none / missing / bad-section` in the results). `SPEC_LINE=gate` (default — the v0.25 coder template writes the line) fails the fixture on `missing` / `bad-section`; `SPEC_LINE=report` only prints it (set it when the A/B baseline runs a pre-v0.25 template) |
+| `scoped_doc: services` | copies `project/scoped/services/CLAUDE.md` (traps and invariants) to `src/services/CLAUDE.md` and names it in the prompt; the fixture's `must_follow` carries the traps so the judge scores whether they were avoided |
+| `extra_files: order-status.js` | copies `project/extra/<file>` into `src/services/` |
+| `handoff_allowed: true` | a report ending in `- HANDOFF: true` is a PASS iff its `## Handoff` block has `- Remaining:`, `- Facts:` with at least one `path:line`, and every touched `.js` passes `node --check`; on any other fixture a handoff sentinel is a FAIL |
+| `pending_template: vX.Y` | skipped unless `INCLUDE_PENDING=1` — for fixtures that need a template feature not yet shipped |
+
+Seed: `coder-06-scoped-doc-trap` (spec + scoped doc, single seam) and
+`coder-07-two-seam` (services + controllers; finishes or hands off).
+
 ## Discipline
 - Reach 20–30 fixtures. Seed is 5 (a service method, an external-call timeout, a
   scope-guard, an overbuild trap, and a `folded: true` code+tests task — the

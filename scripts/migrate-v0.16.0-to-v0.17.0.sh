@@ -78,7 +78,7 @@ grep -qiF 'gardener rota' espalier/skills/espalier/SKILL.md 2>/dev/null \
   || mark "espalier SKILL Stage 0 Proceed default"
 grep -qiF 'gardener rota' espalier/skills/espalier-fix/SKILL.md 2>/dev/null \
   || mark "espalier-fix SKILL Stage 0 Proceed default"
-grep -qiF 'keep both lines' espalier/pipeline.md 2>/dev/null \
+{ grep -qiF 'keep both lines' espalier/pipeline.md || grep -qiF 'keep both lines' espalier/skills/espalier-prune/SKILL.md; } 2>/dev/null \
   || mark "pipeline.md per-key conflict playbook"
 
 if [ -z "$missing" ]; then
@@ -136,7 +136,7 @@ check "drift-helpers: doctor_due v2 + stamp writer" "grep -qF 'doctor_stamp_shar
 check "doctor skill: shared-stamp protocol"         "grep -qF 'doctor_stamp_shared' espalier/skills/espalier-doctor/SKILL.md && grep -qiF 'keep the newer line' espalier/skills/espalier-doctor/SKILL.md"
 check "prune skill: gardener rota"                  "grep -qiF 'gardener' espalier/skills/espalier-prune/SKILL.md"
 check "Stage 0 Proceed defaults (both lanes)"       "grep -qiF 'gardener rota' espalier/skills/espalier/SKILL.md && grep -qiF 'gardener rota' espalier/skills/espalier-fix/SKILL.md"
-check "pipeline: per-key conflict playbook"         "grep -qiF 'keep both lines' espalier/pipeline.md"
+check "pipeline: per-key conflict playbook"         "grep -qiF 'keep both lines' espalier/pipeline.md || grep -qiF 'keep both lines' espalier/skills/espalier-prune/SKILL.md"
 check ".doctor-stamp not gitignored"                "! git check-ignore -q espalier/.doctor-stamp"
 
 echo

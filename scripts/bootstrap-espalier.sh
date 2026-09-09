@@ -29,8 +29,8 @@
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
 #   - Appends the .gitattributes union entry + optional CODEOWNERS block.
-#   - Runs the validation checks (R6) — 53 claude-only, 58 with codex,
-#     63 with copilot.
+#   - Runs the validation checks (R6) — 56 claude-only, 61 with codex,
+#     66 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -343,6 +343,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-requirements"
   run "mkdir -p espalier/skills/espalier-grill"
   run "mkdir -p espalier/skills/espalier"
+  run "mkdir -p espalier/skills/espalier/stages"
   run "mkdir -p espalier/skills/espalier-fix"
   run "mkdir -p espalier/skills/espalier-prune"
   run "mkdir -p espalier/skills/espalier-doctor"
@@ -353,6 +354,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-simplify"
   run "mkdir -p espalier/maps"
   run "mkdir -p espalier/agents"
+  run "mkdir -p espalier/agents/modes"
   run "mkdir -p espalier/hooks"
   run "mkdir -p espalier/wiki"
   run "mkdir -p espalier/changes/_template"
@@ -383,6 +385,17 @@ stage_pure_copy() {
   # NOTE: espalier-review.md is NOT pure-copy (has {project} placeholder).
   run "cp '$PLUGIN_DIR/templates/pipeline.md' espalier/pipeline.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier.md' espalier/skills/espalier/SKILL.md"
+  # v0.25: the espalier skill is a router; each stage's procedure is a pure
+  # copy under espalier/skills/espalier/stages/ (read at stage entry), and
+  # the agents' mode-only sections are pure copies under
+  # espalier/agents/modes/ (read when the prompt names the mode).
+  local _sf
+  for _sf in "$PLUGIN_DIR"/templates/skills/espalier-stages/*.md; do
+    run "cp '$_sf' 'espalier/skills/espalier/stages/$(basename "$_sf")'"
+  done
+  for _sf in "$PLUGIN_DIR"/templates/agents/modes/*.md; do
+    run "cp '$_sf' 'espalier/agents/modes/$(basename "$_sf")'"
+  done
   run "cp '$PLUGIN_DIR/templates/skills/espalier-fix.md' espalier/skills/espalier-fix/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-requirements.md' espalier/skills/espalier-requirements/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-grill.md' espalier/skills/espalier-grill/SKILL.md"
@@ -1193,6 +1206,7 @@ stage_merge_decision() {
     _append_config_key canonical-remote "$CANON_REMOTE"
     _append_config_key canonical-branch "$CANON_BRANCH"
     _append_config_key max-open-tickets 9
+    _append_config_key grep-only-paths "__generated__/ schema.graphql schema.prisma"
   else
     cat > espalier/.espalier-config << 'ESPALIERCFG'
 # Espalier pipeline tuning. Key-value, one per line: `<key>: <integer>`.
@@ -1217,6 +1231,11 @@ max-rollbacks: 3
 # /espalier-map anti-waterfall cap: max OPEN decision tickets per map before
 # charting must narrow the destination, split the map, or raise this value.
 max-open-tickets: 9
+
+# Grep-only files (v0.25): space-separated path substrings. Tracked files that
+# match are listed in every context pack as "Grep-only" — agents search them
+# for a symbol, never Read them whole. Patterns and sizes, no threshold.
+grep-only-paths: __generated__/ schema.graphql schema.prisma
 ESPALIERCFG
     # Canonical-ref keys are DYNAMIC (detected) — appended after the quoted
     # heredoc, never interpolated into it.
@@ -1224,7 +1243,7 @@ ESPALIERCFG
       >> espalier/.espalier-config
     _append_config_key canonical-remote "$CANON_REMOTE"
     _append_config_key canonical-branch "$CANON_BRANCH"
-    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH)"
+    log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH; grep-only-paths default)"
   fi
 
   # Opt-in parallel push-gate sections (discovery proposed + human confirmed).
@@ -1464,11 +1483,11 @@ stage_validate() {
   # greenfield Pass 1 (espalier/.greenfield present) renders every
   # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
   # pending-skip — count and numbering unchanged.
-  local TOTAL_CHECKS=53
+  local TOTAL_CHECKS=56
   if want_copilot; then
-    TOTAL_CHECKS=63
+    TOTAL_CHECKS=66
   elif want_codex; then
-    TOTAL_CHECKS=58
+    TOTAL_CHECKS=61
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1631,7 +1650,7 @@ stage_validate() {
     run_check 31 "security-agent"      'test -f .claude/agents/harness-security.md' &
     run_check 32 "security-skill"      'test -f .claude/skills/espalier-security/SKILL.md' &
     run_check 33 "audit-skill"         'test -f .claude/skills/espalier-audit/SKILL.md' &
-    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
+    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md && grep -qF "## Repo-Audit Mode" espalier/agents/modes/repo-audit.md' &
     run_check 35 "production-rule"     '[ -L .claude/rules/espalier-production.md ] && [ -e .claude/rules/espalier-production.md ]' &
     run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   else
@@ -1640,7 +1659,7 @@ stage_validate() {
     run_check 31 "security-agent"      'test -f espalier/agents/harness-security.md' &
     run_check 32 "security-skill"      'test -f espalier/skills/espalier-security/SKILL.md' &
     run_check 33 "audit-skill"         'test -f espalier/skills/espalier-audit/SKILL.md' &
-    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md' &
+    run_check 34 "audit-mode"          'grep -qF "## Repo-Audit Mode" espalier/agents/harness-security.md && grep -qF "## Repo-Audit Mode" espalier/agents/modes/repo-audit.md' &
     run_check 35 "production-rule"     'test -f espalier/rules/production-standards.md' &
     run_check 36 "production-file"     'test -f espalier/rules/production-standards.md' &
   fi
@@ -1690,8 +1709,9 @@ stage_validate() {
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
     run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
-  # 57-63: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
-  # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane) — run
+  # 57-65: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
+  # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0
+  # quality-first context) — run
   # UNCONDITIONALLY, regardless of --platforms; appended after
   # the platform blocks so the shipped IDs 47-56 stay stable.
   run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
@@ -1711,14 +1731,28 @@ stage_validate() {
   else
     run_check 63 "simplify-skill"     'test -f espalier/skills/espalier-simplify/SKILL.md && grep -q "^name: espalier-simplify" espalier/skills/espalier-simplify/SKILL.md' &
   fi
+  # 64-65: v0.25.0 quality-first context. 64 — the context helpers + the
+  # grep-only-paths key (pure-copy + config, present from Pass 1). 65 — the
+  # spawn protocols in the agent bodies and lane skills (agents are Phase-2
+  # writes, so greenfield Pass 1 renders it pending).
+  run_check 64 "context-helpers"    'grep -q "^report_archive()" espalier/hooks/drift-helpers.sh && grep -q "^contract_extract()" espalier/hooks/drift-helpers.sh && grep -q "^exit_gate()" espalier/hooks/drift-helpers.sh && grep -q "^grep_only_files()" espalier/hooks/drift-helpers.sh && grep -q "^scoped_docs()" espalier/hooks/drift-helpers.sh && grep -q "^grep-only-paths:" espalier/.espalier-config' &
+  if gf; then
+    skip_check 65 "spawn-protocols" "pending greenfield Pass 2"
+  else
+    run_check 65 "spawn-protocols"    'grep -qF "## Handoff" espalier/agents/harness-coder.md && grep -qF -- "- HANDOFF: true" espalier/agents/harness-coder.md && grep -qF -- "- Spec applied:" espalier/agents/harness-coder.md && grep -qF "[spec-unread]" espalier/agents/harness-reviewer.md && cat espalier/skills/espalier/SKILL.md espalier/skills/espalier/stages/*.md | grep -qF "HANDOFF: true" && grep -qF "HANDOFF: true" espalier/skills/espalier-fix/SKILL.md && cat espalier/skills/espalier/stages/*.md | grep -qF -- "- Scoped docs:" && grep -qF -- "- Scoped docs:" espalier/skills/espalier-fix/SKILL.md && ! grep -qF "≤ 5 files" espalier/skills/espalier-requirements/SKILL.md && ! grep -qF "≤ 8" espalier/skills/espalier-grill/SKILL.md && ! grep -qF "≤ 8" espalier/skills/espalier-map/SKILL.md' &
+  fi
+  # 66: the router names every stage file, every stage + mode file is
+  # present, and every mode file is named on a prompt line (pure copies —
+  # present from greenfield Pass 1).
+  run_check 66 "stage-procedures"   'for f in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do [ -f "espalier/skills/espalier/stages/$f.md" ] && grep -qF "stages/$f.md" espalier/skills/espalier/SKILL.md || exit 1; done; for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do [ -f "espalier/agents/modes/$m.md" ] || exit 1; done; cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md espalier/skills/espalier-audit/SKILL.md > "$tmpdir/66.cat" && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do grep -qF "modes/$m.md" "$tmpdir/66.cat" || exit 1; done' &
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-63.
+  # must reach stdout, which the run_check harness discards), then 26-66.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-3] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-6] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

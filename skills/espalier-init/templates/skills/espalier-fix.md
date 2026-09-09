@@ -214,7 +214,7 @@ Options:
 checkout's branch: two branches can mint the same dated slug independently
 and collide only when the second PR merges — git surfaces it as add/add
 conflicts under `espalier/changes/`. The resolution recipe lives in
-`espalier/pipeline.md` → "Slug collisions across branches" (rename one dir to
+`espalier/skills/espalier-prune/SKILL.md` → "Slug collisions across branches" (rename one dir to
 the next free `-N` suffix, run `espalier/hooks/rebuild-commit-index.sh`, and
 rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
 
@@ -238,7 +238,10 @@ rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
    `PARTIAL_FIX` keeps its existing prompt ('Resume / extend' offer — see the
    collision table, step 11). `FILED` skeletons are not resumed here; they are
    adopted by the full lane's FILED-skeleton scan.
-3. If a matching `IN_PROGRESS` slug found, RESUME from its recorded stage.
+3. If a matching `IN_PROGRESS` slug found, RESUME from its recorded stage —
+   append `| {N} | RESUMED | {ts} | fresh session |` to Stage History first
+   (the row that closes the gap; `espalier-stats.sh` books the time before
+   it as human wait).
 4. Otherwise, derive slug (above) and create new `espalier/changes/fix/{slug}/`
    from `espalier/changes/_template/`. On creation, write `- Current Stage: 0`
    and `- Status: IN_PROGRESS` to the Status block — this is what the collision
@@ -268,7 +271,10 @@ Run this BEFORE Stage 0 Auto-Link Discovery. Source the drift helpers:
 
 Gather all three signals BEFORE prompting:
 1. **STALE** — `stale_files()` lists flagged files; `tier_counts()` buckets them
-   into fresh / aging / stale / critical / expired.
+   into fresh / aging / stale / critical / expired. Beside it, information
+   only: `contract_drift_lines` summed over `espalier/rules/*.md` — when the
+   total N is above 0 the pre-flight line gains ` · drift=N` (the rules
+   Writing Contract; never a prompt on its own).
 2. **CONV** — `conv_fold` (in `drift-helpers.sh`) folds the legacy
    `espalier/.conventions.tsv` AND any `espalier/conventions/*.tsv` per-key
    files into `key<TAB>diverges_count<TAB>status` lines; every key with status
@@ -644,6 +650,17 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.
 
+5. **Stage boundary (offered, never forced).** After **Approve** — the
+   approval row, `- Push-Target:`, and the context pack on disk — ask ONCE
+   (`AskUserQuestion`, first option default): `Continue here` /
+   `Continue in a fresh session — run /clear, then /espalier-fix with the
+   same bug text: the slug collision (step 11) offers Resume / extend this
+   fix at Stage 3` (bare `/espalier-fix` does not resume). Everything the
+   diagnosis grill read into this context stays resident on "Continue
+   here"; a fresh session starts from requirements.md and the pack. On the
+   fresh-session choice write `- Current Stage: 3` and stop. Skip the offer
+   on an unattended run (`interactivity_mode`).
+
 **Non-interactive exception:** auto-approve ONLY when EXPLICITLY unattended —
 `interactivity_mode` (in `drift-helpers.sh`) returns `unattended` (`CI` /
 `ESPALIER_UNATTENDED` / `ESPALIER_LOOP` / `ESPALIER_HEADLESS` set). Do NOT use a
@@ -662,11 +679,16 @@ first coder spawn):** write
 `espalier/changes/fix/{slug}/context-pack.md` — the fix-lane version is
 small: the requirement path, the layers involved and their spec paths (both
 already in requirements.md's `## Layers involved` / `## Files likely
-touched`), the four rules files, 1-2 reference files per touched layer, and
-the discovered build/lint/test commands. Paths and facts only, never
+touched`), the four rules files, 1-2 reference files per touched layer, the
+discovered build/lint/test commands, and the two helper-filled lines —
+`- Grep-only:` (`grep_only_files`) and `- Scoped docs:` (`scoped_docs` on
+the files likely touched; `none` when empty). Paths and facts only, never
 conclusions — every Stage 3-6 spawn below is pointed at it so no sub-agent
-re-derives the same discovery; agents verify against current code (see the
-espalier skill → "Stage 3 Entry: Context Pack" for the format).
+re-derives the same discovery; agents verify against current code (see
+`espalier/skills/espalier/stages/3-coding.md` → "Stage 3 Entry: Context
+Pack" for the format). Before the
+first coder spawn print `req_shape_check "espalier/changes/fix/{slug}"`
+(information only — headings outside the contract set).
 
 **Baseline (first entry only):** before spawning the coder, record
 `Base-Ref: $(git rev-parse HEAD)` as a line in this fix's pipeline-state.md. Never
@@ -677,10 +699,16 @@ Spawn sub-agent. Prompt:
 
 ```
 You are the harness-coder.
-Read espalier/agents/harness-coder.md for full instructions.
+Your instructions are espalier/agents/harness-coder.md (auto-loaded as your
+system prompt on Claude Code; read it only if it is not already in your
+context).
 
 CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
 paths and facts only, verify against current code.
+{On a continuation after a handoff add:}
+CONTINUATION: espalier/changes/fix/{slug}/coding-log/NN-handoff-{n}.md —
+read its ## Handoff first; its Facts are verified (cite them, do not
+re-derive), its Remaining is your task list.
 REQUIREMENT: {paste requirement summary from Stage 1}
 CAUSED BY: {caused_by list — read those changes' requirements + coding-report + review-record}
 TASK: Fix the bug described above. Stay within the file(s) identified.
@@ -704,21 +732,41 @@ espalier/changes/fix/{slug}/coding-report.md
 ```
 
 (With `test-mode: serial`, drop the TESTS lines — tests are written after
-the final panel PASS instead; see Stage 5/6. The mode read is the espalier
-skill's Stage 3 `test-mode` block — word-key grep with the
-`speculative-tests` legacy mapping.)
+the final panel PASS instead; see Stage 5/6. The mode read is the
+`test-mode` block of `espalier/skills/espalier/stages/3-coding.md` —
+word-key grep with the `speculative-tests` legacy mapping.)
 
 **Stage 3 exit gate (PROGRAMMATIC — one protocol, every coder return):**
-after the coder returns (first pass and every re-spawn):
+after the coder returns (first pass and every re-spawn), in this order —
+sentinel first, so a handoff report is archived before anything appends
+to it:
 
-1. re-run the discovered build + lint yourself as two concurrent background
-   jobs in ONE bash call (per-pid `wait`s capture both exit codes; per-job
-   temp-file output) unless the discovered commands plainly depend on each
-   other — concurrency changes the wait, never the gate;
-2. **folded:** run the discovered test command scoped to the coding
-   report's listed test files where the runner supports path filtering
-   (full suite where it does not) — the old Stage 5 "tests pass" gate,
-   moved earlier so the panel never reviews unexecuted tests;
+0. **handoff sentinel:**
+   `grep -q '^- HANDOFF: true' espalier/changes/fix/{slug}/coding-report.md`
+   (mirrors the `TEST_SCOPE_INFLATION` detector below). Present → the coder
+   handed off at a clean point: `. espalier/hooks/drift-helpers.sh &&
+   report_archive "espalier/changes/fix/{slug}" "handoff-{n}"` moves the
+   report to `coding-log/`, append `| 3 | HANDOFF {n} | {ts} | {remaining
+   item count}; next: {file} |`, run step 1 (the gate — green or red), SKIP
+   steps 2-4 (no report to verify), and re-spawn a fresh coder with the
+   SAME prompt plus the `CONTINUATION:` line naming
+   `coding-log/NN-handoff-{n}.md` (and the failing log when the gate was
+   red). The panel is spawned only on a report without the sentinel;
+1. **gate:** `exit_gate "espalier/changes/fix/{slug}"` (drift-helpers.sh —
+   the `run_build` / `run_lint` / `run_tests` bodies from the installed
+   `pre-push-gate.sh`: build + lint as two concurrent jobs, then — folded —
+   the discovered test command scoped to the coding report's listed test
+   files where the runner supports path filtering, full suite where it
+   does not; the old Stage 5 "tests pass" gate, moved earlier so the panel
+   never reviews unexecuted tests). Exit `0` green; `1` red — archive the
+   report (`report_archive … "exit-gate-fix"`) and return to the coder with
+   the failing job's log; `2` / `3` (a customised gate missing a `run_*`
+   function; the greenfield placeholder) mean "helper unavailable" — run
+   the gate by hand as before: build + lint as two concurrent background
+   jobs in ONE bash call (per-pid `wait`s, per-job temp-file output) unless
+   the discovered commands plainly depend on each other, then the scoped
+   test run — never red;
+2. **folded:** the scoped test run is part of step 1;
 3. **folded:** run the regression verification below — it RE-RUNS on every
    coder return (a fix round can rewrite the regression test) and
    re-appends its `- REGRESSION_VERIFIED:` line; readers take the LAST
@@ -734,6 +782,10 @@ after the coder returns (first pass and every re-spawn):
 All must exit 0 / not fire before the panel spawns. The coder's
 self-reported status is a claim, not the gate. A build/lint/test failure
 returns to the coder without a panel round and without counting a P0 round.
+`report_archive` runs before EVERY coder spawn after the first (labels:
+`stage3`, `handoff-{n}`, `round{n}-fix`, `exit-gate-fix`, `contract-phase`),
+so `coding-report.md` is always the CURRENT spawn's report and the
+`REGRESSION_VERIFIED` lines appended below land on it.
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
@@ -744,9 +796,10 @@ CURRENT diff, spawned concurrently — `harness-reviewer` (correctness / convent
 production readiness, → review-record.md) and `harness-security` (trust boundary —
 never trust frontend data, → security-record.md). BOTH records are OVERWRITTEN each
 round and end with a `VERDICT:` sentinel line. Before every panel spawn, run the
-Stage 3 programmatic gate: re-run the discovered build + lint commands yourself —
-the coder's self-report is a claim, not the gate; a failure goes back to the coder
-without spawning the panel and without counting a P0 round.
+Stage 3 programmatic gate — `exit_gate "espalier/changes/fix/{slug}"` (exit 2 / 3
+= run it by hand as before, never red) — the coder's self-report is a claim,
+not the gate; a failure goes back to the coder without spawning the panel and
+without counting a P0 round.
 
 1. **Baseline BOTH records** (`espalier/changes/fix/{slug}/review-record.md` and
    `.../security-record.md` — exists? size/mtime), then spawn the FRESH panel on
@@ -760,16 +813,21 @@ without spawning the panel and without counting a P0 round.
    scope for secrets / live-endpoint / fixture-data leakage only." Pass
    each agent the `CONTEXT PACK:` line
    (`espalier/changes/fix/{slug}/context-pack.md` — read first; paths and
-   facts only, verify against current code), `ROUND: {n}`, AND the
+   facts only, verify against current code), the coding-log line ("earlier
+   spawns' reports are in espalier/changes/fix/{slug}/coding-log/ — open one
+   only when the current report cites it or a finding needs the history"),
+   `ROUND: {n}`, AND the
    `CAUSAL CONTEXT` line (the `caused_by` slugs + "verify the fix does not
    regress these features' acceptance criteria — read their requirements.md")
    so the regression check reaches the reviewer at Stage 4, not only at Stage 6.
    On a re-review round, also hand each agent the "changed since last review" set
-   (the fix's files from the latest coding-report.md) — the panel re-reviews in
+   (the fix's files from the latest coding-report.md) with `read
+   espalier/agents/modes/re-review.md first (your section)` — the panel
+   re-reviews in
    DELTA SCOPE (fix files + prior findings + direct dependents as required
    reads; a floor, not a ceiling — expand on any suspicion; security runs
-   delta mode when its own prior round was clean — see each agent's
-   "Re-review Rounds" section). Both agents still return fresh current-round
+   delta mode when its own prior round was clean — the mode file holds each
+   agent's "Re-review Rounds" section). Both agents still return fresh current-round
    sentinels and still own the whole-change verdict: every line of the final
    diff got a fresh review in the round it last changed, build/lint re-runs
    before every round, and the fingerprint blocks unreviewed edits at push.
@@ -787,15 +845,18 @@ without spawning the panel and without counting a P0 round.
      with `p0=0` is still an escalation.
    - Verdict word `FAIL`, or `p0=` > 0, or `p1=` > 0 → re-spawn `harness-coder`
      with the combined findings and loop (counter + `max-code-rounds` cap
-     unchanged; the re-spawn prompt's first line is `FIX ROUND {n}: for
-     every P0/P1 below run the Class Sweep (harness-coder.md → Fix Rounds)
-     — fix every sibling of the defect class, not the flagged line; one
-     `### Class Sweep` block per finding in coding-report.md.`): snapshot
+     unchanged; the re-spawn prompt's first line is `FIX ROUND {n}: read
+     espalier/agents/modes/fix-round.md first, then for every P0/P1 below
+     run the Class Sweep — fix every sibling of the defect class, not the
+     flagged line; one `### Class Sweep` block per finding in
+     coding-report.md.`): snapshot
      both sentinels into pipeline-state.md Stage History
      — appending in the same notes cell one bracketed finding line per
      FAILING agent (`[{P-sev} {≤80-char summary}]`; this snapshot is the
      findings digest's only source — the records are overwritten next
-     round), re-spawn with the combined findings, then **return to step 1 and re-review
+     round), archive the current report (`report_archive
+     "espalier/changes/fix/{slug}" "stage3"` before the first fix round,
+     `"round{n-1}-fix"` after), re-spawn with the combined findings, then **return to step 1 and re-review
      the new diff with the whole panel.** Never advance to Stage 5 on the
      coder's fix report alone — a fix is never the last action before the gate;
      a clean panel is. Each non-PASS round increments the counter. Check the cap
@@ -816,6 +877,12 @@ without spawning the panel and without counting a P0 round.
    (so new files count), then overwrite `Reviewed-Diff` in pipeline-state.md with
    `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
    (`<Base-Ref>` = the Stage 3 SHA). The Stage 7 push gate blocks unless this still matches.
+   Then — after the Post-Review drift processing below — the **stage
+   boundary**, asked ONCE (`AskUserQuestion`, first option default):
+   `Continue here` / `Continue in a fresh session — run /clear, then
+   /espalier-fix with the same bug text; the slug collision offers Resume /
+   extend at Stage 5`. On the fresh-session choice write `- Current Stage: 5`
+   and stop; skip the offer on an unattended run.
 
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
@@ -884,10 +951,13 @@ it is a promotion candidate, surfaced at the next Stage 0 pre-flight.
 
 ## Stage 5/6 (folded): the contract phase
 
-Run the espalier skill's "Stage 5/6 (folded): the contract phase" protocol
-— it is shared verbatim: contract detection
+Run `espalier/skills/espalier/stages/5-6-contract.md` — read it now — the
+"Stage 5/6 (folded): the contract phase" protocol, shared verbatim:
+contract detection
 (`grep -q '^## Security-Sensitive Fields' espalier/changes/fix/{slug}/security-record.md`
-after the final panel PASS); no contract → both SKIPPED rows
+after the final panel PASS, then `contract_extract "espalier/changes/fix/{slug}"`
+→ `security-contract.md`, the file the contract spawn and the delta review
+read); no contract → both SKIPPED rows
 (`| 5 | SKIPPED | {ts} | folded: no contract |`,
 `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |`), `Current Stage: 7`,
 zero post-panel spawns; non-empty contract → contract spawn → exit-gate
@@ -909,7 +979,9 @@ certificate refresh. Fix-lane deltas:
 **`test-mode: serial`:** after the final panel PASS, one test-coder spawn
 writes the regression + original-feature + failure-mode tests PLUS the
 contracted abuse tests (reading security-record.md's
-`## Security-Sensitive Fields`), appending directly to coding-report.md —
+`## Security-Sensitive Fields` — via security-contract.md when extracted),
+writing its report fresh to coding-report.md (the orchestrator archives the
+Stage 3 report first — `report_archive … "stage3"` / `"round{n}-fix"`) —
 then the serial Stage 6 review below. The signal greps run against
 coding-report.md, exactly as pre-v0.22.
 
@@ -953,6 +1025,14 @@ BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | 
 COD="espalier/changes/fix/${SLUG}/coding-report.md"
 REG_TESTS="{the regression test file(s) the coder just wrote}"   # from coding-report.md
 REG_RUN="{the project's test runner scoped to ONLY $REG_TESTS — see above}"
+
+# Handoff guard — a report carrying the sentinel is archived and continued
+# by a fresh coder (Stage 3 exit gate, step 0); nothing appends to it, and
+# an already-archived report must not be recreated by an append below.
+if [ ! -f "$COD" ] || grep -q '^- HANDOFF: true' "$COD"; then
+  echo "REGRESSION_VERIFIED: skipped this return — coding-report.md is a handoff (archived; continuation coder next)"
+  exit 0
+fi
 
 # Harness failure (couldn't run) vs assertion failure (ran and failed) —
 # conflating them is how a test that never executed gets certified.
@@ -1024,7 +1104,9 @@ Spawn `harness-reviewer`:
 
 ```
 You are the harness-reviewer reviewing tests for a fix.
-Read espalier/agents/harness-reviewer.md.
+Your instructions are espalier/agents/harness-reviewer.md (auto-loaded as
+your system prompt on Claude Code; read it only if it is not already in
+your context). Read espalier/agents/modes/stage6-abuse-coverage.md first.
 
 CONTEXT PACK: espalier/changes/fix/{slug}/context-pack.md — read it first;
 paths and facts only — your verdict comes from the tests you read.
@@ -1033,8 +1115,8 @@ CAUSAL CONTEXT: this fix is caused by {paste caused_by entries}. Verify the
 tests don't regress those original features (read their acceptance criteria).
 ROUND: {n} — put round={n} in your VERDICT sentinel line.
 {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {the test files the Stage 5
-fix re-spawn touched, from the latest coding-report.md}. Re-review in delta
-scope per your "Re-review Rounds" section.
+fix re-spawn touched, from the latest coding-report.md}. Read
+espalier/agents/modes/re-review.md first and re-review in delta scope.
 
 Check:
 - Regression test would have failed on pre-fix code. The orchestrator recorded
@@ -1044,8 +1126,9 @@ Check:
   that the ASSERTIONS are meaningful, not tautological.
 - Original feature's acceptance criteria still pass
 - No tests are tautological (asserting the fix's masked behaviour instead of intended)
-- Security coverage: every field in security-record.md's `## Security-Sensitive
-  Fields` contract has a passing abuse test (tamper → rejected → store unchanged).
+- Security coverage: every field in security-contract.md (fallback:
+  security-record.md's `## Security-Sensitive Fields` block) has a passing
+  abuse test (tamper → rejected → store unchanged).
   A missing one is a P0 → back to Stage 5.
 - Failure-mode coverage: every NEW external-call path has a dependency-failure
   test (per espalier/rules/production-standards.md). A missing one is a P1.

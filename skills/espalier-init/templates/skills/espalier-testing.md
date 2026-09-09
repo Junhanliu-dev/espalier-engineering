@@ -29,9 +29,10 @@ description: Test writing skill matching project's testing patterns
 - Error paths (not just happy path)
 
 ## Security Abuse Tests (when a security contract is present)
-When the change has an `espalier/changes/{type}/{slug}/security-record.md` with a
-`## Security-Sensitive Fields` contract (from the Stage 4 `harness-security` audit),
-write a negative test for EACH field. The shape is always **tamper → assert
+When the change has an `espalier/changes/{type}/{slug}/security-contract.md` —
+the `## Security-Sensitive Fields` block the orchestrator extracted from the
+Stage 4 `harness-security` audit (if the file is absent, read the block from
+`security-record.md`) — write a negative test for EACH field. The shape is always **tamper → assert
 rejected → assert persistent store unchanged**:
 - tamper the value (foreign id, `$0.01` price, `isAdmin=true`, illegal status)
 - assert the request is rejected (403 / 404 / 422 per project convention)

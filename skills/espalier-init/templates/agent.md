@@ -25,8 +25,8 @@ following the Espalier structure below.
 | Requirements | espalier/skills/espalier-requirements/ | Requirement decomposition | Analysis phase |
 | Grill | espalier/skills/espalier-grill/ | Stage 1 requirement/diagnosis interrogation | Analysis phase |
 | Wiki | espalier/wiki/ | Business context | On demand |
-| Pipeline | espalier/pipeline.md | Stage definitions | Via /espalier |
-| Config | espalier/.espalier-config | Escalation caps: review-round (max-req/code/test-rounds) + max-rollbacks, default 3; canonical-remote/canonical-branch (integration ref for maintenance discipline + race guard) | Stage 2/4/6 gates + rollback + maintenance |
+| Pipeline | espalier/pipeline.md | Stage contract (trigger / load / gate / output / limit); the procedure is espalier/skills/espalier/stages/*.md, read at stage entry; agent mode text is espalier/agents/modes/*.md, read when a prompt names it | Via /espalier |
+| Config | espalier/.espalier-config | Escalation caps: review-round (max-req/code/test-rounds) + max-rollbacks, default 3; canonical-remote/canonical-branch (integration ref for maintenance discipline + race guard); grep-only-paths (generated files the context pack lists as Grep-only — searched, never Read) | Stage 2/4/6 gates + rollback + maintenance + Stage 3 pack |
 | Fix      | espalier/skills/espalier-fix/ | Bug-fix orchestrator, 7 stages (0–7, no Stage 2) | Via /espalier-fix |
 | Ask      | espalier/skills/espalier-ask/ | Read-only Q&A over espalier/ docs | Via /espalier-ask |
 | Audit    | espalier/skills/espalier-audit/ | Repo-wide security audit → wiki/security-audit.md | Via /espalier-audit |

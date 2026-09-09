@@ -68,12 +68,24 @@ SEC_MARK='**Class-sweep verification (your own findings).**'
 LANE_MARK='FIX ROUND {n}:'
 SKIPFILE="espalier/.migrations-skipped"
 
-grep -qF "$CODER_MARK" "$TPL/agents/harness-coder.md" 2>/dev/null \
-  && grep -qF "$LANE_MARK" "$TPL/skills/espalier.md" 2>/dev/null \
-  || die "plugin dir $PLUGIN_DIR is not v0.23.1 (templates lack the class-sweep text). Update the plugin first."
+# v0.25+ plugins keep the class-sweep text in espalier/agents/modes/ (the
+# body carries the heading + a pointer) and the FIX ROUND line in the
+# espalier skill's stages/4-panel.md — extract from wherever the plugin
+# holds it, so a chain that starts below v0.23.1 still applies this step.
+_src_for() {  # TEMPLATE END-ANCHOR MODE-FILE → the file that carries the END anchor
+  if grep -qF -- "$2" "$1" 2>/dev/null; then printf '%s' "$1"; else printf '%s' "$3"; fi
+}
+CODER_SRC=$(_src_for "$TPL/agents/harness-coder.md"    'the reviewer files it as a P1 and the round repeats.' "$TPL/agents/modes/fix-round.md")
+REV_SRC=$(_src_for   "$TPL/agents/harness-reviewer.md" 'finding, filed early.'                                "$TPL/agents/modes/re-review.md")
+SEC_SRC=$(_src_for   "$TPL/agents/harness-security.md" 'sibling doors open is still open.'                    "$TPL/agents/modes/re-review.md")
+LANE_SRC="$TPL/skills/espalier.md"; grep -qF "$LANE_MARK" "$LANE_SRC" 2>/dev/null || LANE_SRC="$TPL/skills/espalier-stages/4-panel.md"
+grep -qF "$CODER_MARK" "$CODER_SRC" 2>/dev/null \
+  && grep -qF "$LANE_MARK" "$LANE_SRC" 2>/dev/null \
+  || die "plugin dir $PLUGIN_DIR is not v0.23.1+ (templates lack the class-sweep text). Update the plugin first."
 
-handled() {  # $1 = marker, $2 = file, $3 = skip label
-  grep -qF "$1" "$2" 2>/dev/null || grep -qF "v0.23.1-$3" "$SKIPFILE" 2>/dev/null
+handled() {  # $1 = marker, $2 = file, $3 = skip label — a v0.25+ install holds the text in espalier/agents/modes/
+  grep -qF "$1" "$2" 2>/dev/null || grep -qsF "$1" espalier/agents/modes/*.md 2>/dev/null \
+    || grep -qF "v0.23.1-$3" "$SKIPFILE" 2>/dev/null
 }
 
 missing=""
@@ -182,7 +194,7 @@ CODER=espalier/agents/harness-coder.md
 if ! handled "$CODER_MARK" "$CODER" coder-class-sweep; then
   ANCH='## Editing Discipline'
   if grep -qF -- "$ANCH" "$CODER"; then
-    extract_block "$TPL/agents/harness-coder.md" "$CODER_MARK" 'the reviewer files it as a P1 and the round repeats.'
+    extract_block "$CODER_SRC" "$CODER_MARK" 'the reviewer files it as a P1 and the round repeats.'
     insert_before "$CODER" "$ANCH"
     log "inserted coder Fix Rounds (class sweep) section"
   else
@@ -195,7 +207,7 @@ REV=espalier/agents/harness-reviewer.md
 if ! handled "$REV_MARK" "$REV" reviewer-class-sweep; then
   ANCH='re-spawned again after the next fix.'
   if grep -qF -- "$ANCH" "$REV"; then
-    extract_block "$TPL/agents/harness-reviewer.md" "$REV_MARK" 'finding, filed early.'
+    extract_block "$REV_SRC" "$REV_MARK" 'finding, filed early.'
     insert_after "$REV" "$ANCH"
     log "inserted reviewer class-sweep verification step"
   else
@@ -208,7 +220,7 @@ SEC=espalier/agents/harness-security.md
 if ! handled "$SEC_MARK" "$SEC" security-class-sweep; then
   ANCH='trusts no sensitive client value.'
   if grep -qF -- "$ANCH" "$SEC"; then
-    extract_block "$TPL/agents/harness-security.md" "$SEC_MARK" 'sibling doors open is still open.'
+    extract_block "$SEC_SRC" "$SEC_MARK" 'sibling doors open is still open.'
     insert_after "$SEC" "$ANCH"
     log "inserted security class-sweep verification step"
   else
