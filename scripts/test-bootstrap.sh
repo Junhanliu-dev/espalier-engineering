@@ -136,6 +136,7 @@ description: smoke
 tools: Read
 ---
 ## Repo-Audit Mode
+7. Scoped docs named in the pack
 EOF
   cat > "$dir/espalier/rules/security-standards.md" << 'EOF'
 # Security Standards
@@ -2094,6 +2095,17 @@ M35_RERUN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=a
 assert "35g re-run with all platforms: total $N_ALL, config key appended once" \
   "echo \"\$M35_RERUN\" | grep -q 'Validation: $N_ALL/$N_ALL passed' \
    && [ \"\$(grep -c '^grep-only-paths:' '$TMP/espalier/.espalier-config')\" -eq 1 ]"
+# 35s-u: the migrate skill's Step 1 detection block (extracted from SKILL.md,
+# run as-is) must call a current install current — the supersession floor
+# keeps retired-phrase probes from re-flagging an install that carries a
+# later release. A wrapper prints the flags for the not-current case.
+DETECT35=$(mktemp -t detect35.XXXX); DETECT35F=$(mktemp -t detect35f.XXXX)
+awk '/^### Step 1: Preflight/{s=1} s && /^### Step 2/{exit} s' "$SCRIPT_DIR/../skills/espalier-migrate/SKILL.md" \
+  | awk '/^```bash/{b=1; next} /^```/{b=0; next} b' > "$DETECT35"
+{ cat "$DETECT35"; echo 'echo "FLAGS:$NEEDS_V0250_PATCH/$NEEDS_V0240_PATCH/$NEEDS_V0231_PATCH/$NEEDS_V0220_PATCH/$NEEDS_V0211_PATCH/$NEEDS_V0170_PATCH/$NEEDS_V0131_PATCH"'; } > "$DETECT35F"
+assert "35s migrate-skill detection on a fresh v0.25.0 install: floor v0.25.0, 'Already fully up to date' (no retired-phrase probe fires)" \
+  "[ -s '$DETECT35' ] && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0250_PATCH' ) \
+   && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'Already fully up to date' )"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # 35h-m: migration v0.24.0 → v0.25.0 on a REAL v0.24.0-shaped install — the
@@ -2150,6 +2162,9 @@ else
     "echo \"\$M250_DRY\" | grep -q 'coder Handoff section' && echo \"\$M250_DRY\" | grep -q 'drift-helpers.sh context helpers' \
      && ! grep -q '^scoped_docs()' '$TMP/espalier/hooks/drift-helpers.sh' && ! ls '$TMP'/espalier/*.pre-v0.25.bak >/dev/null 2>&1 \
      && ! grep -q '^grep-only-paths' '$TMP/espalier/.espalier-config'"
+  assert "35t migrate-skill detection on the real v0.24.0 install BEFORE migration: floor v0.24.0, only v0.25.0 flagged (v0.23.1 / v0.22.0 / v0.21.1 / v0.17.0 / v0.13.1 stay no)" \
+    "( cd '$TMP' && bash '$DETECT35F' 2>&1 | grep -q 'floor: NEEDS_V0240_PATCH' ) \
+     && ( cd '$TMP' && bash '$DETECT35F' 2>&1 | grep -q 'FLAGS:yes/no/no/no/no/no/no' )"
   RULE_SHA_BEFORE=$(git -C "$TMP" hash-object espalier/rules/coding-standards.md)
   REQ_SHA_BEFORE=$(git -C "$TMP" hash-object espalier/changes/feat/2026-09-09-x/requirements.md)
   ES_BEFORE=$(cat "$TMP/espalier/rules/engineering-structure.md")
@@ -2192,8 +2207,12 @@ else
   assert "35k re-run is a no-op" "echo \"\$M250_RERUN\" | grep -qi 'nothing to do'"
   assert "35l validate-only passes on the migrated install (checks 64-65 live, claude-only total $N_CLAUDE)" \
     "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' )"
+  assert "35u migrate-skill detection on the migrated install: floor v0.25.0, 'Already fully up to date'" \
+    "( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0250_PATCH' ) \
+     && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'Already fully up to date' )"
   [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 fi
+rm -f "$DETECT35" "$DETECT35F"
 
 # 35m-n: customised agent files (the simulate_llm_writes stubs, stripped of
 # their v0.25 marker lines) — anchored edits skip-with-record, everything
@@ -2205,6 +2224,7 @@ simulate_llm_writes "$TMP" typescript
 ( cd "$TMP" \
   && grep -v 'Handoff\|Spec applied\|HANDOFF\|Commit Discipline' espalier/agents/harness-coder.md > a.tmp && mv a.tmp espalier/agents/harness-coder.md \
   && grep -v 'spec-unread' espalier/agents/harness-reviewer.md > b.tmp && mv b.tmp espalier/agents/harness-reviewer.md \
+  && grep -v 'Scoped docs named' espalier/agents/harness-security.md > s.tmp && mv s.tmp espalier/agents/harness-security.md \
   && grep -v '^grep-only-paths' espalier/.espalier-config > c.tmp && mv c.tmp espalier/.espalier-config )
 M250_SKIP=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
 M250_SKIP_RC=$?
