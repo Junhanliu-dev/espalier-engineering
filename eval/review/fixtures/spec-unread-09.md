@@ -11,11 +11,13 @@ planted_issues:
     hint: "the report's '- Spec applied:' line names '§ Retry policy'; specs/services.md has no such section (Function shape / Status values / Results only) and the code wraps nothing in a retry helper — expected an advisory [spec-unread] row naming the section"
 false_positive_watch:
   - "the code itself is clean and follows every rule in the spec and coding-standards — no P0/P1 on the code"
-  - "findOrder/saveOrder are repository (internal) calls — do NOT flag a missing timeout"
+  - "findOrder/transitionOrderStatus are repository (internal) calls — do NOT flag a missing timeout"
   - "orderId/actorId are already-parsed service params — do NOT flag missing input validation"
+  - "the status change is an atomic conditional update in the repository (transitionOrderStatus updates only while the stored status is still cancellable; a null result is the conflict) — do NOT flag read-modify-write, a missing transaction, or a lost update; the preceding findOrder serves only the not-found / soft-deleted check"
+  - "the entry log is the spec's required first statement and an outcome log follows the success path — do NOT flag missing structured logging"
 shadow: false
 ---
-const { findOrder, saveOrder } = require('../repositories/order-repo');
+const { findOrder, transitionOrderStatus } = require('../repositories/order-repo');
 const { ORDER_STATUS } = require('./order-status');
 const { AppError } = require('../errors');
 const logger = require('../logger');
@@ -25,10 +27,11 @@ async function cancelOrder(orderId, actorId) {
   logger.info('cancelOrder', { orderId, actorId });
   const order = await findOrder(orderId);
   if (!order || order.deletedAt) return { ok: false, err: new AppError('not found') };
-  if (order.status === ORDER_STATUS.shipped || order.status === ORDER_STATUS.cancelled) {
-    return { ok: false, err: new AppError('conflict') };
-  }
-  const updated = await saveOrder({ ...order, status: ORDER_STATUS.cancelled });
+  // atomic conditional update at the store: succeeds only while the stored
+  // status is still cancellable; null means the row moved on (shipped/cancelled)
+  const updated = await transitionOrderStatus(orderId, [ORDER_STATUS.placed], ORDER_STATUS.cancelled);
+  if (!updated) return { ok: false, err: new AppError('conflict') };
+  logger.info('cancelOrder', { orderId, actorId, outcome: 'cancelled' });
   return { ok: true, value: updated };
 }
 

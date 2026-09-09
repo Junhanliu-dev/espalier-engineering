@@ -15,7 +15,10 @@ TPL="$HERE/../../skills/espalier-init/templates"
 CODER_TPL="$TPL/agents/harness-coder.md"
 CODING_SKILL_TPL="$TPL/skills/espalier-coding.md"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# KEEP_WORK=1 preserves the throwaway projects (their git history — the v0.25
+# coder commits its units — and coding reports) for debugging.
+KEEP_WORK="${KEEP_WORK:-0}"
+[ "$KEEP_WORK" = "1" ] || trap 'rm -rf "$WORK"' EXIT
 
 GATE_PASS_RATE="0.80"
 
@@ -83,7 +86,7 @@ Read $proj/espalier/agents/harness-coder.md and follow it EXACTLY, plus $proj/es
 
 TASK: $task
 $tests_clause$pack_clause
-Implement it (primary file: $proj/$target). Write your coding-report to $proj/espalier/changes/feat/eval/coding-report.md." >/dev/null 2>&1 || return 1
+Implement it (primary file: $proj/$target). Write your coding-report to $proj/espalier/changes/feat/eval/coding-report.md." > "$WORK/$fid.agent.log" 2>&1 || return 1
 }
 
 judge() {
@@ -131,7 +134,10 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   diff_file="$WORK/$fid.diff"
   # src/ AND tests/ — folded fixtures write test files, and a diff that
   # excludes them would judge the tests duty unfulfilled regardless of output.
-  ( cd "$proj" && git add -A && git diff --cached -- 'src/' 'tests/' ) > "$diff_file" 2>/dev/null || true
+  # Diff from the runner's baseline commit (the root), not the index: the
+  # v0.25 coder commits each bounded unit as it goes (Commit Discipline), so
+  # an index diff would read a committed change as "no code".
+  ( cd "$proj" && git add -A && git diff --cached "$(git rev-list --max-parents=0 HEAD)" -- 'src/' 'tests/' ) > "$diff_file" 2>/dev/null || true
   report="$proj/espalier/changes/feat/eval/coding-report.md"
 
   if [ ! -s "$diff_file" ]; then
@@ -191,12 +197,32 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
   spec_ok=1; sflag=""
   spec_fx="$(sed -n -E 's/^spec:[[:space:]]*//p' "$fixture" | head -1)"
   if [ -n "$spec_fx" ]; then
-    sline="$(grep -m1 '^- Spec applied:' "$report" 2>/dev/null || true)"
-    if [ -z "$sline" ]; then sres="missing"
-    elif printf '%s' "$sline" | grep -qE '^- Spec applied: none'; then sres="none"
-    else
-      sec="$(printf '%s' "$sline" | awk -F'§' 'NF>1{print $2}' | awk -F'—' '{print $1}' | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//')"
-      if [ -n "$sec" ] && grep -qiE "^##+ .*$sec" "$proj/espalier/skills/espalier-coding/specs/$spec_fx.md"; then sres="ok"; else sres="bad-section"; fi
+    # Every `- Spec applied:` line (one per touched layer). A line is `none`
+    # when it says so (`none — no spec for {layer}`); otherwise every cited
+    # section — `§ A / B, C` on that line — must be a heading of the spec.
+    # Only the first physical line of a wrapped entry is read.
+    spec_file="$proj/espalier/skills/espalier-coding/specs/$spec_fx.md"
+    sres="missing"; n_lines=0; n_ok=0; n_none=0
+    while IFS= read -r sline; do
+      [ -n "$sline" ] || continue
+      n_lines=$((n_lines + 1))
+      body="${sline#*- Spec applied:}"
+      if printf '%s' "$body" | grep -qiE '(^|[^a-z])none([^a-z]|$)'; then n_none=$((n_none + 1)); continue; fi
+      cited="$(printf '%s' "$body" | awk -F'§' 'NF>1{ $1=""; print }' | awk -F'—' '{print $1}')"
+      [ -n "$(printf '%s' "$cited" | tr -d '[:space:]')" ] || { sres="bad-section"; break; }
+      line_ok=1
+      for sec in $(printf '%s' "$cited" | sed -E 's/ and / \/ /g' | tr '/,;+' '\n\n\n\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/^`//; s/`$//; s/ /_/g' | grep -v '^$'); do
+        sec="$(printf '%s' "$sec" | tr '_' ' ')"
+        grep -qiE "^##+ .*$sec" "$spec_file" || line_ok=0
+      done
+      [ "$line_ok" = 1 ] && n_ok=$((n_ok + 1)) || { sres="bad-section"; break; }
+    done <<EOF
+$(grep '^- Spec applied:' "$report" 2>/dev/null || true)
+EOF
+    if [ "$sres" != "bad-section" ]; then
+      if [ "$n_lines" -eq 0 ]; then sres="missing"
+      elif [ "$n_ok" -gt 0 ]; then sres="ok"
+      else sres="none"; fi
     fi
     sflag="\tspec-line=$sres"
     if [ "${SPEC_LINE:-gate}" = "gate" ] && [ "$sres" != "ok" ]; then spec_ok=0; fi

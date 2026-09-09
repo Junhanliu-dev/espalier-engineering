@@ -19,7 +19,11 @@ REVIEW_SKILL_TPL="$TPL/skills/espalier-review.md"
 PROD_RULE_TPL="$TPL/rules/production-standards.md"
 SEC_RULE_TPL="$TPL/rules/security-standards.md"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# KEEP_WORK=1 preserves the throwaway projects, records, and per-fixture judge
+# lines for debugging / attribution (default: clean up on exit).
+KEEP_WORK="${KEEP_WORK:-0}"
+[ "$KEEP_WORK" = "1" ] || trap 'rm -rf "$WORK"' EXIT
+if [ "$KEEP_WORK" = "1" ]; then : > "$WORK/judge-lines.tsv"; echo "KEEP_WORK: $WORK"; fi
 
 GATE_CATCH_RATE="0.80"
 
@@ -113,7 +117,7 @@ Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review aga
 
 WHAT TO REVIEW: read $cdir/coding-report.md, then EVERY file it lists (under $proj/). When it lists test files, your verdict covers the tests too — run your test checklist on them with the code in view.
 
-Write your review to $cdir/review-record.md using your instruction file's EXACT output format (findings table with Priority + Verdict). You have no Write/Edit tool — use a Bash heredoc/redirection." >/dev/null 2>&1 || return 1
+Write your review to $cdir/review-record.md using your instruction file's EXACT output format (findings table with Priority + Verdict). You have no Write/Edit tool — use a Bash heredoc/redirection." > "$WORK/$fid.agent.log" 2>&1 || return 1
 }
 
 judge() {
@@ -159,6 +163,10 @@ for fixture in "$FIXTURES"/$FIXTURE_GLOB; do
 
   planted="$(printf '%s' "$line" | sed -E 's/.*"planted":([0-9]+).*/\1/')"
   caught="$(printf '%s'  "$line" | sed -E 's/.*"caught":([0-9]+).*/\1/')"
+  if [ "$KEEP_WORK" = "1" ]; then
+    cp "$record" "$WORK/$fid.record.md" 2>/dev/null || true
+    printf '%s\t%s\n' "$fid" "$line" >> "$WORK/judge-lines.tsv"
+  fi
   fp="$(printf '%s'      "$line" | sed -E 's/.*"false_positives":([0-9]+).*/\1/')"
   vmatch="$(printf '%s'  "$line" | sed -E 's/.*"verdict_match":([01]).*/\1/')"
 
