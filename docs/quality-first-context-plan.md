@@ -1312,6 +1312,23 @@ Suite sizes are expected to land near bootstrap 311 → ~345, hooks
 
 ## 15. Revision history
 
+- r4.9 (2026-09-09): **Commit Discipline** (owner: "the current commit
+  behaviour is to commit large chunk into one single commit, make the
+  coders and other agents do better commit behaviour"). Coder section
+  `## Commit Discipline: Small, Atomic, Named` (one bounded unit per commit
+  at a clean point, project Commit Conventions, staged by path, never
+  rewrite what a panel saw, no git under PARALLEL DISPATCH — the
+  orchestrator commits each part after the wave), `- Commits:` report line,
+  handoff commits its finished units first; reviewer advisory `commits:`
+  tag reading `git log <Base-Ref>..HEAD`; COMMITS prompt lines in both
+  lanes; fix-round commit per class, contract-phase `test(...)` commit;
+  Stage 7 commits only what is left by path (`chore(espalier):` for the
+  records), never squashes, records every commit in `Base-Ref..HEAD`
+  (`## Commits` one row per SHA — the fix lane's blame needs it); fix-lane
+  revert covers the range; `development-process.md` managed block gains
+  the atomic-commits bullet; stats `commits per change`; check 65 marker;
+  migration #35 anchored steps (section, You-Must-NOT bullet, rule bullet);
+  Test 35r, T22m. No number anywhere: small is a seam.
 - r4.8 (2026-09-09): **v0.25.1 folded into v0.25.0** (owner). B.2: the
   espalier skill is a 22 KB router (Stage Execution Protocol gains a
   procedure table + the cross-stage sequencing rule; every historical

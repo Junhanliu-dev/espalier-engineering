@@ -17,7 +17,7 @@ transcripts and 45 orchestrator sessions (design + field evidence in
 41–57 % of every agent's spend, half of all coder tokens are processed
 above 200k context, the on-demand layer (layer spec, scoped docs) was
 opened inconsistently, and nested workspace docs never reached a subagent
-before Claude Code 2.1.259. Suites: bootstrap 328/328, hooks 193/193;
+before Claude Code 2.1.259. Suites: bootstrap 329/329, hooks 193/193;
 validation is 56/61/66 by platform set (new checks 64–66).
 
 - **Bounded coder work + the Handoff protocol** (`harness-coder.md`,
@@ -174,6 +174,34 @@ validation is 56/61/66 by platform set (new checks 64–66).
   the config key, and prints report-only lines (requirement shape per
   IN_PROGRESS change, rules contract drift). No instruction-file line, no
   hooks, no symlinks.
+- **Commit discipline — small, atomic, named.** The coder commits its own
+  work as it goes, one bounded unit per commit at a clean point (build and
+  lint green, the unit's tests pass): a preparing refactor before the
+  behaviour change, tests in the commit of the code they prove, generated
+  output and scoped-doc edits as their own commits — never the whole task
+  as one commit at the end, never `git add -A`, never `espalier/` records
+  (the orchestrator's `chore(espalier):` commit owns them). Messages follow
+  the project's discovered Commit Conventions
+  (`espalier/rules/development-process.md`; Conventional Commits where the
+  log says so), body cites `{type}/{slug}`, no tool attribution trailer
+  unless the convention asks; fix rounds commit one `fix({scope}): {class}
+  (review round {n})` per defect class and never amend a commit a panel
+  round has seen; the contract phase commits `test({scope}): abuse tests
+  for {fields}`; a handoff commits its finished units first. Under
+  PARALLEL DISPATCH no coder runs git (shared working tree) — each part
+  carries `- Commit: {message}` and the orchestrator commits the part's
+  files as one commit after the wave, in order. Stage 7 commits only what
+  is left, by path and under the report's message, then the change's
+  records as one `chore(espalier):` commit; it never squashes or rebases
+  (squash-merge is the pull request's policy) and records EVERY commit in
+  `Base-Ref..HEAD` in `## Commits` — the fix lane's blame resolves a line
+  to one commit, so every commit must map to its change; the fix lane's
+  late-escalation revert covers the range. The reviewer reads
+  `git log --oneline <Base-Ref>..HEAD` beside the diff and files a commit
+  that bundles unrelated seams, or a message off the convention, as an
+  advisory `commits:` row (P3). `espalier-stats.sh` reports commits per
+  change. The rule template's managed Maintenance Commits block gains the
+  atomic-commits bullet; check 65 asserts the coder section.
 - **Procedure at the point of use — the router, the contract, the mode
   files.** The `/espalier` skill is a ROUTER (22 KB, from 64): pre-flight,
   convention promotion, session resumption, the Stage Execution Protocol
