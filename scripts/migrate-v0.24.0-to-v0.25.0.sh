@@ -20,9 +20,9 @@
 #     migration has used for these files.
 #   - Anchored edits, text EXTRACTED from the plugin templates at run time so
 #     a migrated install is byte-identical to a fresh one in those sections:
-#     harness-coder.md (Handoff protocol, Docs clause, read-once / Grep-only /
-#     Scoped-docs lines, report shape + hygiene, rules reword lines, contract
-#     file reads); harness-reviewer.md (Before Reviewing lines, spec-citation
+#     harness-coder.md (Handoff protocol, Commit Discipline, Docs clause,
+#     read-once / Grep-only / Scoped-docs lines, report shape + hygiene, rules
+#     reword lines, contract file reads); harness-reviewer.md (Before Reviewing lines, spec-citation
 #     check, advisory row rules + `docs:` tag, contract file read);
 #     harness-security.md (Before Auditing lines); the seven mode-only
 #     sections (coder Fix Rounds + Simplification Changes; reviewer Re-review
@@ -31,7 +31,8 @@
 #     at the mode file (the text is read when the prompt names the mode);
 #     the espalier-testing SKILL (contract file read); espalier/agent.md
 #     (Config + Pipeline rows); espalier/rules/engineering-structure.md
-#     (`## Not Precedent` anchor).
+#     (`## Not Precedent` anchor); espalier/rules/development-process.md (the
+#     atomic-commits bullet in the managed Maintenance Commits block).
 #     A customised file missing its anchor is skipped with a record in
 #     espalier/.migrations-skipped, never mangled. An install that already
 #     carries a section's v0.25 text (the rules reword lines on some installs)
@@ -102,6 +103,12 @@ NP_TOKEN='ESPALIER NOT PRECEDENT v1'
 # coder
 CODER_HANDOFF='## Handoff: Finish Bounded, Hand Off Clean'
 CODER_HANDOFF_END='task list.'
+CODER_COMMITS='## Commit Discipline: Small, Atomic, Named'
+CODER_COMMITS_END='an advisory `commits:` row.'
+CODER_NOGIT='(see Commit Discipline)'
+CODER_NOGIT_END='(see Commit Discipline)'
+DEVPROC_MARK='Pipeline commits are atomic'
+DEVPROC_END="pull request's policy."
 CODER_DOCS='**Docs.** When your change makes a claim'
 CODER_DOCS_END="\`/espalier-prune\`'s, not yours."
 CODER_READ='8. Read once.'
@@ -180,6 +187,8 @@ AGENT=espalier/agent.md
 RULE=espalier/rules/engineering-structure.md
 handled "$CODER_HANDOFF"  "$CODER" coder-handoff    || mark "coder Handoff section"
 handled "$CODER_DOCS"     "$CODER" coder-docs       || mark "coder Docs clause"
+handled "$CODER_COMMITS"  "$CODER" coder-commit-discipline || mark "coder Commit Discipline section"
+handled "$CODER_NOGIT"    "$CODER" coder-must-not-git || mark "coder You Must NOT — one-commit / git under PARALLEL DISPATCH bullet"
 handled "$CODER_READ"     "$CODER" coder-read-once  || mark "coder read-once / Grep-only / Scoped-docs lines"
 handled "$CODER_REPORT"   "$CODER" coder-report     || mark "coder report shape (Prior reports / Spec applied / Docs lines)"
 handled "$CODER_PROSE"    "$CODER" coder-report-prose || mark "coder report prose (overwrite semantics, spec line, hygiene)"
@@ -202,6 +211,8 @@ handled "$SEC_AUDITMODE"  "$SEC" security-mode-repo-audit    || mark "security R
 if [ -f "$TESTSK" ]; then handled "$TEST_MARK" "$TESTSK" testing-contract-read || mark "espalier-testing SKILL contract file read"; fi
 if [ -f "$AGENT" ];  then handled "$AGENT_MARK" "$AGENT" agent-config-row || mark "agent.md Config row (grep-only-paths)"; handled "$AGENT_PIPE_MARK" "$AGENT" agent-pipeline-row || mark "agent.md Pipeline row (stages/)"; fi
 if [ -f "$RULE" ];   then grep -qF "$NP_TOKEN" "$RULE" 2>/dev/null || mark "engineering-structure.md ## Not Precedent anchor"; fi
+DEVPROC=espalier/rules/development-process.md
+if [ -f "$DEVPROC" ]; then handled "$DEVPROC_MARK" "$DEVPROC" devproc-atomic-commits || mark "development-process.md atomic-commits bullet (Maintenance Commits block)"; fi
 grep -q "^$CFG_KEY:" espalier/.espalier-config 2>/dev/null || mark ".espalier-config grep-only-paths key"
 grep -qxF '*.pre-v0.*.bak' .gitignore 2>/dev/null || mark ".gitignore backup pattern"
 
@@ -407,6 +418,19 @@ insert_step() {
 if [ -f "$CODER" ]; then
   insert_step coder-handoff "$CODER" "$CODER_HANDOFF" "$CODER_HANDOFF" "$CODER_HANDOFF_END" before '## Editing Discipline'
   insert_step coder-docs "$CODER" "$CODER_DOCS" "$CODER_DOCS" "$CODER_DOCS_END" before '## Change Impact Analysis (do this BEFORE writing code)'
+  # Commit Discipline sits between Editing Discipline (whose Docs clause the
+  # step above added) and Change Impact Analysis.
+  insert_step coder-commit-discipline "$CODER" "$CODER_COMMITS" "$CODER_COMMITS" "$CODER_COMMITS_END" before '## Change Impact Analysis (do this BEFORE writing code)'
+  # the You Must NOT bullet (three lines) follows "- Add features not in the requirements"
+  if ! handled "$CODER_NOGIT" "$CODER" coder-must-not-git; then
+    if grep -qF -- '- Add features not in the requirements' "$CODER" 2>/dev/null; then
+      extract_block "$TPL/agents/harness-coder.md" '- Land the whole task as one commit at the end' "$CODER_NOGIT_END"
+      insert_after "$CODER" '- Add features not in the requirements'
+      log "applied coder-must-not-git ($CODER)"
+    else
+      record_skip coder-must-not-git "$CODER" "the '- Add features not in the requirements' bullet"
+    fi
+  fi
   # the three reading-discipline lines follow step 7 of Before Writing ANY Code
   insert_step coder-read-once "$CODER" "$CODER_READ" "$CODER_READ" "$CODER_READ_END" after 'change — after you understand it, never instead of understanding it.'
   # report shape: the Coding Report block's field lines are re-rendered from the template
@@ -513,6 +537,19 @@ if [ -f "$AGENT" ] && ! handled "$AGENT_PIPE_MARK" "$AGENT" agent-pipeline-row; 
     log "applied agent-pipeline-row ($AGENT)"
   else
     record_skip agent-pipeline-row "$AGENT" "the Pipeline row ('| Pipeline | espalier/pipeline.md |')"
+  fi
+fi
+
+# 2f'. development-process.md — the atomic-commits bullet closes the managed
+# Maintenance Commits block (fixed policy text; a scout never rewrites it).
+if [ -f "$DEVPROC" ] && ! handled "$DEVPROC_MARK" "$DEVPROC" devproc-atomic-commits; then
+  ANCH='union-file conflicts locally, never in the web UI.'
+  if grep -qF -- "$ANCH" "$DEVPROC" 2>/dev/null; then
+    extract_block "$TPL/rules/development-process.md" '- Pipeline commits are atomic' "$DEVPROC_END"
+    insert_after "$DEVPROC" "$ANCH"
+    log "applied devproc-atomic-commits ($DEVPROC)"
+  else
+    record_skip devproc-atomic-commits "$DEVPROC" "the Maintenance Commits block's union-merge bullet"
   fi
 fi
 

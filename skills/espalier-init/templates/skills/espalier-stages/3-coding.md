@@ -80,9 +80,11 @@ with two extra lines in each prompt:
 - `REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-{n}.md`
   — parts, never `coding-report.md` directly.
 - `PARALLEL DISPATCH: do NOT run the build / test / dependency-install
-  commands — other coders share this working tree and concurrent runs
-  corrupt each other. Write code only; the orchestrator runs the exit gate
-  on the combined result.` (The coders' self-run build is a convenience
+  commands, and do NOT run git — other coders share this working tree and
+  concurrent runs corrupt each other. Write code only; put your commit
+  message under "- Commit:" in your part; the orchestrator runs the exit
+  gate on the combined result and commits each part's files as one commit
+  after the wave.` (The coders' self-run build is a convenience
   check, not a gate — the orchestrator's Stage 3 exit gate is, and it still
   runs.)
 
@@ -101,7 +103,10 @@ re-spawns only that coder, again targeting ITS `coding-report.part-{n}.md`
 sub-tasks' reports that Stages 4-6 read); re-concatenate after the fix.
 Unclear attribution → re-run the failing sub-tasks serially (serial
 re-spawns may run the build themselves again). Only after the exit gate
-passes, delete the part files. Any overlap or uncertainty → serial dispatch,
+passes: commit each part's files as ONE commit with the part's `- Commit:`
+message, in sub-task order (`git add {the part's Files created / modified /
+Test files}` — never `-A`, never `espalier/`), record the SHAs under the
+combined report's `- Commits:`, then delete the part files. Any overlap or uncertainty → serial dispatch,
 exactly as before. Parallelism changes DISPATCH only — the Stage 4 panel
 always reviews the COMBINED diff, and the review/gate contract is untouched.
 
@@ -137,6 +142,12 @@ Agent tool:
     first (its harness-coder section) — requirements.md is a cut filed by
     /espalier-simplify; apply "Simplification Changes: Retire the Whole
     Obligation" and report a "### Retired Surface" block.
+
+    COMMITS: commit each bounded unit at a clean point per your Commit
+    Discipline — one seam per commit, message per
+    espalier/rules/development-process.md → Commit Conventions, body cites
+    {type}/{slug}; stage by path, never espalier/. List them under
+    "- Commits:" in the report.
 
     When done, write your coding report to:
     espalier/changes/{type}/{slug}/coding-report.md

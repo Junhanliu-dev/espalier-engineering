@@ -727,6 +727,12 @@ fix's scope (>2 additional files or crossing a layer boundary), append
 the Test Scope Signal block per harness-coder.md — do NOT silently
 expand scope.
 
+COMMITS: commit each bounded unit at a clean point per your Commit
+Discipline — the fix and its regression test together, a preparing
+refactor first as its own commit; message per
+espalier/rules/development-process.md → Commit Conventions, body cites
+fix/{slug}; stage by path, never espalier/. List them under "- Commits:".
+
 When done, write your coding report to:
 espalier/changes/fix/{slug}/coding-report.md
 ```
@@ -1197,7 +1203,12 @@ commit and the Stage 7 clean-tree gate stays green:
 (The legacy `espalier/.conventions.tsv` is read-only to this plugin version —
 never written, nothing to stage.)
 
-Standard push. Then:
+What is still uncommitted is handled by path — code the coder left
+uncommitted under the message its report carries, then the change's
+records as one `chore(espalier): {slug} — pipeline records` commit (the
+espalier skill's `stages/7-10-delivery.md` → "Stage 7: What Is Still
+Uncommitted"); the coder's commits are pushed as made, never squashed or
+rebased. Standard push. Then:
 
 > Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
 > `fix/` prefix). Per-entry `caused_by` fields are passed as FUNCTION
@@ -1205,13 +1216,19 @@ Standard push. Then:
 > bash invocation — the per-entry body is a function, so the whole Stage 7
 > bookkeeping costs one round-trip with byte-identical file effects.
 
-### 7.1 Record own commit
+### 7.1 Record own commits
 
-Same as `/espalier` Stage 7 — append row to own pipeline-state.md `## Commits` table. Also self-heal the reverse-lookup cache:
+Same as `/espalier` Stage 7 — one row per commit of the change
+(`Base-Ref..HEAD`, oldest first; HEAD alone when no Base-Ref was recorded)
+in own pipeline-state.md `## Commits` table, each self-healing the
+reverse-lookup cache — the fix lane's blame resolves a line to ONE commit,
+so every commit must map to this fix:
 
 ```bash
 . espalier/hooks/lookup-helpers.sh
-_cache_append "$(git rev-parse HEAD)" "fix/${SLUG}" "original"
+BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | tail -1 | awk '{print $2}')
+if [ -n "$BASE_REF" ]; then SHAS=$(git rev-list --reverse "${BASE_REF}..HEAD"); else SHAS=$(git rev-parse HEAD); fi
+for SHA in $SHAS; do _cache_append "$SHA" "fix/${SLUG}" "original"; done
 ```
 
 ### 7.2 Bidirectional back-link
@@ -1321,16 +1338,17 @@ mutate frontmatter (`type: feat`, `escalated_from: fix/{slug}`); reset Current S
 ```
 {Stage 5: Test scope inflation | Stage 6: Reviewer flagged ESCALATION_REQUIRED}
 
-Code committed at Stage 3: {SHA} ({files})
+Code committed at Stage 3: {commits since Base-Ref — sha — subject, one per line} ({files})
 {Stage 5: Test sub-agent needs {N} additional files in {layers}}
 {Stage 6: Reviewer Escalation Reason: {analysis}}
 
 Options:
-  1. Revert Stage 3 commit + abort fix
-       → git revert {SHA}; Status: ABORTED_LATE
-  2. Late-escalate to feat lane (PRESERVE commit)
+  1. Revert the Stage 3 commits + abort fix
+       → git revert --no-edit {Base-Ref}..HEAD (newest first, one revert
+         commit each); Status: ABORTED_LATE
+  2. Late-escalate to feat lane (PRESERVE commits)
        → mv fix/{slug} → feat/{slug}-fix; tombstone left at old slot;
-         Stage 3 commit stays on branch; reset Current Stage: 1;
+         the Stage 3 commits stay on the branch; reset Current Stage: 1;
          resume via /espalier --resume
   3. Ship as partial fix + file root-cause feat
        → Continue to Stage 7; Status: PARTIAL_FIX

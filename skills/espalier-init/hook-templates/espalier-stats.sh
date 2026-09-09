@@ -101,7 +101,7 @@ echo
 echo "## Spawn shape (per change)"
 echo
 if [ -d "$CH" ] && ls "$CH"/*/*/pipeline-state.md >/dev/null 2>&1; then
-  spawns=""; handoffs=""; parts=""; resumes=""
+  spawns=""; handoffs=""; parts=""; resumes=""; commits=""
   for sf in "$CH"/*/*/pipeline-state.md; do
     dir=$(dirname "$sf")
     case "$dir" in */_template/*|*/_template) continue ;; esac
@@ -125,6 +125,9 @@ $h"
     r=$(grep -cE '^\| [0-9]+ \| RESUMED ' "$sf" 2>/dev/null); r=${r:-0}
     resumes="$resumes
 $r"
+    c=$(grep -cE '^\| 7 \| [0-9a-f]+ \|' "$sf" 2>/dev/null); c=${c:-0}
+    commits="$commits
+$c"
   done
   if [ -z "$(printf '%s\n' "$spawns" | grep -v '^$')" ]; then
     echo "none — no coding reports yet"
@@ -133,10 +136,13 @@ $r"
     printf '%s\n' "$handoffs" | grep -v '^$' | _stat_dist "handoffs per change"
     printf '%s\n' "$parts"    | grep -v '^$' | _stat_dist "parallel parts per change"
     printf '%s\n' "$resumes"  | grep -v '^$' | _stat_dist "fresh-session resumes per change"
+    printf '%s\n' "$commits"  | grep -v '^$' | _stat_dist "commits per change (Stage 7 rows)"
     echo
     echo "(Quality reads: handoffs are a coder finishing bounded work at a clean"
     echo "point — a change that hands off habitually wants smaller sub-tasks at"
-    echo "decomposition; resumes are the human taking the stage-boundary offer."
+    echo "decomposition; resumes are the human taking the stage-boundary offer;"
+    echo "commits per change near 1 means the coder is still landing the whole"
+    echo "task as one commit — the Commit Discipline wants one seam per commit."
     echo "Pre-v0.25 changes have no coding-log/ and count as one spawn.)"
   fi
 else

@@ -43,3 +43,8 @@ pipeline Stage 9 runs/verifies. If DISCOVERY.deploy was null, write exactly:
 - Union-merge caveat: GitHub's web conflict editor ignores custom merge
   drivers (including `merge=union` on `espalier/.ask-gaps.tsv`) — resolve
   union-file conflicts locally, never in the web UI.
+- Pipeline commits are atomic: the coder commits one bounded unit per
+  commit at a clean point, staged by path, message per the Commit
+  Conventions above (`harness-coder.md` → Commit Discipline); the
+  pipeline pushes them as made and never squashes — squash-merge is the
+  pull request's policy.

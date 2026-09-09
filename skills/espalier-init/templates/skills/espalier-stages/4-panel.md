@@ -25,7 +25,10 @@ Agent tool:
     what the coder did. Then read the actual files listed there — the code
     AND its "Test files" subsection. Earlier spawns' reports are in
     espalier/changes/{type}/{slug}/coding-log/ — open one only when the
-    current report cites it or a finding needs the history. One verdict covers both: run your
+    current report cites it or a finding needs the history.
+    COMMITS: {git log --oneline <Base-Ref>..HEAD} — the coder's commits;
+    a commit that bundles unrelated seams or a message off the project's
+    Commit Conventions is an advisory `commits:` row (P3), never a FAIL. One verdict covers both: run your
     test-review checklist on the tests (assertions meaningful, not
     tautological; changed-interface coverage; failure-mode coverage per
     espalier/rules/production-standards.md — a missing one is a P1) with
@@ -137,7 +140,9 @@ Stage 5 by any other path:
    `FIX ROUND {n}: read espalier/agents/modes/fix-round.md first, then for
    every P0/P1 below run the Class Sweep — fix every sibling of the defect
    class, not the flagged line; one `### Class Sweep` block per finding in
-   coding-report.md.` — the panel verifies the sweep next round. After snapshotting a ROUND row, also
+   coding-report.md; commit each class as its own commit
+   (`fix({scope}): {class} (review round {n})`) — never amend a commit this
+   panel has seen.` — the panel verifies the sweep next round. After snapshotting a ROUND row, also
    update the `Review Rounds:` numerators in pipeline-state.md — a resumed
    session recounts rounds from this line plus the ROUND rows, never from
    memory.
