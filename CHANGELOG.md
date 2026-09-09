@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0 — 2026-09-09
+## 0.25.0 — 2026-09-10
 
 Minor: **quality-first context** — every agent works with its instructions
 at full strength on current inputs. Smaller context is the by-product,
@@ -153,10 +153,20 @@ validation is 56/61/66 by platform set (new checks 64–66).
   `path:line` and every touched `.js` passes `node --check`; fails on any
   other fixture); the `- Spec applied:` line is script-checked against the
   spec (`SPEC_LINE=gate`, the default now that the template ships; `report`
-  to print only). `eval/review`: `spec-unread-09` (clean code, a report
-  citing a non-existent spec section; expected an advisory
-  `[spec-unread]` row). Logic unit-tested without an LLM; the same-day A/B
-  runs (`--model` pinned) are the release gate before the tag.
+  to print only; every per-layer line is checked, multi-section citations
+  and `none — no spec for {layer}` accepted). `eval/review`:
+  `spec-unread-09` (clean code, a report citing a non-existent spec
+  section; expected an advisory `[spec-unread]` row). Runners keep each
+  fixture's headless agent log and honour `KEEP_WORK=1` in all three
+  suites; the coder runner diffs from its baseline commit (the v0.25 coder
+  commits as it goes). Same-day A/B under one pinned model
+  (`docs/context-benchmark-v0.25.md`): coder seed 5/5 → 5/5; review seed
+  catch 1.00 / FP 0 → 1.00 / 0 plus `spec-unread-09` PASS (the
+  `[spec-unread]` row filed, `PASS_WITH_FIXES`); security catch 1.00 →
+  1.00 with false positives 8 → 0 — RESULT PASS 20/20, the first green FP
+  gate under a 2026-09 model (the security-precision entry below; under
+  the recalibrated rubric the stored v0.24.0 records score 16 and the
+  pre-bar v0.25.0 records 17).
 - **Install / validation / migration.** Bootstrap writes `grep-only-paths`
   into `.espalier-config` (append-if-missing on an existing file). Checks
   64 `context-helpers` (the helpers + the key) and 65 `spawn-protocols`
@@ -174,6 +184,38 @@ validation is 56/61/66 by platform set (new checks 64–66).
   the config key, and prints report-only lines (requirement shape per
   IN_PROGRESS change, rules contract drift). No instruction-file line, no
   hooks, no symlinks.
+- **Security audit precision — shown, not assumed.** The auditor's Priority
+  Rubric gains the bar every P0/P1 clears: the client-supplied value and the
+  sink it reaches are in the code the auditor read, and the exploit is
+  stated as the tamper its abuse test performs. A control that lives outside
+  the audited files (an auth middleware, a session guard, a framework
+  default, a model-level sanitizer, the catalog a handler calls) is recorded
+  under Controls confirmed as `unverified: {control} — not in the audited
+  files` — never filed as a P0/P1 for being absent; a field the record
+  *might* carry, a caller that *might* be unauthenticated, a whole-record
+  response, audit-log ordering, an inventory oracle are P2/P3 until the
+  tamper is shown; timeouts, transactions, idempotency, retries, and logging
+  are the reviewer's Production-Readiness Review; a destination or lookup
+  key that authorizes nothing is not a P0; one value reaching one sink is
+  one root defect, filed once; "client-supplied" and "reachable" are shown
+  the same way — a queue payload, a job argument, a webhook body is a
+  client value at P0/P1 only when the audited code shows a client reaching
+  it, else P2/P3 plus an `unverified:` line for the producer; replay and a
+  second effect of a filed root defect are the reviewer's / a sibling read;
+  and the tell — a finding that states its own unverified premise ("not in
+  the audited files", "if `debit` is not atomic", "no idempotency key") is
+  not a P0/P1, an unverified premise is not a P1 mitigating factor. Not a
+  cap on findings — every defect with a shown path is filed; it is what
+  each finding proves. The eval rubric codifies the same class as spurious
+  at P0/P1 (never at P2/P3), `vuln-06` validates its amount (a genuine
+  extra hole a stronger model found), and the fixtures' watch lines name
+  the email / destination / atomicity / server-set-status extras. This is
+  the deferred security FP-gate recalibration, closed at the source: the
+  same-day A/B had the gate red AT BASELINE (8 false positives under the
+  2026-09 model, all of this class; 16 under the recalibrated rubric), and
+  the shipped bar runs the full suite at catch 1.00 / 0 false positives
+  with the kept records carrying the same observations at P2/P3
+  (`eval/security/KNOWN-ISSUES.md`, `docs/context-benchmark-v0.25.md`).
 - **Commit discipline — small, atomic, named.** The coder commits its own
   work as it goes, one bounded unit per commit at a clean point (build and
   lint green, the unit's tests pass): a preparing refactor before the

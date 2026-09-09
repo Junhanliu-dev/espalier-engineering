@@ -2,15 +2,17 @@
 
 ## Items deferred from v0.22.0
 
-- **eval/security judge-collapse recalibration.** The FP gate fails under
-  2026-08 models AT BASELINE (v0.21.1 templates): today's auditors slice
-  one planted defect into per-axis findings and the judge double-counts
-  the slices as false positives; one clean fixture (shadow-03) mismatches
-  on both template versions. Catch-rate stays 1.00 everywhere. Full
-  evidence + A/B method in `eval/security/KNOWN-ISSUES.md`.
-  - **Trigger to revisit**: before the next release that touches any
-    security-eval input — recalibrate the judge collapse rule, re-validate
-    `judge-validation/` under the current model, re-key shadow-03.
+- **eval/security judge-collapse recalibration.** ~~Deferred~~ **CLOSED in
+  v0.25.0.** The collapse rule, the shadow-03 re-key, and the 24/24 judge
+  validation landed in v0.23.0; the gate that stayed red (8 false positives
+  AT BASELINE under the 2026-09 model — one class, P0/P1s resting on what
+  the auditor could not see) was fixed at the source in v0.25.0: the
+  auditor's **Shown, not assumed** bar, the rubric codifying the class,
+  hardened watch lines. Full suite: catch 1.00, 0 false positives, PASS
+  20/20. Evidence + A/B in `eval/security/KNOWN-ISSUES.md` and
+  `docs/context-benchmark-v0.25.md`. The attribution discipline (baseline
+  A/B under the same model + a `KEEP_WORK` rerun before blaming a
+  template) stays.
 
 Things consciously punted from v0.2.0. Each has a documented rationale; revisit when the trigger condition (noted in each entry) materializes.
 

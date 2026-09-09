@@ -1312,6 +1312,25 @@ Suite sizes are expected to land near bootstrap 311 → ~345, hooks
 
 ## 15. Revision history
 
+- r4.10 (2026-09-09): **security FP gate fixed at the source** (owner: "fix
+  the security FP gate"). The same-day A/B had the gate red at baseline
+  (v0.24.0 templates, opus: catch 1.00, 8 FPs / 7 fixtures; v0.25.0
+  candidate 2) — every extra a speculative or out-of-class P0/P1 (a session
+  guard outside the fixture body, a field the record might carry, a
+  whole-record response, production seeds, an unvalidated destination key,
+  an unproven signup email). `harness-security.md` Priority Rubric gains
+  "Shown, not assumed" + the `unverified:` Controls-confirmed convention
+  (precision, no cap); `eval/security/rubric.md` codifies the class;
+  `vuln-06` / `shadow-01` fixtures hardened; migration #35 steps; Test 35b;
+  `docs/context-benchmark-v0.25.md` carries the before/after. Outcome:
+  under the recalibrated rubric the stored records score baseline 16 /
+  pre-bar candidate 17; the bar's first wording ran live at 3 (repo-03,
+  vuln-05, vuln-06 — each a P0/P1 stating its own unverified premise); the
+  shipped wording adds "client-supplied and reachable are shown the same
+  way", replay / second effect = the reviewer's / a sibling read, and the
+  tell (a finding stating its own unverified premise is not a P0/P1);
+  `vuln-05` gains a watch line; full suite PASS 20/20, catch 1.00, FP 0;
+  judge replay 24/24; suites 329/329 + 193/193.
 - r4.9 (2026-09-09): **Commit Discipline** (owner: "the current commit
   behaviour is to commit large chunk into one single commit, make the
   coders and other agents do better commit behaviour"). Coder section
