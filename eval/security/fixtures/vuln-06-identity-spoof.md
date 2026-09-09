@@ -10,6 +10,7 @@ planted_vulns:
     hint: POST /transfer takes the acting account from req.body.fromUserId instead of the session — any caller can move funds out of any user's account by naming it in the body
 false_positive_watch:
   - "toUserId is just a destination label, not an authorization decision — flagging it alone is not the planted defect"
+  - "amountCents is validated server-side (positive integer within the source balance) — do NOT flag it; that the debit/credit pair is not one transaction is the reviewer's production-readiness concern, not this audit's P0/P1"
 shadow: false
 ---
 const db = require('./db');
@@ -20,6 +21,9 @@ async function transfer(req, res) {
   const from = await db.accounts.findByUser(fromUserId);
   const to = await db.accounts.findByUser(toUserId);
   if (!from || !to) return res.status(404).json({ error: 'account not found' });
+  if (!Number.isInteger(amountCents) || amountCents <= 0 || amountCents > from.balanceCents) {
+    return res.status(422).json({ error: 'invalid amount' });
+  }
   await db.accounts.debit(from.id, amountCents);
   await db.accounts.credit(to.id, amountCents);
   return res.json({ ok: true });

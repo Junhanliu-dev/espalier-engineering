@@ -1,11 +1,67 @@
 # eval/security — Known Issues
 
+Status 2026-09-09 (v0.25.0): the FP gate was red AT BASELINE under the
+2026-09 default model (v0.24.0 templates + fixtures, opus pinned: catch 1.00,
+8 false positives across 7 fixtures) and the v0.25.0 candidate showed 2. Read
+side by side, the extras were one class: **speculative or out-of-class P0/P1s**
+— "no auth middleware asserts `req.session.userId`" (five fixtures: a control
+that lives outside the single-handler fixture body), "the record might carry a
+balance field", a whole-record response, audit-log ordering, an inventory
+oracle, a missing transaction / idempotency (production seeds), an unvalidated
+`toUserId` (a destination label), an unproven signup `email` at P1. Fixed at
+the source, three ways: (1) `harness-security.md` Priority Rubric gains
+**Shown, not assumed** — a P0/P1 names the client value and the sink in the
+audited code with the tamper stated; a control outside the audited files is
+`unverified: … — not in the audited files` under Controls confirmed, never a
+finding for being absent; production seeds are the reviewer's; a lookup /
+destination key that authorizes nothing is not a P0; one root defect is filed
+once (no cap on findings — the bar each one clears); (2) `rubric.md` codifies
+the same class as spurious at P0/P1 and never-FP at P2/P3; (3) `vuln-06`'s
+body validates `amountCents` (a genuine extra hole a stronger model found —
+the shadow-03 precedent) and `shadow-01` / `vuln-06` watch lines name the
+email / destination / atomicity extras, `vuln-05`'s the server-set
+`status` / replay extra. Re-validated: **RESULT PASS 20/20, catch 1.00,
+0 false positives** (rows under FIXED below). History kept as the
+diagnostic record.
+
 Status 2026-08-25 (v0.23.0 fix round): the deferred v0.22 recalibration is
 DONE — judge validated at **24/24 = 1.00 agreement** against the hand-scored
 set (`judge-validation/`, threshold ≥ 0.75), shadow-03 is re-keyed and
 green, and the full 20-fixture suite runs at catch-rate 1.00. The one FP
 observed in a full run (shadow-02) does not reproduce and is recorded as
 judge variance below. History kept as the diagnostic record.
+
+## FIXED (2026-09-09): speculative / out-of-class P0/P1 — the shown-not-assumed bar
+
+Same 20 fixtures, same pinned model (`ANTHROPIC_MODEL=opus`), the
+recalibrated `rubric.md`; the judge-validation replay agrees with
+`handscore.tsv` 24/24 under it.
+
+| Auditor | Records | Catch | FP |
+|---|---|---|---|
+| v0.24.0 template | baseline run, re-judged | 1.00 | 16 (10 fixtures) |
+| v0.25.0 before the bar | first candidate run, re-judged | 1.00 | 17 (8 fixtures) |
+| v0.25.0 bar, first wording | live run | 1.00 | 3 (repo-03, vuln-05, vuln-06) |
+| v0.25.0 bar, shipped wording | live run | 1.00 | **0 — RESULT PASS 20/20** |
+
+The three that survived the first wording shared one shape: a P0/P1 whose
+own text carried the premise it needed — repo-03 filed the queue
+consumer's `event.userId` at P1 while writing "no publisher/queue ACL is
+present in the audited files … hence P1, not P0"; vuln-06 filed the
+check-then-debit race at P1 with `unverified: db.accounts.debit / credit
+atomicity` under Controls confirmed; vuln-05 filed the hard-coded `status`
+plus "no idempotency key" at P1 as a third finding beside the planted
+missing recompute. A wording gap, not judge variance (the judge scored
+each as the hand score would). The bar now says "client-supplied" and
+"reachable" are shown the same way (an unseen queue / job producer is
+P2/P3 plus an `unverified:` line), replay and a second effect of a filed
+root defect are the reviewer's / a sibling read, and a finding that states
+its own unverified premise is not a P0/P1 — an unverified premise is not a
+P1 "mitigating factor". A 4-fixture probe (repo-03, vuln-03, vuln-05,
+vuln-06) then the full suite: 0 false positives, and the kept records carry
+the same observations at P2/P3 with their `unverified:` lines — precision,
+not suppression. The judge-variance discipline below still applies to any
+future red gate.
 
 ## FIXED: judge-collapse counting artifact
 

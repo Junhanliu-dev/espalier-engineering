@@ -13,6 +13,7 @@ planted_vulns:
     hint: the same pick() also passes 'plan' — a caller grants themselves a paid plan at signup; one root pick() bug, but two distinct sensitive fields, each needing its own contract entry
 false_positive_watch:
   - "email and displayName are legitimately client-set — flagging those is a false positive; the defect is that verified/plan are in the same pick()"
+  - "email is the signup identity claim itself — uniqueness or proof-of-control belongs to a verification flow outside this handler; a P0/P1 on email is a false positive (P2 at most)"
 shadow: true
 ---
 const db = require('./db');
