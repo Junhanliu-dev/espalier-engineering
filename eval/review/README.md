@@ -23,7 +23,8 @@ eval/review/
 ## Run
 
 ```bash
-bash eval/review/run.sh
+bash eval/review/run.sh                     # full suite — the release gate
+KEEP_WORK=1 bash eval/review/run.sh 'spec-unread-09.md'   # keep the projects, <fixture>.record.md, judge-lines.tsv, <fixture>.agent.log for a partial debug run
 ```
 
 Per fixture: builds a throwaway project (the change + the canned ReviewApp rules +

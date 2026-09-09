@@ -86,7 +86,7 @@ Read $proj/espalier/agents/harness-security.md and follow it EXACTLY (including 
 
 WHAT TO AUDIT: read $cdir/coding-report.md, then the file it lists ($proj/$file). Assume the client is hostile.
 
-Write your audit (OVERWRITE) to $cdir/security-record.md using your instruction file's EXACT output format (findings table + Verdict + the '## Security-Sensitive Fields' contract when a sensitive surface is touched). You have no Write/Edit tool — write the record via a Bash heredoc/redirection." >/dev/null 2>&1 || return 1
+Write your audit (OVERWRITE) to $cdir/security-record.md using your instruction file's EXACT output format (findings table + Verdict + the '## Security-Sensitive Fields' contract when a sensitive surface is touched). You have no Write/Edit tool — write the record via a Bash heredoc/redirection." > "$WORK/$fid.agent.log" 2>&1 || return 1
 }
 
 # Repo-audit mode: materialize the fixture's '=== FILE: <path> ===' blocks into a

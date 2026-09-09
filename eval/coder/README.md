@@ -29,8 +29,16 @@ eval/coder/
 ## Run
 
 ```bash
-bash eval/coder/run.sh
+bash eval/coder/run.sh                      # full suite — the release gate
+KEEP_WORK=1 bash eval/coder/run.sh 'coder-06*.md'   # keep the throwaway projects (their git history — the v0.25 coder commits its units — reports, and <fixture>.agent.log) for a partial debug run
 ```
+
+Pin the model when the session default is a headless-refusing tier
+(`ANTHROPIC_MODEL=opus`), and run the A/B baseline (old templates + old
+fixtures under today's model) before attributing a regression — see
+`docs/context-benchmark-v0.25.md` for the 2026-09-09 run. The diff the judge
+scores is taken from the runner's baseline commit, not the index, because
+the coder commits as it goes.
 
 Per fixture: builds a throwaway git project (conventions + reference file + coding
 skill/agent), runs `harness-coder` headless on the task, captures the git diff of
@@ -64,7 +72,7 @@ before, so the seed set's baseline is untouched.
 
 | key | effect |
 |---|---|
-| `spec: services` | copies `project/specs/services.md` into the throwaway project's `espalier/skills/espalier-coding/specs/`, names it in a pack-style prompt line, and script-checks the report's `- Spec applied:` line names an existing section (`spec-line=ok / none / missing / bad-section` in the results). `SPEC_LINE=gate` (default — the v0.25 coder template writes the line) fails the fixture on `missing` / `bad-section`; `SPEC_LINE=report` only prints it (set it when the A/B baseline runs a pre-v0.25 template) |
+| `spec: services` | copies `project/specs/services.md` into the throwaway project's `espalier/skills/espalier-coding/specs/`, names it in a pack-style prompt line, and script-checks the report's `- Spec applied:` line names an existing section (`spec-line=ok / none / missing / bad-section` in the results). `SPEC_LINE=gate` (default — the v0.25 coder template writes the line) fails the fixture on `missing` / `bad-section`; `SPEC_LINE=report` only prints it (set it when the A/B baseline runs a pre-v0.25 template). Every `- Spec applied:` line is checked (one per touched layer): a line saying `none — no spec for {layer}` counts as none; otherwise every section it cites (`§ A / B, C`, `§ A and § B`) must be a heading of the spec; the result is `ok` when at least one layer line cites real sections and none cites a wrong one |
 | `scoped_doc: services` | copies `project/scoped/services/CLAUDE.md` (traps and invariants) to `src/services/CLAUDE.md` and names it in the prompt; the fixture's `must_follow` carries the traps so the judge scores whether they were avoided |
 | `extra_files: order-status.js` | copies `project/extra/<file>` into `src/services/` |
 | `handoff_allowed: true` | a report ending in `- HANDOFF: true` is a PASS iff its `## Handoff` block has `- Remaining:`, `- Facts:` with at least one `path:line`, and every touched `.js` passes `node --check`; on any other fixture a handoff sentinel is a FAIL |
