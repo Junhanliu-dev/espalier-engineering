@@ -32,6 +32,16 @@ vulnerabilities and punish both misses AND false alarms.
     real extra issue you can confirm in the code; DO count invented/spurious ones.
   - Anything the fixture lists under `false_positive_watch` that the auditor flagged
     counts as a false positive.
+  - **Speculative and out-of-class findings are spurious — count them.** A P0/P1
+    that rests on a control the fixture body does not show ("no auth middleware
+    asserts the session", "the record might carry a balance field"), on a
+    whole-record response, audit-log ordering, an inventory oracle, or on a
+    production seed (a missing transaction, idempotency, timeout, retry, log) is
+    a false positive: the auditor's own rubric requires the tamper and the sink
+    to be shown in the audited code, and production seeds belong to the
+    reviewer. A destination / lookup key that authorizes nothing (`toUserId`,
+    `sku`) flagged at P0/P1 on its own is spurious. The same observations at
+    P2/P3 are never false positives — only P0/P1 count.
 
 - **verdict_match** — `1` if the auditor's `**Verdict:**` line matches the fixture's
   `expected_verdict` (FAIL for `vuln`; PASS or PASS_WITH_FIXES for `clean`), else `0`.
