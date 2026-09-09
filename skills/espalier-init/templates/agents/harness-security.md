@@ -128,7 +128,7 @@ separate files avoid a write race when the panel runs in parallel.
 - Sensitive surface touched: {yes/no}
 - Sensitive fields in scope: {count + list}
 - Trust-boundary defects (P0): {count}
-- Controls confirmed: {ownership / recompute / allow-list / state-machine — which}
+- Controls confirmed: {ownership / recompute / allow-list / state-machine — which; `unverified: {control} — not in the audited files` for a control you rely on but could not read}
 
 VERDICT: {PASS|PASS_WITH_FIXES|FAIL} p0={n} p1={n} round={n}
 ```
@@ -168,6 +168,47 @@ any is missing.
 - **P1** — a real trust-boundary weakness with a mitigating factor (e.g. an
   additional check elsewhere, or a hard-to-reach path). Must fix.
 - **P2/P3** — defense-in-depth improvements, not exploitable as shown.
+
+**Shown, not assumed — the bar every P0/P1 clears.** A P0/P1 names a
+client-supplied value and the sink it reaches IN THE CODE YOU READ, with the
+exploit stated as the tamper its abuse test performs. It never rests on what
+you could not see:
+- A control that lives outside the audited files — an auth middleware, a
+  session guard, a framework default, a model-level sanitizer, the catalog a
+  handler calls — is not a finding for being absent from the diff. Record it
+  under `Controls confirmed` as `unverified: {control} — not in the audited
+  files`; the reviewer's Runtime-Surface Review and the human read that
+  line. It becomes a P0/P1 only when the change itself removes or bypasses
+  it.
+- A field the record *might* carry, a caller that *might* be
+  unauthenticated, a response that echoes a whole record, audit-log
+  ordering, an inventory oracle: P2/P3 until the tamper is shown.
+- "Client-supplied" and "reachable" are shown the same way. A queue payload,
+  a job argument, a webhook body, an internal call's parameter is a client
+  value at P0/P1 only when the audited code shows a client reaching it. When
+  the producer is not in the audited files, the observation is P2/P3 and the
+  producer goes under `Controls confirmed` as `unverified: …`.
+- Timeouts, transactions, idempotency, retries, logging, replay of the same
+  message are the reviewer's Production-Readiness Review
+  (`production-standards.md`), never this audit's P0/P1 — file one only when
+  the client can exploit the gap to cross a trust boundary, and then as the
+  boundary defect it enables. A second effect of a root defect already filed
+  (the same message, the same order, the same missing recompute) is a sibling
+  read inside that finding, not a finding of its own.
+- A destination or lookup key that authorizes nothing (`toUserId`, `sku`, a
+  filter value) is not a P0 for being unvalidated; the authorization
+  decision it feeds, when one exists, is.
+- Severity by exploit, not by field name: one value reaching one sink is
+  one root defect, filed once, with every sibling read listed in it.
+- The tell: a finding that states the premise it needs in its own words —
+  `not in the audited files`, "if the producer is client-reachable", "if
+  `debit` is not atomic", "no idempotency key" — is not a P0/P1, and an
+  unverified premise is not a P1 "mitigating factor". Keep the observation
+  at P2/P3 with its `unverified:` line; the reviewer's Runtime-Surface
+  Review and the human read it there.
+This is not a cap on findings — every defect with a shown path is filed —
+it is what each finding proves. One precise P0 that names the tamper beats
+four that guess.
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 

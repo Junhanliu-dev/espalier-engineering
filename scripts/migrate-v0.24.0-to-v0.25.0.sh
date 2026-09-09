@@ -129,6 +129,9 @@ REV_DOCS='- `docs:` a doc diff'
 REV_DOCS_END='round; no count.'
 # security
 SEC_BEFORE='7. Scoped docs named in the pack'
+SEC_SHOWN='**Shown, not assumed — the bar every P0/P1 clears.**'
+SEC_SHOWN_END='four that guess.'
+SEC_CONTROLS='`unverified: {control} — not in the audited files`'
 # mode pointers (the body keeps the heading + a one-line pointer)
 CODER_FIXMODE='modes/fix-round.md'
 CODER_SIMPMODE='modes/simplification.md'
@@ -201,6 +204,8 @@ handled "$REV_SPEC"       "$REV" reviewer-spec      || mark "reviewer spec-citat
 handled "$REV_MIN"        "$REV" reviewer-advisory-rows || mark "reviewer Minimalism advisory row rule"
 handled "$REV_DOCS"       "$REV" reviewer-docs-tag  || mark "reviewer docs: tag + Readability row rule"
 handled "$SEC_BEFORE"     "$SEC" security-before    || mark "security Before Auditing lines (reword, coding-log, Read-tool evidence, read-once, Grep-only, Scoped-docs)"
+handled "$SEC_SHOWN"      "$SEC" security-shown-not-assumed || mark "security Priority Rubric — Shown, not assumed (the P0/P1 bar)"
+handled "$SEC_CONTROLS"   "$SEC" security-controls-unverified || mark "security Summary — unverified-control convention"
 handled "$CODER_FIXMODE"  "$CODER" coder-mode-fix-round      || mark "coder Fix Rounds → modes/fix-round.md pointer"
 handled "$CODER_SIMPMODE" "$CODER" coder-mode-simplification || mark "coder Simplification Changes → modes/simplification.md pointer"
 handled "$REV_RRMODE"     "$REV" reviewer-mode-re-review     || mark "reviewer Re-review Rounds → modes/re-review.md pointer"
@@ -473,6 +478,15 @@ if [ -f "$SEC" ]; then
     '1. `espalier/rules/security-standards.md` — the trust boundary, the sensitive' 'the code before it clears a finding, as with the pack.' \
     '1. Read `espalier/rules/security-standards.md` — the trust boundary, the sensitive' '   verdict for staleness.' \
     '1. `espalier/rules/security-standards.md` — the trust boundary, the sensitive' '   verdict for staleness.'
+fi
+
+# 2c''. security Priority Rubric — the Shown-not-assumed bar follows the P2/P3
+# bullet; the Summary's Controls-confirmed line gains the unverified form.
+if [ -f "$SEC" ]; then
+  insert_step security-shown-not-assumed "$SEC" "$SEC_SHOWN" "$SEC_SHOWN" "$SEC_SHOWN_END" before '## Re-review Rounds (you may be re-spawned on a fix)'
+  swap_step security-controls-unverified "$SEC" "$SEC_CONTROLS" \
+    '- Controls confirmed: {ownership / recompute / allow-list / state-machine — which;' '- Controls confirmed: {ownership / recompute / allow-list / state-machine — which;' \
+    '- Controls confirmed: {ownership / recompute / allow-list / state-machine — which}' '- Controls confirmed: {ownership / recompute / allow-list / state-machine — which}'
 fi
 
 # 2c'. the seven mode-only sections → heading + one-line pointer (the text

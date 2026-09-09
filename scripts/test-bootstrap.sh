@@ -2018,7 +2018,9 @@ assert "35b reviewer + security templates: reword lines, read-once / Grep-only /
    && grep -qF 'security-contract.md' '$TPL35/agents/modes/stage6-abuse-coverage.md' \
    && grep -qF 'auto-loaded into your context on Claude Code' '$TPL35/agents/harness-security.md' \
    && grep -qF 'a \`git diff\` in Bash is never' '$TPL35/agents/harness-security.md' \
-   && grep -qF '7. Scoped docs named in the pack' '$TPL35/agents/harness-security.md'"
+   && grep -qF '7. Scoped docs named in the pack' '$TPL35/agents/harness-security.md' \
+   && grep -qF 'Shown, not assumed' '$TPL35/agents/harness-security.md' \
+   && grep -qF 'unverified: {control}' '$TPL35/agents/harness-security.md'"
 P35_GUARD="grep -q '^- HANDOFF: true' \"\$COD\""
 assert "35c espalier + fix SKILLs: sentinel detector, CONTINUATION, report_archive, exit_gate, contract_extract, req_shape_check, pack lines, resume offers, RESUMED row, fix-lane regression guard, all seven spawn lines reworded" \
   "esp_all '$TPL35' | grep -qF \"grep -q '^- HANDOFF: true'\" \
