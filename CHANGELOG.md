@@ -1,5 +1,211 @@
 # Changelog
 
+## 0.25.0 — 2026-09-09
+
+Minor: **quality-first context** — every agent works with its instructions
+at full strength on current inputs. Smaller context is the by-product,
+never the goal: **this release sets no hard budget of any kind** — no size
+cap on a file, no turn cap on a spawn, no refusal on size, no numeric cap
+on findings. Every gate, rubric, verdict sentinel, round cap
+(`max-req/code/test-rounds`, `max-rollbacks` — escalation caps, not context
+budgets), and escalation path is contract-equal to v0.24.0. Each
+mechanism is a protocol an agent follows, a default the orchestrator
+applies, or a number the human sees. Measured on 565 portal subagent
+transcripts and 45 orchestrator sessions (design + field evidence in
+`docs/quality-first-context-plan.md`, numbers in
+`docs/context-field-report-2026-09-08.md`): the per-turn baseline is
+41–57 % of every agent's spend, half of all coder tokens are processed
+above 200k context, the on-demand layer (layer spec, scoped docs) was
+opened inconsistently, and nested workspace docs never reached a subagent
+before Claude Code 2.1.259. Suites: bootstrap 328/328, hooks 193/193;
+validation is 56/61/66 by platform set (new checks 64–66).
+
+- **Bounded coder work + the Handoff protocol** (`harness-coder.md`,
+  `espalier` + `espalier-fix` SKILLs). Sub-tasks are sized at
+  decomposition as one seam (the requirements template's `≤ 5 files` rule
+  is replaced by a sizing paragraph); inside a spawn, a coder whose task
+  does not fit hands off at a clean point — file finished, build green
+  (never under `PARALLEL DISPATCH`), report written fresh with a
+  `## Handoff` block (Done / Remaining with the hard part named / Facts
+  each with `path:line` / Next) and the sentinel `- HANDOFF: true`. The
+  orchestrator reads the sentinel FIRST, archives the report
+  (`report_archive` → `coding-log/NN-handoff-{n}.md`, a `| 3 | HANDOFF {n} |`
+  row), runs the exit gate, and re-spawns a fresh coder with the same
+  prompt plus a `CONTINUATION:` line — green or red, exactly as a red gate
+  re-spawns today. The panel is spawned only on a report without the
+  sentinel and reviews the combined diff once; the fix lane's regression
+  bash skips a handoff report. Parts of a parallel wave are continued
+  before concatenation.
+- **Current inputs for the panel.** `coding-report.md` is the CURRENT
+  spawn's report (written fresh, never appended); every prior spawn's
+  report is one file in `coding-log/`, archived by the orchestrator before
+  each later spawn (`stage3`, `handoff-{n}`, `round{n}-fix`,
+  `exit-gate-fix`, `contract-phase`) and read only when named. Two lines
+  stay cumulative because gates key off them (`- Test files:`, the
+  re-verified `### Class Sweep` / `### Retired Surface` blocks).
+  Requirements are contract + notes: the five sections, `## Open
+  Questions`, `## Convention Notes`, `## Retired Surface` are the contract;
+  derivation, alternatives, and the grill's Q&A go to
+  `requirements-notes.md` (the grill writes the decision into the
+  criterion and the Q&A into the notes; `/espalier-ask` and
+  `/espalier-simplify` read both; the Stage 2 review files a heading
+  outside the set as a P2; `req_shape_check` prints the list before the
+  first coder spawn — information only). `contract_extract` writes
+  `security-contract.md` (the `## Security-Sensitive Fields` block, no
+  adjudication prose) for the contract-phase coder and the delta reviewer
+  (fallback: the block in `security-record.md`; every existing grep is
+  unchanged). Advisory findings are one row each — tag, `path:line`, the
+  concrete replacement, ranked by what the coder gains — no rationale
+  paragraphs, no count. Report hygiene: empty sections are one line,
+  nothing runnable is restated, doc text is never pasted.
+- **Docs: edit the claim.** A change that makes a scoped-doc claim false
+  (workspace / directory `CLAUDE.md`, `espalier/wiki/*`) edits THAT claim
+  in place — one line, present tense; never a rewrite, never a section for
+  the feature; touched docs listed under `- Docs:`. The reviewer's
+  Readability review gains the mirror `docs:` tag (advisory).
+- **Load once, read what the pointer names.** All seven spawn lines say
+  "Your instructions are `espalier/agents/harness-X.md` (auto-loaded as
+  your system prompt on Claude Code; read it only if it is not already in
+  your context)" — the line stays the load mechanism on Codex / Copilot;
+  the rules reword lines (already hand-applied on one install) ship in the
+  templates; a read-once line in every agent (a tool result the harness
+  persisted is grepped, never paged back); Grep-only files (new
+  `.espalier-config` key `grep-only-paths: __generated__/ schema.graphql
+  schema.prisma`, `grep_only_files` → the pack's `- Grep-only:` line — path
+  and size, no threshold) are searched, never Read. The coding report
+  gains a mandatory `- Spec applied: specs/{layer}.md § {section} — {one
+  clause}` line; the reviewer opens the cited section and files a
+  citation that names no section, or a diff that contradicts it, as an
+  advisory `[spec-unread]` row (the shape violation itself at its normal
+  severity, as today). The pack gains `- Facts established:` and
+  `- Scoped docs:` (`scoped_docs` — every `CLAUDE.md` / `AGENTS.md` on the
+  path from each reference file up to the repo root, nearest last): agents
+  grep each for the files they touch and read those sections, never
+  re-Reading a doc the platform injected — the only path by which a
+  workspace doc reaches a Codex / Copilot coder. The security agent reads
+  each changed file with the Read tool — a `git diff` in Bash is never the
+  only evidence.
+- **The orchestrator: fresh at boundaries, one gate call.** After the
+  Stage 2 approval and after the Stage 4 PASS (serial mode: the Stage 6
+  PASS) — state already on disk — the orchestrator offers once, first
+  option default: `Continue here` / `Continue in a fresh session` (`/clear`,
+  then bare `/espalier` resumes at Stage 3 / 5 from `pipeline-state.md`;
+  fix lane: `/espalier-fix` with the same bug text and the slug collision's
+  Resume). After Stage 2 the offer says what stays resident on "Continue
+  here" (everything the grill read). Never on an unattended run; every
+  resumption appends `| {N} | RESUMED | {ts} | fresh session |`
+  (`espalier-stats.sh` books the gap before it as human wait).
+  `exit_gate DIR [TESTS…]` in `drift-helpers.sh` runs the Stage 3 exit
+  gate as ONE call — build + lint concurrent (per-pid waits, per-job logs),
+  then the discovered tests scoped to the report's listed test files where
+  the runner takes paths (`npm test -- …`, jest / vitest / pytest / rspec
+  files, `go test` packages; full suite otherwise) — from the installed
+  `pre-push-gate.sh`'s own `run_build` / `run_lint` / `run_tests` bodies
+  (brace-depth extraction, `bash -n`; a multi-line body with an inner brace
+  group survives). Exit `0` green, `1` red (re-spawn the coder with the
+  job's log), `2` a `run_*` function missing or unparseable in a customised
+  gate, `3` the greenfield placeholder — 2 and 3 mean "gate by hand as
+  before", never red. Four call sites (both lanes' Stage 3 exit gate, the
+  contract-phase gate, the fix lane's Stage 4 loop). Works when sourced
+  under bash or zsh.
+- **The grill's code reads are unlimited.** The `≤ 8 file reads … ask
+  instead` cap and its three references (grill 162 / 168, map 174) are
+  gone: read as much of the code as answering the question needs; ask the
+  user only for what the code cannot answer (product intent, priorities,
+  an unratified decision); the existing stop-early rule is the only stop.
+  Question tiers (`light` ≤ 3, `full` ≤ 7), the audit's ≤ 8 files / 4
+  batches, and simplify's 4 batches / 12 leads are interaction and fan-out
+  bounds and stay.
+- **Rules that stay rules, without a budget.** A Writing Contract for
+  `espalier/rules/*.md` ships in `.scout-prompts.md` (mirrored in
+  `references/discovery-checklist.md`): one bullet per rule, present tense,
+  one `path:line`, no counts / dates / SHAs / PR numbers / shell commands /
+  history / walkthroughs; seed text never rewritten. Scouts 1.3 / 1.6 /
+  1.11 carry the constraint; scout 1.2 returns a `not_precedent` array
+  that refreshes the new `## Not Precedent` section of
+  `engineering-structure.md` (managed anchor `ESPALIER NOT PRECEDENT v1`;
+  an entry the scout cannot re-prove is dropped). `/espalier-prune` renders
+  a **Removed rules (N)** ledger (`rule_bullets` + `comm`) above the diff
+  and the size as information; `/espalier-doctor` (and both lanes'
+  Stage 0 pre-flight, ` · drift=N`) reports `contract drift: N line(s) in
+  M rule file(s)` (`contract_drift_lines` — awk, report only). Nothing
+  refuses; the migration edits no rule.
+- **Measurement.** `espalier-stats.sh` gains `## Spawn shape (per change)`
+  (coder spawns = 1 + `coding-log/` files, handoffs, parallel parts,
+  fresh-session resumes — n / median / max, `none` on an older install) and
+  `## Workspace docs (report-only)` (every tracked `CLAUDE.md` / `AGENTS.md`
+  with size and last change — the platform injects a subdirectory doc
+  whole on Claude Code; trimming it is the owner's lever). New dev script
+  `scripts/context-report.py` reads a Claude Code project directory and
+  prints the field report's sections for that install (spend map, tokens
+  above 150k / 200k, baseline share, pack cohort, orchestrator sessions,
+  on-demand reads, `nested_memory` injection per spawn, self re-reads,
+  handoff / resume rows; `--bare` for the global-harness baseline;
+  `--json`) — documented in `docs/usage-cost.md`. `maprun.py` parses stage
+  labels by a literal `### N. ` (the `### 8.5 Doc Drift Check` heading no
+  longer overwrites stage 8) with fallback labels and one warning when
+  headings are missing.
+- **Evals.** `eval/coder`: two new fixtures — `coder-06-scoped-doc-trap`
+  (a layer spec + a scoped `CLAUDE.md` with three traps, opt-in `spec:` /
+  `scoped_doc:` / `extra_files:` keys, seed baseline untouched) and
+  `coder-07-two-seam` (`handoff_allowed: true`: a `- HANDOFF: true` report
+  passes iff `## Handoff` carries `- Remaining:` and `- Facts:` with a
+  `path:line` and every touched `.js` passes `node --check`; fails on any
+  other fixture); the `- Spec applied:` line is script-checked against the
+  spec (`SPEC_LINE=gate`, the default now that the template ships; `report`
+  to print only). `eval/review`: `spec-unread-09` (clean code, a report
+  citing a non-existent spec section; expected an advisory
+  `[spec-unread]` row). Logic unit-tested without an LLM; the same-day A/B
+  runs (`--model` pinned) are the release gate before the tag.
+- **Install / validation / migration.** Bootstrap writes `grep-only-paths`
+  into `.espalier-config` (append-if-missing on an existing file). Checks
+  64 `context-helpers` (the helpers + the key) and 65 `spawn-protocols`
+  (the markers in the agent bodies and lane skills; no `≤ 5 files`, no
+  `≤ 8` read budget; greenfield Pass 1 pending) — totals 55 / 60 / 65,
+  derived in the test suite from three constants. Migration #35
+  (`scripts/migrate-v0.24.0-to-v0.25.0.sh`, `/espalier-migrate` entry 35):
+  refreshes 15 pure copies (backups `.pre-v0.25.bak`; `.gitignore` gains
+  `*.pre-v0.*.bak` once), anchored edits EXTRACTED from the templates for
+  the three agent bodies, the testing SKILL, `agent.md`, and
+  `engineering-structure.md` (a `swap_block` primitive for reworded
+  sentences; alternate anchors for an install that hand-applied the rules
+  reword; customised files skip-with-record; verified byte-identical
+  against a real v0.24.0 install built from the git tag — Test 35), appends
+  the config key, and prints report-only lines (requirement shape per
+  IN_PROGRESS change, rules contract drift). No instruction-file line, no
+  hooks, no symlinks.
+- **Procedure at the point of use — the router, the contract, the mode
+  files.** The `/espalier` skill is a ROUTER (22 KB, from 64): pre-flight,
+  convention promotion, session resumption, the Stage Execution Protocol
+  (with a procedure table and the cross-stage sequencing rule), the state
+  file, rollback, human checkpoints, completion. Each stage's procedure
+  moved verbatim to `espalier/skills/espalier/stages/{1-2-requirements,
+  3-coding, 4-panel, 5-6-contract, 7-10-delivery}.md`, read when the stage
+  starts — the most recent thing in context — and a maprun worker (stages
+  1–6) never loads `7-10-delivery.md`. `espalier/pipeline.md` is the stage
+  CONTRACT (14 KB, from 23): trigger / load / gate / output / limit and a
+  `Procedure:` line per stage, the eleven headings frozen for
+  `pre-push-gate.sh`, `espalier-stats.sh`, and `maprun.py`; the three
+  maintenance conflict recipes moved to `/espalier-prune`, which owns the
+  discipline. The agents' mode-only sections — coder Fix Rounds and
+  Simplification Changes, reviewer Re-review Rounds, Simplification Review
+  and Security Abuse-Test Coverage, security Re-review Rounds and Repo-Audit
+  Mode (26–36 % of each always-on body) — live verbatim in
+  `espalier/agents/modes/{fix-round, simplification, re-review, repo-audit,
+  stage6-abuse-coverage}.md`; each body keeps the heading and a one-line
+  pointer (every historical grep still resolves), and the prompt line that
+  announces the mode names the file first (`FIX ROUND {n}: read
+  espalier/agents/modes/fix-round.md first, …`, `SIMPLIFICATION CHANGE:`,
+  `CHANGED SINCE LAST REVIEW:`, the contract delta review, `REPO-AUDIT
+  MODE:`) — the same delivery as the context pack, on every platform.
+  Nothing is removed: the text is read at the moment it applies, at the
+  end of context. Bootstrap copies `stages/` and `modes/` as pure copies;
+  check 66 `stage-procedures` asserts every file is present and named;
+  check 34 also looks at `modes/repo-audit.md`; migrations #33 and #34
+  extract their sections from the mode files when the body template no
+  longer carries them, so a pre-v0.23.1 chain still applies. The eval
+  runners copy `modes/` beside the agent body.
+
 ## 0.24.0 — 2026-09-03
 
 Minor: **the simplify lane** — `/espalier-simplify`, an evidence-first
