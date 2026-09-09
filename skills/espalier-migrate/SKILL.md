@@ -487,7 +487,17 @@ version. Up to THIRTY-FIVE migrations may apply, always in this order:
    only what is left, by path, never squashes, and records every commit in
    `Base-Ref..HEAD`; the reviewer's advisory `commits:` tag; the fix lane's
    late-escalation revert covers the range; `development-process.md` gains
-   the atomic-commits bullet in its managed block. Validation
+   the atomic-commits bullet in its managed block. The security auditor's
+   Priority Rubric gains **Shown, not assumed** — a P0/P1 names the client
+   value and the sink in the audited code with the tamper stated; a control
+   outside the audited files is recorded as `unverified:` under Controls
+   confirmed, never filed for being absent; "client-supplied" and
+   "reachable" are shown the same way (an unseen queue / job producer is
+   P2/P3 plus an `unverified:` line); production seeds and replay belong to
+   the reviewer, a second effect of a filed root defect is a sibling read
+   inside it; a lookup / destination key that authorizes nothing is not a
+   P0; a finding that states its own unverified premise is not a P0/P1
+   (precision, not a cap — every shown defect is filed). Validation
    checks 64 `context-helpers`, 65 `spawn-protocols`, 66 `stage-procedures`;
    totals 56 / 61 / 66 by platform set.
    Mechanical: `scripts/migrate-v0.24.0-to-v0.25.0.sh`.
