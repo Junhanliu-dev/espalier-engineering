@@ -1562,6 +1562,79 @@ assert "23j pre-push hook default: build and lint both ran (exit 0); a lint fail
    && ! grep -q 'gate_build_section\|gate_lint_section' '$HOOKS_SRC/pre-push-gate.sh'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP23" "$TMPH"
 
+# ─── T24: v0.27 unknowns helpers (drift-helpers.sh) + stats deviations row ──
+echo "T24: v0.27 unknowns helpers, stats deviations row"
+TMP24=$(mktemp -d -t hooks-t24.XXXX)
+make_repo "$TMP24"
+install_hooks "$TMP24"
+cp "$HOOKS_SRC/espalier-stats.sh" "$TMP24/espalier/hooks/" 2>/dev/null || true
+CH24="$TMP24/espalier/changes/feat/2026-09-14-u"; mkdir -p "$CH24"
+
+# 24a _md_section: the section body to the next same-or-higher heading, fences kept, sentinel stops it
+printf '# T\n\n## A\nline a\n```\n## not a heading\n```\n### A1\nsub\n## B\nline b\n- HANDOFF: true\ntrailing\n' > "$TMP24/md.md"
+OUT=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && _md_section md.md "## A" | tr '\n' '|' )
+OUT2=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && _md_section md.md "## B" | tr '\n' '|' )
+OUT3=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && _md_section md.md "## Z"; echo "rc=$?" )
+assert "24a _md_section: '## A' runs through its fenced block and '### A1' and stops at '## B'; '## B' stops at the HANDOFF sentinel; a missing heading prints nothing, exit 0" \
+  "[ \"\$OUT\" = 'line a|\`\`\`|## not a heading|\`\`\`|### A1|sub|' ] && [ \"\$OUT2\" = 'line b|' ] && [ \"\$OUT3\" = 'rc=0' ]"
+
+# 24b deviations_list: entries only, blanks dropped; nothing without the block or the report
+printf '## Coding Report\n- Files created: a.js\n- Notes: skipped X\n\n### Deviations\n- "AC1" → built: narrow; because: `a.js:3`; left undone: wide\n\n- "AC2" → built: strict; because: `b.js:9`; left undone: lax\n\n### Class Sweep\n- none\n' > "$CH24/coding-report.md"
+OUT=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && deviations_list "$CH24" )
+mkdir -p "$CH24-none"; printf '## Coding Report\n- Notes: none\n' > "$CH24-none/coding-report.md"
+OUT2=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && deviations_list "$CH24-none"; echo "rc=$?" )
+OUT3=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && deviations_list "$CH24-missing"; echo "rc=$?" )
+assert "24b deviations_list: two entries, no blank lines, the Class Sweep block excluded; no block → empty exit 0; no report → empty exit 0" \
+  "[ \"\$(echo \"\$OUT\" | grep -c .)\" -eq 2 ] && echo \"\$OUT\" | grep -qF 'AC1' && echo \"\$OUT\" | grep -qF 'AC2' && ! echo \"\$OUT\" | grep -qF 'none' \
+   && [ \"\$OUT2\" = 'rc=0' ] && [ \"\$OUT3\" = 'rc=0' ]"
+
+# 24c open_question_append: creates the heading at EOF, then appends inside the section (before the next heading), idempotent per call, exit 1 without requirements.md
+printf '### 1. Requirement Summary\n- What: x\n### 2. Acceptance Criteria\n- [ ] AC1\n' > "$CH24/requirements.md"
+OUT=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && open_question_append "$CH24" 'AC1 → narrow (ratified at Stage 3 BLOCKED 1)' )
+( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && printf '\n## Convention Notes\n- rules/x cleared\n' >> "$CH24/requirements.md" && open_question_append "$CH24" 'second (default — revisit)' >/dev/null )
+OUT2=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && open_question_append "$CH24-missing" 'x' 2>/dev/null; echo "rc=$?" )
+assert "24c open_question_append: '## Open Questions' created once at EOF with the line; a second line lands inside the section above the following heading; printed; exit 1 without requirements.md" \
+  "[ \"\$OUT\" = '- AC1 → narrow (ratified at Stage 3 BLOCKED 1)' ] \
+   && [ \"\$(grep -c '^## Open Questions' '$CH24/requirements.md')\" -eq 1 ] \
+   && [ \"\$(grep -n '^- second' '$CH24/requirements.md' | cut -d: -f1)\" -lt \"\$(grep -n '^## Convention Notes' '$CH24/requirements.md' | cut -d: -f1)\" ] \
+   && [ \"\$(grep -n '^- AC1' '$CH24/requirements.md' | cut -d: -f1)\" -lt \"\$(grep -n '^- second' '$CH24/requirements.md' | cut -d: -f1)\" ] \
+   && [ \"\$OUT2\" = 'rc=1' ]"
+
+# 24d req_shape_check: References is contract; a stray heading still reported
+printf '\n## References\n- vendor/x: backoff semantics\n## Design rationale\n- why\n' >> "$CH24/requirements.md"
+OUT=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && req_shape_check "$CH24" )
+assert "24d req_shape_check: '## References' and '## Open Questions' are contract headings; 'Design rationale' is reported" \
+  "[ \"\$OUT\" = 'Design rationale → requirements-notes.md' ]"
+
+# 24e delivery_brief: assembled from the records, count line, none-lines, exit 1 without requirements
+printf '## Status\n- Current Stage: 10\n\n## Stage History\n| Stage | Status | Timestamp | Notes |\n|---|---|---|---|\n| 3 | BLOCKED 1 | ts | AC1 |\n| 4 | ROUND 1 FAIL | ts | reviewer: FAIL |\n| 4 | PASSED | ts | deviations: 2 |\n\n## Commits\n| Stage | SHA | Files |\n|---|---|---|\n| 7 | abc1234 | a.js |\n| 7 | def5678 | b.js |\n' > "$CH24/pipeline-state.md"
+printf '## Review\n\nVERDICT: PASS p0=0 p1=0 round=2\n' > "$CH24/review-record.md"
+printf '## Audit\n\nVERDICT: PASS_WITH_FIXES p0=0 p1=0 round=2\n' > "$CH24/security-record.md"
+OUT=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && delivery_brief feat 2026-09-14-u )
+BRIEF="$CH24/delivery-brief.md"
+OUT2=$( cd "$TMP24" && . espalier/hooks/drift-helpers.sh && delivery_brief feat nope 2>/dev/null; echo "rc=$?" )
+assert "24e delivery_brief: path + count line; requirement / criteria / Open Questions / References / Deviations / Notes / verdicts / rows / commits copied; empty sources are 'none'; exit 1 without requirements.md" \
+  "echo \"\$OUT\" | grep -qF 'delivery brief: 2 deviations, 1 rounds, 2 commits' && echo \"\$OUT\" | grep -qF '$BRIEF' \
+   && grep -qF '# Delivery Brief: feat/2026-09-14-u' '$BRIEF' && grep -qF -- '- What: x' '$BRIEF' && grep -qF -- '- [ ] AC1' '$BRIEF' \
+   && grep -qF -- '- AC1 → narrow (ratified at Stage 3 BLOCKED 1)' '$BRIEF' && grep -qF -- '- vendor/x: backoff semantics' '$BRIEF' \
+   && grep -qF -- '\"AC2\" → built: strict' '$BRIEF' && grep -qF 'skipped X' '$BRIEF' \
+   && grep -qF -- '- review: VERDICT: PASS p0=0' '$BRIEF' && grep -qF -- '- security: VERDICT: PASS_WITH_FIXES' '$BRIEF' \
+   && grep -qF '| 3 | BLOCKED 1 |' '$BRIEF' && grep -qF '| 4 | ROUND 1 FAIL |' '$BRIEF' && ! grep -qF '| 4 | PASSED |' '$BRIEF' \
+   && [ \"\$(grep -c '^| 7 | ' '$BRIEF')\" -eq 2 ] \
+   && awk '/^## Decisions the code froze/{f=1; next} f && /^## /{exit} f && /none/{ok=1} END{exit !ok}' '$BRIEF' \
+   && grep -qF -- '- ci-result.md: none' '$BRIEF' \
+   && [ \"\$OUT2\" = 'rc=1' ]"
+
+# 24f stats: the deviations row counts changes with a logged block (report or archive) and BLOCKED rows
+mkdir -p "$TMP24/espalier/changes/feat/2026-09-14-v/coding-log"
+printf '## Status\n- Current Stage: 10\n- Status: COMPLETE\n\n## Stage History\n| 3 | BLOCKED 1 | ts | x |\n| 3 | BLOCKED 2 | ts | y |\n' > "$TMP24/espalier/changes/feat/2026-09-14-v/pipeline-state.md"
+printf '## Coding Report\n- Notes: none\n' > "$TMP24/espalier/changes/feat/2026-09-14-v/coding-report.md"
+printf '## Coding Report\n### Deviations\n- old one\n' > "$TMP24/espalier/changes/feat/2026-09-14-v/coding-log/01-stage3.md"
+OUT=$( cd "$TMP24" && bash espalier/hooks/espalier-stats.sh 2>/dev/null )
+assert "24f espalier-stats: 'deviations: changes-with-logged-deviations=2 stage3-blocked-rows=3' (one live block, one archived block; 1 + 2 BLOCKED rows)" \
+  "echo \"\$OUT\" | grep -qF 'deviations: changes-with-logged-deviations=2 stage3-blocked-rows=3'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP24"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

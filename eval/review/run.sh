@@ -109,13 +109,30 @@ run_review() {
   # e.g. a `- Spec applied:` citation the reviewer must verify (v0.25 D.5).
   local rextra; rextra="$(sed -n -E 's/^report_extra:[[:space:]]*//p' "$fixture" | head -1 | sed -E 's/^"(.*)"$/\1/')"
   [ -n "$rextra" ] && printf '%s\n' "$rextra" >> "$cdir/coding-report.md"
+  # v0.27 deviation fixtures (opt-in): `criteria: "<line>"` writes the change's
+  # requirements.md with that one acceptance criterion; `deviation: "<line>"`
+  # appends a `### Deviations` block with that one entry to the coding report.
+  # The reviewer's Deviation Review then judges the entry against the diff and
+  # the diff against the criterion.
+  # `existing_files: <name…>` copies project/extra/<name> into src/services/ as
+  # pre-existing territory (never listed in the coding report).
+  local exist; exist="$(sed -n -E 's/^existing_files:[[:space:]]*//p' "$fixture" | head -1)"
+  local x; for x in $exist; do cp "$PROJECT/extra/$x" "$proj/src/services/$x"; done
+  local crit; crit="$(sed -n -E 's/^criteria:[[:space:]]*//p' "$fixture" | head -1 | sed -E 's/^"(.*)"$/\1/')"
+  local dev; dev="$(sed -n -E 's/^deviation:[[:space:]]*//p' "$fixture" | head -1 | sed -E 's/^"(.*)"$/\1/')"
+  local req_clause=""
+  if [ -n "$crit" ]; then
+    printf '### 1. Requirement Summary\n- **What:** the change under review\n\n### 2. Acceptance Criteria\n- [ ] %s\n' "$crit" > "$cdir/requirements.md"
+    req_clause=" The approved contract is $cdir/requirements.md — your Deviation Review checks the coding report's ### Deviations block (when present) against the diff, and the diff against those acceptance criteria."
+  fi
+  [ -n "$dev" ] && printf '\n### Deviations\n- %s\n' "$dev" >> "$cdir/coding-report.md"
 
   claude -p --dangerously-skip-permissions --output-format text \
 "You are the harness-reviewer for ReviewApp. The project root is $proj; EVERY espalier/ path is relative to that root.
 
 Read $proj/espalier/agents/harness-reviewer.md and follow it EXACTLY. Review against $proj/espalier/rules/coding-standards.md, $proj/espalier/rules/engineering-structure.md, $proj/espalier/rules/production-standards.md, and $proj/espalier/skills/espalier-review/SKILL.md.$spec_clause Judge ONLY against those project rules, not generic opinions.
 
-WHAT TO REVIEW: read $cdir/coding-report.md, then EVERY file it lists (under $proj/). When it lists test files, your verdict covers the tests too — run your test checklist on them with the code in view.
+WHAT TO REVIEW: read $cdir/coding-report.md, then EVERY file it lists (under $proj/). When it lists test files, your verdict covers the tests too — run your test checklist on them with the code in view.$req_clause
 
 Write your review to $cdir/review-record.md using your instruction file's EXACT output format (findings table with Priority + Verdict). You have no Write/Edit tool — use a Bash heredoc/redirection." > "$WORK/$fid.agent.log" 2>&1 || return 1
 }

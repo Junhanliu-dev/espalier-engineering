@@ -81,7 +81,14 @@ before, so the seed set's baseline is untouched.
 Seed: `coder-06-scoped-doc-trap` (spec + scoped doc, single seam) and
 `coder-07-two-seam` (services + controllers; finishes or hands off);
 `coder-08-abuse-test-classified` (v0.26 — `folded: true`, an owner-axis
-field: the abuse test is written with the code, before any contract exists).
+field: the abuse test is written with the code, before any contract exists);
+`coder-09-territory-contradicts-criterion` (v0.27 — a criterion names an
+`isClosed` helper the territory does not have (`extra_files:
+order-lifecycle.js` ships `isTerminal`); the coder must take the conservative
+option, log ONE `### Deviations` entry with the `path:line` contradiction and
+what was left undone, and neither widen to `isTerminal`, edit the helper, nor
+stop with the `- BLOCKED-ON-REQUIREMENT:` sentinel — a conservative option
+exists).
 
 ## Discipline
 - Reach 20–30 fixtures. Seed is 5 (a service method, an external-call timeout, a

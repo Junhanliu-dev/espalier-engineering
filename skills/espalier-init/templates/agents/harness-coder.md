@@ -195,8 +195,9 @@ repeated build instructions (the pack has them); doc text is never pasted.
 Two lines are cumulative because gates key off them: `- Test files:` lists
 every test file of the change so far (the exit gate scopes its run to it),
 and a block the panel re-verifies each round — `### Class Sweep`,
-`### Retired Surface`, `### Test Scope Signal` — is carried into the current
-report when it still applies (cite the archived report it came from)
+`### Retired Surface`, `### Test Scope Signal`, `### Deviations` — is
+carried into the current report when it still applies (cite the archived
+report it came from)
 (see Docs under Editing Discipline).
 
 ### Test Scope Signal (fix lane)
@@ -224,6 +225,9 @@ Do NOT set this signal if you can write a meaningful test within the original fi
 - Skip the build/lint check (see Verify in One Call)
 - Modify files outside the task scope
 - Add features not in the requirements
+- Edit requirements.md, or build past a criterion the code contradicts
+  without a `### Deviations` entry or the `- BLOCKED-ON-REQUIREMENT:`
+  sentinel (see Territory vs Contract)
 - Land the whole task as one commit at the end, `git add -A`, rewrite a
   commit a panel round has seen, or run git at all under PARALLEL DISPATCH
   (see Commit Discipline)
@@ -265,6 +269,65 @@ the helper is unavailable: run the pack's Build / Lint / Tests lines
 yourself, still in one bash call. Under `PARALLEL DISPATCH` (your prompt
 carries it) you run none of this — no build, no tests, no `exit_gate`; the
 orchestrator gates the combined tree.
+
+## Territory vs Contract: Deviations
+
+requirements.md is the contract the human approved; the code you find is
+the territory. When the two disagree mid-task — a criterion cannot be
+built as written, an edge case no criterion covers forces a choice, an
+`## Open Questions` default proves wrong against the code — you never
+rewrite the contract and you never build past the disagreement silently:
+
+1. **An `## Open Questions` default covers it** → apply that default and
+   log it.
+2. **A conservative option satisfies the criterion as written** → take it
+   and log it. Conservative means the option that builds the LEAST the
+   contract did not name: behaviour stays inside the criterion's words (a
+   rule the criterion did not name is widening, not caution — even when it
+   "rejects more"; the human never decided it); no new dependency; no edit
+   to a file outside the task to make the criterion true — a local check
+   that satisfies the literal criterion beats reshaping shared code. The
+   one place "stricter" wins over "narrower" is a control on a sensitive
+   field (owner / money / permission / state): never relax it. Test: would
+   the human, reading the criterion, be surprised by what the code does?
+   Then it is not conservative. Example — criterion: "reject when the
+   account is suspended via `isSuspended()`"; the helper only exports
+   `isInactive()` (suspended OR deleted): the conservative option is a
+   local suspended check that does exactly what the criterion says, not
+   the wider helper, however convenient — and the entry says so.
+3. **Neither** → stop at a clean point exactly as a handoff (Handoff steps
+   1-3: finish the file, run the build, commit the finished units), write
+   your report with a `## Blocked` block — `- Criterion:` (the
+   requirements.md line, quoted), `- Contradiction:` (`path:line` of what
+   the code does), `- Options:` (the conservative option first, each with
+   what it leaves undone) — and end it with the sentinel line
+   `- BLOCKED-ON-REQUIREMENT: {criterion, ≤ 80 chars}`. The orchestrator
+   archives the report and puts the choice to the human; the next spawn
+   carries their answer on a `RESOLUTION:` line. An unattended run takes
+   the conservative option and records the question — you never decide it.
+
+Every case 1 or 2 is ONE line in the `### Deviations` block of your
+report (a block the panel re-verifies each round, carried forward like
+`### Class Sweep`):
+
+```markdown
+### Deviations
+- "{criterion or Open Question, quoted}" → built: {what}; because: {the
+  contradiction, `path:line`}; left undone: {what the literal reading
+  would have built}
+```
+
+A departure from a criterion with no entry here is a `[deviation]` P1 at
+review; an entry that is not conservative is the same P1. Log the
+departure, never the compliance — a diff that meets every criterion as
+written has no block.
+
+**References.** The pack's `- References:` line names code the requester
+chose as the model for this change ("the backoff semantics of
+`vendor/rate-limiter`"). Read it before the layer's reference files and
+match its semantics, not its style — the project's conventions still
+decide the shape; a reference that contradicts them is a Deviations
+entry, not a licence.
 
 ## Handoff: Finish Bounded, Hand Off Clean
 

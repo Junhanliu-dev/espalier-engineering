@@ -1483,11 +1483,11 @@ stage_validate() {
   # greenfield Pass 1 (espalier/.greenfield present) renders every
   # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
   # pending-skip — count and numbering unchanged.
-  local TOTAL_CHECKS=58
+  local TOTAL_CHECKS=59
   if want_copilot; then
-    TOTAL_CHECKS=68
+    TOTAL_CHECKS=69
   elif want_codex; then
-    TOTAL_CHECKS=63
+    TOTAL_CHECKS=64
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1712,6 +1712,7 @@ stage_validate() {
   # 57-65: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
   # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0,
   # 67-68 v0.26.0 turn economy
+  # 69 v0.27.0 unknowns channel
   # quality-first context) — run
   # UNCONDITIONALLY, regardless of --platforms; appended after
   # the platform blocks so the shipped IDs 47-56 stay stable.
@@ -1756,11 +1757,20 @@ stage_validate() {
   else
     run_check 68 "contract-coverage" 'grep -qF "covered_by:" espalier/agents/harness-security.md && grep -qF "Abuse test, now" espalier/agents/harness-coder.md && grep -qF "## Verify in One Call" espalier/agents/harness-coder.md && grep -qF "covered_by" espalier/agents/modes/stage6-abuse-coverage.md && cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md > "$tmpdir/68.cat" && grep -qF -- "- Session-Boundary:" "$tmpdir/68.cat" && grep -qF "GAPS:" "$tmpdir/68.cat" && grep -qF -- "- Session-Boundary:" espalier/skills/espalier-fix/SKILL.md' &
   fi
+  # 69 (v0.27 unknowns channel): the three helpers (pure copy), the grill's
+  # requester brief + the References contract section (pure copies), and
+  # the coder / reviewer / security bodies' territory-vs-contract text
+  # (LLM-written at init — greenfield Pass 1 has no agent bodies yet).
+  if gf; then
+    skip_check 69 "unknowns-channel" "pending greenfield Pass 2"
+  else
+    run_check 69 "unknowns-channel" 'for fn in deviations_list open_question_append delivery_brief _md_section; do grep -q "^$fn()" espalier/hooks/drift-helpers.sh || exit 1; done; grep -qF "Step 1.6" espalier/skills/espalier-grill/SKILL.md && grep -qF "## References" espalier/skills/espalier-requirements/SKILL.md && grep -qF "### Deviations" espalier/agents/harness-coder.md && grep -qF -- "- BLOCKED-ON-REQUIREMENT:" espalier/agents/harness-coder.md && grep -qF "[deviation]" espalier/agents/harness-reviewer.md && grep -qF "### Deviations" espalier/agents/harness-security.md && cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md > "$tmpdir/69.cat" && grep -qF "BLOCKED-ON-REQUIREMENT" "$tmpdir/69.cat" && grep -qF "deviations_list" "$tmpdir/69.cat" && grep -qF "delivery_brief" "$tmpdir/69.cat" && grep -qF "delivery_brief" espalier/skills/espalier-fix/SKILL.md' &
+  fi
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-68.
+  # must reach stdout, which the run_check harness discards), then 26-69.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
   cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-9] 2>/dev/null

@@ -1,5 +1,27 @@
 # Deferred Items
 
+## Items deferred from v0.27.0
+
+- **Deviation classes as convention candidates.** v0.27 copies each change's
+  `### Deviations` to `requirements-notes.md` and the map digest (notify-only).
+  A deviation that recurs across changes ("criterion X always meets
+  territory Y") is a Convention Observation only when a reviewer files it;
+  nothing aggregates deviations by class the way `append_convention`
+  aggregates observations by key.
+  - **Trigger to revisit**: `espalier-stats.sh`'s `deviations:` row shows
+    logged deviations on ≥ 3 changes in a month, or the same criterion wording
+    blocks twice.
+- **Quiz content from the brief only.** The Stage 10 quiz asks from
+  `delivery-brief.md`'s text; a wrong answer changes nothing (the human
+  re-reads and re-decides). No scoring, no gate — by design.
+  - **Trigger to revisit**: a field request for the quiz to block acceptance,
+    or for the questions to reach into the diff.
+- **`familiarity: low` is words-only.** The grill takes it from the
+  requester's statement, never from a heuristic (first change in a layer,
+  git blame age). Inferring it would misread a domain expert as a newcomer.
+  - **Trigger to revisit**: Step 1.6 briefs that the requester says they
+    needed and did not get, on ≥ 2 changes.
+
 ## Items deferred from v0.22.0
 
 - **eval/security judge-collapse recalibration.** ~~Deferred~~ **CLOSED in

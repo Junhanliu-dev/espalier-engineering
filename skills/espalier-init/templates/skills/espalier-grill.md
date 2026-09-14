@@ -32,6 +32,7 @@ is never called directly by the user.
 | | `score` (from `/espalier-map` handoff) — Step 1 signal count only; no interrogation, no writes |
 | `input_text` | the requirement, bug description, or ticket question (+ map context) |
 | `reqs_path` | path to the change's `requirements.md` (spec/diagnosis) or the ticket file (decision) |
+| `familiarity` | optional — `low` when the requester SAID this area is new to them ("I don't know the auth module", "never touched this"); otherwise unset. Never inferred. |
 
 ### Decision-mode deltas (`mode=decision`)
 
@@ -108,10 +109,15 @@ Do not judge ambiguity by feel. Count concrete ambiguity **signals** in `input_t
 | Rule collision | the requirement's approach contradicts an `espalier/rules/` convention |
 | Wiki duplication | the requirement re-implements a capability `espalier/wiki/` documents |
 | Unstated ripple | the requirement touches a documented critical-path / data-model with unstated downstream |
+| Requester unfamiliar | `familiarity: low` was passed — the requester said this area is new to them |
 
-The last three are not in `input_text` — they surface only by cross-referencing the
-project's own map, which **Step 1.5** does. A collision confirmed there counts as a
-signal and floors the tier at `light` (Step 1.5). Count the text signals now; let
+Rule collision, wiki duplication, and unstated ripple are not in `input_text` — they
+surface only by cross-referencing the project's own map, which **Step 1.5** does. A
+collision confirmed there counts as a signal and floors the tier at `light` (Step
+1.5). Requester unfamiliar is the one signal the requester supplies about
+themselves: it counts, floors the tier at `light`, and turns on **Step 1.6** — a
+requester who does not know the area cannot name what they have not considered,
+so the map is read to them before they are asked. Count the text signals now; let
 Step 1.5 add any collision signals before you commit to a tier.
 
 Map the count to a depth tier:
@@ -188,6 +194,30 @@ only. Never propose new designs, generate alternatives, or brainstorm — that i
 grill's job, and it would fight the point of encoding conventions. Zero collisions → add
 nothing and stay silent.
 
+### Step 1.6 — Requester brief (the requester's unknown unknowns)
+
+Runs after Step 1.5, before Step 2, when `familiarity: low` was passed OR the tier
+is `full`. Step 1.5 catches what the repo knows and the requester does not; this
+step tells the requester what they could not have asked about. It reads the same
+map — `espalier/rules/`, `espalier/wiki/`, and the layer specs under
+`espalier/skills/espalier-coding/specs/` for the layers the requirement touches —
+and prints ONE short brief before the first question, at most seven lines, each
+a fact with its citation:
+
+- what this area already decides that the requirement does not mention (the
+  documented data model the change joins, the critical path it sits on, the
+  convention that fixes the shape — `wiki/<file>#section`, `rules/<file>#section`,
+  `specs/<layer>.md § section`);
+- what "good" looks like here — the reference pattern the layer spec names;
+- the one thing a newcomer to this area most often gets wrong, when a rule or
+  wiki page records it.
+
+The brief explains; it never proposes. No design, no alternatives, no "you could
+also" — the Step 1.5 scope guard applies word for word. A line without a
+citation is not a line. Empty `rules/` and `wiki/` → skip silently, as Step 1.5.
+The brief lands in `requirements-notes.md` under `## Requester brief` (Step 3);
+the questions that follow assume it was read.
+
 ### Step 2 — Grill loop (tiers `light` and `full`)
 
 Ask questions **sequentially** — one question, wait for the answer, let the answer
@@ -210,6 +240,21 @@ instead of a generic one.
 > the full dataset, async job · XLSX · JSON endpoint}. The discriminating question is
 > "CSV of the current page, or the full dataset as an async job?" — not the generic
 > "what format do you want?".
+
+At tier `full`, and whenever Step 1.6 ran, the list is NOT private: show it with
+the first question — one line per candidate build, then the question that
+eliminates most. The requester reacts to shapes they would not have named; the
+question still does the eliminating, and the cap is unchanged. At tier `light`
+the list stays private (the input is near-crisp; showing it would add reading,
+not information).
+
+When the candidates differ in APPROACH — not detail — and the requester cannot
+choose ("not sure", "either"), do not choose for them: record `approach: {the
+candidates}` under `## Open Questions` in requirements.md with the conservative
+candidate named as the default, and print ONE line — `approach undecided: a
+/espalier-map prototype or research ticket settles what talking cannot`. The
+requirement still proceeds to the approval gate, where the human sees the default
+and decides; grill never brainstorms past this point.
 
 Rules for the loop:
 - **Answer from the codebase first.** If a question is answerable by reading the code
@@ -261,6 +306,8 @@ A **resolved collision** (Step 1.5) lands the same way, carrying its citation:
 When Step 1.5 ran, add a short `## Convention Notes` block to `requirements.md` listing
 each `rules/`/`wiki/` path consulted and the collision verdict (raised / cleared / doc
 flagged stale) — so the audit trail shows the cross-check ran even when it found nothing.
+When Step 1.6 ran, its brief goes to `requirements-notes.md` under `## Requester
+brief`, verbatim — the contract file carries decisions, not explanations.
 
 Every grilled decision must land as a verifiable line. Never leave a resolution only
 in the conversation.
@@ -300,3 +347,7 @@ Return ONE verdict to the invoking stage — it records this in `pipeline-state.
   claim against the current code — a stale doc gets `mark_stale`, not a question.
 - NEVER brainstorm new designs or generate alternatives in Step 1.5 — it surfaces
   collisions with conventions that already exist in `rules/`/`wiki/`, nothing more.
+- NEVER turn the Step 1.6 brief into a proposal — it explains what the map already
+  decides, every line cited; the candidate list shown at `full` tier is the
+  requester's to react to, never a recommendation.
+- NEVER pass `familiarity: low` on your own read of the requester — only their words.

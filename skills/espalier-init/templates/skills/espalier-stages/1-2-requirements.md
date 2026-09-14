@@ -23,9 +23,19 @@ chain Stage 1 → 2 → 3 automatically — that is the bug this gate closes. Af
 Stage 2's gate passes (no P0/P1 reqs findings), HALT and get explicit user
 sign-off on `requirements.md` before Stage 3.
 
-1. Present a concise summary of the final `requirements.md`: the one-line goal,
-   the acceptance criteria, and anything the Stage 1 grill resolved or marked
-   out-of-scope.
+1. Present a concise summary of the final `requirements.md` — in THIS order,
+   the decisions most likely to change first, so the human's attention lands
+   where an edit is cheapest:
+   - the decisions the code will freeze: the data-model, interface, and
+     user-facing lines of `## Technical Considerations`, and every
+     `## Open Questions` entry with its conservative default — the human
+     ratifies each default here (a rejected default is an **Edit**; an
+     `approach:` entry is the grill saying talking could not settle it —
+     offer `/espalier-map` in the same breath);
+   - the one-line goal and the acceptance criteria;
+   - scope in / out, `## References` when present, and what the grill
+     resolved.
+   The mechanical part (task decomposition) is not read out.
 2. In the SAME turn as this prompt, write the context pack —
    `stages/3-coding.md` → "Stage 3 Entry: Context Pack" holds the format
    (read that section now; paths and facts only, approval-independent). Then

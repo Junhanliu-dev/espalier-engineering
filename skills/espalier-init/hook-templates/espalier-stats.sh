@@ -19,7 +19,9 @@
 #   - spawn shape per change (v0.25): coder spawns, handoffs, parallel parts,
 #     fresh-session resumes — from coding-log/ and the HANDOFF / RESUMED rows;
 #     (v0.26) contract phases covered at Stage 3 vs coder-spawned, and the
-#     session-boundary preferences chosen at the approval gate
+#     session-boundary preferences chosen at the approval gate;
+#     (v0.27) changes whose coder logged a `### Deviations` block and Stage 3
+#     BLOCKED rows — the territory-vs-contract channel in use
 #   - workspace docs (report-only): every CLAUDE.md / AGENTS.md with size + last change
 #   - per-map ticket/fog/session/spawned-change state (espalier/maps/)
 #   - convention divergence hotspots (conv_fold, when drift-helpers is present)
@@ -155,6 +157,17 @@ $c"
     done
     echo "contract phases: covered-at-Stage-3=$cov coder-spawned=$spawned no-contract=$nocon"
     echo "session boundaries chosen: none=$sb_none after-2=$sb_2 after-4=$sb_4 both=$sb_both"
+    # v0.27: the territory-vs-contract channel — changes whose coder logged
+    # deviations (coding-report.md or any archived report) and Stage 3
+    # BLOCKED rows (the human resolved a criterion mid-implementation).
+    dev_changes=0; blocked=0
+    for sf in "$CH"/*/*/pipeline-state.md; do
+      case "$sf" in */_template/*) continue ;; esac
+      dir=$(dirname "$sf")
+      if grep -qs '^### Deviations' "$dir/coding-report.md" "$dir"/coding-log/*.md 2>/dev/null; then dev_changes=$((dev_changes + 1)); fi
+      b=$(grep -cE '^\| 3 \| BLOCKED ' "$sf" 2>/dev/null); b=${b:-0}; blocked=$((blocked + b))
+    done
+    echo "deviations: changes-with-logged-deviations=$dev_changes stage3-blocked-rows=$blocked"
     echo
     echo "(Quality reads: handoffs are a coder finishing bounded work at a clean"
     echo "point — a change that hands off habitually wants smaller sub-tasks at"
@@ -163,7 +176,9 @@ $c"
     echo "task as one commit — the Commit Discipline wants one seam per commit;"
     echo "contract phases covered at Stage 3 are the coder writing its abuse"
     echo "tests with the code — a rising coder-spawned count means the coder's"
-    echo "classification is missing fields the auditor names."
+    echo "classification is missing fields the auditor names; logged"
+    echo "deviations are the code refusing the contract as written — many"
+    echo "per change means Stage 1 is not reading the territory it should."
     echo "Pre-v0.25 changes have no coding-log/ and count as one spawn.)"
   fi
 else

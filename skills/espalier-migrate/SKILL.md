@@ -18,7 +18,7 @@ description: Migrate an existing harness/espalier install to the current Espalie
 ## Instructions
 
 You are running a migration of an existing install to the current Espalier
-version. Up to THIRTY-SIX migrations may apply, always in this order:
+version. Up to THIRTY-SEVEN migrations may apply, always in this order:
 
 1. **v0.1.x → v0.2.x** — typed `harness/changes/{type}/{slug}/` layout,
    `/harness-fix` lane, squash-merge decision. Mechanical:
@@ -534,29 +534,62 @@ version. Up to THIRTY-SIX migrations may apply, always in this order:
    touched). Validation checks 67 `turn-economy-helpers`, 68
    `contract-coverage`; totals 58 / 63 / 68 by platform set.
    Mechanical: `scripts/migrate-v0.25.1-to-v0.26.0.sh`.
+37. **v0.26.0 → v0.27.0** — unknowns release: a channel for what the code
+   teaches during and after implementation, with the contract still
+   frozen. Every gate, rubric, sentinel, round cap, and escalation path is
+   contract-equal to v0.26.0; the coder never edits requirements.md; the
+   human resolves every criterion the code contradicts. The coder logs
+   each departure from the contract under `### Deviations` (the
+   conservative option, the `path:line` contradiction, what was left
+   undone) or stops at a clean point with `- BLOCKED-ON-REQUIREMENT:` —
+   the Stage 3 exit gate archives the report, the human takes the
+   conservative option (`open_question_append` records it as ratified)
+   or rewords the criterion, a fresh coder continues with `RESOLUTION:`
+   (unattended: the conservative option, `(default — revisit)`). The
+   reviewer's Deviation Review verifies the block every round (unlogged
+   or non-conservative departure = `[deviation]` P1); the auditor files a
+   relaxed control on a sensitive field as P0. The Stage 4 PASS prints
+   the deviations (`deviations_list`); Stage 10 presents
+   `delivery-brief.md` (`delivery_brief` — assembled from the records,
+   never authored) and offers a quiz (interactive only); Completion
+   copies the deviations to `requirements-notes.md` `## Settled for next
+   time`. The grill takes `familiarity: low` (only from the requester's
+   own words), reads the map to them first (Step 1.6 requester brief,
+   cited, never a proposal), shows its 3–5 candidate builds at `full`
+   tier, and records an undecided APPROACH under `## Open Questions`
+   with a `/espalier-map` pointer instead of choosing. requirements.md
+   gains `## References` (the requester's named model; the pack's
+   `- References:` line); the approval gate leads with the decisions most
+   likely to change (data model, interfaces, user-facing, every Open
+   Questions default — ratified there). `espalier-stats.sh` reports the
+   deviations row. Refreshes 12 pure copies (backups `.pre-v0.27.bak`);
+   anchored edits EXTRACTED from the templates for the coder, reviewer
+   and security bodies (customised files skip-with-record). Validation
+   check 69 `unknowns-channel`; totals 59 / 64 / 69 by platform set.
+   Mechanical: `scripts/migrate-v0.26.0-to-v0.27.0.sh`.
 
 Your job: detect which one(s) apply, locate the scripts, preview, get
-confirmation, apply in order. A v0.1.x install needs ALL THIRTY-SIX; a v0.3.x
-install needs the last thirty-four; a v0.4.x install needs the last thirty-three; a
+confirmation, apply in order. A v0.1.x install needs ALL THIRTY-SEVEN; a v0.3.x
+install needs the last thirty-five; a v0.4.x install needs the last thirty-four; a
 v0.5.0–v0.5.2 install needs the v0.5.3 patch then v0.6 … v0.25.0; a
 v0.5.3–v0.5.x install needs v0.6 … v0.25.0; a v0.6.x install needs
 v0.7 … v0.24.0; a v0.7.x install needs v0.8 … v0.25.0; a v0.8.0 install needs
 v0.8.1 … v0.24.0; a v0.8.1 install needs v0.8.2 … v0.25.0; a v0.8.2 install
 needs v0.9.0 … v0.24.0; a v0.9.0 install needs v0.9.1 … v0.25.0; a v0.9.1
 install needs v0.9.2 … v0.25.0; a v0.9.2 install needs v0.9.3, v0.9.4,
-v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.9.3 install
-needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a
+v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.9.3 install
+needs v0.9.4, v0.10.0, v0.11.0, v0.12.0, v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a
 v0.9.4, v0.9.5, or v0.9.6 install needs v0.10.0, v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
-v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
-v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
-v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.13.1
-install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.13.2 install needs v0.14.0,
-v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.14.0 install needs v0.15.0,
-v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.15.0 install needs v0.16.0, v0.17.0, v0.18.0,
-v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.16.0 install needs v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a
-v0.17.0 install needs v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.18.0 install needs
-v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.19.0 install needs v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.20.0 install needs v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.21.0 install needs v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.21.1 install needs v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.22.0 install needs v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.22.1 install needs v0.23.0, v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.23.0 install needs v0.23.1, v0.24.0, v0.25.0, then v0.26.0; a v0.23.1 install needs v0.24.0 v0.25.0, then v0.26.0; a v0.24.0 install needs v0.25.0 then v0.26.0; a v0.25.x install needs only v0.26.0.
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.10.0 install needs v0.11.0, v0.12.0, v0.13.0,
+v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.11.0 install needs v0.12.0, v0.13.0, v0.13.1,
+v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.12.0 install needs v0.13.0, v0.13.1, v0.13.2, v0.14.0, v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.13.0 install needs v0.13.1, v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.13.1
+install needs v0.13.2, v0.14.0, v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.13.2 install needs v0.14.0,
+v0.15.0, v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.14.0 install needs v0.15.0,
+v0.16.0, v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.15.0 install needs v0.16.0, v0.17.0, v0.18.0,
+v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.16.0 install needs v0.17.0, v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a
+v0.17.0 install needs v0.18.0, v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.18.0 install needs
+v0.19.0, v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.19.0 install needs v0.20.0, v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.20.0 install needs v0.21.0, v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.21.0 install needs v0.21.1, v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.21.1 install needs v0.22.0, v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.22.0 install needs v0.22.1, v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.22.1 install needs v0.23.0, v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.23.0 install needs v0.23.1, v0.24.0, v0.25.0, v0.26.0, then v0.27.0; a v0.23.1 install needs v0.24.0 v0.25.0, v0.26.0, then v0.27.0; a v0.24.0 install needs v0.25.0 v0.26.0, then v0.27.0; a v0.25.x install needs only v0.26.0.
 
 Two gaps in the script names are deliberate, not missing steps: there is no
 v0.2→v0.3 script because v0.2/v0.3 detection is lumped — the v0.3→v0.4 step
@@ -661,6 +694,7 @@ NEEDS_V0231_PATCH=no
 NEEDS_V0240_PATCH=no
 NEEDS_V0250_PATCH=no
 NEEDS_V0260_PATCH=no
+NEEDS_V0270_PATCH=no
 
 if [ ! -d "harness" ] && [ ! -d "espalier" ]; then
   echo "ERROR: no harness/ or espalier/ dir found — not a target install."
@@ -708,6 +742,7 @@ if [ -d "harness" ]; then
   NEEDS_V0240_PATCH=yes      # ...then the v0.24.0 simplify-lane release
   NEEDS_V0250_PATCH=yes      # ...then the v0.25.0 quality-first context release
   NEEDS_V0260_PATCH=yes      # ...then the v0.26.0 turn-economy release
+  NEEDS_V0270_PATCH=yes      # ...then the v0.27.0 unknowns release
 elif [ -d "espalier" ]; then
   # Already renamed. v0.4.x still needs the doc-drift upgrade.
   if [ ! -f "espalier/hooks/drift-detect.sh" ] || [ ! -f "espalier/.doctor-cadence" ]; then
@@ -1097,6 +1132,24 @@ elif [ -d "espalier" ]; then
      || ! ok260 'covered_by:' espalier/agents/harness-security.md security-contract-covered-by; then
     NEEDS_V0260_PATCH=yes
   fi
+  # v0.27.0: the unknowns channel. Probe = the delivery_brief helper (the
+  # surface every install gains) plus the coder's `### Deviations` block and
+  # the reviewer's `[deviation]` tag (the same phrases check 69 greps — an
+  # init-written body carries them even when its prose differs); keep in sync with
+  # migrate-v0.26.0-to-v0.27.0.sh's own idempotency check (labels are
+  # v0.27.0-*; skip records count as handled).
+  ok270() { grep -qF "$1" "$2" 2>/dev/null \
+            || grep -qF "v0.27.0-$3" espalier/.migrations-skipped 2>/dev/null; }
+  if ! grep -qF 'delivery_brief()' espalier/hooks/drift-helpers.sh 2>/dev/null \
+     || ! grep -qF 'delivery_brief' espalier/skills/espalier/SKILL.md 2>/dev/null \
+     || ! grep -qF 'BLOCKED-ON-REQUIREMENT' espalier/skills/espalier/stages/3-coding.md 2>/dev/null \
+     || ! grep -qF 'BLOCKED-ON-REQUIREMENT' espalier/skills/espalier-fix/SKILL.md 2>/dev/null \
+     || ! grep -qF 'Step 1.6' espalier/skills/espalier-grill/SKILL.md 2>/dev/null \
+     || ! grep -qF 'changes-with-logged-deviations' espalier/hooks/espalier-stats.sh 2>/dev/null \
+     || ! ok270 '### Deviations' espalier/agents/harness-coder.md coder-territory \
+     || ! ok270 '[deviation]' espalier/agents/harness-reviewer.md reviewer-deviation-review; then
+    NEEDS_V0270_PATCH=yes
+  fi
 fi
 
 # Supersession floor. Every probe above greps a historical phrase, and later
@@ -1111,7 +1164,11 @@ fi
 # floor release's own flag stays as probed — its script is the current one
 # and re-runs safely. Floor markers are phrases no later release retires.
 FLOOR=""
-if grep -qF 'contract_gaps()' espalier/hooks/drift-helpers.sh 2>/dev/null \
+if grep -qF 'delivery_brief()' espalier/hooks/drift-helpers.sh 2>/dev/null \
+   && grep -qF 'BLOCKED-ON-REQUIREMENT' espalier/skills/espalier/stages/3-coding.md 2>/dev/null \
+   && grep -qF 'Step 1.6' espalier/skills/espalier-grill/SKILL.md 2>/dev/null; then
+  FLOOR=NEEDS_V0270_PATCH
+elif grep -qF 'contract_gaps()' espalier/hooks/drift-helpers.sh 2>/dev/null \
    && grep -qF 'Session-Boundary' espalier/skills/espalier/SKILL.md 2>/dev/null \
    && grep -qF 'covered_by' espalier/agents/modes/stage6-abuse-coverage.md 2>/dev/null; then
   FLOOR=NEEDS_V0260_PATCH
@@ -1139,7 +1196,7 @@ if [ -n "$FLOOR" ]; then
            NEEDS_V0160_PATCH NEEDS_V0170_PATCH NEEDS_V0180_PATCH NEEDS_V0190_PATCH \
            NEEDS_V0200_PATCH NEEDS_V0210_PATCH NEEDS_V0211_PATCH NEEDS_V0220_PATCH \
            NEEDS_V0221_PATCH NEEDS_V0230_PATCH NEEDS_V0231_PATCH NEEDS_V0240_PATCH \
-           NEEDS_V0250_PATCH NEEDS_V0260_PATCH; do
+           NEEDS_V0250_PATCH NEEDS_V0260_PATCH NEEDS_V0270_PATCH; do
     [ "$f" = "$FLOOR" ] && break
     eval "$f=no"
   done
@@ -1164,7 +1221,7 @@ if [ "$NEEDS_V01_V02" = no ] && [ "$NEEDS_V03_V04" = no ] \
    && [ "$NEEDS_V0220_PATCH" = no ] && [ "$NEEDS_V0221_PATCH" = no ] \
    && [ "$NEEDS_V0230_PATCH" = no ] && [ "$NEEDS_V0231_PATCH" = no ] \
    && [ "$NEEDS_V0240_PATCH" = no ] && [ "$NEEDS_V0250_PATCH" = no ] \
-   && [ "$NEEDS_V0260_PATCH" = no ]; then
+   && [ "$NEEDS_V0260_PATCH" = no ] && [ "$NEEDS_V0270_PATCH" = no ]; then
   echo "Already fully up to date. Nothing to do."
   exit 0
 fi
@@ -1185,7 +1242,7 @@ never a stray `$HOME` checkout that merely shares the name.
 PLUGIN_DIR=""
 # Primary: derive the plugin root from the skill's own location.
 if [ -n "${CLAUDE_SKILL_DIR:-}" ] \
-   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.25.1-to-v0.26.0.sh" ]; then
+   && [ -f "${CLAUDE_SKILL_DIR}/../../scripts/migrate-v0.26.0-to-v0.27.0.sh" ]; then
   PLUGIN_DIR="$(cd "${CLAUDE_SKILL_DIR}/../.." && pwd)"
 fi
 
@@ -1194,7 +1251,7 @@ fi
 if [ -z "$PLUGIN_DIR" ]; then
   for candidate in "${ESPALIER_PLUGIN_DIR:-}" "$HOME/repos/espalier-engineering"; do
     [ -n "$candidate" ] || continue
-    if [ -f "$candidate/scripts/migrate-v0.25.1-to-v0.26.0.sh" ]; then
+    if [ -f "$candidate/scripts/migrate-v0.26.0-to-v0.27.0.sh" ]; then
       PLUGIN_DIR="$candidate"
       break
     fi
@@ -1212,7 +1269,7 @@ fi
 The probe is the NEWEST migration script, so a plugin that predates the current
 chain fails to resolve rather than resolving and then dying on a missing script
 mid-apply. If the primary path misses and the fallback fires, the plugin install
-is likely stale (no `migrate-v0.25.1-to-v0.26.0.sh`) — tell the user to
+is likely stale (no `migrate-v0.26.0-to-v0.27.0.sh`) — tell the user to
 `/plugin update espalier-engineering` first. Bump this probe whenever a new
 migration script is added.
 
@@ -1258,6 +1315,7 @@ verbatim:
 [ "$NEEDS_V0240_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.23.1-to-v0.24.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0250_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.24.0-to-v0.25.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0260_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.25.1-to-v0.26.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0270_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.26.0-to-v0.27.0.sh" --dry-run --plugin-dir="$PLUGIN_DIR"
 ```
 
 A dry-run for a step whose prerequisite has not been applied yet may refuse with
@@ -1406,6 +1464,7 @@ completed.
 [ "$NEEDS_V0240_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.23.1-to-v0.24.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0250_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.24.0-to-v0.25.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 [ "$NEEDS_V0260_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.25.1-to-v0.26.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
+[ "$NEEDS_V0270_PATCH" = yes ] && bash "$PLUGIN_DIR/scripts/migrate-v0.26.0-to-v0.27.0.sh" --yes --plugin-dir="$PLUGIN_DIR"
 ```
 
 Each script's verification block prints `X passed, Y failed`. Surface every
