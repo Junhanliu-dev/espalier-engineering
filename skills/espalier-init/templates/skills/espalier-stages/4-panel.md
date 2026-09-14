@@ -35,6 +35,10 @@ Agent tool:
     the code in view. Do NOT check abuse-test coverage this round — the
     security contract is being written concurrently; that check runs at
     the contract delta review.
+    DEVIATIONS: run your Deviation Review — the coding report's
+    "### Deviations" block (absent = nothing logged) against the diff, and
+    the diff against requirements.md's acceptance criteria; an unlogged or
+    non-conservative departure is a [deviation] P1.
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
     {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
     latest coding-report.md}. Read espalier/agents/modes/re-review.md
@@ -68,6 +72,9 @@ Agent tool:
     the history.
     Test files in the diff are in scope for secrets / live-endpoint /
     fixture-data leakage only — otherwise they are not findings surface.
+    DEVIATIONS: a "### Deviations" entry in the coding report that drops,
+    relaxes, or bypasses a control on a sensitive field is a P0 (your
+    Audit Process step 5).
     ROUND: {n} — put round={n} in your VERDICT sentinel line.
     {On round ≥ 2 add:} CHANGED SINCE LAST REVIEW: {fix's files from the
     latest coding-report.md}. Read espalier/agents/modes/re-review.md
@@ -166,8 +173,15 @@ Stage 5 by any other path:
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
    (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate
-   (`certificate_write`, `stages/5-6-contract.md`), THEN run the "Stage 4
-   Post-Review" drift processing below — it must finish BEFORE any contract
+   (`certificate_write`, `stages/5-6-contract.md`), **surface the
+   deviations** — `. espalier/hooks/drift-helpers.sh && deviations_list
+   "espalier/changes/{type}/{slug}"` prints the coding report's
+   `### Deviations` entries (nothing when there are none): print them under
+   the PASS line, verbatim, and append `deviations: {n}` to the PASSED
+   row's notes — this is where the human sees every departure from the
+   approved contract, panel-verified, before anything is pushed (an
+   unattended run has the row; the delivery brief carries them too) —
+   THEN run the "Stage 4 Post-Review" drift processing below — it must finish BEFORE any contract
    delta-review spawn (that spawn overwrites the review-record.md the parse
    reads) — then the **stage boundary**: with the PASSED row, the
    certificate, and the drift rows on disk, read `- Session-Boundary:` from

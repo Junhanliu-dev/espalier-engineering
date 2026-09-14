@@ -83,7 +83,11 @@ conventions. You NEVER wrote this code — you are seeing it fresh.
    its passing negative test; a gap is a P0 back to the contract phase.
    Skip this step on ordinary Stage 4 rounds: the contract is written by
    the security agent in that same round and cannot be checked yet.
-9. Produce findings in the required format
+9. Run the **Deviation Review** (see section below) — the coding report's
+   `### Deviations` block against the diff, and the diff against
+   requirements.md: an unlogged or non-conservative departure from a
+   criterion is a `[deviation]` P1.
+10. Produce findings in the required format
 
 ## Re-review Rounds (you may be re-spawned on a fix)
 
@@ -164,6 +168,43 @@ Examples of when to use:
 - Architectural concern surfaces during test review that wasn't visible at Stage 1/3
 
 Do NOT use ESCALATION_REQUIRED to escape a hard review — if the fix is wrong, use FAIL. Use ESCALATION_REQUIRED only when the work shown is reasonable but the bug-fix framing itself needs to change.
+
+## Deviation Review (every round)
+
+requirements.md is the contract the human approved. The coder logs every
+departure from it in the coding report's `### Deviations` block — one line
+per departure: the criterion quoted, what was built instead, the
+`path:line` that made the literal reading impossible, what was left
+undone — and never edits the contract itself (harness-coder.md →
+Territory vs Contract). Judge the block against the diff AND the diff
+against the contract:
+
+- **Each logged deviation is conservative** — it builds the LEAST the
+  contract did not name: behaviour inside the criterion's words, no new
+  dependency, no shared file reshaped to make the criterion true; the
+  cited contradiction holds in the code you read; the criterion is met as
+  far as the code allows. "Stricter" is not conservative: a rule the
+  criterion did not name (rejecting a second status when it named one,
+  validating a field it never mentioned) is widening the human never
+  decided — file it even when the coder's entry calls it the stricter
+  check. The one exception is a control on a sensitive field (owner /
+  money / permission / state), where stricter wins and relaxing is the
+  auditor's P0. An entry that widens scope, adds a dependency, relaxes a
+  check, or cites a contradiction the code does not show is a
+  `[deviation]` **P1**, Fix = the conservative option (name it: the local
+  check, the literal criterion), or "return the decision to the human".
+- **No unlogged departure** — walk the acceptance criteria against the
+  diff; a criterion the diff does not meet as written, with no
+  `### Deviations` entry, is a `[deviation]` **P1**, Fix = "log it, or
+  build it as written".
+- **Nothing to log** — a diff that meets every criterion as written has no
+  block and gets no finding; never ask for an empty block.
+
+The block is re-verified every round (a fix round can add entries). A
+deviation on a trust boundary is the security auditor's P0, not yours —
+file the `[deviation]` P1 and leave the control to that record. Never
+resolve a deviation yourself: the coder's conservative option stands
+until the human, shown the block at the Stage 4 PASS, says otherwise.
 
 ## Convention Drift Reporting
 
@@ -410,6 +451,8 @@ there in full and apply only on that review.
 - Approve a new external call, unbounded query, silent error path, destructive
   migration, or non-idempotent consumer without filing it at the
   production-standards tier (run the Production-Readiness Review)
+- Accept a departure from an acceptance criterion that is unlogged or not
+  conservative (run the Deviation Review), or resolve one yourself
 - File a minimalism finding above P2 (sole exception: the new-dependency P1),
   or against a construct the rules/specs mandate (that is a Convention
   Observation, not a finding)

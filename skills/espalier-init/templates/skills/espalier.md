@@ -265,10 +265,10 @@ For each stage:
    | Stage | Procedure: read `espalier/skills/espalier/stages/{file}` now, then run it |
    |-------|------------------------------------------------------------------------|
    | 1–2 | `stages/1-2-requirements.md` — Stage 1/2 loads, the Requirements Approval Gate (BLOCKING) with the push / deploy pre-authorization and the session-boundary preference |
-   | 3 | `stages/3-coding.md` — Stage 3 Entry: Context Pack, sub-task sizing and parallel dispatch, the coder spawn, the Stage 3 exit gate (the `- HANDOFF: true` sentinel → archive → `exit_gate` → continuation), the `test-mode` read |
-   | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate (`certificate_write`) + the boundary read, post-review drift (`drift_index`) and convention index |
+   | 3 | `stages/3-coding.md` — Stage 3 Entry: Context Pack, sub-task sizing and parallel dispatch, the coder spawn, the Stage 3 exit gate (the `- HANDOFF: true` sentinel → archive → `exit_gate` → continuation; the `- BLOCKED-ON-REQUIREMENT:` sentinel → the human resolves the criterion, `open_question_append`, continuation with `RESOLUTION:`), the `test-mode` read |
+   | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate (`certificate_write`) + the deviations surfaced (`deviations_list`) + the boundary read, post-review drift (`drift_index`) and convention index |
    | 5–6 | `stages/5-6-contract.md` — Stage 5/6 (folded): contract coverage first (`contract_gaps` — a coder only for the gaps) and the delta review / test writing and test review (serial), the certificate, crash recovery |
-   | 7–10 | `stages/7-10-delivery.md` — convention-index staging, commit recording (`record_commits`), the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check (`stage85_drift`) |
+   | 7–10 | `stages/7-10-delivery.md` — convention-index staging, commit recording (`record_commits`), the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check (`stage85_drift`), the Stage 10 delivery brief (`delivery_brief`) and quiz offer |
 
    This file ROUTES; the stage files carry the procedure verbatim and
    `espalier/pipeline.md` is the contract (trigger / load / gate / output /
@@ -421,10 +421,21 @@ When Stage 10 passes:
   escape hatch applies)` — and, when other `simplify_from` changes have
   completed since this one's `survey_commit`, add `run /espalier-doctor
   --since {survey_commit}`. Notify-only: never edit a doc here.
+- **Territory notes** — when the coding report carries `### Deviations` or
+  the Stage History a `BLOCKED` row, append the entries to
+  `requirements-notes.md` under `## Settled for next time` (create the
+  heading when absent; one line each, verbatim from the report): the
+  contract's next author reads what the code refused this time. A charted
+  change also appends them to its findings digest (above) under a
+  `deviations:` line. Notify-only; nothing edits a rule or wiki page —
+  a deviation that recurs across changes is a Convention Observation for
+  the reviewer who sees it, promoted on the same path as any other.
 - Commit the espalier bookkeeping — a charted change stages its map dir in
   the SAME commit, so the digest + Spawned-Changes update ride with it:
   `git add espalier/changes/{type}/{slug}` (+ `git add espalier/maps/{map-slug}`
   when charted) `&& git commit -m 'chore(espalier): close {slug}'` — the
   next change starts from a clean tree.
-- Summarize: files changed, tests added, review findings addressed
+- Summarize from `delivery-brief.md` (written before the Stage 10
+  checkpoint — `stages/7-10-delivery.md`): files changed, tests added,
+  review findings addressed, deviations ratified
 - Report total rounds and rollbacks

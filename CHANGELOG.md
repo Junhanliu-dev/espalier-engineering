@@ -1,5 +1,109 @@
 # Changelog
 
+## 0.27.0 — 2026-09-14
+
+Minor: **finding the unknowns** — the map (requirements.md) is not the
+territory (the code). Designed against Thariq's "A Field Guide to Fable:
+Finding Your Unknowns" (design + gap analysis in `docs/unknowns-plan-v1.md`):
+v0.26 resolved every unknown at Stage 1 and froze the contract, so a coder
+that met the territory mid-implementation could only comply or hand off, and
+nothing after Stage 4 taught the human what the code had refused. v0.27 adds
+the channel and keeps the freeze: agents DISCOVER unknowns before, during and
+after implementation; only the human RESOLVES them, at gates that already
+exist. **Every gate, rubric, verdict sentinel, round cap, and escalation path
+is contract-equal to v0.26.0; the coder never edits requirements.md; nothing
+sets a budget.** Suites: bootstrap 363/363 (Test 37; Tests 35/36 now chain
+#37), hooks 209/209 (T24); validation 59/64/69 by platform set (new check
+69); evals `coder-09` PASS, `review/rule-deviation-10` PASS (opus pinned) —
+both FAILED on their first run and exposed a real defect in the first draft of
+the conservative-option rule ("the stricter check" read as licence to widen a
+product rule); the rule now says "the least the contract did not name", and
+"stricter" wins only on a control on a sensitive field.
+
+- **During — the coder's Deviations (the tension fix).** `harness-coder.md`
+  → "Territory vs Contract: Deviations": when the code contradicts an
+  approved criterion, an `## Open Questions` default covers it → apply and
+  log; a conservative option satisfies the criterion as written (narrower,
+  stricter, smaller — never a relaxed control on a trust boundary) → take it
+  and log; neither → stop at a clean point as a handoff, write a `## Blocked`
+  block (Criterion / Contradiction / Options) and end with
+  `- BLOCKED-ON-REQUIREMENT: {criterion}`. Every logged case is one line in
+  `### Deviations` (quoted criterion → built / because `path:line` / left
+  undone), a block carried forward like `### Class Sweep`. `You Must NOT`
+  gains "Edit requirements.md, or build past a criterion … without an
+  entry or the sentinel". The pack's `- References:` line (below) is read
+  before the layer's reference files — semantics, not style.
+- **During — the orchestrator resolves, never the coder.** The Stage 3 exit
+  gate (`stages/3-coding.md`, fix lane, `pipeline.md`) greps the sentinel
+  after `- HANDOFF: true`: archive as `blocked-{n}`, row
+  `| 3 | BLOCKED {n} | {ts} | {criterion} |`, then ONE `AskUserQuestion` —
+  take the conservative option (default; recorded via the new
+  `open_question_append` helper as ratified, the criterion stands) / change
+  the criterion (that answer is the approval — section re-reviewed, no
+  second gate) / abort; unattended → the conservative option with
+  `(default — revisit)`, no question, never a hang. The continuation spawn
+  carries `CONTINUATION:` + `RESOLUTION:`. The panel never sees a blocked
+  report.
+- **During — the panel verifies the log.** `harness-reviewer.md` → "Deviation
+  Review (every round)" (Review Process step 9): each logged deviation is
+  conservative and its contradiction holds in the code; a criterion the diff
+  does not meet as written with no entry is a `[deviation]` P1; nothing to
+  log → no finding, never an empty block; the reviewer never resolves one.
+  `harness-security.md` Audit Process step 5: a deviation that drops,
+  relaxes or bypasses a control on a sensitive field is a P0, whatever the
+  coder called it. Both panel prompts carry a `DEVIATIONS:` line.
+- **After the panel — the human sees it.** The Stage 4 PASS
+  (`stages/4-panel.md`, fix lane) prints the block via `deviations_list` and
+  appends `deviations: {n}` to the PASSED row — every departure from the
+  approved contract, panel-verified, before anything is pushed.
+- **After — delivery brief + quiz.** `stages/7-10-delivery.md` → "Stage 10:
+  Delivery Brief": `delivery_brief TYPE SLUG` assembles `delivery-brief.md`
+  from the records (requirement, criteria, Technical Considerations, the
+  ratified Open Questions, References, Deviations, the coder's not-built
+  Notes, files/tests, verdict lines, ROUND/HANDOFF/BLOCKED rows, commits,
+  CI/deploy) — copied, never authored — and prints one count line; the
+  Stage 10 checkpoint presents it and, interactive only, offers a
+  five-question quiz from the brief (default no). Completion copies the
+  deviations to `requirements-notes.md` `## Settled for next time` (and a
+  charted change's findings digest) — notify-only; a recurring deviation is
+  a Convention Observation on the existing promotion path.
+- **Before — the grill (pre-implementation unknowns).**
+  `espalier-grill.md`: optional `familiarity: low` input, passed ONLY from the
+  requester's own words (never inferred) — one more Step 1 signal, floors
+  `light`; Step 1.6 "Requester brief" (familiarity low or tier `full`) reads
+  rules / wiki / layer specs to the requester before the first question — at
+  most seven cited lines, explains, never proposes (the Step 1.5 scope guard
+  word for word), lands in `requirements-notes.md` `## Requester brief`; at
+  `full` tier the 3–5 divergent candidate builds are SHOWN with the first
+  question (private at `light`); when candidates differ in APPROACH and the
+  requester cannot choose, `approach:` is recorded under `## Open Questions`
+  with the conservative default and ONE `/espalier-map` line — grill never
+  brainstorms past that. `espalier-requirements.md`: `## References`
+  (the requester's named model — path + what to take; contract-set member,
+  `req_shape_check` knows it); step 5 passes `familiarity`.
+- **Before — the approval gate leads with what will change.**
+  `stages/1-2-requirements.md` step 1: Technical Considerations' data-model /
+  interface / user-facing lines and every Open Questions default first (the
+  human ratifies each; a rejected default is an Edit; an `approach:` entry
+  gets the map offer), then goal + criteria, then scope / References / what
+  the grill resolved; the decomposition is not read out. The pack gains
+  `- References:`.
+- **Helpers, stats, checks, migration.** `drift-helpers.sh` v0.27 block:
+  `_md_section`, `deviations_list`, `open_question_append`,
+  `delivery_brief`. `espalier-stats.sh`: `deviations:
+  changes-with-logged-deviations=N stage3-blocked-rows=N`. Validation check
+  69 `unknowns-channel`; totals 59 / 64 / 69. Migration #37
+  `scripts/migrate-v0.26.0-to-v0.27.0.sh` (12 pure copies with
+  `.pre-v0.27.bak`; anchored edits extracted from the templates for the
+  coder / reviewer / security bodies, skip-with-record when customised);
+  `/espalier-migrate` entry 37, `NEEDS_V0270_PATCH` probe + supersession
+  floor. Evals: `coder-09-territory-contradicts-criterion`,
+  `review/rule-deviation-10`.
+- **Not changed, on purpose.** No new stage, no new agent, no budget. The
+  contract stays frozen; the process stays prescriptive (a process spec, not
+  a task spec); brainstorming stays in the map lane; HTML artifacts stay out
+  (the git-tracked markdown audit chain is the artifact).
+
 ## 0.26.0 — 2026-09-14
 
 Minor: **turn economy** — fewer agent turns and fewer spawns for the same

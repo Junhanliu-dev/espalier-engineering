@@ -24,6 +24,7 @@ harmless:
 - Rules: espalier/rules/coding-standards.md · engineering-structure.md · security-standards.md · production-standards.md
 - Reference files: {1-2 existing files per touched layer that exemplify its conventions}
 - Facts established: {verified facts a spawn must not re-derive, one per line, each with `path:line` — or "none"}
+- References: {requirements.md `## References` entries — path and what to take from it, one per line; or "none"} — the requester's model for this change, read before the reference files
 - Grep-only: {`grep_only_files` output — path (size), one per line; or "none"} — searched, never Read; grep for the symbol
 - Scoped docs: {`scoped_docs <reference files>` output — nearest last; or "none"} — workspace docs on the path from each reference file up to the repo root (root instruction file excluded — always loaded). Grep each for the files you touch; Read the matching sections (offset/limit). A claim there is a trap, an invariant, a deliberate stub, or a rejected alternative: verify it against the code before relying on it, as with the pack.
 - Verify: `. espalier/hooks/drift-helpers.sh && exit_gate espalier/changes/{type}/{slug} {test files}` — one call, the gate's own commands (build ∥ lint, then the tests named)
@@ -133,6 +134,10 @@ Agent tool:
     CONTINUATION: espalier/changes/{type}/{slug}/coding-log/NN-handoff-{n}.md
     — read its ## Handoff first; its Facts are verified (cite them, do not
     re-derive), its Remaining is your task list.
+    {On a re-spawn after a blocked report add, with the CONTINUATION line
+    naming coding-log/NN-blocked-{n}.md:}
+    RESOLUTION: {the human's decision — or the unattended default — on the
+    criterion in the continuation's ## Blocked block, one line}
     TESTS: alongside the code, write the interface tests and failure-mode
     tests for this change per espalier/skills/espalier-testing/SKILL.md,
     and the abuse test (tamper → rejected → store unchanged) for every
@@ -166,6 +171,32 @@ report is archived before anything overwrites or appends to it:
 1. **Sentinel.** `grep -q '^- HANDOFF: true' espalier/changes/{type}/{slug}/coding-report.md`
    (after a parallel wave: each `coding-report.part-{n}.md`). Present → the
    coder handed off at a clean point (harness-coder.md → Handoff).
+1b. **Blocked sentinel.** `grep -q '^- BLOCKED-ON-REQUIREMENT:' …coding-report.md`
+   (same files). Present → the coder stopped at a clean point because the
+   code contradicts a criterion and no conservative option satisfies it
+   (harness-coder.md → Territory vs Contract). Treat it as a handoff for
+   steps 2-4 with these differences: the archive label is `blocked-{n}`,
+   the row is `| 3 | BLOCKED {n} | {ts} | {criterion} |`, and BEFORE the
+   continuation spawn the criterion is resolved — by the human, never by
+   you or the coder. Interactive: ONE `AskUserQuestion` carrying the
+   report's `## Blocked` block (Criterion, Contradiction, Options):
+   ```
+   The code contradicts an approved criterion; the coder stopped.
+     1. Take the conservative option (default) — recorded under
+        ## Open Questions as ratified; the criterion stands
+     2. Change the criterion — tell me the new text; I edit the line,
+        re-run the Stage 2 review on that section, and continue (this
+        answer is the approval — no second gate)
+     3. Abort — Status: ABORTED
+   ```
+   Option 1: `. espalier/hooks/drift-helpers.sh && open_question_append
+   "espalier/changes/{type}/{slug}" "{criterion} → {conservative option}
+   (ratified at Stage 3 BLOCKED {n})"`. Unattended (`interactivity_mode`
+   = unattended): option 1 with `(default — revisit)` in place of
+   `(ratified …)`, no question, never a hang. The continuation prompt
+   then carries `CONTINUATION:` naming `coding-log/NN-blocked-{n}.md` AND
+   a `RESOLUTION:` line (the decision, one line). The panel never sees a
+   blocked report.
 2. **Archive** (sentinel present). `. espalier/hooks/drift-helpers.sh &&
    report_archive "espalier/changes/{type}/{slug}" "handoff-{n}"` moves the
    report to `coding-log/NN-handoff-{n}.md` ({n} counts this change's
@@ -195,8 +226,9 @@ report is archived before anything overwrites or appends to it:
 4. **Continuation** (sentinel present). Green or red, the next spawn is a
    fresh `harness-coder` with the SAME prompt (same REPORT TARGET for a
    part) plus the `CONTINUATION:` line naming
-   `coding-log/NN-handoff-{n}.md` — and, when the gate was red, the failing
-   log, exactly as a red gate re-spawns a coder. The panel is spawned only
+   `coding-log/NN-handoff-{n}.md` (`NN-blocked-{n}.md` plus the
+   `RESOLUTION:` line after a blocked report) — and, when the gate was
+   red, the failing log, exactly as a red gate re-spawns a coder. The panel is spawned only
    on a report without the sentinel. Unattended runs (maprun workers) need
    no human for any of this.
 
@@ -204,8 +236,9 @@ report is archived before anything overwrites or appends to it:
 so `coding-report.md` is always the CURRENT spawn's report and every prior
 spawn's report is one file in `coding-log/` (read only when named). Labels
 name the spawn that wrote the archived report: `stage3` (`stage3-part{k}`
-for a wave's parts), `handoff-{n}` (`handoff-{n}-part{k}`), `round{n}-fix`
-(the FIX ROUND {n} report), `exit-gate-fix`, `contract-phase`. A no-op when
+for a wave's parts), `handoff-{n}` (`handoff-{n}-part{k}`), `blocked-{n}`,
+`round{n}-fix` (the FIX ROUND {n} report), `exit-gate-fix`,
+`contract-phase`. A no-op when
 no report exists.
 
 **`test-mode` (read once at Stage 3 entry — word-key pattern, NOT the round

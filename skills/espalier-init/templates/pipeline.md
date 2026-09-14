@@ -39,7 +39,7 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Trigger:** New requirement received
 - **Load:** espalier/skills/espalier-requirements/SKILL.md (invokes espalier-grill unless `--no-grill`)
 - **Gate:** requirements.md exists with ≥ 2 acceptance criteria; the grill's verdict recorded (`GRILLED (light|full)` / `SKIPPED: <reason>`)
-- **Output:** espalier/changes/{type}/{slug}/requirements.md (the contract) + requirements-notes.md (derivation, alternatives, the grill's Q&A)
+- **Output:** espalier/changes/{type}/{slug}/requirements.md (the contract — `## References` when the requester named a model; `## Open Questions` carries every default the human ratifies at the gate) + requirements-notes.md (derivation, alternatives, the grill's Q&A and its requester brief)
 - **Procedure:** espalier skill → stages/1-2-requirements.md
 
 ### 2. Requirements Review
@@ -54,7 +54,7 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 ### 3. Coding Implementation
 - **Trigger:** Requirements approved
 - **Load:** the context pack (`context-pack.md` — paths and facts only, written in the approval-gate turn), then spawn `harness-coder` (espalier/agents/harness-coder.md); under `test-mode: folded` (default) the coder also writes the change's interface and failure-mode tests and the abuse test for every sensitive field it classifies, and verifies each cycle with the gate's own `exit_gate` call
-- **Gate (PROGRAMMATIC, every coder return):** `- HANDOFF: true` on the report → archive it to `coding-log/` and continue with a fresh coder (the panel never sees a handoff report); then `exit_gate` — the discovered build and lint exit 0 and, folded, the discovered tests scoped to the report's listed test files pass (exit 1 = red → back to the coder without a panel round; exit 2 / 3 = run the gate by hand). The coder's self-reported "Build status: pass" is a claim, not the gate.
+- **Gate (PROGRAMMATIC, every coder return):** `- HANDOFF: true` on the report → archive it to `coding-log/` and continue with a fresh coder (the panel never sees a handoff report); `- BLOCKED-ON-REQUIREMENT:` → archive, the HUMAN resolves the criterion (conservative option ratified via `open_question_append`, or the criterion edited and its section re-reviewed; unattended: the conservative option, `(default — revisit)`), continue with a fresh coder carrying `RESOLUTION:` — the coder never edits requirements.md; then `exit_gate` — the discovered build and lint exit 0 and, folded, the discovered tests scoped to the report's listed test files pass (exit 1 = red → back to the coder without a panel round; exit 2 / 3 = run the gate by hand). The coder's self-reported "Build status: pass" is a claim, not the gate.
 - **Constraint:** one spawn per sub-task; sub-tasks with pairwise-disjoint planned file sets may run concurrently, any overlap → serial; `report_archive` before every coder spawn after the first (`coding-report.md` is the CURRENT spawn's report)
 - **Commits:** the coder commits each bounded unit at a clean point (one seam per commit, message per `espalier/rules/development-process.md` → Commit Conventions, staged by path — harness-coder.md → Commit Discipline); under PARALLEL DISPATCH no coder runs git — the orchestrator commits each part's files as one commit after the wave
 - **Baseline (first entry only):** `Base-Ref: $(git rev-parse HEAD)` in pipeline-state.md — never overwritten on a re-spawn
@@ -63,12 +63,12 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 
 ### 4. Code Review (fixpoint loop — a two-agent review panel, re-review after EVERY fix)
 - **Trigger:** Stage 3 gate green
-- **Load:** every round TWO fresh agents on the CURRENT diff, concurrently — `harness-reviewer` (→ review-record.md) and `harness-security` (→ security-record.md); folded: the reviewer's verdict covers code AND tests; round ≥ 2 runs in DELTA SCOPE (`CHANGED SINCE LAST REVIEW`, modes/re-review.md — a floor, not a ceiling)
+- **Load:** every round TWO fresh agents on the CURRENT diff, concurrently — `harness-reviewer` (→ review-record.md; its Deviation Review: the report's `### Deviations` against the diff and the diff against the criteria — an unlogged or non-conservative departure is a `[deviation]` P1) and `harness-security` (→ security-record.md; a deviation relaxing a control on a sensitive field is a P0); folded: the reviewer's verdict covers code AND tests; round ≥ 2 runs in DELTA SCOPE (`CHANGED SINCE LAST REVIEW`, modes/re-review.md — a floor, not a ceiling)
 - **Gate (to leave Stage 4):** the MOST RECENT run of BOTH agents saw the CURRENT code and its last `VERDICT:` sentinel is `PASS` or `PASS_WITH_FIXES` with `p0=0 p1=0` — never "the earlier P0s were addressed". `V=$(grep '^VERDICT:' <record> | tail -1)`, both records written THIS round (baseline + `round={n}`); `ESCALATION_REQUIRED` runs the escalation protocol, never advances
 - **Loop:** a non-PASS verdict from EITHER agent → `report_archive`, re-spawn `harness-coder` under `FIX ROUND {n}:` (modes/fix-round.md — the defect CLASS, `### Class Sweep`), then a FULL panel round on the new diff — a fix is never the last action before the gate; the round's two sentinels + one bracketed finding per failing agent are snapshotted into Stage History (`| 4 | ROUND {n} FAIL | … |`) — the findings digest's only source
 - **Limit:** `max-code-rounds` (default 3), checked BEFORE re-spawning; security P0/P1 share the counter — at the cap `- Status: ESCALATED`, `| 4 | ESCALATED | {ts} | … |`
 - **Certificate (on PASS):** `certificate_write` — `git add -A`, then `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)` in pipeline-state.md — the push gate blocks unless it still matches
-- **Security contract (on PASS):** `## Security-Sensitive Fields` in security-record.md → `contract_extract` → security-contract.md, the Stage 5/6 input; drift processing (`drift_index`) and the boundary read (`- Session-Boundary:`) run on that PASS
+- **Security contract (on PASS):** `## Security-Sensitive Fields` in security-record.md → `contract_extract` → security-contract.md, the Stage 5/6 input; the deviations surfaced to the human (`deviations_list`, `deviations: {n}` in the PASSED row), drift processing (`drift_index`) and the boundary read (`- Session-Boundary:`) run on that PASS
 - **Output:** review-record.md + security-record.md, BOTH overwritten each round; `| 4 | PASSED | … |`
 - **Procedure:** espalier skill → stages/4-panel.md
 
@@ -124,9 +124,9 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Procedure:** espalier skill → stages/7-10-delivery.md
 
 ### 10. User Confirmation
-- **Human checkpoint:** final delivery acceptance — present files, tests, review verdicts, deploy result; Approve / Request Changes via `AskUserQuestion`. Push and deploy pre-authorization NEVER extend here
+- **Human checkpoint:** final delivery acceptance — present `delivery-brief.md` (`delivery_brief`: requirement, ratified decisions, deviations, verdicts, rounds, commits, CI / deploy — assembled from the records, never authored) and offer the quiz (interactive only, default no); Approve / Request Changes via `AskUserQuestion`. Push and deploy pre-authorization NEVER extend here
 - **Non-interactive exception:** unattended → record `delivery auto-accepted (non-interactive)` and mark COMPLETE — do not hang
-- **Output:** pipeline-state.md `- Status: COMPLETE`; the bookkeeping commit (`chore(espalier): close {slug}`)
+- **Output:** espalier/changes/{type}/{slug}/delivery-brief.md; pipeline-state.md `- Status: COMPLETE`; deviations copied to requirements-notes.md `## Settled for next time`; the bookkeeping commit (`chore(espalier): close {slug}`)
 - **Procedure:** espalier skill → Completion
 
 ## Rollback Rules

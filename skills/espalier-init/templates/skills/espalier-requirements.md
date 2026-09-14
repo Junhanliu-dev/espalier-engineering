@@ -53,11 +53,23 @@ The contract phase stays one spawn; a contract too large for one spawn
 hands off (the coder's Handoff protocol). Splitting changes DISPATCH only:
 the panel still reviews the COMBINED diff once.
 
+### References (when the requester named a model)
+
+When the requirement points at code as the model — "like `X` does", "the
+same semantics as `vendor/rate-limiter`", a file, a folder, a library, a
+URL — record it, one line each, under `## References`: the path (or URL)
+and what to take from it (semantics, a shape, a protocol — never "copy
+it"). The section exists only when the requester named one; the context
+pack carries it as `- References:`, the coder reads it before the layer's
+reference files, the reviewer checks fidelity to it. A reference that
+contradicts a project convention is settled here, by the grill, not by
+the coder.
+
 ### Contract and notes (what requirements.md holds)
 
 The five sections above — plus `## Open Questions`, `## Convention Notes`,
-and `## Retired Surface` when a simplify cut filed the change — are the
-CONTRACT: what the coder builds to, what the reviewer checks against, the
+`## References` when the requester named a model, and `## Retired
+Surface` when a simplify cut filed the change — are the CONTRACT: what the coder builds to, what the reviewer checks against, the
 text the human approves at the Requirements Approval Gate. Derivation,
 alternatives considered, what was settled for next time, and the grill's
 full question-and-answer record go to `requirements-notes.md` in the same
@@ -76,7 +88,10 @@ nothing is refused on size, the human approved this text.
    so the grill has a document for its inline writes to land in (same order as
    the fix lane: draft, then grill).
 5. **Grill the requirement.** Unless the pipeline passed `--no-grill`, invoke the
-   `espalier-grill` skill in `spec` mode on the draft. Grill interrogates the
+   `espalier-grill` skill in `spec` mode on the draft. Pass `familiarity: low`
+   ONLY when the requester's own words say the area is new to them ("I don't
+   know this module", "never touched the auth code") — never from your read
+   of them; the grill then reads the map to them first (its Step 1.6). Grill interrogates the
    requirement (adaptive depth — it may skip a crisp one) and writes resolved
    decisions into the Acceptance Criteria and Scope Definition sections above.
    Record its verdict (`GRILLED (light)` / `GRILLED (full)` /

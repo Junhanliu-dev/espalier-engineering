@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.26.0-2ea44f" alt="version v0.26.0"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.27.0-2ea44f" alt="version v0.27.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>
@@ -150,6 +150,8 @@ Init is a one-time ~$2–5 on a medium repo (Opus main + Sonnet scouts + cache).
 5. **Every rule has a reason** — an observed pattern, or a known failure mode it prevents.
 
 ## Latest release
+
+**v0.27.0 — finding the unknowns.** The map (requirements.md) is not the territory (the code); v0.27 gives the pipeline a channel for what the territory teaches during and after implementation — with the contract still frozen and every resolution a human's. The coder logs each departure from an approved criterion under `### Deviations` (the conservative option, the `path:line` contradiction, what was left undone) or stops with `- BLOCKED-ON-REQUIREMENT:` for the human to resolve — it never edits requirements.md; the reviewer's Deviation Review verifies the block every round (`[deviation]` P1), the auditor files a relaxed control as P0, the Stage 4 PASS prints the deviations, Stage 10 presents an assembled `delivery-brief.md` and offers a quiz. Before coding, the grill reads the map to an unfamiliar requester first (Step 1.6, cited, never a proposal), shows its candidate builds at `full` tier, and records an undecided approach instead of choosing; `## References` carries the requester's named model; the approval gate leads with the decisions most likely to change. Contract-equal to v0.26.0 — no gate, rubric, sentinel, or cap changes; nothing sets a budget. Migration #37; validation 59/64/69. Design: `docs/unknowns-plan-v1.md`.
 
 **v0.26.0 — turn economy.** Fewer agent turns and fewer spawns for the same gates, measured on real runs (a coder spawn is ~37 model turns at ~15s each; model latency is flat across context size; the contract phase was a second cold coder spawn that mostly re-verified tests already in the diff). Coders write the abuse test for every sensitive field they classify **with the code** and verify each cycle with ONE call — `exit_gate`, the gate's own commands. The auditor's contract carries `covered_by:` per entry, so a fully covered contract spawns **no contract-phase coder** and goes straight to the delta review, which still proves every entry itself (a `covered_by` that does not hold is its P0). The session-boundary preference is asked once at the approval gate (`- Session-Boundary:`); the Stage 2 and Stage 4 boundaries read it instead of asking. The bash blocks the orchestrator retyped every run are helpers now — `regression_verify`, `record_commits`, `certificate_write`, `drift_index`, `stage85_drift`, `backlink_all`. `exit_gate` scopes monorepo (`(cd WS && CMD) || return 1` per line) and `uv run pytest` test bodies and starts tests as soon as the build is green; the push hook runs build ∥ lint by default. `espalier-stats.sh` shows contract phases covered at Stage 3 vs coder-spawned. Every gate, rubric, sentinel and round cap is contract-equal to v0.25; nothing sets a budget. Design + field data: `docs/pipeline-speed-plan-v4.md`, `docs/pipeline-field-report-2026-09-14.md`.
 

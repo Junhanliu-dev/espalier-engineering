@@ -719,6 +719,10 @@ paths and facts only, verify against current code.
 CONTINUATION: espalier/changes/fix/{slug}/coding-log/NN-handoff-{n}.md —
 read its ## Handoff first; its Facts are verified (cite them, do not
 re-derive), its Remaining is your task list.
+{On a re-spawn after a blocked report add, with the CONTINUATION line
+naming coding-log/NN-blocked-{n}.md:}
+RESOLUTION: {the human's decision — or the unattended default — on the
+criterion in the continuation's ## Blocked block, one line}
 REQUIREMENT: {paste requirement summary from Stage 1}
 CAUSED BY: {caused_by list — read those changes' requirements + coding-report + review-record}
 TASK: Fix the bug described above. Stay within the file(s) identified.
@@ -771,6 +775,24 @@ to it:
    SAME prompt plus the `CONTINUATION:` line naming
    `coding-log/NN-handoff-{n}.md` (and the failing log when the gate was
    red). The panel is spawned only on a report without the sentinel;
+0b. **blocked sentinel:**
+   `grep -q '^- BLOCKED-ON-REQUIREMENT:' espalier/changes/fix/{slug}/coding-report.md`.
+   Present → the code contradicts an acceptance criterion and no
+   conservative option satisfies it (harness-coder.md → Territory vs
+   Contract). Same protocol as step 0 with the label `blocked-{n}`, the
+   row `| 3 | BLOCKED {n} | {ts} | {criterion} |`, and — BEFORE the
+   continuation spawn — the criterion resolved by the human, never by
+   you or the coder: interactive → ONE `AskUserQuestion` carrying the
+   report's `## Blocked` block (Criterion, Contradiction, Options), the
+   choices `1. Take the conservative option (default)` (recorded with
+   `. espalier/hooks/drift-helpers.sh && open_question_append
+   "espalier/changes/fix/{slug}" "{criterion} → {option} (ratified at
+   Stage 3 BLOCKED {n})"`; the criterion stands) / `2. Change the
+   criterion — tell me the new text` (edit the line; this answer is the
+   approval) / `3. Abort`; unattended → option 1 with `(default —
+   revisit)`, no question. The continuation prompt carries
+   `CONTINUATION:` naming `coding-log/NN-blocked-{n}.md` and a
+   `RESOLUTION:` line. The panel never sees a blocked report;
 1. **gate:** `exit_gate "espalier/changes/fix/{slug}"` (drift-helpers.sh —
    the `run_build` / `run_lint` / `run_tests` bodies from the installed
    `pre-push-gate.sh`: build + lint as two concurrent jobs, then — folded —
@@ -802,7 +824,8 @@ All must exit 0 / not fire before the panel spawns. The coder's
 self-reported status is a claim, not the gate. A build/lint/test failure
 returns to the coder without a panel round and without counting a P0 round.
 `report_archive` runs before EVERY coder spawn after the first (labels:
-`stage3`, `handoff-{n}`, `round{n}-fix`, `exit-gate-fix`, `contract-phase`),
+`stage3`, `handoff-{n}`, `blocked-{n}`, `round{n}-fix`, `exit-gate-fix`,
+`contract-phase`),
 so `coding-report.md` is always the CURRENT spawn's report and the
 `REGRESSION_VERIFIED` lines appended below land on it.
 
@@ -897,6 +920,11 @@ without counting a P0 round.
    files count), then `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
    in pipeline-state.md, the last existing line overwritten in place
    (`<Base-Ref>` = the Stage 3 SHA). The Stage 7 push gate blocks unless this still matches.
+   Surface the deviations: `deviations_list "espalier/changes/fix/{slug}"`
+   prints the coding report's `### Deviations` entries (nothing when
+   none) — print them under the PASS line verbatim and append
+   `deviations: {n}` to the PASSED row's notes; the human sees every
+   departure from the approved criteria here, panel-verified, before push.
    Then — after the Post-Review drift processing below — the **stage
    boundary**: read `- Session-Boundary:` (collected at the approval gate;
    no question here). `after-4` or `both` → write `- Current Stage: 5`,
@@ -1367,9 +1395,17 @@ When Stage 7 passes:
   `espalier/maps/{map-slug}/findings/{YYYY-MM-DD}-fix-{kebab}.md` (skip if
   it exists), update the map's Spawned Changes row, and stage the map dir
   in the bookkeeping commit below.
+- **Delivery brief + territory notes** — `. espalier/hooks/drift-helpers.sh
+  && delivery_brief fix "{slug}"` assembles `delivery-brief.md` from the
+  records (requirement, ratified decisions, deviations, verdicts, rounds,
+  commits — copied, never authored); when the coding report carries
+  `### Deviations` or the Stage History a `BLOCKED` row, append the entries
+  to `requirements-notes.md` under `## Settled for next time` (one line
+  each, verbatim). Both ride the bookkeeping commit below.
 - Commit the espalier bookkeeping (`git add espalier/changes/fix/{slug}`
   + `git add espalier/maps/{map-slug}` when charted
   `&& git commit -m 'chore(espalier): close {slug}'`) so the next change starts
   from a clean tree.
-- Summarize: original cause, fix files, regression tests added.
+- Summarize from `delivery-brief.md`: original cause, fix files, regression
+  tests added, deviations ratified.
 - Report total rounds and any escalation gates tripped (even if user chose to override).

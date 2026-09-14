@@ -389,7 +389,7 @@ contract_extract() {
 # Report only: always exit 0, never edits, no size, no refusal — the human
 # approved the text at the approval gate. The contract set: the requirement
 # template's five numbered sections (Goal / Abuse tests as written in the
-# field), Open Questions, Convention Notes, the simplify lane's proof
+# field), Open Questions, Convention Notes, References, the simplify lane's proof
 # sections, the map digest, and the fix lane's sections.
 req_shape_check() {
   local req="$1/requirements.md"
@@ -400,7 +400,7 @@ req_shape_check() {
     /^##+ / {
       h = $0; sub(/^#+ +/, "", h); sub(/[ \t]+$/, "", h)
       k = tolower(h); sub(/^[0-9]+\. */, "", k)
-      if (k ~ /^(requirement summary|goal|acceptance criteria|abuse tests|scope definition|technical considerations|task decomposition|open questions|convention notes|retired surface|simplification evidence|known failure patterns|symptom|reproduction|root cause|files likely touched|layers involved|expected behaviou?r|out of scope|not in scope)/) next
+      if (k ~ /^(requirement summary|goal|acceptance criteria|abuse tests|scope definition|technical considerations|task decomposition|open questions|convention notes|references|retired surface|simplification evidence|known failure patterns|symptom|reproduction|root cause|files likely touched|layers involved|expected behaviou?r|out of scope|not in scope)/) next
       print h " → requirements-notes.md"
     }
   ' "$req"
@@ -960,4 +960,147 @@ regression_verify() {
   printf -- '- REGRESSION_VERIFIED_SCOPE: %s\n' "$scope" >> "$cod"
   printf '%s\n' "$line"
   return 0
+}
+
+# --- v0.27 unknowns helpers ---------------------------------------------------
+# deviations_list · open_question_append · delivery_brief (+ _md_section).
+# The territory-vs-contract channel: the coder logs departures, the panel
+# verifies them, the human sees them at the Stage 4 PASS and in the delivery
+# brief. Same rules as the blocks above — awk only, mawk/BSD-safe, nothing
+# refuses on size, nothing here decides anything.
+
+# _md_section FILE HEADING — print the body of the first markdown section
+# whose heading line is exactly HEADING (any `#` depth), up to the next
+# heading of the same or a higher level, a `- HANDOFF:` / `- BLOCKED-ON-…`
+# sentinel, or EOF. Fenced blocks inside the section are printed as-is.
+# Prints nothing (exit 0) when the file or the heading is absent.
+_md_section() {
+  local f="$1" h="$2"
+  [ -f "$f" ] || return 0
+  awk -v want="$h" '
+    /^```/ { if (insp) print; fence = !fence; next }
+    fence  { if (insp) print; next }
+    /^#+ / {
+      if (insp) {
+        d = 0; while (substr($0, d + 1, 1) == "#") d++
+        if (d <= depth) exit
+      } else if ($0 == want) {
+        insp = 1; depth = 0; while (substr($0, depth + 1, 1) == "#") depth++
+        next
+      }
+    }
+    insp && (/^- HANDOFF: / || /^- BLOCKED-ON-REQUIREMENT: /) { exit }
+    insp { print }
+  ' "$f"
+}
+
+# deviations_list DIR — the entries of the `### Deviations` block of
+# DIR/coding-report.md, one per line, blank lines dropped. Nothing when the
+# report or the block is absent (exit 0 either way): the caller prints what
+# it gets and counts the lines.
+deviations_list() {
+  _md_section "$1/coding-report.md" "### Deviations" | grep -v '^[[:space:]]*$'
+  return 0
+}
+
+# open_question_append DIR TEXT — append `- TEXT` under `## Open Questions`
+# in DIR/requirements.md, creating the heading at the end when absent. The
+# orchestrator records a ratified (or unattended-default) resolution of a
+# Stage 3 BLOCKED report here; the criterion itself is never rewritten by
+# this helper. Prints the line it wrote. Exit 1 without a requirements.md.
+open_question_append() {
+  local req="$1/requirements.md" text="$2" tmp
+  [ -f "$req" ] || return 1
+  if grep -q '^## Open Questions' "$req"; then
+    tmp="$req.oqtmp"
+    # insert after the last non-blank line of the section (or right after
+    # the heading when the section is empty)
+    awk -v line="- $text" '
+      { buf[NR] = $0 }
+      /^## Open Questions/ && !seen { seen = 1; insp = 1; at = NR; next }
+      insp && /^## / { insp = 0 }
+      insp && !/^[[:space:]]*$/ { at = NR }
+      END {
+        for (i = 1; i <= NR; i++) { print buf[i]; if (i == at) print line }
+      }
+    ' "$req" > "$tmp" && mv "$tmp" "$req"
+  else
+    if [ -s "$req" ] && [ -n "$(tail -c1 "$req")" ]; then printf '\n' >> "$req"; fi
+    printf '\n## Open Questions\n- %s\n' "$text" >> "$req"
+  fi
+  printf -- '- %s\n' "$text"
+}
+
+# delivery_brief TYPE SLUG — write espalier/changes/TYPE/SLUG/delivery-brief.md
+# from the change's own records (requirements.md, coding-report.md, the two
+# review records, pipeline-state.md, ci-result.md, deploy-result.md):
+# sections copied, nothing paraphrased, nothing judged; a section with no
+# source is one `none` line. Prints the path and one count line. Exit 1
+# without a requirements.md.
+delivery_brief() {
+  local type="$1" slug="$2" dir out req cod state rev sec n_dev n_round n_commit body
+  dir="$_DS_ROOT/espalier/changes/$type/$slug"
+  req="$dir/requirements.md"; cod="$dir/coding-report.md"; state="$dir/pipeline-state.md"
+  rev="$dir/review-record.md"; sec="$dir/security-record.md"; out="$dir/delivery-brief.md"
+  [ -f "$req" ] || return 1
+  _sec_or_none() {  # FILE HEADING — the section body, or "none"
+    body=$(_md_section "$1" "$2" | grep -v '^[[:space:]]*$')
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+  }
+  _first_heading() {  # FILE PATTERN — the first heading line matching PATTERN (regex), else ""
+    grep -E "$2" "$1" 2>/dev/null | head -1
+  }
+  local h_sum h_ac h_tc h_oq h_ref
+  h_sum=$(_first_heading "$req" '^##+ .*[Rr]equirement [Ss]ummary'); [ -n "$h_sum" ] || h_sum=$(_first_heading "$req" '^##+ .*(Goal|Symptom)')
+  h_ac=$(_first_heading "$req" '^##+ .*[Aa]cceptance [Cc]riteria')
+  h_tc=$(_first_heading "$req" '^##+ .*[Tt]echnical [Cc]onsiderations')
+  h_oq=$(_first_heading "$req" '^##+ Open Questions')
+  h_ref=$(_first_heading "$req" '^##+ References')
+  n_dev=$(deviations_list "$dir" | grep -c .)
+  n_round=$(grep -cE '^\| 4 \| ROUND [0-9]+ FAIL ' "$state" 2>/dev/null); n_round=${n_round:-0}
+  n_commit=$(grep -cE '^\| 7 \| [0-9a-f]+ \|' "$state" 2>/dev/null); n_commit=${n_commit:-0}
+  {
+    echo "# Delivery Brief: $type/$slug"
+    echo ""
+    echo "Assembled from the change's records by \`delivery_brief\` — copied, not authored."
+    echo ""
+    echo "## What was asked"
+    [ -n "$h_sum" ] && _sec_or_none "$req" "$h_sum" || echo "none"
+    echo ""
+    echo "## Acceptance criteria"
+    [ -n "$h_ac" ] && _sec_or_none "$req" "$h_ac" || echo "none"
+    echo ""
+    echo "## Decisions the code froze (Technical Considerations)"
+    [ -n "$h_tc" ] && _sec_or_none "$req" "$h_tc" || echo "none"
+    echo ""
+    echo "## Decisions ratified by the human (Open Questions)"
+    [ -n "$h_oq" ] && _sec_or_none "$req" "$h_oq" || echo "none"
+    echo ""
+    echo "## References the requester named"
+    [ -n "$h_ref" ] && _sec_or_none "$req" "$h_ref" || echo "none"
+    echo ""
+    echo "## Deviations (the code vs the contract — panel-verified)"
+    body=$(deviations_list "$dir"); if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Deliberately not built (coder Notes)"
+    body=$(grep -E '^- Notes:' "$cod" 2>/dev/null | head -1 | sed 's/^- Notes:[[:space:]]*//'); [ -n "$body" ] && echo "$body" || echo "none"
+    echo ""
+    echo "## Files and tests"
+    body=$(grep -E '^- (Files created|Files modified|Test files|Docs):' "$cod" 2>/dev/null); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    echo "## Verdicts (last sentinel of each record)"
+    body=$( { grep '^VERDICT:' "$rev" 2>/dev/null | tail -1 | sed 's/^/- review: /'; grep '^VERDICT:' "$sec" 2>/dev/null | tail -1 | sed 's/^/- security: /'; } ); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    echo "## Rounds, handoffs, blocks (Stage History)"
+    body=$(grep -E '^\| [0-9]+ \| (ROUND [0-9]+ FAIL|HANDOFF [0-9]+|BLOCKED [0-9]+|ESCALATED|RESUMED) ' "$state" 2>/dev/null); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    echo "## Commits"
+    body=$(grep -E '^\| 7 \| [0-9a-f]+ \|' "$state" 2>/dev/null); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    echo "## CI and deploy"
+    if [ -f "$dir/ci-result.md" ]; then echo "- ci-result.md: present"; else echo "- ci-result.md: none"; fi
+    if [ -f "$dir/deploy-result.md" ]; then echo "- deploy-result.md: present"; else echo "- deploy-result.md: none"; fi
+  } > "$out"
+  printf '%s\n' "$out"
+  echo "delivery brief: $n_dev deviations, $n_round rounds, $n_commit commits"
 }

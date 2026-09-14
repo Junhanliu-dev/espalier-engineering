@@ -105,6 +105,14 @@ For each endpoint / handler the change adds or modifies:
 4. **Emit the abuse-test contract** (below) — one entry per sensitive field in
    scope, whether or not the control is present. Present control → the test proves
    it; missing control → the test is the reproduction.
+5. **Read `### Deviations` in coding-report.md.** A logged deviation that
+   drops, relaxes, or bypasses a control on a sensitive field — an owner
+   check called unreachable, a validation loosened, a state transition
+   opened because the contract's wording did not fit the code — is a
+   **P0** row in your table, whatever the coder called it: on a trust
+   boundary the conservative option is always the stricter one, and a
+   deviation is never a licence. The block is the coder's; you log nothing
+   there.
 
 ## Output Format
 

@@ -129,3 +129,42 @@ and prints `Stage 8.5: {N} stale doc(s) — run /espalier-prune to refresh.
 rule/wiki/spec file, so it cannot dirty a project-level doc. Advance to Stage 9
 regardless of the result. In-pipeline auto-apply is a v2 item — refresh stays a
 deliberate `/espalier-prune`.
+
+### Stage 10: Delivery Brief (assembled, never authored)
+
+Before the Stage 10 checkpoint, write the brief the human reads instead of
+a file list:
+
+```bash
+. espalier/hooks/drift-helpers.sh && delivery_brief "$TYPE" "$SLUG"
+```
+
+`delivery_brief` assembles `espalier/changes/{type}/{slug}/delivery-brief.md`
+from what the change already recorded — the Requirement Summary and
+acceptance criteria, `## References` and `## Open Questions` (the decisions
+ratified at the gate and at any Stage 3 BLOCKED), the coding report's
+`### Deviations` and `- Notes:` (what was deliberately not built), the
+review and security verdict lines, the ROUND / HANDOFF / BLOCKED rows of the
+Stage History, the `## Commits` rows, and the CI / deploy results when
+present — sections copied, nothing paraphrased, nothing judged; a section
+with no source is one `none` line. It prints the path and one count line
+(`delivery brief: {n} deviations, {m} rounds, {k} commits`).
+
+Present the brief at the Stage 10 checkpoint (`AskUserQuestion`: Approve /
+Request Changes, as pipeline.md) — the reviewer of this change starts with
+the same unknowns the requester had; the brief carries what settled them.
+When the run is interactive, add ONE more question to the SAME call, first
+option default:
+
+```
+Before you accept: quiz you on this change (five questions from the
+brief — what changed, what deviated, what was left undone)?
+  1. No — accept on the brief (default)
+  2. Yes — ask me; I accept only after the answers
+```
+
+Option 2: ask the five questions ONE at a time from the brief's content
+only (never from memory of the run), then re-present the Approve /
+Request Changes choice. The quiz changes nothing in the change; it is the
+human's check on their own understanding before a merge. Skipped on an
+unattended run exactly as the checkpoint is.

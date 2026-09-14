@@ -41,6 +41,14 @@ reviewer must verify against the spec — plan §7, `[spec-unread]`);
 `pending_template: vX.Y` skips the fixture unless `INCLUDE_PENDING=1`. Seed:
 `spec-unread-09` (clean code, a citation of a section that does not exist —
 expected an advisory `[spec-unread]` row; the v0.25 reviewer template ships the check).
+v0.27 deviation fixtures: `criteria: "<line>"` writes the change's
+`requirements.md` with that one acceptance criterion and points the prompt at
+it; `deviation: "<line>"` appends a `### Deviations` block with that one
+entry to the coding report — the reviewer's Deviation Review then judges the
+entry against the diff and the diff against the criterion. Seed:
+`rule-deviation-10` (a logged deviation that WIDENS the rule — `isTerminal`
+where the criterion said CLOSED only — expected a `[deviation]` P1 naming the
+conservative option; the helper file rides as a second `=== FILE:` block).
 
 ## Fixture format
 
