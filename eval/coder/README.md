@@ -79,7 +79,9 @@ before, so the seed set's baseline is untouched.
 | `pending_template: vX.Y` | skipped unless `INCLUDE_PENDING=1` — for fixtures that need a template feature not yet shipped |
 
 Seed: `coder-06-scoped-doc-trap` (spec + scoped doc, single seam) and
-`coder-07-two-seam` (services + controllers; finishes or hands off).
+`coder-07-two-seam` (services + controllers; finishes or hands off);
+`coder-08-abuse-test-classified` (v0.26 — `folded: true`, an owner-axis
+field: the abuse test is written with the code, before any contract exists).
 
 ## Discipline
 - Reach 20–30 fixtures. Seed is 5 (a service method, an external-call timeout, a

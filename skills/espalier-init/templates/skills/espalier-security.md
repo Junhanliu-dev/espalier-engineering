@@ -25,7 +25,11 @@ is the *method* and the *test recipe*.
    "value used" when nothing re-derives / re-authorizes / recomputes it.
 5. **Verify the control.** Confirm the required server-side control is present
    (below). Missing or bypassable → P0/P1.
-6. **Emit the abuse-test contract** — one entry per sensitive field.
+6. **Emit the abuse-test contract** — one entry per sensitive field, each
+   with a `covered_by:` line naming the test already in the diff that
+   performs its abuse test (tamper → rejected → store unchanged), or
+   `none` — the coder writes those with the code for the fields it
+   classifies; the contract phase then writes only the `none` entries.
 
 ## Control Checklist
 

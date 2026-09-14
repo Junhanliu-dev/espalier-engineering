@@ -6,7 +6,8 @@
 #   - pre-push-gate.sh    (active-change selection, certificate, test-count parse,
 #                          exit-2 blocking contract, secret scan, corrupt-state fail-closed)
 #   - pre-push-gate-wrapper.sh (push detection matrix, fail-closed python probe)
-#   - drift-helpers.sh    (mark/clear/tier, interactivity_mode)
+#   - drift-helpers.sh    (mark/clear/tier, interactivity_mode; the v0.25 context helpers;
+#                          the v0.26 turn-economy helpers + gate scoping)
 #   - phantom-helper lint (every `_fn` a skill template calls must be defined in a hook template)
 #
 # Hook exit-code contract asserted throughout: a blocking run exits 2 with
@@ -1412,6 +1413,154 @@ assert "22o maprun _stage_names: ten stages from the template, 8 = CI Verificati
   "echo \"\$OUT\" | grep -q '^10 CI Verification User Confirmation$' \
    && echo \"\$OUT2\" | grep -q 'missing stage heading(s) 8, 9, 10' && echo \"\$OUT2\" | grep -q '^10 CI Verification Deployment Verification User Confirmation$'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP22"
+
+# ─── T23: v0.26 turn-economy helpers, gate scoping, hook overlap ──────────
+echo "T23: v0.26 turn-economy helpers, gate scoping, hook overlap"
+TMP23=$(mktemp -d -t hooks-t23.XXXX)
+make_repo "$TMP23"
+install_hooks "$TMP23"
+cp "$HOOKS_SRC/parse-drift-blocks.py" "$TMP23/espalier/hooks/"
+mkdir -p "$TMP23/espalier/rules" "$TMP23/backend/src" "$TMP23/frontend/src" "$TMP23/t" "$TMP23/src"
+printf '# Coding Standards\n- rule\n' > "$TMP23/espalier/rules/coding-standards.md"
+CH23="$TMP23/espalier/changes/feat/2026-09-14-a"; mkdir -p "$CH23"
+
+# 23a contract_gaps: covered / none / missing / fallback to the record / no contract
+printf '## Security-Sensitive Fields\n- field: cartId\n  axis: owner\n  covered_by: tests/cart.abuse.test.js:41-58\n- field: price\n  axis: money\n  covered_by: none\n- field: role\n  axis: permission\n\n## Other\n' > "$CH23/security-contract.md"
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && contract_gaps "$CH23"; echo "rc=$?" )
+printf '## Security-Sensitive Fields\n- field: cartId\n  covered_by: tests/a.js:1\n\nVERDICT: PASS p0=0 p1=0 round=1\n' > "$CH23/security-record.md"
+OUT2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && rm -f "$CH23/security-contract.md" && contract_gaps "$CH23"; echo "rc=$?" )
+OUT3=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && rm -f "$CH23/security-record.md" && contract_gaps "$CH23"; echo "rc=$?" )
+assert "23a contract_gaps: prints the none + missing entries (not the covered one); empty on a fully covered record fallback; exit 1 without a contract" \
+  "[ \"\$(echo \"\$OUT\" | grep -v rc= | tr '\n' ' ')\" = 'price role ' ] && echo \"\$OUT\" | grep -q 'rc=0' \
+   && [ \"\$(echo \"\$OUT2\" | grep -v rc=)\" = '' ] && echo \"\$OUT2\" | grep -q 'rc=0' && echo \"\$OUT3\" | grep -q 'rc=1'"
+
+# 23b certificate_write: inserted after Base-Ref, then overwritten in place; prose untouched; the push gate accepts it
+echo change > "$TMP23/src/a.txt"
+( cd "$TMP23" && git add src/a.txt && git -c user.email=t@t -c user.name=t commit -qm change )
+BASE23=$(cd "$TMP23" && git rev-parse HEAD~1)
+printf '## Status\n- Current Stage: 4\n- Status: IN_PROGRESS\n\n## Stage History\n| Stage | Status | Timestamp | Notes |\n|---|---|---|---|\n| 4 | ROUND 1 FAIL | ts | note quoting Reviewed-Diff: deadbeef in prose |\nBase-Ref: %s\n' "$BASE23" > "$CH23/pipeline-state.md"
+H1=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && certificate_write "$CH23" )
+echo more >> "$TMP23/src/a.txt"
+H2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && certificate_write "$CH23" )
+EXP23=$( cd "$TMP23" && git diff "$BASE23" -- . ':(exclude)espalier/' | git hash-object --stdin )
+assert "23b certificate_write: one anchored Reviewed-Diff line after Base-Ref, overwritten in place on the second call, equal to the live fingerprint; the prose mention untouched; no Base-Ref → exit 1" \
+  "[ \"\$(grep -c '^Reviewed-Diff:' '$CH23/pipeline-state.md')\" -eq 1 ] && [ \"\$H2\" = \"\$EXP23\" ] && [ \"\$H1\" != \"\$H2\" ] \
+   && grep -q '^Reviewed-Diff: '\"\$H2\"'$' '$CH23/pipeline-state.md' && grep -qF 'quoting Reviewed-Diff: deadbeef' '$CH23/pipeline-state.md' \
+   && ! ( cd '$TMP23' && . espalier/hooks/drift-helpers.sh && mkdir -p espalier/changes/feat/nobase && printf -- '- Current Stage: 4\n' > espalier/changes/feat/nobase/pipeline-state.md && certificate_write espalier/changes/feat/nobase 2>/dev/null )"
+
+# 23c record_commits: rows oldest first, idempotent, cache self-healed
+( cd "$TMP23" && git add -A && git -c user.email=t@t -c user.name=t commit -qm second )
+SHA_A=$(cd "$TMP23" && git rev-parse HEAD~1); SHA_B=$(cd "$TMP23" && git rev-parse HEAD)
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && record_commits feat 2026-09-14-a )
+OUT2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && record_commits feat 2026-09-14-a )
+assert "23c record_commits: two rows oldest first under ## Commits, printed once, no duplicate on re-run, commit-index rows written" \
+  "[ \"\$(echo \"\$OUT\" | grep -c '^| 7 | ')\" -eq 2 ] && [ -z \"\$OUT2\" ] \
+   && [ \"\$(grep -c '^| 7 | ' '$CH23/pipeline-state.md')\" -eq 2 ] \
+   && [ \"\$(grep -n '^| 7 | $SHA_A ' '$CH23/pipeline-state.md' | cut -d: -f1)\" -lt \"\$(grep -n '^| 7 | $SHA_B ' '$CH23/pipeline-state.md' | cut -d: -f1)\" ] \
+   && grep -q \"^$SHA_A	feat/2026-09-14-a	original	\" '$TMP23/espalier/.commit-index.tsv'"
+
+# 23d drift_index: DRIFT → stale row + line; MALFORMED → line only
+printf '## Review\n\n## Convention Drift\n- Rule file: espalier/rules/coding-standards.md\n- Old convention: "x"\n- New convention observed: "y"\n- Evidence files: a.ts, b.ts\n- Recommendation: update rule\n\n## Convention Drift\n- Rule file: espalier/rules/coding-standards.md\n- Rule file: espalier/rules/other.md\n- Old convention: "x"\n\nVERDICT: PASS p0=0 p1=0 round=1\n' > "$CH23/review-record.md"
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && drift_index feat 2026-09-14-a )
+assert "23d drift_index: a DRIFT block marks the rule stale and appends convention_drift:, a bundled block appends convention_drift_malformed:, both printed" \
+  "echo \"\$OUT\" | grep -q '^convention_drift: espalier/rules/coding-standards.md' && echo \"\$OUT\" | grep -q '^convention_drift_malformed: ' \
+   && grep -q '^convention_drift: espalier/rules/coding-standards.md' '$CH23/pipeline-state.md' \
+   && grep -q '^espalier/rules/coding-standards.md	' '$TMP23/espalier/.drift-state.tsv'"
+
+# 23e stage85_drift: table appended + summary line; "no drift" when clean
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && stage85_drift feat 2026-09-14-a )
+OUT2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && clear_stale espalier/rules/coding-standards.md && stage85_drift feat 2026-09-14-a )
+assert "23e stage85_drift: one stale doc → notify table in doc-patches.md + the summary line; cleared → 'no drift'" \
+  "echo \"\$OUT\" | grep -q '^Stage 8.5: 1 stale doc(s)' && grep -q '^| espalier/rules/coding-standards.md | fresh | convention drift' '$CH23/doc-patches.md' \
+   && [ \"\$OUT2\" = 'Stage 8.5: no drift.' ]"
+
+# 23f backlink_all: real slug linked once (idempotent), unknown_squash + note rows skipped
+mkdir -p "$TMP23/espalier/changes/fix/2026-09-14-b"
+printf -- '---\ntype: fix\ncaused_by:\n  - slug: feat/2026-09-14-a\n    sha: abc\n    role: primary\n    lookup: exact\n  - slug: unknown_squash\n    sha: def\n    role: call_path\n    lookup: skipped\n  - note: overflow, 3 more frames\n---\n\n# Bug: widget explodes\n' > "$TMP23/espalier/changes/fix/2026-09-14-b/requirements.md"
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && backlink_all 2026-09-14-b )
+OUT2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && backlink_all 2026-09-14-b )
+assert "23f backlink_all: one Follow-up Fixes row with the bug title, unknown_squash and note rows skipped, second run writes nothing" \
+  "[ \"\$OUT\" = 'fix/2026-09-14-b -> feat/2026-09-14-a (primary)' ] && [ -z \"\$OUT2\" ] \
+   && [ \"\$(grep -c '^| fix/2026-09-14-b | primary | exact | widget explodes | ' '$CH23/pipeline-state.md')\" -eq 1 ]"
+
+# 23g regression_verify: true / cached / false-on-fixed / harness-error skipped / handoff guard
+FIX23="$TMP23/espalier/changes/fix/2026-09-14-b"
+printf 'grep -q FIXED src/b.txt\n' > "$TMP23/t/reg.sh"
+echo broken > "$TMP23/src/b.txt"
+( cd "$TMP23" && git add -A && git -c user.email=t@t -c user.name=t commit -qm prefix )
+BASEFIX=$(cd "$TMP23" && git rev-parse HEAD)
+echo FIXED > "$TMP23/src/b.txt"
+printf -- '- Current Stage: 3\nBase-Ref: %s\n' "$BASEFIX" > "$FIX23/pipeline-state.md"
+printf '## Coding Report\n- Test files: t/reg.sh\n' > "$FIX23/coding-report.md"
+R1=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && regression_verify "$FIX23" "bash t/reg.sh" t/reg.sh )
+R2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && regression_verify "$FIX23" "bash t/reg.sh" t/reg.sh )
+printf '## Coding Report\n- Test files: t/reg.sh\n' > "$FIX23/coding-report.md"
+R3=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && regression_verify "$FIX23" "false" t/reg.sh )
+printf '## Coding Report\n' > "$FIX23/coding-report.md"
+R4=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && regression_verify "$FIX23" "bash t/missing.sh" t/reg.sh )
+printf '## Coding Report\n- HANDOFF: true\n' > "$FIX23/coding-report.md"
+R5=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && regression_verify "$FIX23" "bash t/reg.sh" t/reg.sh )
+assert "23g regression_verify: true (fails at Base-Ref, passes on fix) then (cached); false on a fixed-tree failure; skipped on a harness error; a handoff report left untouched; worktree removed" \
+  "echo \"\$R1\" | grep -q '^- REGRESSION_VERIFIED: true (test fails on pre-fix $BASEFIX, passes on fix)$' \
+   && echo \"\$R2\" | grep -q '^- REGRESSION_VERIFIED: true .* (cached)$' \
+   && echo \"\$R3\" | grep -q '^- REGRESSION_VERIFIED: false — regression test FAILS on the FIXED code' \
+   && echo \"\$R4\" | grep -q '^- REGRESSION_VERIFIED: skipped — scoped invocation could not run on the fixed tree' \
+   && echo \"\$R5\" | grep -q 'is a handoff' && [ \"\$(grep -c REGRESSION '$FIX23/coding-report.md')\" -eq 0 ] \
+   && [ \"\$(cd '$TMP23' && git worktree list | grep -c reg-base)\" -eq 0 ]"
+
+# 23h _gate_scoped_cmd: multi-workspace body scoped per workspace; a file under no workspace → full suite; uv run pytest scoped
+MW=$(printf 'run_tests() {\n  (cd backend && npm test) || return 1\n  (cd frontend && npm test) || return 1\n}')
+SC1=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && _gate_scoped_cmd "$MW" backend/src/a.test.ts frontend/src/b.test.ts )
+SC2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && _gate_scoped_cmd "$MW" backend/src/a.test.ts )
+SC3=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && _gate_scoped_cmd "$MW" backend/src/a.test.ts tools/x.test.ts )
+SC4=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && _gate_scoped_cmd "$(printf 'run_tests() {\n  uv run pytest -q\n}')" tests/test_a.py )
+assert "23h _gate_scoped_cmd: two-workspace body → per-workspace scoped commands joined with &&; a workspace with no file dropped; a file under no workspace → full suite; uv run pytest scoped" \
+  "[ \"\$SC1\" = '(cd backend && npm test -- src/a.test.ts) && (cd frontend && npm test -- src/b.test.ts)' ] \
+   && [ \"\$SC2\" = '(cd backend && npm test -- src/a.test.ts)' ] && [ -z \"\$SC3\" ] \
+   && [ \"\$SC4\" = 'uv run pytest -q tests/test_a.py' ]"
+
+# 23i exit_gate ordering: tests start after the build while a slow lint finishes; a red build still prints the lint line
+cat > "$TMP23/espalier/hooks/pre-push-gate.sh" << 'G23'
+#!/bin/bash
+run_build() {
+  true
+}
+run_lint() {
+  sleep 1; echo lint-done
+}
+run_tests() {
+  echo tests-ran > /tmp/.t23-tests-ran
+}
+G23
+printf '## Coding Report\n' > "$CH23/coding-report.md"
+rm -f /tmp/.t23-tests-ran
+T0=$(date +%s)
+OUT=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && exit_gate "$CH23"; echo "rc=$?" )
+sed 's/^  true$/  echo build-broken; false/' "$TMP23/espalier/hooks/pre-push-gate.sh" > "$TMP23/g.tmp" && mv "$TMP23/g.tmp" "$TMP23/espalier/hooks/pre-push-gate.sh"
+rm -f /tmp/.t23-tests-ran
+OUT2=$( cd "$TMP23" && . espalier/hooks/drift-helpers.sh && exit_gate "$CH23"; echo "rc=$?" )
+assert "23i exit_gate: green run prints build, lint, tests in order (rc 0); a red build prints the lint line and 'tests: skipped — build red' (rc 1) without running the tests" \
+  "[ \"\$(echo \"\$OUT\" | tr '\n' ' ')\" = 'build: exit 0 lint: exit 0 tests: exit 0 (full suite) rc=0 ' ] \
+   && echo \"\$OUT2\" | grep -q '^build: exit 1 — log: ' && echo \"\$OUT2\" | grep -q '^lint: exit 0$' && echo \"\$OUT2\" | grep -q '^tests: skipped — build red$' && echo \"\$OUT2\" | grep -q 'rc=1' \
+   && [ ! -f /tmp/.t23-tests-ran ]"
+rm -f /tmp/.t23-tests-ran
+
+# 23j pre-push hook: build ∥ lint by default (key absent) — both run, a lint failure blocks with its message, the serial functions are gone
+TMPH=$(mktemp -d -t hooks-t23h.XXXX)
+make_repo "$TMPH"
+mkdir -p "$TMPH/espalier/hooks"
+sed -e "s|{build_command}|touch $TMPH/.built; sleep 1|g" -e "s|{lint_command}|touch $TMPH/.linted|g" -e "s|{test_command}|echo '3 passed'|g" \
+    "$HOOKS_SRC/pre-push-gate.sh" > "$TMPH/espalier/hooks/pre-push-gate.sh"
+state_file "$TMPH" feat 2026-09-14-h 7 IN_PROGRESS
+( cd "$TMPH" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>&1 ); RCH=$?
+sed -e "s|{build_command}|true|g" -e "s|{lint_command}|echo lint-broken; false|g" -e "s|{test_command}|echo '3 passed'|g" \
+    "$HOOKS_SRC/pre-push-gate.sh" > "$TMPH/espalier/hooks/pre-push-gate.sh"
+( cd "$TMPH" && bash espalier/hooks/pre-push-gate.sh >/dev/null 2>"$TMPH/err.txt" ); RCH2=$?
+assert "23j pre-push hook default: build and lint both ran (exit 0); a lint failure blocks with 'BLOCKED: Lint fails' + its output (exit 2); no gate_build_section / gate_lint_section left" \
+  "[ $RCH -eq 0 ] && [ -f '$TMPH/.built' ] && [ -f '$TMPH/.linted' ] \
+   && [ $RCH2 -eq 2 ] && grep -q 'BLOCKED: Lint fails' '$TMPH/err.txt' && grep -q 'lint-broken' '$TMPH/err.txt' \
+   && ! grep -q 'gate_build_section\|gate_lint_section' '$HOOKS_SRC/pre-push-gate.sh'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP23" "$TMPH"
 
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""

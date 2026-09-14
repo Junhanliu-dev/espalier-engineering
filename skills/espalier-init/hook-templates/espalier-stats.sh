@@ -17,7 +17,9 @@
 #   - simplify-filed changes (requirements.md simplify_from:) vs hand-written
 #     refactors — code rounds, rollbacks, withdrawn cuts, simplify tags
 #   - spawn shape per change (v0.25): coder spawns, handoffs, parallel parts,
-#     fresh-session resumes — from coding-log/ and the HANDOFF / RESUMED rows
+#     fresh-session resumes — from coding-log/ and the HANDOFF / RESUMED rows;
+#     (v0.26) contract phases covered at Stage 3 vs coder-spawned, and the
+#     session-boundary preferences chosen at the approval gate
 #   - workspace docs (report-only): every CLAUDE.md / AGENTS.md with size + last change
 #   - per-map ticket/fog/session/spawned-change state (espalier/maps/)
 #   - convention divergence hotspots (conv_fold, when drift-helpers is present)
@@ -137,12 +139,31 @@ $c"
     printf '%s\n' "$parts"    | grep -v '^$' | _stat_dist "parallel parts per change"
     printf '%s\n' "$resumes"  | grep -v '^$' | _stat_dist "fresh-session resumes per change"
     printf '%s\n' "$commits"  | grep -v '^$' | _stat_dist "commits per change (Stage 7 rows)"
+    # v0.26: where the contract phase went — covered at Stage 3 (no coder
+    # spawn), a coder spawned for the gaps, or no contract at all; and the
+    # session-boundary preference the human chose at the approval gate.
+    cov=0; spawned=0; nocon=0; sb_none=0; sb_2=0; sb_4=0; sb_both=0
+    for sf in "$CH"/*/*/pipeline-state.md; do
+      case "$sf" in */_template/*) continue ;; esac
+      if grep -qE '^\| 5 \| PASSED \|[^|]*\| folded: contract covered' "$sf" 2>/dev/null; then cov=$((cov + 1))
+      elif grep -qE '^\| 5 \| (IN_PROGRESS|STARTED) \|[^|]*\| .*contract phase' "$sf" 2>/dev/null; then spawned=$((spawned + 1))
+      elif grep -qE '^\| 5 \| SKIPPED \|[^|]*\| folded: no contract' "$sf" 2>/dev/null; then nocon=$((nocon + 1)); fi
+      case "$(grep -m1 '^- Session-Boundary:' "$sf" 2>/dev/null | awk '{print $3}')" in
+        none) sb_none=$((sb_none + 1)) ;; after-2) sb_2=$((sb_2 + 1)) ;;
+        after-4) sb_4=$((sb_4 + 1)) ;; both) sb_both=$((sb_both + 1)) ;;
+      esac
+    done
+    echo "contract phases: covered-at-Stage-3=$cov coder-spawned=$spawned no-contract=$nocon"
+    echo "session boundaries chosen: none=$sb_none after-2=$sb_2 after-4=$sb_4 both=$sb_both"
     echo
     echo "(Quality reads: handoffs are a coder finishing bounded work at a clean"
     echo "point — a change that hands off habitually wants smaller sub-tasks at"
-    echo "decomposition; resumes are the human taking the stage-boundary offer;"
+    echo "decomposition; resumes are the human taking a session boundary;"
     echo "commits per change near 1 means the coder is still landing the whole"
-    echo "task as one commit — the Commit Discipline wants one seam per commit."
+    echo "task as one commit — the Commit Discipline wants one seam per commit;"
+    echo "contract phases covered at Stage 3 are the coder writing its abuse"
+    echo "tests with the code — a rising coder-spawned count means the coder's"
+    echo "classification is missing fields the auditor names."
     echo "Pre-v0.25 changes have no coding-log/ and count as one spawn.)"
   fi
 else

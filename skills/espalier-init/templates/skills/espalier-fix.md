@@ -647,19 +647,27 @@ feat lane). Only if the fix stays in-lane does this approval gate fire.
    /espalier-prune + convention decisions, same mechanics as the Stage 0
    prompt, then continue) / Ignore this run.
 
+3d. In the SAME call — when it still has a slot (four questions per call;
+   with 3b present and no slot left, ask this one right after) — collect
+   the session-boundary preference, first option default (mirror of the
+   full lane's step 3d): `Continue here at both` / `Stop after approval`
+   / `Stop after the Stage 4 PASS` / `Stop at both`, recorded as
+   `- Session-Boundary: none | after-2 | after-4 | both`. Everything the
+   diagnosis grill read into this context stays resident on "continue"; a
+   fresh session starts from requirements.md and the pack (the v0.25
+   `Continue in a fresh session` offer, chosen once, here). Skip the
+   question on an unattended run (`interactivity_mode`).
+
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise and re-ask. On
    **Abort**, write Status: ABORTED and stop.
 
-5. **Stage boundary (offered, never forced).** After **Approve** — the
-   approval row, `- Push-Target:`, and the context pack on disk — ask ONCE
-   (`AskUserQuestion`, first option default): `Continue here` /
-   `Continue in a fresh session — run /clear, then /espalier-fix with the
+5. **Stage boundary (read, never asked).** After **Approve** — the
+   approval row, `- Push-Target:`, `- Session-Boundary:`, and the context
+   pack on disk — read the preference: `after-2` or `both` → write
+   `- Current Stage: 3`, print `run /clear, then /espalier-fix with the
    same bug text: the slug collision (step 11) offers Resume / extend this
-   fix at Stage 3` (bare `/espalier-fix` does not resume). Everything the
-   diagnosis grill read into this context stays resident on "Continue
-   here"; a fresh session starts from requirements.md and the pack. On the
-   fresh-session choice write `- Current Stage: 3` and stop. Skip the offer
-   on an unattended run (`interactivity_mode`).
+   fix at Stage 3` (bare `/espalier-fix` does not resume), and stop. Any
+   other value or a missing line → continue here.
 
 **Non-interactive exception:** auto-approve ONLY when EXPLICITLY unattended —
 `interactivity_mode` (in `drift-helpers.sh`) returns `unattended` (`CI` /
@@ -680,7 +688,9 @@ first coder spawn):** write
 small: the requirement path, the layers involved and their spec paths (both
 already in requirements.md's `## Layers involved` / `## Files likely
 touched`), the four rules files, 1-2 reference files per touched layer, the
-discovered build/lint/test commands, and the two helper-filled lines —
+discovered build/lint/test commands behind a `- Verify:` line
+(`. espalier/hooks/drift-helpers.sh && exit_gate espalier/changes/fix/{slug} {test files}`
+— one call, the gate's own commands), and the two helper-filled lines —
 `- Grep-only:` (`grep_only_files`) and `- Scoped docs:` (`scoped_docs` on
 the files likely touched; `none` when empty). Paths and facts only, never
 conclusions — every Stage 3-6 spawn below is pointed at it so no sub-agent
@@ -720,8 +730,11 @@ TESTS: alongside the fix, write NOW (per espalier/skills/espalier-testing/SKILL.
    still works — read its requirements.md acceptance criteria).
 3. For every NEW external-call path the fix introduces, a failure-mode
    test per espalier/rules/production-standards.md.
-Everything EXCEPT contracted abuse tests (that contract does not exist
-yet). List the test files in their own "Test files" subsection of the
+4. The abuse test (tamper → rejected → store unchanged) for every
+   client-supplied sensitive value you classify under Security-Aware
+   Coding — the Stage 4 auditor's contract may name more; a contract
+   phase then writes only the gaps.
+List the test files in their own "Test files" subsection of the
 coding report. If a meaningful test requires touching files OUTSIDE the
 fix's scope (>2 additional files or crossing a layer boundary), append
 the Test Scope Signal block per harness-coder.md — do NOT silently
@@ -879,16 +892,17 @@ without counting a P0 round.
      `PASS_WITH_FIXES` AND `p0=0` AND `p1=0` on the current code.
 4. **Both last sentinels PASS/PASS_WITH_FIXES with p0=0 p1=0 on a fresh review
    of the current code →** PASS. Snapshot
-   the sentinels into Stage History, then record the certificate: `git add -A`
-   (so new files count), then overwrite `Reviewed-Diff` in pipeline-state.md with
-   `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+   the sentinels into Stage History, then record the certificate:
+   `certificate_write "espalier/changes/fix/{slug}"` — `git add -A` (so new
+   files count), then `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+   in pipeline-state.md, the last existing line overwritten in place
    (`<Base-Ref>` = the Stage 3 SHA). The Stage 7 push gate blocks unless this still matches.
    Then — after the Post-Review drift processing below — the **stage
-   boundary**, asked ONCE (`AskUserQuestion`, first option default):
-   `Continue here` / `Continue in a fresh session — run /clear, then
-   /espalier-fix with the same bug text; the slug collision offers Resume /
-   extend at Stage 5`. On the fresh-session choice write `- Current Stage: 5`
-   and stop; skip the offer on an unattended run.
+   boundary**: read `- Session-Boundary:` (collected at the approval gate;
+   no question here). `after-4` or `both` → write `- Current Stage: 5`,
+   print `run /clear, then /espalier-fix with the same bug text; the slug
+   collision offers Resume / extend at Stage 5`, and stop. Any other
+   value, a missing line, or an unattended run → continue.
 
 Special check for fix lane: reviewer MUST verify the fix doesn't regress the
 original feature's acceptance criteria (read from `caused_by` change's `requirements.md`).
@@ -906,27 +920,14 @@ review-record.md). Do NOT run it on a P0 round.
 > Variable in scope: `SLUG` is this fix's slug (no `fix/` prefix).
 
 ```bash
-. espalier/hooks/drift-helpers.sh
-REV="espalier/changes/fix/${SLUG}/review-record.md"
-[ -f "$REV" ] || exit 0
-SHA=$(git rev-parse HEAD)
-
-python3 espalier/hooks/parse-drift-blocks.py "$REV" \
-| while IFS=$'\t' read -r KIND RULE_FILE COUPLED; do
-  case "$KIND" in
-    DRIFT)
-      mark_stale "$RULE_FILE" "$SHA" "convention drift flagged in fix/${SLUG} review"
-      LINE="convention_drift: $RULE_FILE"
-      [ -n "$COUPLED" ] && LINE="$LINE (coupled_with: $COUPLED)"
-      echo "$LINE" >> "espalier/changes/fix/${SLUG}/pipeline-state.md"
-      ;;
-    MALFORMED)
-      echo "convention_drift_malformed: $RULE_FILE (reviewer bundled blocks — drift NOT indexed)" \
-        >> "espalier/changes/fix/${SLUG}/pipeline-state.md"
-      ;;
-  esac
-done
+. espalier/hooks/drift-helpers.sh && drift_index fix "$SLUG"
 ```
+
+`drift_index` runs `parse-drift-blocks.py` over the record: each `DRIFT`
+block marks its rule file stale and appends `convention_drift: {rule file}`
+(+ `(coupled_with: …)`) to pipeline-state.md; a `MALFORMED` block appends
+`convention_drift_malformed: {rule file} (reviewer bundled blocks — drift NOT
+indexed)` instead. It prints the lines it appended.
 
 A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
 Stage 4 has already PASSED when this parse runs — record it in pipeline-state.md
@@ -966,8 +967,10 @@ after the final panel PASS, then `contract_extract "espalier/changes/fix/{slug}"
 read); no contract → both SKIPPED rows
 (`| 5 | SKIPPED | {ts} | folded: no contract |`,
 `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |`), `Current Stage: 7`,
-zero post-panel spawns; non-empty contract → contract spawn → exit-gate
-re-run → contract delta review → FAIL routing (test-only fixes loop under
+zero post-panel spawns; non-empty contract → `contract_gaps` (every entry
+`covered_by:` a test already in the diff → `| 5 | PASSED | {ts} | folded:
+contract covered at Stage 3 |`, no coder spawn; gaps → contract spawn for
+the gap entries only → exit-gate re-run) → contract delta review → FAIL routing (test-only fixes loop under
 `max-test-rounds`; code-touching fixes route to a FULL Stage 4 panel round
 under `max-code-rounds`, cap-before-respawn, no second counter) →
 certificate refresh. Fix-lane deltas:
@@ -1001,9 +1004,10 @@ pattern). Never in the same message as a coder spawn (a verification
 racing a rewrite certifies the wrong tree). The panel therefore sees the
 result BEFORE its first verdict.
 **Skip condition:** each verified run also appends
-`- REGRESSION_VERIFIED_SCOPE: {hash}` (the bash below); when the current
-scope hash equals the last recorded one AND `Base-Ref` is unchanged, skip
-the worktree half and re-append the previous result marked `(cached)`.
+`- REGRESSION_VERIFIED_SCOPE: {hash}` (the helper below); when the current
+scope hash equals the last recorded one — `Base-Ref` never changes within a
+change — the helper skips both runs and re-appends the previous result
+marked `(cached)`.
 (With `test-mode: serial`: run it once, after the last test-writing spawn,
 before Stage 6 — as pre-v0.23.)
 
@@ -1020,75 +1024,47 @@ the new regression test file(s):
    genuine assertion failure there → `true`. A harness error there → `skipped`
    (the reviewer verifies the assertions by reading), NEVER `true`.
 
-Set `REG_RUN` to the project's test runner limited to exactly `$REG_TESTS` —
-most runners accept file paths directly; npm-style runners need `--`
-(e.g. `npx jest <files>`, `pytest <files>`, `npm test -- <files>`,
-`go test ./path/to/pkg/`). Record the result in coding-report.md; the reviewer
-reads it at Stage 6.
+`REG_RUN` is the project's test runner limited to exactly the regression
+test file(s) the coder listed — most runners accept file paths directly;
+npm-style runners need `--` (e.g. `npx jest <files>`, `pytest <files>`,
+`npm test -- <files>`, `go test ./path/to/pkg/`). One call does both steps
+and records the result in coding-report.md; the reviewer reads it at the
+round-1 panel:
 
 ```bash
-BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | tail -1 | awk '{print $2}')
-COD="espalier/changes/fix/${SLUG}/coding-report.md"
-REG_TESTS="{the regression test file(s) the coder just wrote}"   # from coding-report.md
-REG_RUN="{the project's test runner scoped to ONLY $REG_TESTS — see above}"
-
-# Handoff guard — a report carrying the sentinel is archived and continued
-# by a fresh coder (Stage 3 exit gate, step 0); nothing appends to it, and
-# an already-archived report must not be recreated by an append below.
-if [ ! -f "$COD" ] || grep -q '^- HANDOFF: true' "$COD"; then
-  echo "REGRESSION_VERIFIED: skipped this return — coding-report.md is a handoff (archived; continuation coder next)"
-  exit 0
-fi
-
-# Harness failure (couldn't run) vs assertion failure (ran and failed) —
-# conflating them is how a test that never executed gets certified.
-_reg_harness_error() {   # <output-file> → exit 0 if the run failed to RUN at all
-  grep -qiE 'cannot find module|module ?not ?found|no such file or directory|command not found|ENOENT|ImportError|ModuleNotFoundError|SyntaxError|failed to (resolve|load|collect)|no tests? (found|ran)' "$1"
-}
-
-if [ -z "$BASE_REF" ]; then
-  echo "- REGRESSION_VERIFIED: skipped — no Base-Ref recorded" >> "$COD"
-else
-  # Step 1 — scoped run on the FIXED tree validates the invocation itself.
-  OUT_NOW=$(mktemp)
-  $REG_RUN > "$OUT_NOW" 2>&1
-  RC_NOW=$?
-  if [ $RC_NOW -ne 0 ] && _reg_harness_error "$OUT_NOW"; then
-    echo "- REGRESSION_VERIFIED: skipped — scoped invocation could not run on the fixed tree: $(grep -m1 . "$OUT_NOW")" >> "$COD"
-  elif [ $RC_NOW -ne 0 ]; then
-    echo "- REGRESSION_VERIFIED: false — regression test FAILS on the FIXED code (broken test or unfixed bug) (P0 at Stage 6)" >> "$COD"
-  else
-    # Step 2 — same scoped run at the pre-fix commit, in a detached worktree.
-    WT=$(mktemp -d)
-    if git worktree add --detach "$WT" "$BASE_REF" >/dev/null 2>&1; then
-      for t in $REG_TESTS; do mkdir -p "$WT/$(dirname "$t")"; cp "$t" "$WT/$t"; done
-      # Link installed dep dirs — a fresh worktree has none, and a bare run
-      # would fail for that reason alone and fake a 'true'.
-      for dep in node_modules .venv venv vendor; do
-        [ -e "$dep" ] && [ ! -e "$WT/$dep" ] && ln -s "$(pwd)/$dep" "$WT/$dep"
-      done
-      ( cd "$WT" && $REG_RUN ) > "$WT/.reg.out" 2>&1
-      RC_PRE=$?
-      if [ $RC_PRE -eq 0 ]; then
-        echo "- REGRESSION_VERIFIED: false — test PASSES on pre-fix code; it does not capture the bug (P0 at Stage 6)" >> "$COD"
-      elif _reg_harness_error "$WT/.reg.out"; then
-        echo "- REGRESSION_VERIFIED: skipped — could not RUN at Base-Ref (harness error, not an assertion failure): $(grep -m1 . "$WT/.reg.out")" >> "$COD"
-      else
-        echo "- REGRESSION_VERIFIED: true (test fails on pre-fix $BASE_REF, passes on fix)" >> "$COD"
-      fi
-      git worktree remove --force "$WT" >/dev/null 2>&1
-    else
-      echo "- REGRESSION_VERIFIED: skipped — could not create worktree at $BASE_REF" >> "$COD"
-      rm -rf "$WT"
-    fi
-  fi
-  rm -f "$OUT_NOW"
-fi
-
-# Scope hash — the skip condition's recorded fact (folded mode re-runs).
-REG_SCOPE=$( (for t in $REG_TESTS; do printf '%s %s\n' "$t" "$(git hash-object "$t" 2>/dev/null)"; done) | sort | git hash-object --stdin )
-echo "- REGRESSION_VERIFIED_SCOPE: $REG_SCOPE" >> "$COD"
+. espalier/hooks/drift-helpers.sh \
+  && regression_verify "espalier/changes/fix/${SLUG}" "$REG_RUN" {the regression test file(s), from coding-report.md}
 ```
+
+`regression_verify` (drift-helpers.sh):
+- **Handoff guard** — a report carrying the sentinel
+  (`grep -q '^- HANDOFF: true' "$COD"`) is archived and continued by a
+  fresh coder (Stage 3 exit gate, step 0): nothing is appended to it and
+  the helper returns after one line saying so.
+- **Step 1, the fixed tree** — runs `REG_RUN` from the repo root. A harness
+  error (`_reg_harness_error`: cannot find module / ENOENT / ImportError /
+  SyntaxError / failed to collect / no tests found …) → `skipped —
+  scoped invocation could not run on the fixed tree`; an assertion failure
+  → `false — regression test FAILS on the FIXED code (broken test or
+  unfixed bug) (P0 at Stage 6)`.
+- **Step 2, Base-Ref** — a detached worktree at the recorded `Base-Ref`
+  with the test files copied in and the installed dependency dirs
+  (`node_modules`, `.venv`, `venv`, `vendor`) linked, the same `REG_RUN`
+  run there: pass → `false — test PASSES on pre-fix code; it does not
+  capture the bug (P0 at Stage 6)`; harness error → `skipped — could not
+  RUN at Base-Ref (harness error, not an assertion failure)`; a genuine
+  assertion failure → `true (test fails on pre-fix {Base-Ref}, passes on
+  fix)`. The worktree is removed afterwards.
+- **Cache** — the helper appends `- REGRESSION_VERIFIED_SCOPE: {hash}`
+  (the test files' contents) after every run; when the current hash equals
+  the last recorded one (this report, else the newest `coding-log/`
+  report) it skips both runs and re-appends the previous result marked
+  `(cached)`.
+- No `Base-Ref` → `skipped — no Base-Ref recorded`; no test file named →
+  `skipped — no regression test file named`.
+
+It appends the `- REGRESSION_VERIFIED:` line and the scope line to
+coding-report.md and prints the former.
 
 A `REGRESSION_VERIFIED: false` is a P0 the round-1 panel reviewer must
 catch (folded; the Stage 6 reviewer in serial mode) — the
@@ -1210,75 +1186,39 @@ espalier skill's `stages/7-10-delivery.md` → "Stage 7: What Is Still
 Uncommitted"); the coder's commits are pushed as made, never squashed or
 rebased. Standard push. Then:
 
-> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
-> `fix/` prefix). Per-entry `caused_by` fields are passed as FUNCTION
-> ARGUMENTS in 7.2. Run 7.0 + 7.1 + 7.2 (and the cache self-heal) as ONE
-> bash invocation — the per-entry body is a function, so the whole Stage 7
-> bookkeeping costs one round-trip with byte-identical file effects.
+> Variable in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
+> `fix/` prefix). Run 7.0 + 7.1 + 7.2 as ONE bash invocation — the whole
+> Stage 7 bookkeeping costs one round-trip.
 
 ### 7.1 Record own commits
 
 Same as `/espalier` Stage 7 — one row per commit of the change
-(`Base-Ref..HEAD`, oldest first; HEAD alone when no Base-Ref was recorded)
-in own pipeline-state.md `## Commits` table, each self-healing the
-reverse-lookup cache — the fix lane's blame resolves a line to ONE commit,
-so every commit must map to this fix:
+(`git rev-list --reverse Base-Ref..HEAD`, oldest first; HEAD alone when no
+Base-Ref was recorded) in own pipeline-state.md `## Commits` table, each
+self-healing the reverse-lookup cache (`_cache_append`) — the fix lane's
+blame resolves a line to ONE commit, so every commit must map to this fix:
 
 ```bash
-. espalier/hooks/lookup-helpers.sh
-BASE_REF=$(grep '^Base-Ref:' "espalier/changes/fix/${SLUG}/pipeline-state.md" | tail -1 | awk '{print $2}')
-if [ -n "$BASE_REF" ]; then SHAS=$(git rev-list --reverse "${BASE_REF}..HEAD"); else SHAS=$(git rev-parse HEAD); fi
-for SHA in $SHAS; do _cache_append "$SHA" "fix/${SLUG}" "original"; done
+. espalier/hooks/drift-helpers.sh && record_commits fix "$SLUG"
 ```
 
 ### 7.2 Bidirectional back-link
 
-Iterate each entry in this fix's `caused_by:` YAML list (in `requirements.md` frontmatter). Skip entries where:
-- `slug` ∈ {`unknown`, `unknown_squash`} — no destination to write
-- entry is a `- note:` overflow marker (no `slug` key at all)
-
-The orchestrator (Claude) reads the YAML, extracts each entry's fields, and
-calls the FUNCTION below once per remaining entry — all inside the SAME bash
-invocation as 7.0/7.1 (early-outs are `return 0`, safe inside a function;
-the old one-invocation-per-entry contract existed only because a top-level
-`exit 0` would kill a shared script and a bare `continue` outside a loop
-falls through). One invocation, byte-identical file effects, fewer
-round-trips:
+Every entry in this fix's `caused_by:` YAML list (in `requirements.md`
+frontmatter) gets a `## Follow-up Fixes` row in the causing change's
+pipeline-state.md (schema: Fix Slug · Role · Lookup · Reason · Date; the
+Reason is this fix's `# Bug:` title). Entries whose `slug` is `unknown` /
+`unknown_squash` (no destination to write) and `- note:` overflow rows (no
+`slug` key) are skipped; a row already present for (own slug, role) is not
+written twice — the same slug can legitimately appear as `primary` and
+`call_path` in different fixes:
 
 ```bash
-_backlink_one() {  # $1=CAUSING_SLUG  $2=CAUSING_ROLE  $3=CAUSING_LOOKUP
-  local CAUSING_SLUG="$1" CAUSING_ROLE="$2" CAUSING_LOOKUP="$3"
-  local CAUSING_STATE="espalier/changes/${CAUSING_SLUG}/pipeline-state.md"
-  [ ! -f "$CAUSING_STATE" ] && return 0
-
-  # Ensure section exists (schema: Role + Lookup columns)
-  if ! grep -q "^## Follow-up Fixes" "$CAUSING_STATE"; then
-    cat >> "$CAUSING_STATE" << 'EOF'
-
-## Follow-up Fixes
-| Fix Slug | Role | Lookup | Reason | Date |
-|----------|------|--------|--------|------|
-EOF
-  fi
-
-  # Idempotency: own slug + role together (same slug can legitimately appear
-  # as primary and call_path in different fixes)
-  local OWN_SLUG="fix/${SLUG}"
-  if grep -q "| $OWN_SLUG | $CAUSING_ROLE |" "$CAUSING_STATE"; then
-    return 0
-  fi
-
-  # The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
-  local REASON
-  REASON=$(grep -m1 '^# Bug:' "espalier/changes/fix/${SLUG}/requirements.md" | sed 's/^# Bug: //')
-  [ -z "$REASON" ] && REASON="fix/${SLUG}"
-  echo "| $OWN_SLUG | $CAUSING_ROLE | $CAUSING_LOOKUP | $REASON | $(date -u +%Y-%m-%d) |" >> "$CAUSING_STATE"
-}
-
-# One call per parsed entry (slug, role, lookup) — e.g.:
-#   _backlink_one "feat/2026-01-02-auth" "primary"   "exact"
-#   _backlink_one "feat/2026-01-05-log"  "call_path" "squash_hook"
+. espalier/hooks/drift-helpers.sh && backlink_all "$SLUG"
 ```
+
+`backlink_all` parses the frontmatter itself and calls `_backlink_one` per
+entry; it prints one line per row written.
 
 ## Escalation Gates
 

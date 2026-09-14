@@ -1131,7 +1131,7 @@ footer {
       Espalier
     </a>
     <div class="nav-right">
-      <span class="nav-pill">v0.25.0</span>
+      <span class="nav-pill">v0.26.0</span>
       <a href="#install">Install</a>
       <a href="#cost">Cost</a>
       <a href="https://github.com/Junhanliu-dev/espalier-engineering">GitHub →</a>
@@ -1146,7 +1146,7 @@ footer {
       <div class="hero-text">
         <div class="eyebrow">
           <span class="eyebrow-dot"></span>
-          v0.25.0 — quality-first context
+          v0.26.0 — turn economy
         </div>
         <h1>Train your AI&nbsp;coders like you'd train a <em>vine.</em></h1>
         <p class="lede">An espalier trains a fruit tree to grow flat along a wall — pruned, wired, productive, impossible to mistake for a wild one. Espalier does the same for your AI coding agents: discover the patterns already in your codebase, encode them as constraints, get code that lands inside your conventions on the first try, not the fifth.</p>
@@ -1749,6 +1749,9 @@ footer {
         <div class="drift-note">
           Interactive-only — an unattended (no-TTY) run auto-approves so the pipeline never hangs. No new skill, no new stage.
         </div>
+        <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
+          <span style="color:var(--paper)">v0.26.0</span> — turn economy: fewer agent turns and fewer spawns for the same gates, designed against measured runs — a coder spawn is ~37 model turns at ~15&thinsp;s each, model latency is flat across context size, and the contract phase was a second cold coder spawn that mostly re-verified tests already in the diff. Coders write the abuse test for every sensitive field they classify <em>with the code</em> and verify each cycle with one call, <code style="font-family:var(--f-mono);color:var(--vine)">exit_gate</code> — the gate&rsquo;s own commands. The auditor&rsquo;s contract carries <code style="font-family:var(--f-mono);color:var(--vine)">covered_by:</code> per entry, so a fully covered contract spawns <em>no contract-phase coder</em> and goes straight to the delta review, which still proves every entry itself. The session-boundary preference is asked once at the approval gate (<code style="font-family:var(--f-mono);color:var(--vine)">- Session-Boundary:</code>). The bash blocks the orchestrator retyped every run are helpers: <code style="font-family:var(--f-mono);color:var(--vine)">regression_verify</code>, <code style="font-family:var(--f-mono);color:var(--vine)">record_commits</code>, <code style="font-family:var(--f-mono);color:var(--vine)">certificate_write</code>, <code style="font-family:var(--f-mono);color:var(--vine)">drift_index</code>, <code style="font-family:var(--f-mono);color:var(--vine)">stage85_drift</code>, <code style="font-family:var(--f-mono);color:var(--vine)">backlink_all</code>. <code style="font-family:var(--f-mono);color:var(--vine)">exit_gate</code> scopes monorepo and <code style="font-family:var(--f-mono);color:var(--vine)">uv run pytest</code> test bodies and starts tests as soon as the build is green; the push hook runs build &#8741; lint by default. Every gate, rubric, sentinel and round cap is contract-equal; nothing sets a budget. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
+        </p>
         <p style="color:var(--ink-muted); margin-top:32px; font-size:15px; line-height:1.6">
           <span style="color:var(--paper)">v0.25.0</span> — quality-first context: every agent works with its instructions at full strength on current inputs, and <em>nothing sets a hard budget</em> — no size cap, no turn cap, no refusal on size, no cap on findings; every gate, rubric, sentinel, and round cap is unchanged. Measured on 565 subagent transcripts: the per-turn baseline is 41&ndash;57&thinsp;% of every agent&rsquo;s spend and half of all coder tokens are processed above 200k context. So a coder whose task does not fit one spawn hands off at a clean point &mdash; build green, report written fresh with a <code style="font-family:var(--f-mono);color:var(--vine)">## Handoff</code> block whose Facts carry <code style="font-family:var(--f-mono);color:var(--vine)">path:line</code>, sentinel <code style="font-family:var(--f-mono);color:var(--vine)">- HANDOFF: true</code> &mdash; and a fresh coder continues from the archived report; the panel still reviews the combined diff once. <code style="font-family:var(--f-mono);color:var(--vine)">coding-report.md</code> is the current spawn&rsquo;s report (prior spawns in <code style="font-family:var(--f-mono);color:var(--vine)">coding-log/</code>), requirements split into contract + <code style="font-family:var(--f-mono);color:var(--vine)">requirements-notes.md</code>, the security contract is extracted to <code style="font-family:var(--f-mono);color:var(--vine)">security-contract.md</code>, advisory findings are one row each. Spawn lines say the agent body is auto-loaded, a <code style="font-family:var(--f-mono);color:var(--vine)">- Spec applied:</code> line makes the layer-spec read visible (<code style="font-family:var(--f-mono);color:var(--vine)">[spec-unread]</code> is advisory), and the context pack names Grep-only files and every scoped <code style="font-family:var(--f-mono);color:var(--vine)">CLAUDE.md</code> / <code style="font-family:var(--f-mono);color:var(--vine)">AGENTS.md</code> above the touched files &mdash; the only path by which a workspace doc reaches a Codex / Copilot coder. The orchestrator offers a fresh session after Stage 2 approval and after the Stage 4 PASS (state is already on disk; never unattended) and runs the Stage 3 exit gate as one <code style="font-family:var(--f-mono);color:var(--vine)">exit_gate</code> call built from the installed pre-push gate&rsquo;s own commands. Coders commit one bounded unit per commit at a clean point, under the project&rsquo;s own commit conventions, and the pipeline never squashes them. The <code style="font-family:var(--f-mono);color:var(--vine)">/espalier</code> skill is a router whose stage procedures are read at stage entry (<code style="font-family:var(--f-mono);color:var(--vine)">espalier/skills/espalier/stages/</code>), <code style="font-family:var(--f-mono);color:var(--vine)">pipeline.md</code> is the stage contract, and the agents&rsquo; mode-only sections live in <code style="font-family:var(--f-mono);color:var(--vine)">espalier/agents/modes/</code>, named first on the prompt line that announces the mode. The grill&rsquo;s code reads are unlimited. Rules get a Writing Contract, a Removed-rules ledger at the prune gate, a doctor contract-drift line, and a <code style="font-family:var(--f-mono);color:var(--vine)">## Not Precedent</code> anchor. <code style="font-family:var(--f-mono);color:var(--vine)">espalier-stats.sh</code> reports spawn shape and workspace docs; <code style="font-family:var(--f-mono);color:var(--vine)">scripts/context-report.py</code> measures an install&rsquo;s context from its transcripts. <span style="color:var(--paper)">v0.25.1</span> gives <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>&rsquo;s detection a supersession floor: an install carrying a later release no longer trips the probes for phrases that release retired, so a current install is reported current. Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code>.
         </p>
@@ -1804,7 +1807,7 @@ footer {
           <span style="color:var(--paper)">v0.8.1</span> — the coder and reviewer sub-agents now reason about <em>every</em> surface a change touches — admin / CRUD UIs, API validation, client forms, persisted data, other callers — not just the happy path. Closes a class of fix-round where a now system-derived value left "required" on a UI blocks the user before the server-side hook ever runs.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
-          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.22.1 → v0.23.0 → v0.23.1 → v0.24.0 → v0.25.0) in order.
+          Existing users run <code style="font-family:var(--f-mono);color:var(--vine)">/espalier-migrate</code> — it auto-detects your version and applies the chain (… v0.23.0 → v0.23.1 → v0.24.0 → v0.25.0 → v0.26.0) in order.
         </p>
         <p style="color:var(--ink-muted); margin-top:16px; font-size:15px; line-height:1.6">
           New pipeline runs get the loop; in-flight changes are unaffected. <span style="color:var(--paper)">Non-breaking.</span>
@@ -2199,7 +2202,7 @@ footer {
     </div>
     <div class="footer-bottom">
       <div>© 2026 · Espalier Engineering</div>
-      <div>v0.25.0 — quality-first context</div>
+      <div>v0.26.0 — turn economy</div>
     </div>
   </div>
 </footer>

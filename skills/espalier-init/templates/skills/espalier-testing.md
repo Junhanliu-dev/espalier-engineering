@@ -39,7 +39,11 @@ rejected → assert persistent store unchanged**:
 - assert the persisted store did NOT change
 
 A happy-path test does NOT satisfy the contract. See
-`espalier/skills/espalier-security/SKILL.md` for the recipe. Enforced at the
+`espalier/skills/espalier-security/SKILL.md` for the recipe. The coder
+writes the abuse test for every sensitive field it classifies WITH the code
+(Security-Aware Coding — a Stage 3 duty under folded test-mode); the
+auditor's contract names such a test in its `covered_by:` line, and the
+contract phase writes only the entries still uncovered. Enforced at the
 contract delta review (serial test-mode: Stage 6) —
 a contracted field with no abuse test is a P0.
 

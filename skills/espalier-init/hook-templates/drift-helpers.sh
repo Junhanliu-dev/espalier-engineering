@@ -523,19 +523,13 @@ _gate_test_files() {
   return 0
 }
 
-# _gate_scoped_cmd DEF FILE… — when the run_tests body is ONE command whose
-# runner takes file paths, print that command with the files appended (`--`
-# for npm / pnpm / yarn scripts; package dirs for `go test`). Print nothing
-# when the body is multi-line, `cd`s into a workspace the files are not all
-# under, or the runner is not path-scopable — the caller then runs the full
-# suite: never fewer tests than the coder listed.
-_gate_scoped_cmd() {
-  local def="$1"; shift
-  local body cmd pre="" wd="" f rel files="" pkgs=""
-  [ $# -gt 0 ] || return 0
-  body=$(printf '%s\n' "$def" | sed '1d;$d' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | grep -v '^#')
-  [ "$(printf '%s\n' "$body" | wc -l | tr -d ' ')" = 1 ] || return 0
-  cmd=$body
+# _gate_scope_line CMD — one test command (`CMD`, or `cd WS && CMD`) scoped
+# to the test files read from stdin, one per line: the command with the
+# files appended (`--` for npm / pnpm / yarn scripts; package dirs for
+# `go test`). Prints nothing when a file is not under WS, the command is
+# compound, or the runner is not path-scopable.
+_gate_scope_line() {
+  local cmd="$1" pre="" wd="" f rel files="" pkgs=""
   case "$cmd" in
     "(cd "*) return 0 ;;
     "cd "*"&&"*)
@@ -543,7 +537,8 @@ _gate_scoped_cmd() {
       cmd=${cmd#*&&}; cmd=${cmd# }; pre="cd $wd && " ;;
   esac
   case "$cmd" in *"&&"*|*"||"*|*";"*|*"|"*|*">"*) return 0 ;; esac
-  for f in "$@"; do
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
     if [ -n "$wd" ]; then
       case "$f" in "$wd"/*) rel=${f#"$wd"/} ;; *) return 0 ;; esac
     else
@@ -552,11 +547,12 @@ _gate_scoped_cmd() {
     files="$files $rel"; pkgs="$pkgs
 ./$(dirname "$rel")/"
   done
+  [ -n "$files" ] || return 0
   pkgs=$(printf '%s\n' "$pkgs" | grep -v '^$' | sort -u | tr '\n' ' ' | sed 's/ $//')
   case "$cmd" in
     "npm test"|"npm run test"|"npm run test:"*|"pnpm test"|"pnpm run test"*|"yarn test"|"yarn run test"*)
       printf '%s%s --%s' "$pre" "$cmd" "$files" ;;
-    "npx jest"*|"npx vitest run"*|"npx mocha"*|jest*|"vitest run"*|mocha*|pytest*|"python -m pytest"*|"python3 -m pytest"*|rspec*|"bundle exec rspec"*|phpunit*|"vendor/bin/phpunit"*)
+    "npx jest"*|"npx vitest run"*|"npx mocha"*|jest*|"vitest run"*|mocha*|pytest*|"python -m pytest"*|"python3 -m pytest"*|"uv run pytest"*|"poetry run pytest"*|"pnpm exec vitest run"*|"pnpm vitest run"*|"pnpm exec jest"*|"bun test"*|rspec*|"bundle exec rspec"*|phpunit*|"vendor/bin/phpunit"*)
       printf '%s%s%s' "$pre" "$cmd" "$files" ;;
     "go test"*)
       cmd=${cmd% ./...}; printf '%s%s %s' "$pre" "$cmd" "$pkgs" ;;
@@ -564,9 +560,51 @@ _gate_scoped_cmd() {
   esac
 }
 
+# _gate_scoped_cmd DEF FILE… — the run_tests body scoped to FILE…, when its
+# shape allows it: ONE command whose runner takes file paths (the files
+# appended — `_gate_scope_line`), or one workspace line per body line —
+# `(cd WS && CMD) || return 1` or `cd WS && CMD`, a monorepo's shape — each
+# scoped to the files under WS/ and joined with `&&`, a workspace with no
+# listed file dropped. Prints nothing when a file is under no workspace,
+# a line has another shape, or a runner is not path-scopable — the caller
+# then runs the full suite: never fewer tests than the coder listed.
+_gate_scoped_cmd() {
+  local def="$1"; shift
+  local body nlines cmd wd f sub one out="" claimed=0 total=$#
+  [ "$total" -gt 0 ] || return 0
+  body=$(printf '%s\n' "$def" | sed '1d;$d' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' | grep -v '^#')
+  nlines=$(printf '%s\n' "$body" | wc -l | tr -d ' ')
+  if [ "$nlines" = 1 ]; then
+    printf '%s\n' "$@" | _gate_scope_line "$body"
+    return 0
+  fi
+  while IFS= read -r cmd; do
+    case "$cmd" in
+      "(cd "*") || return 1") cmd=${cmd#\(}; cmd=${cmd%) || return 1} ;;
+      "cd "*"&&"*) ;;
+      *) return 0 ;;
+    esac
+    wd=${cmd#cd }; wd=${wd%%&&*}; wd=$(printf '%s' "$wd" | tr -d ' "'"'"'')
+    sub=""
+    for f in "$@"; do
+      case "$f" in "$wd"/*) sub="$sub$f
+"; claimed=$((claimed + 1)) ;; esac
+    done
+    [ -n "$sub" ] || continue
+    one=$(printf '%s' "$sub" | _gate_scope_line "$cmd")
+    [ -n "$one" ] || return 0
+    out="$out${out:+ && }($one)"
+  done <<EOF
+$body
+EOF
+  [ "$claimed" -eq "$total" ] || return 0
+  printf '%s' "$out"
+}
+
 # exit_gate DIR [TEST_FILE…] — the Stage 3 exit gate as one call: the
 # installed gate's run_build and run_lint as two concurrent jobs (per-pid
-# waits, each job's output to its own temp file), then run_tests scoped to
+# waits, each job's output to its own temp file), then — as soon as the
+# build is green, while lint may still be running — run_tests scoped to
 # TEST_FILE… (or to the coding report's listed test files when none are
 # given; the full suite when the runner is not path-scopable). The commands
 # have one source — the function bodies init substituted into
@@ -609,21 +647,317 @@ EOF
   ( cd "$_DS_ROOT" && eval "$def_b" && run_build ) > "$tmpd/build.log" 2>&1 & pid_b=$!
   ( cd "$_DS_ROOT" && eval "$def_l" && run_lint )  > "$tmpd/lint.log"  2>&1 & pid_l=$!
   wait "$pid_b"; rc_b=$?
-  wait "$pid_l"; rc_l=$?
-  if [ "$rc_b" -eq 0 ]; then echo "build: exit 0"; else echo "build: exit $rc_b — log: $tmpd/build.log"; fi
-  if [ "$rc_l" -eq 0 ]; then echo "lint: exit 0";  else echo "lint: exit $rc_l — log: $tmpd/lint.log"; fi
   if [ "$rc_b" -ne 0 ]; then
+    wait "$pid_l"; rc_l=$?
+    echo "build: exit $rc_b — log: $tmpd/build.log"
+    if [ "$rc_l" -eq 0 ]; then echo "lint: exit 0"; else echo "lint: exit $rc_l — log: $tmpd/lint.log"; fi
     echo "tests: skipped — build red"
     return 1
   fi
   scoped=$(_gate_scoped_cmd "$def_t" "$@")
   if [ -n "$scoped" ]; then
     ( cd "$_DS_ROOT" && eval "$scoped" ) > "$tmpd/tests.log" 2>&1; rc_t=$?
-    if [ "$rc_t" -eq 0 ]; then echo "tests: exit 0 ($nfiles files)"; else echo "tests: exit $rc_t ($nfiles files) — log: $tmpd/tests.log"; fi
+    t="tests: exit $rc_t ($nfiles files)"
   else
     ( cd "$_DS_ROOT" && eval "$def_t" && run_tests ) > "$tmpd/tests.log" 2>&1; rc_t=$?
-    if [ "$rc_t" -eq 0 ]; then echo "tests: exit 0 (full suite)"; else echo "tests: exit $rc_t (full suite) — log: $tmpd/tests.log"; fi
+    t="tests: exit $rc_t (full suite)"
   fi
+  wait "$pid_l"; rc_l=$?
+  echo "build: exit 0"
+  if [ "$rc_l" -eq 0 ]; then echo "lint: exit 0"; else echo "lint: exit $rc_l — log: $tmpd/lint.log"; fi
+  if [ "$rc_t" -eq 0 ]; then echo "$t"; else echo "$t — log: $tmpd/tests.log"; fi
   [ "$rc_l" -eq 0 ] && [ "$rc_t" -eq 0 ] && return 0
   return 1
+}
+
+# --- v0.26 turn-economy helpers ----------------------------------------------
+# contract_gaps · certificate_write · record_commits · drift_index ·
+# stage85_drift · backlink_all · regression_verify. Each is a bash block the
+# orchestrator used to retype at a stage boundary, with the same file
+# effects; the skills now call them by name. Same discipline as above:
+# mawk-safe, BSD-safe, zsh-safe, nothing refuses on size.
+
+# contract_gaps DIR — the security contract's entries whose `covered_by:`
+# line is missing or `none`, one `field:` value per line — read from
+# DIR/security-contract.md, or from the `## Security-Sensitive Fields` block
+# of security-record.md when the file is absent. Empty output = every entry
+# names a test already in the diff: the orchestrator spawns no contract-phase
+# coder and goes straight to the delta review, which proves each entry
+# itself. Exit 1 when there is no contract at all.
+contract_gaps() {
+  local dir="$1" src
+  if [ -f "$dir/security-contract.md" ]; then
+    src="$dir/security-contract.md"
+  elif [ -f "$dir/security-record.md" ] && grep -q '^## Security-Sensitive Fields' "$dir/security-record.md"; then
+    src="$dir/security-record.md"
+  else
+    return 1
+  fi
+  awk '
+    function flush() { if (field != "" && !covered) print field; field = ""; covered = 0 }
+    /^## Security-Sensitive Fields/ { insp = 1; next }
+    insp && /^## /       { flush(); exit }
+    insp && /^- field:/  { flush(); field = $0; sub(/^- field:[ \t]*/, "", field); sub(/[ \t]+$/, "", field); next }
+    insp && field != "" && /^[ \t]+covered_by:/ {
+      v = $0; sub(/^[ \t]+covered_by:[ \t]*/, "", v); sub(/[ \t]+$/, "", v)
+      if (v != "" && tolower(v) != "none") covered = 1
+    }
+    END { flush() }
+  ' "$src"
+}
+
+# certificate_write DIR — the review certificate: `git add -A` (so new files
+# count), then `Reviewed-Diff: <hash>` of the source diff since the change's
+# Base-Ref (espalier/ excluded) in DIR/pipeline-state.md — the last existing
+# `Reviewed-Diff:` line overwritten in place, else the line inserted after
+# the Base-Ref line. Prints the hash. Exit 1 without a Base-Ref.
+certificate_write() {
+  local state="$1/pipeline-state.md" base hash n tmp
+  [ -f "$state" ] || return 1
+  base=$(grep -E '^(- )?Base-Ref:' "$state" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+  [ -n "$base" ] || { echo "certificate_write: no Base-Ref in $state" >&2; return 1; }
+  git -C "$_DS_ROOT" add -A >/dev/null 2>&1
+  hash=$(git -C "$_DS_ROOT" diff "$base" -- . ':(exclude)espalier/' | git hash-object --stdin)
+  n=$(grep -nE '^(- )?Reviewed-Diff:' "$state" | tail -1 | cut -d: -f1)
+  tmp=$(mktemp "$state.XXXXXX") || return 1
+  if [ -n "$n" ]; then
+    awk -v n="$n" -v h="$hash" 'NR == n { sub(/Reviewed-Diff:.*/, "Reviewed-Diff: " h) } { print }' "$state" > "$tmp"
+  else
+    awk -v h="$hash" '
+      { print }
+      !done && /^(- )?Base-Ref:/ { print (($0 ~ /^- /) ? "- " : "") "Reviewed-Diff: " h; done = 1 }
+    ' "$state" > "$tmp"
+  fi
+  mv "$tmp" "$state" || return 1
+  printf '%s\n' "$hash"
+}
+
+# record_commits TYPE SLUG — the Stage 7 commit record: one
+# `| 7 | SHA | files |` row per commit in Base-Ref..HEAD (oldest first; HEAD
+# alone without a Base-Ref) under `## Commits` in the change's state file,
+# idempotent per SHA, each row self-healing the reverse-lookup cache when
+# lookup-helpers.sh is installed. Prints the rows it added.
+record_commits() {
+  local type="$1" slug="$2" state base shas sha files
+  state="$_DS_ROOT/espalier/changes/$type/$slug/pipeline-state.md"
+  [ -f "$state" ] || return 1
+  base=$(grep -E '^(- )?Base-Ref:' "$state" | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+  if [ -n "$base" ]; then
+    shas=$(git -C "$_DS_ROOT" rev-list --reverse "${base}..HEAD")
+  else
+    shas=$(git -C "$_DS_ROOT" rev-parse HEAD)
+  fi
+  grep -q '^## Commits' "$state" \
+    || printf '\n## Commits\n| Stage | SHA | Files |\n|-------|-----|-------|\n' >> "$state"
+  [ -f "$_DS_ROOT/espalier/hooks/lookup-helpers.sh" ] && . "$_DS_ROOT/espalier/hooks/lookup-helpers.sh"
+  printf '%s\n' "$shas" | while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    files=$(git -C "$_DS_ROOT" diff-tree --no-commit-id --name-only -r "$sha" | tr '\n' ',' | sed 's/,$//')
+    if ! grep -qE "^\| 7 \| ${sha} " "$state"; then
+      printf '| 7 | %s | %s |\n' "$sha" "$files" >> "$state"
+      printf '| 7 | %s | %s |\n' "$sha" "$files"
+    fi
+    type _cache_append >/dev/null 2>&1 && ( cd "$_DS_ROOT" && _cache_append "$sha" "${type}/${slug}" "original" )
+  done
+  return 0
+}
+
+# drift_index TYPE SLUG — Stage 4 post-review: every Convention Drift block
+# of the change's review-record.md (parse-drift-blocks.py) flags its rule
+# file stale and appends a `convention_drift:` line to the state file; a
+# malformed block (two rule files in one block) appends
+# `convention_drift_malformed:` instead — never a P0 back into the record.
+# Prints the appended lines. No-op without a record or python3.
+drift_index() {
+  local type="$1" slug="$2" dir rev sha kind rule coupled line
+  dir="$_DS_ROOT/espalier/changes/$type/$slug"; rev="$dir/review-record.md"
+  [ -f "$rev" ] || return 0
+  command -v python3 >/dev/null 2>&1 || { echo "drift_index: python3 not found — drift not indexed" >&2; return 0; }
+  sha=$(git -C "$_DS_ROOT" rev-parse HEAD)
+  python3 "$_DS_ROOT/espalier/hooks/parse-drift-blocks.py" "$rev" | while IFS="$(printf '\t')" read -r kind rule coupled; do
+    case "$kind" in
+      DRIFT)
+        mark_stale "$rule" "$sha" "convention drift flagged in ${type}/${slug} review"
+        line="convention_drift: $rule"
+        [ -n "$coupled" ] && line="$line (coupled_with: $coupled)"
+        ;;
+      MALFORMED) line="convention_drift_malformed: $rule (reviewer bundled blocks — drift NOT indexed)" ;;
+      *) continue ;;
+    esac
+    printf '%s\n' "$line" >> "$dir/pipeline-state.md"
+    printf '%s\n' "$line"
+  done
+  return 0
+}
+
+# stage85_drift TYPE SLUG — the Stage 8.5 doc-drift notice: every flagged
+# doc as a row of a notify table appended to the change's doc-patches.md
+# (edits no doc, blocks nothing) and one summary line on stdout.
+stage85_drift() {
+  local type="$1" slug="$2" patches stale f tier reason n
+  patches="$_DS_ROOT/espalier/changes/$type/$slug/doc-patches.md"
+  stale=$(stale_files)
+  if [ -z "$stale" ]; then echo "Stage 8.5: no drift."; return 0; fi
+  {
+    echo ""
+    echo "## Stage 8.5 Doc Drift (notify-only)"
+    echo "| File | Tier | Reason |"
+    echo "|------|------|--------|"
+    printf '%s\n' "$stale" | while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      tier=$(classify_tier "$f")
+      reason=$(awk -F'\t' -v x="$f" '$1==x {print $4; exit}' "$DRIFT_STATE")
+      echo "| $f | $tier | $reason |"
+    done
+  } >> "$patches"
+  n=$(printf '%s\n' "$stale" | grep -c .)
+  echo "Stage 8.5: $n stale doc(s) — run /espalier-prune to refresh. (Not blocking; pipeline continues.)"
+}
+
+# _backlink_one SLUG CAUSING_SLUG ROLE LOOKUP — one Follow-up Fixes row in the
+# causing change's state file; idempotent on (own slug, role) — the same
+# slug can legitimately appear as primary and call_path in different fixes.
+_backlink_one() {
+  local slug="$1" causing="$2" role="$3" lookup="$4" state reason own
+  state="$_DS_ROOT/espalier/changes/$causing/pipeline-state.md"
+  [ -f "$state" ] || return 0
+  grep -q '^## Follow-up Fixes' "$state" \
+    || printf '\n## Follow-up Fixes\n| Fix Slug | Role | Lookup | Reason | Date |\n|----------|------|--------|--------|------|\n' >> "$state"
+  own="fix/$slug"
+  grep -qF "| $own | $role |" "$state" && return 0
+  # The title line sits BELOW the YAML frontmatter — grep it; head -1 would read `---`.
+  reason=$(grep -m1 '^# Bug:' "$_DS_ROOT/espalier/changes/fix/$slug/requirements.md" 2>/dev/null | sed 's/^# Bug: //')
+  [ -n "$reason" ] || reason="$own"
+  printf '| %s | %s | %s | %s | %s |\n' "$own" "$role" "$lookup" "$reason" "$(date -u +%Y-%m-%d)" >> "$state"
+  printf '%s -> %s (%s)\n' "$own" "$causing" "$role"
+}
+
+# backlink_all SLUG — the fix lane's Stage 7 back-links: every `caused_by:`
+# entry of espalier/changes/fix/SLUG/requirements.md whose slug names a real
+# change (never unknown / unknown_squash, never a `- note:` overflow row)
+# gets its Follow-up Fixes row in the causing change's state file. Prints
+# one line per row written. Exit 1 without a requirements file.
+backlink_all() {
+  local slug="$1" req c_slug c_role c_lookup
+  req="$_DS_ROOT/espalier/changes/fix/$slug/requirements.md"
+  [ -f "$req" ] || return 1
+  awk '
+    function flush() {
+      if (s != "" && s != "unknown" && s != "unknown_squash") print s "\t" r "\t" l
+      s = ""; r = ""; l = ""
+    }
+    NR == 1 && /^---/ { fm = 1; next }
+    fm && /^---/ { flush(); exit }
+    fm && /^caused_by:/ { inc = 1; next }
+    fm && inc && /^[^ \t-]/ { flush(); inc = 0 }
+    inc && /^[ \t]*- / {
+      flush()
+      if ($0 ~ /^[ \t]*- slug:/) { s = $0; sub(/^[ \t]*- slug:[ \t]*/, "", s); sub(/[ \t]+$/, "", s) }
+      next
+    }
+    inc && s != "" && /^[ \t]+role:/   { r = $0; sub(/^[ \t]+role:[ \t]*/, "", r); sub(/[ \t]+$/, "", r) }
+    inc && s != "" && /^[ \t]+lookup:/ { l = $0; sub(/^[ \t]+lookup:[ \t]*/, "", l); sub(/[ \t]+$/, "", l) }
+    END { flush() }
+  ' "$req" | while IFS="$(printf '\t')" read -r c_slug c_role c_lookup; do
+    [ -n "$c_slug" ] || continue
+    _backlink_one "$slug" "$c_slug" "$c_role" "$c_lookup"
+  done
+  return 0
+}
+
+# _reg_harness_error FILE — exit 0 when a runner's output shows it failed to
+# RUN at all (missing module, bad invocation, nothing collected) rather than
+# ran and failed an assertion — conflating the two is how a test that never
+# executed gets certified.
+_reg_harness_error() {
+  grep -qiE 'cannot find module|module ?not ?found|no such file or directory|command not found|ENOENT|ImportError|ModuleNotFoundError|SyntaxError|failed to (resolve|load|collect)|no tests? (found|ran)' "$1"
+}
+
+# _reg_last PREFIX DIR — the last line starting with PREFIX in the current
+# coding-report.md, else in the newest coding-log/ report that has one.
+_reg_last() {
+  local prefix="$1" dir="$2" f
+  if [ -f "$dir/coding-report.md" ] && grep -q "^$prefix" "$dir/coding-report.md"; then
+    grep "^$prefix" "$dir/coding-report.md" | tail -1
+    return 0
+  fi
+  f=$(ls -r "$dir/coding-log"/*.md 2>/dev/null | while IFS= read -r g; do
+        grep -q "^$prefix" "$g" && { printf '%s\n' "$g"; break; }
+      done)
+  [ -n "$f" ] && grep "^$prefix" "$f" | tail -1
+  return 0
+}
+
+# regression_verify DIR REG_RUN TEST_FILE… — the fix lane's regression check
+# at the Stage 3 exit gate, as one call. REG_RUN is the project's runner
+# scoped to exactly TEST_FILE… (`npx jest <files>`, `pytest <files>`,
+# `npm test -- <files>`), run from the repo root. Two steps, in this order:
+# the FIXED tree first (validates the invocation itself — runner found, deps
+# resolve, file loads), then the change's Base-Ref in a detached worktree
+# with the test files copied in and the installed dependency dirs linked.
+# Appends to DIR/coding-report.md and prints:
+#   - REGRESSION_VERIFIED: true | false — … | skipped — …
+#   - REGRESSION_VERIFIED_SCOPE: <hash of the test files' contents>
+# `true` only on a genuine assertion failure at Base-Ref — a harness error
+# there is `skipped`, never `true` (a bug whose pre-fix symptom IS a
+# load-time error classifies as skipped: the check errs toward human eyes).
+# A report carrying `- HANDOFF: true` is left untouched (archived and
+# continued by a fresh coder). When the scope hash equals the last recorded
+# one (this report, else the newest coding-log/ report), the runs are
+# skipped and the previous result is re-appended marked (cached).
+regression_verify() {
+  local dir="$1" run="$2"; shift 2
+  local state cod base scope prev_scope prev_res out_now rc_now wt rc_pre t dep line
+  state="$dir/pipeline-state.md"; cod="$dir/coding-report.md"
+  if [ ! -f "$cod" ] || grep -q '^- HANDOFF: true' "$cod"; then
+    echo "REGRESSION_VERIFIED: skipped this return — coding-report.md is a handoff (archived; continuation coder next)"
+    return 0
+  fi
+  if [ $# -eq 0 ]; then
+    line="- REGRESSION_VERIFIED: skipped — no regression test file named"
+    printf '%s\n' "$line" >> "$cod"; printf '%s\n' "$line"
+    return 0
+  fi
+  scope=$( (for t in "$@"; do printf '%s %s\n' "$t" "$(git -C "$_DS_ROOT" hash-object "$t" 2>/dev/null)"; done) | sort | git hash-object --stdin )
+  prev_scope=$(_reg_last '- REGRESSION_VERIFIED_SCOPE:' "$dir" | sed 's/^- REGRESSION_VERIFIED_SCOPE:[[:space:]]*//')
+  prev_res=$(_reg_last '- REGRESSION_VERIFIED:' "$dir"); prev_res=${prev_res% (cached)}
+  base=$(grep -E '^(- )?Base-Ref:' "$state" 2>/dev/null | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
+  if [ -z "$base" ]; then
+    line="- REGRESSION_VERIFIED: skipped — no Base-Ref recorded"
+  elif [ -n "$prev_scope" ] && [ "$prev_scope" = "$scope" ] && [ -n "$prev_res" ]; then
+    line="$prev_res (cached)"
+  else
+    out_now=$(mktemp "${TMPDIR:-/tmp}/reg-now.XXXXXX") || return 2
+    ( cd "$_DS_ROOT" && eval "$run" ) > "$out_now" 2>&1; rc_now=$?
+    if [ "$rc_now" -ne 0 ] && _reg_harness_error "$out_now"; then
+      line="- REGRESSION_VERIFIED: skipped — scoped invocation could not run on the fixed tree: $(grep -m1 . "$out_now")"
+    elif [ "$rc_now" -ne 0 ]; then
+      line="- REGRESSION_VERIFIED: false — regression test FAILS on the FIXED code (broken test or unfixed bug) (P0 at Stage 6)"
+    else
+      wt=$(mktemp -d "${TMPDIR:-/tmp}/reg-base.XXXXXX") || return 2
+      if git -C "$_DS_ROOT" worktree add --detach "$wt" "$base" >/dev/null 2>&1; then
+        for t in "$@"; do mkdir -p "$wt/$(dirname "$t")"; cp "$_DS_ROOT/$t" "$wt/$t"; done
+        for dep in node_modules .venv venv vendor; do
+          [ -e "$_DS_ROOT/$dep" ] && [ ! -e "$wt/$dep" ] && ln -s "$_DS_ROOT/$dep" "$wt/$dep"
+        done
+        ( cd "$wt" && eval "$run" ) > "$wt/.reg.out" 2>&1; rc_pre=$?
+        if [ "$rc_pre" -eq 0 ]; then
+          line="- REGRESSION_VERIFIED: false — test PASSES on pre-fix code; it does not capture the bug (P0 at Stage 6)"
+        elif _reg_harness_error "$wt/.reg.out"; then
+          line="- REGRESSION_VERIFIED: skipped — could not RUN at Base-Ref (harness error, not an assertion failure): $(grep -m1 . "$wt/.reg.out")"
+        else
+          line="- REGRESSION_VERIFIED: true (test fails on pre-fix $base, passes on fix)"
+        fi
+        git -C "$_DS_ROOT" worktree remove --force "$wt" >/dev/null 2>&1
+      else
+        line="- REGRESSION_VERIFIED: skipped — could not create worktree at $base"
+        rm -rf "$wt"
+      fi
+    fi
+    rm -f "$out_now"
+  fi
+  printf '%s\n' "$line" >> "$cod"
+  printf -- '- REGRESSION_VERIFIED_SCOPE: %s\n' "$scope" >> "$cod"
+  printf '%s\n' "$line"
+  return 0
 }

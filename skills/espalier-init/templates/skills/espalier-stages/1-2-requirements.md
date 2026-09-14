@@ -12,8 +12,8 @@ Stage 1: read `espalier/skills/espalier-requirements/SKILL.md` (it invokes
 grill's Q&A goes to `requirements-notes.md`. Stage 2: review it per
 `espalier/skills/espalier-review/SKILL.md` (a heading outside the contract
 set is a P2 → `requirements-notes.md`). Then the gate below. Everything the
-grill reads lands in THIS context — the gate's stage-boundary offer is what
-releases it.
+grill reads lands in THIS context — the gate's session-boundary preference
+(step 3d) is what releases it.
 
 ### Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
 
@@ -97,30 +97,40 @@ sign-off on `requirements.md` before Stage 3.
    acceptance are untouched — like the push pre-auth, this removes only the
    redundant wait, and it NEVER extends to Stage 10.
 
+3d. In the SAME `AskUserQuestion` call — when it still has a slot (the
+   tool takes four questions; with 3b AND 3c both present, ask this one
+   right after) — collect the session-boundary preference, first option
+   default:
+
+   ```
+   Session boundaries — state is on disk at each; nothing depends on this:
+     1. Continue here at both (default)
+     2. Stop after approval — a fresh session runs from Stage 3
+     3. Stop after the Stage 4 PASS — a fresh session runs from Stage 5
+     4. Stop at both
+   (Everything Stage 1 read into this context — code, docs, the grill's
+   answers — stays resident on "continue"; a fresh session starts from
+   requirements.md, the context pack, and the stage's procedure. The
+   `Continue in a fresh session` path of v0.25, chosen once, here.)
+   ```
+
+   Record it as `- Session-Boundary: none | after-2 | after-4 | both` in
+   pipeline-state.md. Skip the question on an unattended run
+   (`interactivity_mode` returns `unattended`) exactly as the Completion's
+   BUILT offer is skipped — no line, every boundary continues.
+
 4. Advance to Stage 3 ONLY on **Approve**. On **Edit**, revise `requirements.md`
    per the feedback, re-run the Stage 2 gate, and re-present this gate. On
    **Abort**, write Status: ABORTED to pipeline-state.md and stop.
 
-5. **Stage boundary (offered, never forced).** After **Approve** — the
-   `| 2 | PASSED |` row, `- Push-Target:`, and the context pack are on disk —
-   ask ONCE with `AskUserQuestion` (the first option is the default):
-
-   ```
-   Requirements approved; state is on disk.
-     1. Continue here
-     2. Continue in a fresh session — run `/clear`, then `/espalier` with no
-        argument: Session Resumption picks this change up at Stage 3 from
-        pipeline-state.md.
-   (After Stage 2: everything Stage 1 read into this context — code, docs,
-   the grill's answers — stays resident on "Continue here"; a fresh session
-   starts from requirements.md and the context pack.)
-   ```
-
-   On "Continue in a fresh session": write `- Current Stage: 3` (Session
-   Resumption resumes by this line), print the two commands, and stop. On
-   an unattended run (`interactivity_mode` returns `unattended`) skip the
-   offer exactly as the Completion's BUILT offer is skipped. Nothing forces
-   the reset; Session Resumption is unchanged.
+5. **Stage boundary (read, never asked).** After **Approve** — the
+   `| 2 | PASSED |` row, `- Push-Target:`, `- Session-Boundary:`, and the
+   context pack are on disk — read the preference: `after-2` or `both` →
+   write `- Current Stage: 3` (Session Resumption resumes by this line),
+   print `run /clear, then /espalier with no argument: Session Resumption
+   picks this change up at Stage 3 from pipeline-state.md`, and stop. Any
+   other value or a missing line → continue here. Nothing forces the reset;
+   Session Resumption is unchanged.
 
 **Non-interactive exception:** auto-approve ONLY when the run is EXPLICITLY
 unattended — `interactivity_mode` (in `drift-helpers.sh`) returns `unattended`,

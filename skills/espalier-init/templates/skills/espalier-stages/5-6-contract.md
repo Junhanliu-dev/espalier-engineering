@@ -24,24 +24,36 @@ decides empty vs non-empty.
   `| 6 | SKIPPED | {ts} | folded: reviewed at Stage 4 |` — set
   `Current Stage: 7`, and proceed to Stage 7.
 - **Non-empty contract (sensitive change):**
-  1. Write `| 5 | IN_PROGRESS | {ts} | contract phase |`; extract the
-     contract — `contract_extract "espalier/changes/{type}/{slug}"` writes
-     `security-contract.md` = the `## Security-Sensitive Fields` block to
-     the next heading (the auditor's round-N adjudication prose never rides
-     into a Stage 5/6 spawn again); archive the current report
-     (`report_archive … "round{n}-fix"`, or `"stage3"` when no fix round
-     ran); then ONE
-     test-coder spawn, alone in its message: "CONTRACT PHASE: read
-     espalier/changes/{type}/{slug}/security-contract.md (fallback: the
-     `## Security-Sensitive Fields` block of security-record.md) — for EVERY
-     field listed, write the negative abuse
-     test it names (tamper the value → assert rejected → assert store
-     unchanged). Commit them as `test({scope}): abuse tests for {fields}`
-     (Commit Discipline). Write your coding report fresh to
-     coding-report.md — the earlier report is in coding-log/."
-  2. Re-run the Stage 3 exit gate (`exit_gate`, `stages/3-coding.md` —
-     build + lint + scoped test run; the contract tests must build and PASS
-     before anyone reviews them).
+  1. Extract the contract — `contract_extract "espalier/changes/{type}/{slug}"`
+     writes `security-contract.md` = the `## Security-Sensitive Fields`
+     block to the next heading (the auditor's round-N adjudication prose
+     never rides into a Stage 5/6 spawn again). Then read the gaps:
+     `GAPS=$(contract_gaps "espalier/changes/{type}/{slug}")` — the entries
+     whose `covered_by:` line is missing or `none` (the auditor names the
+     test in the diff that already performs an entry's abuse test; the
+     coder wrote those at Stage 3 for the fields it classified).
+     - **No gaps (every entry covered):** write
+       `| 5 | PASSED | {ts} | folded: contract covered at Stage 3 ({n} entries) |`
+       — no coder spawn, no exit-gate re-run (the tests are in the diff the
+       panel just passed) — and go to step 3, the delta review, which
+       proves every entry itself; a `covered_by` that does not hold is its
+       P0 and lands on the gap path below.
+     - **Gaps:** write `| 5 | IN_PROGRESS | {ts} | contract phase — {k} of {n} entries |`;
+       archive the current report (`report_archive … "round{n}-fix"`, or
+       `"stage3"` when no fix round ran); then ONE test-coder spawn, alone
+       in its message: "CONTRACT PHASE: read
+       espalier/changes/{type}/{slug}/security-contract.md (fallback: the
+       `## Security-Sensitive Fields` block of security-record.md). GAPS:
+       {the field lines contract_gaps printed} — for EACH of those entries
+       write the negative abuse test it names (tamper the value → assert
+       rejected → assert store unchanged); the other entries are covered
+       by tests already in the diff — do not rewrite them. Commit as
+       `test({scope}): abuse tests for {fields}` (Commit Discipline). Write
+       your coding report fresh to coding-report.md — the earlier report
+       is in coding-log/."
+  2. (Gap path) Re-run the Stage 3 exit gate (`exit_gate`,
+     `stages/3-coding.md` — build + lint + scoped test run; the contract
+     tests must build and PASS before anyone reviews them).
   3. **Contract delta review (Stage 6):** ONE `harness-reviewer` spawn,
      alone in its message, its prompt's first line `CONTRACT DELTA REVIEW:
      read espalier/agents/modes/stage6-abuse-coverage.md first`, delta
@@ -56,8 +68,9 @@ decides empty vs non-empty.
   4. **Contract-phase FAIL routing:**
      - fix touches ONLY test files → contract loop: archive the report
        (`report_archive … "contract-phase"`), re-spawn the coder in
-       CONTRACT PHASE mode with the findings, re-run the exit gate, delta
-       review again — under `max-test-rounds` (read
+       CONTRACT PHASE mode with the findings (its GAPS: the entries the
+       review named — a `covered_by` that did not hold is a gap now),
+       re-run the exit gate, delta review again — under `max-test-rounds` (read
        `grep '^max-test-rounds:' espalier/.espalier-config | grep -oE '[0-9]+'`,
        default 3; cap-before-respawn — at the cap, escalate:
        `| 6 | ESCALATED | {ts} | {reason, round count} |`).
@@ -72,12 +85,13 @@ decides empty vs non-empty.
      `| 6 | PASSED | {ts} | contract delta review |`.
 
 **Certificate (write at the final panel PASS; refresh at delta-review
-PASS):** `git add -A` (so new files count), then record in
-pipeline-state.md, overwriting any prior value —
+PASS):** `certificate_write "espalier/changes/{type}/{slug}"`
+(drift-helpers.sh) — `git add -A` (so new files count), then
 `Reviewed-Diff: $(git diff <Base-Ref> -- . ':(exclude)espalier/' | git hash-object --stdin)`
+recorded in pipeline-state.md, the last existing line overwritten in place,
 where `<Base-Ref>` is the SHA recorded at Stage 3 entry (never overwritten
-on a re-spawn). The Stage 7 push gate blocks unless this fingerprint still
-matches the pushed code.
+on a re-spawn). The helper prints the hash. The Stage 7 push gate blocks
+unless this fingerprint still matches the pushed code.
 
 **Crash recovery (folded — no part-files, no quarantine):** tests are
 ordinary tracked files listed in coding-report.md. A resume into Stage 4
@@ -155,5 +169,5 @@ Before stopping, set `- Status: ESCALATED` and add a Stage History row
 Otherwise re-spawn, increment the counter, and loop. After snapshotting a
 ROUND row, also update the `Review Rounds:` numerators in pipeline-state.md —
 a resumed session recounts rounds from this line plus the ROUND rows, never
-from memory. On the serial Stage 6 PASS (row + certificate refreshed) make
-the same stage-boundary offer as Stage 4's step 5, resuming at Stage 7.
+from memory. On the serial Stage 6 PASS (row + certificate refreshed) read
+`- Session-Boundary:` exactly as Stage 4's step 5 does, resuming at Stage 7.

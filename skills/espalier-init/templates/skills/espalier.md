@@ -264,11 +264,11 @@ For each stage:
 
    | Stage | Procedure: read `espalier/skills/espalier/stages/{file}` now, then run it |
    |-------|------------------------------------------------------------------------|
-   | 1–2 | `stages/1-2-requirements.md` — Stage 1/2 loads, the Requirements Approval Gate (BLOCKING) with the push / deploy pre-authorization and the stage-boundary offer |
+   | 1–2 | `stages/1-2-requirements.md` — Stage 1/2 loads, the Requirements Approval Gate (BLOCKING) with the push / deploy pre-authorization and the session-boundary preference |
    | 3 | `stages/3-coding.md` — Stage 3 Entry: Context Pack, sub-task sizing and parallel dispatch, the coder spawn, the Stage 3 exit gate (the `- HANDOFF: true` sentinel → archive → `exit_gate` → continuation), the `test-mode` read |
-   | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate + stage-boundary offer, post-review drift and convention index |
-   | 5–6 | `stages/5-6-contract.md` — Stage 5/6 (folded): the contract phase and delta review / test writing and test review (serial), the certificate, crash recovery |
-   | 7–10 | `stages/7-10-delivery.md` — convention-index staging, commit recording, the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check |
+   | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate (`certificate_write`) + the boundary read, post-review drift (`drift_index`) and convention index |
+   | 5–6 | `stages/5-6-contract.md` — Stage 5/6 (folded): contract coverage first (`contract_gaps` — a coder only for the gaps) and the delta review / test writing and test review (serial), the certificate, crash recovery |
+   | 7–10 | `stages/7-10-delivery.md` — convention-index staging, commit recording (`record_commits`), the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check (`stage85_drift`) |
 
    This file ROUTES; the stage files carry the procedure verbatim and
    `espalier/pipeline.md` is the contract (trigger / load / gate / output /
@@ -378,12 +378,16 @@ At stages marked with human checkpoint in pipeline.md:
 - "Skip" only allowed for stages 9-10
 - "Request Changes" triggers rollback with human's feedback as context
 
-Stage-boundary resume offers — after Stage 2 approval and after the Stage 4
-PASS (serial mode: after the Stage 6 PASS) — are `Continue here` /
-`Continue in a fresh session`, asked once, first option default, never on an
-unattended run. Nothing depends on the answer: the state is already on
-disk and Session Resumption is unchanged; a fresh session runs Stages 7–10
-with the change's state and the stage's procedure at the top of its context.
+Stage boundaries — after Stage 2 approval and after the Stage 4 PASS
+(serial mode: after the Stage 6 PASS) — are decided ONCE, at the
+Requirements Approval Gate (`stages/1-2-requirements.md` step 3d): one
+question, first option default, recorded as `- Session-Boundary: none |
+after-2 | after-4 | both`, never asked on an unattended run. Each boundary
+then READS the line instead of asking (the v0.25 `Continue in a fresh
+session` offer, chosen up front). Nothing depends on the answer: the state
+is already on disk and Session Resumption is unchanged; a fresh session
+runs the remaining stages with the change's state and the stage's
+procedure at the top of its context.
 
 ### Completion
 

@@ -165,17 +165,17 @@ Stage 5 by any other path:
    delete.
 5. **Only when both last sentinels are PASS/PASS_WITH_FIXES with p0=0 p1=0 on
    the current code →** snapshot the two sentinel lines into Stage History
-   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate (command in
-   `stages/5-6-contract.md`), THEN run the "Stage 4 Post-Review" drift
-   processing below — it must finish BEFORE any contract delta-review spawn
-   (that spawn overwrites the review-record.md the parse reads) — then the
-   **stage boundary**: with the PASSED row, the certificate, and the drift
-   rows on disk, ask ONCE (`AskUserQuestion`, first option default):
-   `Continue here` / `Continue in a fresh session — run /clear, then
-   /espalier with no argument: Session Resumption picks this change up at
-   Stage 5 from pipeline-state.md`. On the fresh-session choice write
-   `- Current Stage: 5` and stop; skip the offer on an unattended run
-   (`interactivity_mode`). Then the
+   (`| 4 | PASSED | … |`), write the `Reviewed-Diff` certificate
+   (`certificate_write`, `stages/5-6-contract.md`), THEN run the "Stage 4
+   Post-Review" drift processing below — it must finish BEFORE any contract
+   delta-review spawn (that spawn overwrites the review-record.md the parse
+   reads) — then the **stage boundary**: with the PASSED row, the
+   certificate, and the drift rows on disk, read `- Session-Boundary:` from
+   pipeline-state.md (collected at the Requirements Approval Gate; no
+   question here). `after-4` or `both` → write `- Current Stage: 5`, print
+   `run /clear, then /espalier with no argument: Session Resumption picks
+   this change up at Stage 5 from pipeline-state.md`, and stop. Any other
+   value, a missing line, or an unattended run → continue. Then the
    Stage 5/6 contract flow. The exit gate requires BOTH
    clean — never one agent's pass alone. A security P0/P1 shares the correctness
    `max-code-rounds` round counter.
@@ -191,27 +191,17 @@ round's P0 count.
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug.
 
 ```bash
-. espalier/hooks/drift-helpers.sh
-REV="espalier/changes/${TYPE}/${SLUG}/review-record.md"
-[ -f "$REV" ] || exit 0
-SHA=$(git rev-parse HEAD)
-
-python3 espalier/hooks/parse-drift-blocks.py "$REV" \
-| while IFS=$'\t' read -r KIND RULE_FILE COUPLED; do
-  case "$KIND" in
-    DRIFT)
-      mark_stale "$RULE_FILE" "$SHA" "convention drift flagged in ${TYPE}/${SLUG} review"
-      LINE="convention_drift: $RULE_FILE"
-      [ -n "$COUPLED" ] && LINE="$LINE (coupled_with: $COUPLED)"
-      echo "$LINE" >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-      ;;
-    MALFORMED)
-      echo "convention_drift_malformed: $RULE_FILE (reviewer bundled blocks — drift NOT indexed)" \
-        >> "espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-      ;;
-  esac
-done
+. espalier/hooks/drift-helpers.sh && drift_index "$TYPE" "$SLUG"
 ```
+
+`drift_index` runs `parse-drift-blocks.py` over the record: each `DRIFT`
+block marks its rule file stale (`mark_stale`, reason `convention drift
+flagged in {type}/{slug} review`) and appends
+`convention_drift: {rule file}` (+ `(coupled_with: …)`) to
+pipeline-state.md; a `MALFORMED` block appends
+`convention_drift_malformed: {rule file} (reviewer bundled blocks — drift NOT
+indexed)` instead. It prints the lines it appended; no record or no python3
+is a no-op.
 
 A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
 Stage 4 has already PASSED when this parse runs, so there is no later round to
