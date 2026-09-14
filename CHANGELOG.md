@@ -1,5 +1,95 @@
 # Changelog
 
+## 0.26.0 — 2026-09-14
+
+Minor: **turn economy** — fewer agent turns and fewer spawns for the same
+gates. Designed against field data (`docs/pipeline-field-report-2026-09-14.md`,
+plan in `docs/pipeline-speed-plan-v4.md`): a coder spawn is 37 model turns at
+~15s each (70 % of its wall), model latency is flat across 50–300k context, the
+mechanical gates are seconds, and on portal.quota the contract phase — a second
+cold coder spawn after the panel — mostly re-verified tests already in the
+diff (7 of 7 recent runs carried the auditor's improvised coverage marks; 2 of
+7 wrote nothing). **Every gate, rubric, verdict sentinel, round cap, and
+escalation path is contract-equal to v0.25.1; nothing sets a budget.**
+Suites: bootstrap 347/347 (Test 36; Test 35 now chains #36), hooks 203/203
+(T23); validation 58/63/68 by platform set (new checks 67–68); evals
+`coder-08` PASS, `security vuln-01` PASS with `covered_by: none` (opus pinned).
+
+- **Contract coverage first (A).** `harness-coder.md` → Security-Aware Coding
+  gains "Abuse test, now": the coder writes the tamper → rejected →
+  store-unchanged test for every sensitive field it classifies WITH the code
+  (a Stage 3 duty under folded test-mode; both lanes' TESTS prompt lines say
+  so). `harness-security.md`'s contract entries gain `covered_by: {path:lines}
+  | none` — the test in the diff that already performs the entry's abuse
+  test, a ROUTING fact never a verdict. Stage 5 (`stages/5-6-contract.md`,
+  fix lane, `pipeline.md`) runs the new `contract_gaps` helper after
+  `contract_extract`: every entry covered → `| 5 | PASSED | {ts} | folded:
+  contract covered at Stage 3 ({n} entries) |`, no coder spawn, no exit-gate
+  re-run, straight to the delta review; gaps → ONE contract-phase coder with a
+  `GAPS:` line (the coder's contract-phase sections write those entries only).
+  `modes/stage6-abuse-coverage.md`: a `covered_by` is a claim to verify — one
+  that does not hold is the same P0 as a missing test. `espalier-stats.sh`
+  reports `contract phases: covered-at-Stage-3 / coder-spawned / no-contract`.
+- **One-call verification (B).** `harness-coder.md` → "Verify in One Call":
+  the build, the lint, and the coder's tests are one bash call —
+  `exit_gate espalier/changes/{type}/{slug} {test files}` — the same call the
+  orchestrator makes on return; never a runner, a type-checker, and a
+  formatter in three turns, never a hunt for a command the pack names; exit
+  2/3 → the pack's lines, still one call; none of it under PARALLEL DISPATCH.
+  The context pack's `- Verify:` line (both lanes) carries the one-liner;
+  `espalier-coding` points at it.
+- **Session-boundary preference (C).** The two v0.25 stage-boundary offers
+  become ONE question inside the Requirements Approval Gate call (step 3d,
+  both lanes; asked right after when 3b and 3c fill the call): `Continue here
+  at both` / `Stop after approval` / `Stop after the Stage 4 PASS` / `Stop at
+  both`, recorded as `- Session-Boundary: none | after-2 | after-4 | both`.
+  The Stage 2 and Stage 4 (serial: Stage 6) boundaries READ the line — a
+  missing line or an unattended run continues. `espalier-stats.sh` reports
+  the mix.
+- **Helpers for the retyped blocks (D, `drift-helpers.sh`).**
+  `regression_verify DIR REG_RUN files…` (the fix lane's Base-Ref worktree
+  check — handoff guard, harness-error classifier, fixed tree first, the
+  `(cached)` re-append on an unchanged scope hash), `record_commits TYPE
+  SLUG`, `certificate_write DIR` (anchored in-place overwrite), `drift_index
+  TYPE SLUG`, `stage85_drift TYPE SLUG`, `backlink_all SLUG` (parses the
+  `caused_by:` frontmatter itself; `_backlink_one` per entry). The stage
+  files and the fix SKILL call them by name; the bash bodies leave the
+  templates (≈ 620 KB retyped across 26 portal sessions).
+- **Exit gate scoping + overlap (E).** `_gate_scoped_cmd` scopes a
+  multi-line `run_tests` body whose lines are `(cd WS && CMD) || return 1` /
+  `cd WS && CMD` (each workspace scoped to its files, joined with `&&`,
+  workspaces with no listed file dropped; a file under no workspace → full
+  suite) and the `uv run pytest` / `poetry run pytest` / `pnpm exec vitest
+  run` / `pnpm vitest run` / `pnpm exec jest` / `bun test` runners
+  (`_gate_scope_line` holds the single-command logic). `exit_gate` starts the
+  tests as soon as the build is green while lint finishes; output order and
+  exit codes unchanged.
+- **Push hook build ∥ lint by default (F).** `pre-push-gate.sh`'s serial
+  `gate_build_section` / `gate_lint_section` become one
+  `gate_build_lint_section` (per-pid waits, per-job temp files, build failure
+  reports first); tests still follow a green build; `hook-parallel-gates:
+  yes` stays the three-way opt-in the human confirmed at init.
+- **Validation + migration.** Checks 67 `turn-economy-helpers`, 68
+  `contract-coverage` (pending on greenfield Pass 1); totals 58/63/68.
+  Migration #36 `scripts/migrate-v0.25.1-to-v0.26.0.sh`: 14 pure copies
+  (`.pre-v0.26.bak`); anchored edits extracted from the templates for the
+  coder and security bodies, the testing / security / coding SKILLs, and the
+  push hook's two serial sections (the discovered commands untouched;
+  customised files skip-with-record). `/espalier-migrate` entry 36,
+  `NEEDS_V0260_PATCH` probe + supersession floor, Step 2 probe filename,
+  Step 3/6 lines. Test 36 (a–n: templates, fresh install totals, a REAL
+  v0.25.1 install from `git show v0.25.1:` before/after, stub skip records,
+  the detection block as-is); Test 35 now chains #36 after #35 (the
+  byte-identity asserts compare against current templates). T23 (a–j: every
+  helper, the multi-workspace / `uv` scoping, exit-gate ordering, the hook's
+  default overlap).
+- **Evals.** `eval/coder` fixture `coder-08-abuse-test-classified`
+  (`folded: true`; the abuse test for an owner-axis field written with the
+  code); `eval/security` rubric notes `covered_by` honesty.
+- **Docs.** `docs/pipeline-speed-plan-v4.md` (the design, expected effects
+  hedged until stats confirm), `docs/pipeline-field-report-2026-09-14.md`
+  (the measurements), `validation.md` rows 67–68, `deferred-items.md`.
+
 ## 0.25.1 — 2026-09-10
 
 Patch: **migrate-detection floor.** `/espalier-migrate`'s version detection

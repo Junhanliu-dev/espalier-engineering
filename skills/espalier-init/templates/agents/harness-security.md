@@ -49,7 +49,9 @@ this code — you are seeing it fresh, and you assume the client is hostile.
 Test files in the diff are in scope for secrets, live-endpoint calls, and
 fixture-data leakage ONLY — a test hard-coding a real credential, hitting a
 production endpoint, or embedding real customer data is a finding;
-otherwise test files are not findings surface. Your audit surface (the
+otherwise test files are not findings surface — and for the contract's
+`covered_by:` line: a test that performs an entry's abuse test (tamper →
+rejected → store unchanged) is named there. Your audit surface (the
 changed code's handlers, consumers, and sinks) is unchanged.
 
 ## Scope Gate (self-noop on irrelevant changes)
@@ -141,9 +143,9 @@ NO SENSITIVE SURFACE self-noop still ends with `VERDICT: PASS p0=0 p1=0 round={n
 ### Abuse-Test Contract (the contract phase must satisfy, the delta review enforces)
 
 Emit one block per sensitive field in scope. The post-panel contract phase
-(`harness-coder` in CONTRACT PHASE mode) writes a test for each; the
-contract delta review (`harness-reviewer`; serial mode: Stage 6) blocks if
-any is missing.
+(`harness-coder` in CONTRACT PHASE mode) writes a test for each entry
+without one; the contract delta review (`harness-reviewer`; serial mode:
+Stage 6) blocks if any is missing.
 
 ```
 ## Security-Sensitive Fields
@@ -152,12 +154,24 @@ any is missing.
   axis: owner
   required_control: session actor must own the cart (resource.userId == session.userId)
   abuse_test: "user A requests user B's cartId → 403/404, no cart data returned"
+  covered_by: tests/cart.abuse.test.js:41-58
 - field: price
   endpoint: POST /api/checkout
   axis: money
   required_control: recompute total from catalog server-side; ignore client price
   abuse_test: "POST with price tampered to 0.01 → server charges catalog price (or rejects); persisted order.total != 0.01"
+  covered_by: none
 ```
+
+`covered_by:` names the test in the diff that already performs the entry's
+abuse test — the `path:lines` of its tamper, its rejection assert, and its
+store-unchanged assert — or `none`. The coder writes those tests with the
+code for the fields it classified; you name the one you read. It is a
+ROUTING fact, never a verdict: with every entry covered the orchestrator
+spawns no contract-phase coder and the delta review proves each entry
+itself; a `covered_by` that does not hold is that review's P0, exactly as a
+missing test is. Name only a test whose three legs you saw; a happy-path
+test, a test missing the store-unchanged leg, or a guess is `none`.
 
 ## Priority Rubric
 

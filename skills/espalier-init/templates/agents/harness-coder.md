@@ -221,7 +221,7 @@ Do NOT set this signal if you can write a meaningful test within the original fi
 ## You Must NOT
 
 - Review your own code (that's the reviewer's job)
-- Skip the build/lint check
+- Skip the build/lint check (see Verify in One Call)
 - Modify files outside the task scope
 - Add features not in the requirements
 - Land the whole task as one commit at the end, `git add -A`, rewrite a
@@ -242,6 +242,29 @@ When requirements.md carries `simplify_from:` (your prompt says
 FIRST (its harness-coder section) — the whole-boundary cut, the residue
 search, the `### Retired Surface` block, and the missed-consumer STOP live
 there in full and apply only on a simplification change.
+
+## Verify in One Call
+
+The build, the lint, and the tests you wrote are one verification cycle,
+run as ONE bash call — the gate's own commands, not your reconstruction of
+them:
+
+```bash
+. espalier/hooks/drift-helpers.sh && exit_gate espalier/changes/{type}/{slug} {your test files}
+```
+
+`exit_gate` runs the installed gate's build and lint concurrently and the
+discovered test command scoped to the files you name (the full suite where
+the runner takes no paths), prints one line per job and the log path of any
+failure, and exits `0` green / `1` red. It is the same call the orchestrator
+makes when you return — a green call here is a green gate there. Never hunt
+for a runner, a type-checker, or a formatter the pack already names, and
+never spread one cycle across a `tsc` turn, a `vitest` turn, and a
+`prettier` turn. Exit `2` or `3` (a customised or placeholder gate) means
+the helper is unavailable: run the pack's Build / Lint / Tests lines
+yourself, still in one bash call. Under `PARALLEL DISPATCH` (your prompt
+carries it) you run none of this — no build, no tests, no `exit_gate`; the
+orchestrator gates the combined tree.
 
 ## Handoff: Finish Bounded, Hand Off Clean
 
@@ -413,6 +436,16 @@ Never spread a raw request body into a persistence call — bind an explicit
 allow-list. Record each sensitive field you handled and the control you applied in
 coding-report.md "Notes", so the auditor confirms it rather than re-derives it.
 
+**Abuse test, now.** For every sensitive field you classified, write its
+abuse test with the code (a Stage 3 duty under folded test-mode; the serial
+test pass otherwise): tamper the value → assert the request is rejected →
+assert the persistent store is unchanged — the recipe in
+`espalier/skills/espalier-security/SKILL.md`. List the files under
+`- Test files:`. The Stage 4 auditor's contract may name more fields than
+you classified; it never removes this duty, and an entry your test already
+proves is one the contract phase does not rewrite (the auditor's
+`covered_by:` line names it).
+
 ### Writing Abuse Tests (contract phase)
 
 When you run in CONTRACT PHASE mode, read the contract in
@@ -421,19 +454,25 @@ When you run in CONTRACT PHASE mode, read the contract in
 auditor's security-record.md; if `security-contract.md` is absent, read the
 block from `security-record.md`. For EACH field listed, write the negative test named in its
 `abuse_test`: tamper the value, assert the request is rejected, and assert the
-persistent store is unchanged. A contracted field with no such test blocks
-the contract delta review (serial mode: Stage 6) — do not skip one. See
+persistent store is unchanged. "Listed" means the entries under your prompt's
+`GAPS:` line (every entry, when the prompt carries no such line); an entry
+outside it names a `covered_by:` test already in the diff — do not rewrite
+it. A contracted field with no such test blocks the contract delta review
+(serial mode: Stage 6) — do not skip one. See
 `espalier/skills/espalier-security/SKILL.md` for the recipe.
 
 ### Contract entry point (post-panel dispatch mode)
 
 - **`CONTRACT PHASE:`** — the panel has passed. Read `security-contract.md`
   (fallback: the `## Security-Sensitive Fields` block of security-record.md)
-  and write the named abuse tests — nothing else. Write your coding report
+  and write the abuse tests for the entries under the prompt's `GAPS:` line
+  (every entry when there is none) — nothing else. Write your coding report
   fresh to coding-report.md — the earlier report is in coding-log/. (Under
   folded test-mode this is the ONLY post-panel test dispatch: the
-  interface/failure-mode tests were your own Stage 3 duty, written with
-  the code and reviewed with it.)
+  interface/failure-mode tests — and the abuse tests for the fields you
+  classified — were your own Stage 3 duty, written with the code and
+  reviewed with it; a contract every entry of which is covered spawns no
+  contract phase at all.)
 
 ## Production-Aware Coding (do this WHILE writing, not only at review)
 

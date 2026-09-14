@@ -26,6 +26,7 @@ harmless:
 - Facts established: {verified facts a spawn must not re-derive, one per line, each with `path:line` — or "none"}
 - Grep-only: {`grep_only_files` output — path (size), one per line; or "none"} — searched, never Read; grep for the symbol
 - Scoped docs: {`scoped_docs <reference files>` output — nearest last; or "none"} — workspace docs on the path from each reference file up to the repo root (root instruction file excluded — always loaded). Grep each for the files you touch; Read the matching sections (offset/limit). A claim there is a trap, an invariant, a deliberate stub, or a rejected alternative: verify it against the code before relying on it, as with the pack.
+- Verify: `. espalier/hooks/drift-helpers.sh && exit_gate espalier/changes/{type}/{slug} {test files}` — one call, the gate's own commands (build ∥ lint, then the tests named)
 - Build: {build command} · Lint: {lint command} · Tests: {test command}
 ```
 
@@ -80,8 +81,8 @@ with two extra lines in each prompt:
 - `REPORT TARGET: espalier/changes/{type}/{slug}/coding-report.part-{n}.md`
   — parts, never `coding-report.md` directly.
 - `PARALLEL DISPATCH: do NOT run the build / test / dependency-install
-  commands, and do NOT run git — other coders share this working tree and
-  concurrent runs corrupt each other. Write code only; put your commit
+  commands (nor exit_gate), and do NOT run git — other coders share this
+  working tree and concurrent runs corrupt each other. Write code only; put your commit
   message under "- Commit:" in your part; the orchestrator runs the exit
   gate on the combined result and commits each part's files as one commit
   after the wave.` (The coders' self-run build is a convenience
@@ -133,9 +134,11 @@ Agent tool:
     — read its ## Handoff first; its Facts are verified (cite them, do not
     re-derive), its Remaining is your task list.
     TESTS: alongside the code, write the interface tests and failure-mode
-    tests for this change per espalier/skills/espalier-testing/SKILL.md —
-    everything EXCEPT contracted abuse tests (that contract does not exist
-    yet; it comes from the Stage 4 security audit). List the test files in
+    tests for this change per espalier/skills/espalier-testing/SKILL.md,
+    and the abuse test (tamper → rejected → store unchanged) for every
+    client-supplied sensitive value you classify under Security-Aware
+    Coding. The Stage 4 auditor's contract may name more fields; a
+    contract phase then writes only the gaps. List the test files in
     their own "Test files" subsection of the coding report.
     {On a change whose requirements.md carries simplify_from: add:}
     SIMPLIFICATION CHANGE: read espalier/agents/modes/simplification.md

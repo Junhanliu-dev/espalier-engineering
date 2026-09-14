@@ -35,7 +35,9 @@ reference files → follow the template exactly → climb the Solution Selection
 Ladder) lives in `espalier/agents/harness-coder.md` ("Before Writing ANY
 Code") — follow it from there; it is deliberately not restated here so the two
 files cannot drift. This skill adds the project-specific parts: the Layer
-Specs map and the Implementation Checklist above.
+Specs map and the Implementation Checklist above. Verification is one
+call — `exit_gate` with your test files ("Verify in One Call" in the same
+agent file) — never a runner, a type-checker, and a formatter in three.
 
 ## How This Skill Applies by Stage
 

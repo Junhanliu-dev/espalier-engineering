@@ -36,9 +36,9 @@ PLUGIN_DIR="$(cd "$SCRIPT_DIR/../skills/espalier-init" && pwd)"
 # Validation check totals per platform set. Bump these THREE lines when a
 # release adds checks — every total below derives from them (the hardcoded
 # totals were missed on two releases in a row).
-N_CLAUDE=56   # --platforms=claude (default)
-N_CODEX=61    # claude + codex
-N_ALL=66      # claude + codex + copilot
+N_CLAUDE=58   # --platforms=claude (default)
+N_CODEX=63    # claude + codex
+N_ALL=68      # claude + codex + copilot
 PASS=0
 FAIL=0
 FAILED_TESTS=()
@@ -107,8 +107,9 @@ EOF
   done
 
   # Sub-agents (names kept as harness-coder/harness-reviewer). The v0.25
-  # spawn-protocol markers (check 65) ride the stubs — Test 35's migration
-  # fixture strips them again to exercise the anchored edits.
+  # spawn-protocol markers (check 65) and the v0.26 contract-coverage
+  # markers (check 68) ride the stubs — Tests 35/36's migration fixtures
+  # strip them again to exercise the anchored edits.
   cat > "$dir/espalier/agents/harness-coder.md" << 'EOF'
 ---
 name: harness-coder
@@ -119,6 +120,8 @@ tools: Read, Write
 ## Commit Discipline: Small, Atomic, Named
 - Spec applied: smoke
 - HANDOFF: true
+**Abuse test, now.** smoke
+## Verify in One Call
 EOF
   cat > "$dir/espalier/agents/harness-reviewer.md" << 'EOF'
 ---
@@ -137,6 +140,7 @@ tools: Read
 ---
 ## Repo-Audit Mode
 7. Scoped docs named in the pack
+  covered_by: none
 EOF
   cat > "$dir/espalier/rules/security-standards.md" << 'EOF'
 # Security Standards
@@ -1936,6 +1940,8 @@ with `Write`.
 ## Commit Discipline: Small, Atomic, Named
 - Spec applied: smoke
 - HANDOFF: true
+**Abuse test, now.** smoke
+## Verify in One Call
 V231CODER
 cat > "$TMP/espalier/agents/harness-reviewer.md" << 'V231REV'
 ## Production-Readiness Review (enforce espalier/rules/production-standards.md)
@@ -2103,8 +2109,8 @@ DETECT35=$(mktemp -t detect35.XXXX); DETECT35F=$(mktemp -t detect35f.XXXX)
 awk '/^### Step 1: Preflight/{s=1} s && /^### Step 2/{exit} s' "$SCRIPT_DIR/../skills/espalier-migrate/SKILL.md" \
   | awk '/^```bash/{b=1; next} /^```/{b=0; next} b' > "$DETECT35"
 { cat "$DETECT35"; echo 'echo "FLAGS:$NEEDS_V0250_PATCH/$NEEDS_V0240_PATCH/$NEEDS_V0231_PATCH/$NEEDS_V0220_PATCH/$NEEDS_V0211_PATCH/$NEEDS_V0170_PATCH/$NEEDS_V0131_PATCH"'; } > "$DETECT35F"
-assert "35s migrate-skill detection on a fresh v0.25.0 install: floor v0.25.0, 'Already fully up to date' (no retired-phrase probe fires)" \
-  "[ -s '$DETECT35' ] && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0250_PATCH' ) \
+assert "35s migrate-skill detection on a fresh install: floor v0.26.0, 'Already fully up to date' (no retired-phrase probe fires)" \
+  "[ -s '$DETECT35' ] && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0260_PATCH' ) \
    && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'Already fully up to date' )"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
@@ -2170,6 +2176,13 @@ else
   ES_BEFORE=$(cat "$TMP/espalier/rules/engineering-structure.md")
   M250_OUT=$( cd "$TMP" && bash "$MIGRATE250" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
   M250_RC=$?
+  # The real chain continues with #36 (v0.26.0): the byte-identity asserts
+  # below compare against the CURRENT templates, which #35 alone (a v0.25
+  # step extracting v0.25 blocks) cannot reach.
+  M260_CHAIN=$( cd "$TMP" && bash "$SCRIPT_DIR/migrate-v0.25.1-to-v0.26.0.sh" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  M260_CHAIN_RC=$?
+  assert "35i0 chain: #36 applies after #35 on the same install (exit 0; no agent-body skip records — the seed's stub skills and minimal gate skip by design)" \
+    "[ $M260_CHAIN_RC -eq 0 ] && ! grep -qE 'v0.26.0-(coder-|security-contract|security-test-scope|testing-)' '$TMP/espalier/.migrations-skipped' 2>/dev/null"
   ext35() { sed 's/{project_name}/Smoke/g' "$1"; }
   assert "35i apply on a real v0.24.0 install: exit 0, no skip records, every anchored file byte-identical to its template, pure copies refreshed with backups, config key + gitignore pattern once" \
     "[ $M250_RC -eq 0 ] \
@@ -2207,8 +2220,8 @@ else
   assert "35k re-run is a no-op" "echo \"\$M250_RERUN\" | grep -qi 'nothing to do'"
   assert "35l validate-only passes on the migrated install (checks 64-65 live, claude-only total $N_CLAUDE)" \
     "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' )"
-  assert "35u migrate-skill detection on the migrated install: floor v0.25.0, 'Already fully up to date'" \
-    "( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0250_PATCH' ) \
+  assert "35u migrate-skill detection on the migrated (chained) install: floor v0.26.0, 'Already fully up to date'" \
+    "( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'floor: NEEDS_V0260_PATCH' ) \
      && ( cd '$TMP' && bash '$DETECT35' 2>&1 | grep -q 'Already fully up to date' )"
   [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 fi
@@ -2297,6 +2310,181 @@ assert "35q fresh install: stages/ + modes/ copied, the espalier skill symlink r
    && [ -d '$TMP/.claude/skills/espalier/stages' ] && [ -f '$TMP/.claude/skills/espalier/stages/3-coding.md' ] \
    && echo \"\$M35R_OUT\" | grep -qF '[66/$N_CLAUDE] OK   stage-procedures' \
    && echo \"\$M35R_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed'"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# ─── Test 36: v0.26.0 turn economy — templates + install + migration ──────
+echo "Test 36: v0.26.0 turn economy (templates + install + migration)"
+MIGRATE260="$SCRIPT_DIR/migrate-v0.25.1-to-v0.26.0.sh"
+TPL36="$SCRIPT_DIR/../skills/espalier-init/templates"
+HTPL36="$SCRIPT_DIR/../skills/espalier-init/hook-templates"
+
+# 36a-c: templates carry the markers (no budget anywhere: a covered contract
+# spawns nothing, a boundary is read, a verification is one call).
+assert "36a coder + security + mode templates: Abuse test now, GAPS list + entry, Verify in One Call, You Must NOT pointer; covered_by lines + routing-fact paragraph + scope sentence; stage6 mode verifies covered_by; the three skills carry their sentence" \
+  "grep -qF '**Abuse test, now.**' '$TPL36/agents/harness-coder.md' \
+   && grep -qF 'GAPS:' '$TPL36/agents/harness-coder.md' \
+   && grep -qF 'contract phase at all.)' '$TPL36/agents/harness-coder.md' \
+   && grep -qF '## Verify in One Call' '$TPL36/agents/harness-coder.md' \
+   && grep -qF -- '- Skip the build/lint check (see Verify in One Call)' '$TPL36/agents/harness-coder.md' \
+   && [ \"\$(grep -c '  covered_by: ' '$TPL36/agents/harness-security.md')\" -eq 2 ] \
+   && grep -qF 'ROUTING fact, never a verdict' '$TPL36/agents/harness-security.md' \
+   && grep -qF '\`covered_by:\` line: a test that performs' '$TPL36/agents/harness-security.md' \
+   && grep -qF 'covered_by' '$TPL36/agents/modes/stage6-abuse-coverage.md' \
+   && grep -qF 'covered_by' '$TPL36/skills/espalier-testing.md' \
+   && grep -qF 'covered_by' '$TPL36/skills/espalier-security.md' \
+   && grep -qF 'Verify in One Call' '$TPL36/skills/espalier-coding.md'"
+assert "36b router + stage files + pipeline + fix SKILL: contract_gaps routing, Session-Boundary read at both boundaries (no boundary AskUserQuestion remains), certificate_write / drift_index / record_commits / stage85_drift / regression_verify / backlink_all by name, Verify pack line, abuse-test TESTS clause; historical markers still resolve" \
+  "grep -qF 'contract_gaps' '$TPL36/skills/espalier-stages/5-6-contract.md' && grep -qF 'contract_gaps' '$TPL36/skills/espalier-fix.md' && grep -qF 'contract_gaps' '$TPL36/pipeline.md' \
+   && grep -qF 'folded: contract covered at Stage 3' '$TPL36/skills/espalier-stages/5-6-contract.md' && grep -qF 'contract covered at Stage 3' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF -- '- Session-Boundary:' '$TPL36/skills/espalier-stages/1-2-requirements.md' && grep -qF -- '- Session-Boundary:' '$TPL36/skills/espalier-stages/4-panel.md' \
+   && grep -qF 'Session-Boundary' '$TPL36/skills/espalier.md' && grep -qF -- '- Session-Boundary:' '$TPL36/skills/espalier-fix.md' && grep -qF 'Session-Boundary' '$TPL36/pipeline.md' \
+   && ! esp_all '$TPL36' | grep -qF 'Stage boundary (offered' && ! grep -qF 'Stage boundary (offered' '$TPL36/skills/espalier-fix.md' \
+   && esp_all '$TPL36' | grep -qF 'Continue in a fresh session' && grep -qF 'Continue in a fresh session' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF 'certificate_write' '$TPL36/skills/espalier-stages/4-panel.md' && grep -qF 'certificate_write' '$TPL36/skills/espalier-stages/5-6-contract.md' && grep -qF 'certificate_write' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF 'drift_index' '$TPL36/skills/espalier-stages/4-panel.md' && grep -qF 'drift_index' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF 'record_commits' '$TPL36/skills/espalier-stages/7-10-delivery.md' && grep -qF 'record_commits' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF 'stage85_drift' '$TPL36/skills/espalier-stages/7-10-delivery.md' \
+   && grep -qF 'regression_verify' '$TPL36/skills/espalier-fix.md' && grep -qF 'backlink_all' '$TPL36/skills/espalier-fix.md' \
+   && ! grep -qF 'parse-drift-blocks.py \"\$REV\"' '$TPL36/skills/espalier-fix.md' && ! grep -qF 'git worktree add --detach' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF -- '- Verify: \`. espalier/hooks/drift-helpers.sh && exit_gate' '$TPL36/skills/espalier-stages/3-coding.md' && grep -qF 'exit_gate espalier/changes/fix/{slug} {test files}' '$TPL36/skills/espalier-fix.md' \
+   && grep -qF 'abuse test (tamper → rejected → store unchanged) for every' '$TPL36/skills/espalier-stages/3-coding.md' && grep -qF '4. The abuse test (tamper → rejected → store unchanged) for every' '$TPL36/skills/espalier-fix.md' \
+   && for ph in 'gardener rota' 'Stage 3 Entry: Context Pack' 'Advance ONLY when EVERY record' 'Stage 5/6 (folded)' 'FIX ROUND {n}:' 'HANDOFF: true' 'Requirements Approval Gate'; do grep -qF -- \"\$ph\" '$TPL36/skills/espalier.md' || exit 1; done"
+assert "36c hook templates: the seven helpers + _gate_scope_line defined; the push hook's build ∥ lint section (serial sections gone; 3-way section kept); stats rows" \
+  "for fn in contract_gaps certificate_write record_commits drift_index stage85_drift backlink_all regression_verify _gate_scope_line _reg_last _backlink_one; do grep -q \"^\$fn()\" '$HTPL36/drift-helpers.sh' || exit 1; done \
+   && grep -q '^gate_build_lint_section()' '$HTPL36/pre-push-gate.sh' && ! grep -q '^gate_build_section()' '$HTPL36/pre-push-gate.sh' && ! grep -q '^gate_lint_section()' '$HTPL36/pre-push-gate.sh' && grep -q '^gate_parallel_section()' '$HTPL36/pre-push-gate.sh' \
+   && grep -qF 'contract phases: covered-at-Stage-3' '$HTPL36/espalier-stats.sh' && grep -qF 'session boundaries chosen' '$HTPL36/espalier-stats.sh'"
+
+# 36d: fresh installs — checks 67-68 live; claude-only and all-platform totals.
+TMP=$(mktemp -d -t smoke36.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+M36_OUT=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force 2>&1 )
+assert "36d fresh claude-only install: checks 67-68 pass, total $N_CLAUDE" \
+  "echo \"\$M36_OUT\" | grep -qF '[67/$N_CLAUDE] OK   turn-economy-helpers' \
+   && echo \"\$M36_OUT\" | grep -qF '[68/$N_CLAUDE] OK   contract-coverage' \
+   && echo \"\$M36_OUT\" | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' \
+   && grep -q '^contract_gaps()' '$TMP/espalier/hooks/drift-helpers.sh'"
+M36_RERUN=$( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=all --yes --force 2>&1 )
+assert "36e re-run with all platforms: total $N_ALL" "echo \"\$M36_RERUN\" | grep -q 'Validation: $N_ALL/$N_ALL passed'"
+DETECT36=$(mktemp -t detect36.XXXX); DETECT36F=$(mktemp -t detect36f.XXXX)
+awk '/^### Step 1: Preflight/{s=1} s && /^### Step 2/{exit} s' "$SCRIPT_DIR/../skills/espalier-migrate/SKILL.md" \
+  | awk '/^```bash/{b=1; next} /^```/{b=0; next} b' > "$DETECT36"
+{ cat "$DETECT36"; echo 'echo "FLAGS:$NEEDS_V0260_PATCH/$NEEDS_V0250_PATCH/$NEEDS_V0240_PATCH/$NEEDS_V0231_PATCH/$NEEDS_V0220_PATCH"'; } > "$DETECT36F"
+assert "36f migrate-skill detection on a fresh v0.26.0 install: floor v0.26.0, 'Already fully up to date'" \
+  "[ -s '$DETECT36' ] && ( cd '$TMP' && bash '$DETECT36' 2>&1 | grep -q 'floor: NEEDS_V0260_PATCH' ) \
+   && ( cd '$TMP' && bash '$DETECT36' 2>&1 | grep -q 'Already fully up to date' )"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP"
+
+# 36g-m: migration v0.25.1 → v0.26.0 on a REAL v0.25.1-shaped install — the
+# v0.25.1 templates come from this repo's own history (tag v0.25.1; the
+# release commit as fallback), so the anchored edits run against the byte-real
+# text they were written for.
+V0251_REF=""
+for ref in v0.25.1 3050dfe; do
+  if git -C "$SCRIPT_DIR/.." rev-parse -q --verify "$ref^{commit}" >/dev/null 2>&1; then V0251_REF="$ref"; break; fi
+done
+seed_v0251_install() {  # DIR — a v0.25.1-shaped install with stub LLM files
+  local dir="$1" show
+  show() { git -C "$SCRIPT_DIR/.." show "${V0251_REF}:$1"; }
+  ( cd "$dir" && bash "$BOOTSTRAP" --copy-only --lang=typescript --plugin-dir="$PLUGIN_DIR" >/dev/null 2>&1 )
+  mkdir -p "$dir/espalier/rules" "$dir/espalier/agents/modes" "$dir/espalier/wiki" "$dir/espalier/skills/espalier/stages" \
+           "$dir/espalier/skills/espalier-coding" "$dir/espalier/skills/espalier-review" \
+           "$dir/espalier/skills/espalier-testing" "$dir/espalier/skills/espalier-security"
+  local f s sk h m
+  for f in coding-standards development-process security-standards production-standards; do echo "# $f" > "$dir/espalier/rules/$f.md"; done
+  printf -- '---\nname: espalier-review\ndescription: smoke\n---\n' > "$dir/espalier/skills/espalier-review/SKILL.md"
+  for f in architecture data-models critical-paths external-services; do echo "# $f" > "$dir/espalier/wiki/$f.md"; done
+  show skills/espalier-init/hook-templates/pre-push-gate.sh \
+    | sed -e 's|{build_command}|true|g' -e 's|{lint_command}|true|g' -e 's|{test_command}|echo 3 passed|g' > "$dir/espalier/hooks/pre-push-gate.sh"
+  printf '#!/bin/bash\nexit 0\n' > "$dir/espalier/hooks/check-layer-boundaries.sh"
+  show skills/espalier-init/templates/agents/harness-coder.md    | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-coder.md"
+  show skills/espalier-init/templates/agents/harness-reviewer.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-reviewer.md"
+  show skills/espalier-init/templates/agents/harness-security.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agents/harness-security.md"
+  for sk in espalier-testing espalier-security espalier-coding; do
+    show "skills/espalier-init/templates/skills/$sk.md" | sed -e 's/{project_name}/Smoke/g' -e 's/{project}/Smoke/g' > "$dir/espalier/skills/$sk/SKILL.md"
+  done
+  show skills/espalier-init/templates/agent.md | sed 's/{project_name}/Smoke/g' > "$dir/espalier/agent.md"
+  show skills/espalier-init/templates/rules/engineering-structure.md > "$dir/espalier/rules/engineering-structure.md"
+  show skills/espalier-init/templates/pipeline.md > "$dir/espalier/pipeline.md"
+  show skills/espalier-init/templates/scout-prompts.md > "$dir/espalier/.scout-prompts.md"
+  for sk in espalier espalier-fix espalier-requirements espalier-grill espalier-map espalier-audit espalier-ask espalier-simplify espalier-prune espalier-doctor; do
+    mkdir -p "$dir/espalier/skills/$sk"; show "skills/espalier-init/templates/skills/$sk.md" > "$dir/espalier/skills/$sk/SKILL.md"
+  done
+  for s in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do show "skills/espalier-init/templates/skills/espalier-stages/$s.md" > "$dir/espalier/skills/espalier/stages/$s.md"; done
+  for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do show "skills/espalier-init/templates/agents/modes/$m.md" > "$dir/espalier/agents/modes/$m.md"; done
+  for h in drift-helpers.sh maprun.py espalier-stats.sh; do show "skills/espalier-init/hook-templates/$h" > "$dir/espalier/hooks/$h"; done
+  ( cd "$dir" && bash "$BOOTSTRAP" --wire-only --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 || true )
+  ( cd "$dir" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm v0251 >/dev/null )
+}
+if [ -z "$V0251_REF" ]; then
+  echo "  SKIP 36g-m (no v0.25.1 ref in this clone — shallow checkout?)"
+else
+  TMP=$(mktemp -d -t smoke36m.XXXX)
+  make_smoke_repo "$TMP"
+  seed_v0251_install "$TMP"
+  M260_DRY=$( cd "$TMP" && bash "$MIGRATE260" --dry-run --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  assert "36g dry-run lists the missing markers and creates nothing" \
+    "echo \"\$M260_DRY\" | grep -q 'coder Verify in One Call section' && echo \"\$M260_DRY\" | grep -q 'drift-helpers.sh turn-economy helpers' \
+     && echo \"\$M260_DRY\" | grep -q 'pre-push-gate.sh — build' \
+     && ! grep -q '^contract_gaps()' '$TMP/espalier/hooks/drift-helpers.sh' && ! ls '$TMP'/espalier/*.pre-v0.26.bak >/dev/null 2>&1"
+  assert "36h migrate-skill detection on the real v0.25.1 install BEFORE migration: floor v0.25.0, only v0.26.0 flagged" \
+    "( cd '$TMP' && bash '$DETECT36F' 2>&1 | grep -q 'floor: NEEDS_V0250_PATCH' ) \
+     && ( cd '$TMP' && bash '$DETECT36F' 2>&1 | grep -q 'FLAGS:yes/no/no/no/no' )"
+  M260_OUT=$( cd "$TMP" && bash "$MIGRATE260" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  M260_RC=$?
+  ext36() { sed -e 's/{project_name}/Smoke/g' -e 's/{project}/Smoke/g' "$1"; }
+  assert "36i apply on a real v0.25.1 install: exit 0, no skip records, every anchored file byte-identical to its template, pure copies refreshed with backups, the push hook concurrent and parseable with its commands intact" \
+    "[ $M260_RC -eq 0 ] \
+     && ! grep -qF 'v0.26.0-' '$TMP/espalier/.migrations-skipped' 2>/dev/null \
+     && diff <(ext36 '$TPL36/agents/harness-coder.md') '$TMP/espalier/agents/harness-coder.md' >/dev/null \
+     && diff <(ext36 '$TPL36/agents/harness-security.md') '$TMP/espalier/agents/harness-security.md' >/dev/null \
+     && diff <(ext36 '$TPL36/skills/espalier-testing.md') '$TMP/espalier/skills/espalier-testing/SKILL.md' >/dev/null \
+     && diff <(ext36 '$TPL36/skills/espalier-security.md') '$TMP/espalier/skills/espalier-security/SKILL.md' >/dev/null \
+     && diff <(ext36 '$TPL36/skills/espalier-coding.md') '$TMP/espalier/skills/espalier-coding/SKILL.md' >/dev/null \
+     && cmp -s '$TPL36/skills/espalier.md' '$TMP/espalier/skills/espalier/SKILL.md' \
+     && cmp -s '$TPL36/skills/espalier-stages/5-6-contract.md' '$TMP/espalier/skills/espalier/stages/5-6-contract.md' \
+     && cmp -s '$TPL36/agents/modes/stage6-abuse-coverage.md' '$TMP/espalier/agents/modes/stage6-abuse-coverage.md' \
+     && cmp -s '$TPL36/skills/espalier-fix.md' '$TMP/espalier/skills/espalier-fix/SKILL.md' \
+     && cmp -s '$TPL36/pipeline.md' '$TMP/espalier/pipeline.md' \
+     && cmp -s '$HTPL36/drift-helpers.sh' '$TMP/espalier/hooks/drift-helpers.sh' \
+     && cmp -s '$HTPL36/espalier-stats.sh' '$TMP/espalier/hooks/espalier-stats.sh' \
+     && [ -f '$TMP/espalier/skills/espalier/SKILL.md.pre-v0.26.bak' ] && [ -f '$TMP/espalier/agents/harness-coder.md.pre-v0.26.bak' ] \
+     && [ -f '$TMP/espalier/hooks/pre-push-gate.sh.pre-v0.26.bak' ] \
+     && grep -q '^gate_build_lint_section()' '$TMP/espalier/hooks/pre-push-gate.sh' && ! grep -q '^gate_build_section()' '$TMP/espalier/hooks/pre-push-gate.sh' && ! grep -q '^gate_lint_section()' '$TMP/espalier/hooks/pre-push-gate.sh' \
+     && grep -qxF '  echo 3 passed' '$TMP/espalier/hooks/pre-push-gate.sh' && bash -n '$TMP/espalier/hooks/pre-push-gate.sh' \
+     && diff <(sed -e 's|{build_command}|true|g' -e 's|{lint_command}|true|g' -e 's|{test_command}|echo 3 passed|g' '$HTPL36/pre-push-gate.sh') '$TMP/espalier/hooks/pre-push-gate.sh' >/dev/null"
+  M260_RERUN=$( cd "$TMP" && bash "$MIGRATE260" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+  assert "36j re-run is a no-op" "echo \"\$M260_RERUN\" | grep -qi 'nothing to do'"
+  assert "36k validate-only passes on the migrated install (checks 67-68 live, claude-only total $N_CLAUDE)" \
+    "( cd '$TMP' && bash '$BOOTSTRAP' --validate-only --plugin-dir='$PLUGIN_DIR' 2>&1 | grep -q 'Validation: $N_CLAUDE/$N_CLAUDE passed' )"
+  assert "36l migrate-skill detection on the migrated install: floor v0.26.0, 'Already fully up to date'" \
+    "( cd '$TMP' && bash '$DETECT36' 2>&1 | grep -q 'floor: NEEDS_V0260_PATCH' ) \
+     && ( cd '$TMP' && bash '$DETECT36' 2>&1 | grep -q 'Already fully up to date' )"
+  [ "$KEEP" != "yes" ] && rm -rf "$TMP"
+fi
+rm -f "$DETECT36" "$DETECT36F"
+
+# 36m-n: customised agent files (the simulate_llm_writes stubs, stripped of
+# their v0.26 marker lines) — anchored edits skip-with-record, everything
+# else lands, exit 0, re-run no-op.
+TMP=$(mktemp -d -t smoke36s.XXXX)
+make_smoke_repo "$TMP"
+simulate_llm_writes "$TMP" typescript
+( cd "$TMP" && bash "$BOOTSTRAP" --lang=typescript --merge-decision=ask-later --plugin-dir="$PLUGIN_DIR" --platforms=claude --yes --force >/dev/null 2>&1 )
+( cd "$TMP" \
+  && grep -v 'Abuse test, now\|Verify in One Call' espalier/agents/harness-coder.md > a.tmp && mv a.tmp espalier/agents/harness-coder.md \
+  && grep -v 'covered_by' espalier/agents/harness-security.md > s.tmp && mv s.tmp espalier/agents/harness-security.md )
+M260_SKIP=$( cd "$TMP" && bash "$MIGRATE260" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+M260_SKIP_RC=$?
+assert "36m apply on stub agent files: anchored edits skip-with-record (v0.26.0-* labels; the Verify section lands — its Handoff anchor is in the stub), the stub push hook (no run_build) left alone, exit 0" \
+  "[ $M260_SKIP_RC -eq 0 ] \
+   && ! grep -qF 'v0.26.0-coder-verify-one-call' '$TMP/espalier/.migrations-skipped' && grep -qF '## Verify in One Call' '$TMP/espalier/agents/harness-coder.md' \
+   && grep -qF 'v0.26.0-coder-abuse-now' '$TMP/espalier/.migrations-skipped' \
+   && grep -qF 'v0.26.0-security-contract-covered-by' '$TMP/espalier/.migrations-skipped' \
+   && ! grep -qF 'v0.26.0-gate-build-lint-overlap' '$TMP/espalier/.migrations-skipped' \
+   && ! ls '$TMP'/espalier/skills/espalier/SKILL.md.pre-v0.26.bak >/dev/null 2>&1"
+M260_SKIP2=$( cd "$TMP" && bash "$MIGRATE260" --yes --plugin-dir="$SCRIPT_DIR/.." 2>&1 )
+assert "36n re-run after skip-with-record is a no-op" "echo \"\$M260_SKIP2\" | grep -qi 'nothing to do'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP"
 
 # ─── Summary ──────────────────────────────────────────────────────────────

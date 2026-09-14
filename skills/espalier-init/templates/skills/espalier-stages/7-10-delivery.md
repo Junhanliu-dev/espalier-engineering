@@ -50,34 +50,18 @@ table (the fix lane's reverse lookup blames a line to ONE commit, so every
 commit must resolve to this change).
 
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
-> the orchestrator at Stage Execution entry. Substitute them when running the snippet.
+> the orchestrator at Stage Execution entry.
 
 ```bash
-STATE="espalier/changes/${TYPE}/${SLUG}/pipeline-state.md"
-BASE_REF=$(grep '^Base-Ref:' "$STATE" | tail -1 | awk '{print $2}')
-# Every commit of the change, oldest first; a missing Base-Ref (a pre-v0.25
-# change resumed here) falls back to HEAD alone.
-if [ -n "$BASE_REF" ]; then SHAS=$(git rev-list --reverse "${BASE_REF}..HEAD"); else SHAS=$(git rev-parse HEAD); fi
-
-# Ensure section exists
-if ! grep -q "^## Commits" "$STATE"; then
-  cat >> "$STATE" << EOF
-
-## Commits
-| Stage | SHA | Files |
-|-------|-----|-------|
-EOF
-fi
-
-[ -f espalier/hooks/lookup-helpers.sh ] && . espalier/hooks/lookup-helpers.sh
-for SHA in $SHAS; do
-  FILES=$(git diff-tree --no-commit-id --name-only -r "$SHA" | tr '\n' ',' | sed 's/,$//')
-  # Idempotency: skip if this stage+SHA pair already recorded
-  grep -qE "^\| 7 \| ${SHA} " "$STATE" || echo "| 7 | $SHA | $FILES |" >> "$STATE"
-  # Self-heal reverse-lookup cache (silently no-op if helpers absent)
-  type _cache_append >/dev/null 2>&1 && _cache_append "$SHA" "${TYPE}/${SLUG}" "original"
-done
+. espalier/hooks/drift-helpers.sh && record_commits "$TYPE" "$SLUG"
 ```
+
+`record_commits` lists the change's commits (`git rev-list --reverse
+Base-Ref..HEAD`; HEAD alone when no Base-Ref was recorded — a pre-v0.25
+change resumed here), creates the `## Commits` table when absent, appends
+one `| 7 | {sha} | {files} |` row per commit not already recorded, and
+self-heals the reverse-lookup cache through `_cache_append` when
+`lookup-helpers.sh` is installed. It prints the rows it added.
 
 This commit-record is read at fix-time by `/espalier-fix` Stage 0 reverse lookup,
 and used by the post-merge hook for squash-merge mapping.
@@ -131,29 +115,14 @@ Stage 8's wait protocol.
 > Record Stage 8.5 only in the Stage History notes.
 
 ```bash
-. espalier/hooks/drift-helpers.sh
-STALE=$(stale_files)
-PATCHES="espalier/changes/${TYPE}/${SLUG}/doc-patches.md"
-
-if [ -z "$STALE" ]; then
-  echo "Stage 8.5: no drift."
-else
-  {
-    echo ""
-    echo "## Stage 8.5 Doc Drift (notify-only)"
-    echo "| File | Tier | Reason |"
-    echo "|------|------|--------|"
-    printf '%s\n' "$STALE" | while IFS= read -r f; do
-      [ -z "$f" ] && continue
-      tier=$(classify_tier "$f")
-      reason=$(awk -F'\t' -v x="$f" '$1==x {print $4; exit}' espalier/.drift-state.tsv)
-      echo "| $f | $tier | $reason |"
-    done
-  } >> "$PATCHES"
-  N=$(printf '%s\n' "$STALE" | grep -c .)
-  echo "Stage 8.5: $N stale doc(s) — run /espalier-prune to refresh. (Not blocking; pipeline continues.)"
-fi
+. espalier/hooks/drift-helpers.sh && stage85_drift "$TYPE" "$SLUG"
 ```
+
+`stage85_drift` reads `.drift-state.tsv`; with no flagged doc it prints
+`Stage 8.5: no drift.`, otherwise it appends a `## Stage 8.5 Doc Drift
+(notify-only)` table (file, tier, reason) to the change's `doc-patches.md`
+and prints `Stage 8.5: {N} stale doc(s) — run /espalier-prune to refresh.
+(Not blocking; pipeline continues.)`.
 
 `doc-patches.md` is a per-change artifact created on demand under
 `espalier/changes/{type}/{slug}/` — like `ci-result.md`. Stage 8.5 touches no

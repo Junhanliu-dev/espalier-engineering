@@ -75,10 +75,17 @@ the literal length of the fixture's `planted_vulns` list.
   not-caught if the mislabeling changes the prescribed control to a wrong one.
 - **Contract validity (vuln fixtures).** The record should carry a well-formed
   `## Security-Sensitive Fields` block with one entry per caught sensitive field
-  (sub-fields: field / endpoint / axis / required_control / abuse_test). A caught
+  (sub-fields: field / endpoint / axis / required_control / abuse_test /
+  covered_by). A caught
   vuln with no contract entry is still caught, but a missing/garbled contract is a
   quality defect — treat a completely absent contract on a vuln fixture as one
   false_positive-equivalent penalty (it breaks the Stage 5/6 handoff).
+- **`covered_by` honesty (v0.26).** Each entry's `covered_by:` names the test
+  in the diff that performs its abuse test, or `none`. These fixtures ship no
+  test file, so `none` (or an absent line) is correct; a `covered_by` naming
+  a test that does not exist in the fixture is a fabricated routing fact —
+  note it (it is not a false positive, but it would skip a contract-phase
+  coder in the pipeline).
 
 ## Repo-audit fixtures (`mode: repo-audit`)
 

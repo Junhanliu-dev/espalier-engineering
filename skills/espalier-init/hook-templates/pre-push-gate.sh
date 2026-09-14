@@ -248,7 +248,7 @@ fi
 # (sum → max wall-clock). The key is written at init only when discovery
 # judged the three commands independent AND the human confirmed. Every check
 # still runs and still blocks on failure — only the overlap changes. Key
-# absent (the default): the serial sections below run exactly as before.
+# absent (the default): build and lint overlap, tests follow a green build.
 HOOK_PARALLEL=$(grep '^hook-parallel-gates:' espalier/.espalier-config 2>/dev/null | awk '{print $2}')
 
 # The three {command} placeholders below were substituted from
@@ -267,36 +267,38 @@ HOOK_PARALLEL=$(grep '^hook-parallel-gates:' espalier/.espalier-config 2>/dev/nu
 run_build() {
   {build_command}
 }
-# Pipeline-only gate: wrapped in a function so a no-state-file push can skip it
-# with a single-line guard while the secret scan above still ran.
-gate_build_section() {
-  BUILD_OUTPUT=$(run_build 2>&1)
-  if [ $? -ne 0 ]; then
-    {
-      echo "BLOCKED: Build fails"
-      # Show why. A gate that blocks without printing the failure gets disabled.
-      printf '%s\n' "$BUILD_OUTPUT" | tail -20
-    } >&2
-    exit 2
-  fi
-}
-if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_build_section; fi
 
 # Run lint check
 run_lint() {
   {lint_command}
 }
-gate_lint_section() {
-  LINT_OUTPUT=$(run_lint 2>&1)
-  if [ $? -ne 0 ]; then
-    {
-      echo "BLOCKED: Lint fails"
-      printf '%s\n' "$LINT_OUTPUT" | tail -20
-    } >&2
-    exit 2
+# Pipeline-only gate: wrapped in a function so a no-state-file push can skip
+# it with a single-line guard while the secret scan above still ran.
+# Build and lint overlap by default (v0.26) — the same pair `exit_gate`
+# runs concurrently on every coder return; both must still pass, the build
+# failure reports first so multi-failure output stays deterministic. Tests
+# wait for a green build (a compiled stack needs its output); the three-way
+# overlap stays behind `hook-parallel-gates: yes`, the pairing discovery
+# proposed and the human confirmed at init. bash-3.2 safe: per-pid `wait`,
+# per-job temp-file output.
+gate_build_lint_section() {
+  _bl_b=$(mktemp); _bl_l=$(mktemp)
+  run_build > "$_bl_b" 2>&1 & _bl_pid_b=$!
+  run_lint  > "$_bl_l" 2>&1 & _bl_pid_l=$!
+  wait "$_bl_pid_b"; _bl_rc_b=$?
+  wait "$_bl_pid_l"; _bl_rc_l=$?
+  if [ "$_bl_rc_b" -ne 0 ]; then
+    # Show why. A gate that blocks without printing the failure gets disabled.
+    { echo "BLOCKED: Build fails"; tail -20 "$_bl_b"; } >&2
+    rm -f "$_bl_b" "$_bl_l"; exit 2
   fi
+  if [ "$_bl_rc_l" -ne 0 ]; then
+    { echo "BLOCKED: Lint fails"; tail -20 "$_bl_l"; } >&2
+    rm -f "$_bl_b" "$_bl_l"; exit 2
+  fi
+  rm -f "$_bl_b" "$_bl_l"
 }
-if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_lint_section; fi
+if [ "${PIPELINE_TRACKED:-yes}" = "yes" ] && [ "$HOOK_PARALLEL" != "yes" ]; then gate_build_lint_section; fi
 
 # Run tests and check count. Runners word their counts differently —
 # jest/pytest/cargo "N passed", mocha "N passing", rspec "N examples",

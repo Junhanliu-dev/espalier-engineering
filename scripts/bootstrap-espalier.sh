@@ -29,8 +29,8 @@
 #     copilot-instructions.md section, .github/agents/*.agent.md,
 #     .github/hooks/espalier-gates.json via the camelCase adapter).
 #   - Appends the .gitattributes union entry + optional CODEOWNERS block.
-#   - Runs the validation checks (R6) — 56 claude-only, 61 with codex,
-#     66 with copilot.
+#   - Runs the validation checks (R6) — 58 claude-only, 63 with codex,
+#     68 with copilot.
 #
 # Usage:
 #   bash bootstrap-espalier.sh --merge-decision=<val> [options]
@@ -1475,7 +1475,7 @@ stage_gitignore() {
 
 stage_validate() {
   # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
-  # 5 copilot (52-56) + 7 unconditional base (57-63 — appended AFTER the
+  # 5 copilot (52-56) + 12 unconditional base (57-68 — appended AFTER the
   # platform blocks so shipped platform IDs stay stable; base numbering is
   # non-contiguous by design; 57-58 landed in v0.16, 59-60 in v0.18,
   # 61-62 in v0.19, 63 in v0.24). Numbering is FIXED per platform; copilot without codex
@@ -1483,11 +1483,11 @@ stage_validate() {
   # greenfield Pass 1 (espalier/.greenfield present) renders every
   # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
   # pending-skip — count and numbering unchanged.
-  local TOTAL_CHECKS=56
+  local TOTAL_CHECKS=58
   if want_copilot; then
-    TOTAL_CHECKS=66
+    TOTAL_CHECKS=68
   elif want_codex; then
-    TOTAL_CHECKS=61
+    TOTAL_CHECKS=63
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1710,7 +1710,8 @@ stage_validate() {
     run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
   fi
   # 57-65: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
-  # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0
+  # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0,
+  # 67-68 v0.26.0 turn economy
   # quality-first context) — run
   # UNCONDITIONALLY, regardless of --platforms; appended after
   # the platform blocks so the shipped IDs 47-56 stay stable.
@@ -1745,14 +1746,24 @@ stage_validate() {
   # present, and every mode file is named on a prompt line (pure copies —
   # present from greenfield Pass 1).
   run_check 66 "stage-procedures"   'for f in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do [ -f "espalier/skills/espalier/stages/$f.md" ] && grep -qF "stages/$f.md" espalier/skills/espalier/SKILL.md || exit 1; done; for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do [ -f "espalier/agents/modes/$m.md" ] || exit 1; done; cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md espalier/skills/espalier-audit/SKILL.md > "$tmpdir/66.cat" && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do grep -qF "modes/$m.md" "$tmpdir/66.cat" || exit 1; done' &
+  # 67-68 (v0.26 turn economy): the helpers the stage files call by name
+  # (pure copy — present from Pass 1), and the contract-coverage / session-
+  # boundary / one-call-verify markers in the agent bodies and lane skills
+  # (agents are Phase-2 writes, so greenfield Pass 1 renders 68 pending).
+  run_check 67 "turn-economy-helpers" 'for fn in contract_gaps certificate_write record_commits drift_index stage85_drift backlink_all regression_verify _gate_scope_line; do grep -q "^$fn()" espalier/hooks/drift-helpers.sh || exit 1; done; cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md > "$tmpdir/67.cat" && for fn in contract_gaps certificate_write record_commits drift_index regression_verify backlink_all; do grep -qF "$fn" "$tmpdir/67.cat" || exit 1; done; grep -qF "stage85_drift" espalier/skills/espalier/stages/7-10-delivery.md' &
+  if gf; then
+    skip_check 68 "contract-coverage" "pending greenfield Pass 2"
+  else
+    run_check 68 "contract-coverage" 'grep -qF "covered_by:" espalier/agents/harness-security.md && grep -qF "Abuse test, now" espalier/agents/harness-coder.md && grep -qF "## Verify in One Call" espalier/agents/harness-coder.md && grep -qF "covered_by" espalier/agents/modes/stage6-abuse-coverage.md && cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md > "$tmpdir/68.cat" && grep -qF -- "- Session-Boundary:" "$tmpdir/68.cat" && grep -qF "GAPS:" "$tmpdir/68.cat" && grep -qF -- "- Session-Boundary:" espalier/skills/espalier-fix/SKILL.md' &
+  fi
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-66.
+  # must reach stdout, which the run_check harness discards), then 26-68.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-6] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-9] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

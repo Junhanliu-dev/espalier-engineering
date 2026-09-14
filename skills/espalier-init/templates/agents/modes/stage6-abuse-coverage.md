@@ -15,3 +15,9 @@ value, (b) asserts the request is rejected, and (c) asserts the persistent store
 unchanged. A missing or happy-path-only test for any contracted field is a **P0** —
 the tests do not prove the control holds. Send it back to the contract
 phase (serial: Stage 5). This is enforced coverage, not a suggestion.
+
+An entry's `covered_by:` line is the auditor's routing claim, never
+evidence: open the named test and verify all three legs yourself. A
+`covered_by` that does not hold — the test is absent, happy-path, or
+missing the store-unchanged leg — is the same P0 as a missing test, named
+with the entry's field.

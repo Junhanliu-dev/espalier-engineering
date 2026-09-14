@@ -29,6 +29,29 @@ Things consciously punted from v0.2.0. Each has a documented rationale; revisit 
 - **Migration #23 (v0.15→v0.16) is order-broken for pre-v0.18 installs under the current plugin.** Its Step 3 `bootstrap --wire-only` runs the CURRENT validator, whose checks 59-62 (map skill/guard, maprun skill/engine) fail on an install that has not yet run migrations #25/#26 — the chain dies at its own first step. Field workaround (2026-08-25, portal.cneaustralia): run #25 and #26 first (they install the current pure-copy lanes), then #23/#24, then #27+ — every script is marker-guarded so the reorder is safe. Proper fix: #23 pre-seeds missing pure-copy skills from templates (write-if-absent) before wiring, or wire-only validation renders not-yet-migrated lane checks as pending-skips.
   - **Trigger to revisit**: the next pre-v0.18 install that needs migrating, or the next release that touches migration #23 / the wire-only validator.
 
+## Items deferred from v0.26.0
+
+- **Parallel contract-phase dispatch** — trigger unchanged (a contract phase
+  that hands off more than once on a real change); the covered path makes
+  the spawn rare, so the trigger is less likely to fire.
+- **Review-eval fixture for a `covered_by` that lies.** The delta review's
+  P0 on a wrong `covered_by` is asserted by `modes/stage6-abuse-coverage.md`
+  and Test 36 markers; `eval/review/run.sh` has no contract-delta-review
+  mode to run it under an LLM judge.
+  - **Trigger to revisit**: the first field report of a Stage 6 P0 on a
+    `covered_by` entry, or any edit to the stage6 mode file.
+- **Coder self-verify cache** (skip the orchestrator's `exit_gate` when the
+  coder's own call was green on the same tree hash). Rejected for now: the
+  orchestrator's gate is the independent re-verification (claim-vs-gate);
+  a hook-written sidecar could make it sound, at the cost of machinery on
+  three platforms.
+  - **Trigger to revisit**: stats showing the coder's own `exit_gate` call
+    and the orchestrator's back-to-back on every return dominate Stage 3.
+- **Owner harness (outside espalier):** the user-global Edit hooks
+  (`typescript-preflight`, `compiler-in-the-loop`, `post-tool-use-tracker`)
+  measured 10 % of coder wall on portal.quota; guarded off for
+  `harness-*` subagents on 2026-09-14 via `~/.claude/hooks/skip-for-harness.sh`.
+
 ## Items deferred from v0.25.0
 
 - **`espalier-fix.md` router split.** The espalier skill's router + `stages/` split landed in v0.25.0; the fix lane is a single-lane skill and stays one file.
