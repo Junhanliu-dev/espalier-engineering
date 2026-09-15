@@ -387,10 +387,9 @@ two legs without stage progress, and a leg that dies on a usage-limit
 signature makes the wrapper exit sentinel-less so reap classifies the ticket
 as resumable `QUOTA`, never an escalation. `inline` spawns no worker at all —
 the master works the ticket itself per step 5-inline; the contract above
-still binds it (stages 1–6 only, the change folder is the ticket, never push,
-resume discipline), except the question rules: an inline master asks the
-human directly instead of parking, and marks state directly instead of
-writing sentinels.
+still binds it, except the question rules: an inline master asks the human
+directly instead of parking, and marks state directly instead of writing
+sentinels.
 
 ## State Vocabulary
 
@@ -514,7 +513,7 @@ These are structural, not advisory:
 - **Your working checkout is never touched.** All merges and edits happen in
   the integration worktree.
 - **Without a `pr` config, nothing is ever pushed.** Getting work to the
-  remote is a deliberate human act, after review — exactly v0.19 behavior.
+  remote is a deliberate human act, after review.
 - **With a `pr` config** (an explicit plan-time human opt-in), the MASTER —
   never a worker — pushes ticket branches and the integration branch and
   opens slice PRs. Merging the final assembly PR into the base branch

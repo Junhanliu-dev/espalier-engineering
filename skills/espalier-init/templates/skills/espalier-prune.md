@@ -135,9 +135,6 @@ A skipped gardener week self-corrects: the shared stamp ages out,
 `doctor_due()` starts nagging everyone again — the pre-rota behavior is the
 fallback, not a new failure.
 
-Payoff: most devs stop seeing maintenance pressure entirely; exactly one
-scan and at most one prune sweep per interval.
-
 **Worktree flow — do the discipline FOR the user, not BY the user.** When a
 maintenance-lane action should land on the canonical branch while the user
 sits on a feature branch, offer: *"run this in a temporary worktree of the
@@ -254,11 +251,6 @@ Read the prompts from `espalier/.scout-prompts.md` — they are NOT embedded her
 mapped to the artifact under refresh (Scout Mapping above); run each as an
 Agent/Task scout against the current codebase. Keeping the prompts in a single
 shipped file means `/espalier-prune` and `/espalier-doctor` can never drift apart.
-
-For a file with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both and
-merge their outputs into ONE proposed file before diffing. For a hook, regenerate
-the scripted block from the scout's structured output (see Scout Mapping notes),
-never prose.
 
 ## What This Skill Does NOT Do
 

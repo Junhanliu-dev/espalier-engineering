@@ -84,8 +84,6 @@ semantics; the end-of-session restamp rule applies). Write a timestamped human
 summary to the gitignored `espalier/.drift-report.md`: artifacts scanned,
 flagged, confirmed-current.
 
-The doctor never edits an artifact. To apply a refresh, run `/espalier-prune`.
-
 ## Cadence
 
 The cadence is chosen at `/espalier-init` (Phase 0 Q3) and stored in the tracked
@@ -113,9 +111,7 @@ the canonical branch (`canonical-branch` in `espalier/.espalier-config`),
 via the temporary-worktree flow described in `/espalier-prune`'s
 Multi-Developer Discipline section — one scan per interval, one maintenance
 PR carrying the scan's prune refreshes. Prune and promotion have their own
-lanes (see that section's per-mechanism table); the doctor's lane is the
-weekly maintenance PR only — a scan result stranded on a feature branch
-helps nobody until merge.
+lanes (see that section's per-mechanism table).
 
 **The shared stamp (tracked `espalier/.doctor-stamp`).** The doctor is the
 stamp's ONLY writer. At the END of the maintenance session, write it and
@@ -167,9 +163,6 @@ Read the prompts from `espalier/.scout-prompts.md` — they are NOT embedded her
 mapped to each artifact in scope (Scout Mapping above); run each as an
 Agent/Task scout against the current codebase. `/espalier-prune` reads the same
 file, so the two can never drift apart.
-
-For an artifact with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both
-and merge before the two-way diff.
 
 ## Config Advisories (report-only)
 

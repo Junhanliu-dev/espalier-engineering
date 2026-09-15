@@ -18,11 +18,9 @@ all 10 stages defined in `espalier/pipeline.md`.
 ### Before Starting
 
 1. Read `espalier/pipeline.md` for stage definitions
-2. Check for existing state: look in `espalier/changes/` for a matching
-   requirement (matching = the kebab-tail rule in Session Resumption below)
-   - If found, read `pipeline-state.md` and RESUME from the current stage
-   - If not found, create a new directory and start from Stage 1 — an
-     unrelated in-flight change is surfaced, never silently resumed
+2. Check for existing state per Session Resumption (below): a tail-matching
+   `IN_PROGRESS` change is resumed; otherwise start from Stage 1 — an
+   unrelated in-flight change is surfaced, never silently resumed
 
 ### Flag Parsing
 
@@ -37,8 +35,7 @@ requirement itself is never mistaken for a flag).
 | `--resume` | Recognized no-op. Resumption is already automatic (see Session Resumption); accept and drop the token. |
 
 An unrecognized leading `--token` is NOT absorbed into the requirement — warn the
-user (`unrecognized flag: --token; ignoring`) and drop it. Only the flags above are
-recognized.
+user (`unrecognized flag: --token; ignoring`) and drop it.
 
 ### Stage 0 Pre-Flight (drift + conventions + doctor)
 
@@ -88,11 +85,10 @@ Options:
 print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
 {due|not due} — deferred to the approval gate`), append the same summary to
 `espalier/.drift-report.md` with a `deferred-to-approval-gate ({ts})` marker
-line (an interrupted run leaves an inspectable trace, and the signals
-re-surface at the next invocation's pre-flight anyway — the sidecar is never
-cleared by deferral), and continue to Stage 1. The Requirements Approval
-Gate carries the maintenance question (its step 3b) — still BEFORE Stage 3,
-so a promotion decided there governs this run's coder. The weekly
+line (the sidecar is never cleared by deferral — the signals re-surface at
+the next pre-flight anyway), and continue to Stage 1. The Requirements
+Approval Gate carries the maintenance question (its step 3b) — still BEFORE
+Stage 3, so a promotion decided there governs this run's coder. The weekly
 gardener rota (see /espalier-prune's Multi-Developer Discipline) remains
 the default owner of non-critical maintenance either way.
 
@@ -107,10 +103,9 @@ Stage 1. Never prune, never promote, never run a doctor scan unattended.
 
 When the Stage 0 pre-flight reports a `pattern_key` with >= 3 deduped
 `diverges` observations (from `conv_fold`) and the user picks "Handle now",
-fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (rows, not
-counts — it folds the legacy file and the per-key files and dedupes across
-both), run the race guard below, and surface the candidate with
-`AskUserQuestion`:
+fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (folds the
+legacy and per-key files, deduped), run the race guard below, and surface
+the candidate with `AskUserQuestion`:
 
 ```
 Convention "{pattern_key}" has diverged in {N} changes:
@@ -183,9 +178,8 @@ fi
 (FETCH_HEAD, not `$R/$B` — a source-only fetch doesn't update the tracking
 ref, and a fetch failure must SKIP the check rather than consult stale state.
 The width guard keeps a malformed row from vacuously satisfying
-`$5!="diverges"`.) The guard is a courtesy, not the race defense — two
-same-key decisions on different branches surface as an ordinary git conflict
-at merge, which is the structural detection.
+`$5!="diverges"`.) The guard is a courtesy — the git conflict described
+above remains the structural race detection.
 
 ### Session Resumption
 
@@ -215,9 +209,7 @@ unrelated in-flight change into the new request:
    from 1).
 3. Non-matching in-flight state files do NOT block a new requirement. Start
    the new change normally and surface ONE line: "Note: {N} other in-flight
-   change(s): {slugs} — resume each with /espalier <its requirement>." (The
-   push gate independently warns when several changes are in flight;
-   finishing one before starting the next is the safe default.)
+   change(s): {slugs} — resume each with /espalier <its requirement>."
 4. Invoked with no requirement text at all (bare `/espalier`, or `--resume`
    alone) → resume the single in-flight change; if several are in flight,
    list them and ask which one via `AskUserQuestion`.
@@ -292,12 +284,9 @@ flight; every spawn above is alone in its message.
 
 ### State File Format
 
-Parse `{type}` from the requirement prefix:
-- `feat: <text>` → type = `feat`
-- `fix: <text>` → type = `fix`
-- `refactor: <text>` → type = `refactor`
-- `docs: <text>` → type = `docs`
-- Anything else → type = `feat` (default)
+Parse `{type}` from the requirement prefix: `feat:` → `feat`, `fix:` →
+`fix`, `refactor:` → `refactor`, `docs:` → `docs`; anything else → `feat`
+(default).
 
 `fix:` on the FULL pipeline is for large fixes — >5 files, multiple layers, or
 schema changes (the espalier-fix skill's own "Do NOT use for" list routes those
@@ -383,10 +372,9 @@ Stage boundaries — after Stage 2 approval and after the Stage 4 PASS
 Requirements Approval Gate (`stages/1-2-requirements.md` step 3d): one
 question, first option default, recorded as `- Session-Boundary: none |
 after-2 | after-4 | both`, never asked on an unattended run. Each boundary
-then READS the line instead of asking (the v0.25 `Continue in a fresh
-session` offer, chosen up front). Nothing depends on the answer: the state
-is already on disk and Session Resumption is unchanged; a fresh session
-runs the remaining stages with the change's state and the stage's
+then READS the line instead of asking. Nothing depends on the answer: the
+state is already on disk and Session Resumption is unchanged; a fresh
+session runs the remaining stages with the change's state and the stage's
 procedure at the top of its context.
 
 ### Completion

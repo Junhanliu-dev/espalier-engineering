@@ -125,10 +125,8 @@ and prints `Stage 8.5: {N} stale doc(s) — run /espalier-prune to refresh.
 (Not blocking; pipeline continues.)`.
 
 `doc-patches.md` is a per-change artifact created on demand under
-`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Stage 8.5 touches no
-rule/wiki/spec file, so it cannot dirty a project-level doc. Advance to Stage 9
-regardless of the result. In-pipeline auto-apply is a v2 item — refresh stays a
-deliberate `/espalier-prune`.
+`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Advance to Stage 9
+regardless of the result; refresh stays a deliberate `/espalier-prune`.
 
 ### Stage 10: Delivery Brief (assembled, never authored)
 

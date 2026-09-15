@@ -8,13 +8,11 @@
 ### Stage 3 Entry: Context Pack (assemble once — every spawn reuses it)
 
 In the SAME orchestrator turn that presents the Requirements Approval Gate
-prompt — the pack is paths/facts only and approval-independent, so
-assembling it while the human reads the gate saves one turn — write
+prompt — the pack is paths/facts only and approval-independent — write
 `espalier/changes/{type}/{slug}/context-pack.md` (overwrite if resuming a
 pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it).
 On **Edit** that changes the layer set, re-derive the pack before
-re-asking; on **Abort** the pack is dead weight in the aborted change dir —
-harmless:
+re-asking; on **Abort** it is harmless dead weight:
 
 ```markdown
 # Context Pack: {slug}
@@ -47,11 +45,10 @@ refusal: the human approved this text at the gate; the line is for the next
 Stage 2, not this Stage 3.
 
 Derive the layer list and reference files ONCE (from the requirement +
-`engineering-structure.md` + a quick glob of the touched layers) — this is
-exactly the discovery the coder, both panel agents, and the test spawns
-would otherwise EACH repeat from scratch. The pack lists PATHS AND FACTS
-only — never conclusions, never verdicts, never "this part is fine": every
-agent still reads the named files itself and trusts the current code over
+`engineering-structure.md` + a quick glob of the touched layers). The
+pack lists PATHS AND FACTS only — never conclusions, never verdicts,
+never "this part is fine": every agent still reads the named files
+itself and trusts the current code over
 the pack. Add the `CONTEXT PACK:` line to EVERY Stage 3-6 spawn prompt (the
 prompt templates below carry it). A spawn that finds no pack (resumed old
 change, fix lane before its pack step) falls back to its own discovery —
@@ -108,13 +105,10 @@ re-spawns may run the build themselves again). Only after the exit gate
 passes: commit each part's files as ONE commit with the part's `- Commit:`
 message, in sub-task order (`git add {the part's Files created / modified /
 Test files}` — never `-A`, never `espalier/`), record the SHAs under the
-combined report's `- Commits:`, then delete the part files. Any overlap or uncertainty → serial dispatch,
-exactly as before. Parallelism changes DISPATCH only — the Stage 4 panel
-always reviews the COMBINED diff, and the review/gate contract is untouched.
+combined report's `- Commits:`, then delete the part files. Any overlap or
+uncertainty → serial dispatch.
 
 ### Sub-Agent Delegation
-
-Stages 3-6 use sub-agents for separation of concerns:
 
 **Stage 3 (Coding):**
 ```
@@ -206,12 +200,11 @@ report is archived before anything overwrites or appends to it:
    runs the discovered build and lint as two concurrent jobs, then — folded
    mode — the discovered test command scoped to the coding report's listed
    test files where the runner supports path filtering (full suite where it
-   does not; the old Stage 5 "tests pass" gate, moved earlier — the panel
-   must never review tests nobody has executed), and prints one line per
-   job plus the log path of any failure. The commands have one source: the
-   `run_build` / `run_lint` / `run_tests` bodies init substituted into
-   `espalier/hooks/pre-push-gate.sh`. Exit codes: `0` green; `1` a job
-   failed — red; `2` a `run_*` function is missing or unparseable in a
+   does not), and prints one line per job plus the log path of any failure.
+   The commands have one source: the `run_build` / `run_lint` / `run_tests`
+   bodies init substituted into `espalier/hooks/pre-push-gate.sh`. Exit
+   codes: `0` green; `1` a job failed — red; `2` a `run_*` function is
+   missing or unparseable in a
    customised gate; `3` the greenfield placeholder gate. Only `1` is red.
    On `2` or `3` run the gate by hand exactly as before: build + lint as
    two concurrent background jobs in ONE bash call (`$BUILD & $LINT &`,
@@ -238,8 +231,7 @@ spawn's report is one file in `coding-log/` (read only when named). Labels
 name the spawn that wrote the archived report: `stage3` (`stage3-part{k}`
 for a wave's parts), `handoff-{n}` (`handoff-{n}-part{k}`), `blocked-{n}`,
 `round{n}-fix` (the FIX ROUND {n} report), `exit-gate-fix`,
-`contract-phase`. A no-op when
-no report exists.
+`contract-phase`. A no-op when no report exists.
 
 **`test-mode` (read once at Stage 3 entry — word-key pattern, NOT the round
 caps' integer grep):**

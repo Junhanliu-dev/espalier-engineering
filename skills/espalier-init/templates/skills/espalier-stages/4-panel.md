@@ -7,9 +7,6 @@
 
 ### Stage 4: The Review Panel
 
-Stages 3-6 use sub-agents for separation of concerns; the panel prompts and
-the round procedure are below.
-
 **Stage 4 (Review):**
 ```
 Agent tool:
@@ -178,12 +175,10 @@ Stage 5 by any other path:
    "espalier/changes/{type}/{slug}"` prints the coding report's
    `### Deviations` entries (nothing when there are none): print them under
    the PASS line, verbatim, and append `deviations: {n}` to the PASSED
-   row's notes — this is where the human sees every departure from the
-   approved contract, panel-verified, before anything is pushed (an
-   unattended run has the row; the delivery brief carries them too) —
-   THEN run the "Stage 4 Post-Review" drift processing below — it must finish BEFORE any contract
-   delta-review spawn (that spawn overwrites the review-record.md the parse
-   reads) — then the **stage boundary**: with the PASSED row, the
+   row's notes (the delivery brief carries them too) — THEN run the "Stage
+   4 Post-Review" drift processing below — it must finish BEFORE any
+   contract delta-review spawn (that spawn overwrites the review-record.md
+   the parse reads) — then the **stage boundary**: with the PASSED row, the
    certificate, and the drift rows on disk, read `- Session-Boundary:` from
    pipeline-state.md (collected at the Requirements Approval Gate; no
    question here). `after-4` or `both` → write `- Current Stage: 5`, print

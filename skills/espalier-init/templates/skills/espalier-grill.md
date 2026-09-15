@@ -12,11 +12,10 @@ unconfirmed diagnosis that passes Stage 1 is trusted by every later stage — an
 later gate audits it. Grill is that audit: it converts an under-specified input into
 one a coding agent can execute without guessing.
 
-Grill also closes the one blind spot a bare reading of the input cannot: a requirement
-that will violate a convention the project already encoded in `espalier/rules/` or
-re-implement something `espalier/wiki/` already documents. That collision is known to
-the repo but unknown to the requester — Step 1.5 cross-references the input against the
-project map and turns it into a question before any code is written.
+Grill also closes the one blind spot a bare reading cannot: a requirement that violates
+a convention in `espalier/rules/` or re-implements what `espalier/wiki/` documents —
+known to the repo, unknown to the requester. Step 1.5 cross-references the input against
+the project map and turns that collision into a question before any code is written.
 
 Grill is invoked BY Stage 1 of `/espalier` and `/espalier-fix`, and by
 `/espalier-map` when resolving a grilling ticket. It is not a slash command and
@@ -61,14 +60,13 @@ ambiguity lives in the answer space. Everything below applies with these deltas:
 
 ### Score-only mode (`mode=score`)
 
-The map lane's CLEARED → FILED handoff calls this to score each drafted
-slice requirement BEFORE filing it. Run Step 1's signal count against
-`input_text` (the drafted slice requirement) — nothing else: no Step 1.5,
-no questions, no file writes. Return ONE line to the caller:
-`SCORE: {skip|light|full} (signals={N})`. The handoff files `skip`/`light`
-slices and refuses would-be-`full` ones (the map is not actually clear
-there). This mode records no verdict in pipeline-state.md — no change
-exists yet.
+The map lane's CLEARED → FILED handoff calls this to score each drafted slice
+requirement BEFORE filing it. Run Step 1's signal count against `input_text`
+(the drafted slice requirement) — nothing else: no Step 1.5, no questions, no
+file writes. Return ONE line to the caller: `SCORE: {skip|light|full}
+(signals={N})`. The handoff files `skip`/`light` slices and refuses
+would-be-`full` ones (the map is not actually clear there). This mode records
+no verdict in pipeline-state.md — no change exists yet.
 
 ## Process
 
@@ -145,9 +143,7 @@ count. A `skip`→`light`/`full` bump runs Step 2; a bump down to `skip` returns
 
 Runs in both modes, after Step 1, before Step 2. Its job is the collision the requester
 could not have flagged — a rule they don't know exists, a capability the wiki already
-documents. These are known to the repo but unknown to the requester, and no text-signal
-count in Step 1 can catch them. This is the one class of unknown the project's own map
-can surface and a bare reading of `input_text` cannot.
+documents — which no text-signal count in Step 1 can catch.
 
 Read the project map — NOT source code:
 - `espalier/rules/*.md` — the encoded conventions.
@@ -155,8 +151,7 @@ Read the project map — NOT source code:
 
 **If neither directory exists or both are empty, skip this step silently** — there is
 nothing to cross-check (e.g. a repo not yet initialised by `/espalier-init`). No signal,
-no tier change, no output. (This keeps grill's behaviour identical to before on any
-input that has no map to collide with.)
+no tier change, no output.
 
 Scan for three collision classes (the last three rows of Step 1's signal table):
 

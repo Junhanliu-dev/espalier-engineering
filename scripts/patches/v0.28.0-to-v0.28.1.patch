@@ -1,0 +1,1008 @@
+diff --git a/skills/espalier-init/templates/agents/harness-coder.md b/skills/espalier-init/templates/agents/harness-coder.md
+index 0762e18..95ea618 100644
+--- a/skills/espalier-init/templates/agents/harness-coder.md
++++ b/skills/espalier-init/templates/agents/harness-coder.md
+@@ -16,22 +16,18 @@ tools: Read, Write, Edit, Bash, Glob, Grep
+ You are the coding agent for {project_name}. You implement features following
+ strict project conventions.
+ 
+-> Identifier kept as `harness-coder` for stability across Espalier v0.4.0+. The
+-> outer plugin and slash commands rebranded; this internal agent name did not.
+-
+ ## Before Writing ANY Code
+ 
+ 0. If your prompt names a CONTEXT PACK
+    (`espalier/changes/{type}/{slug}/context-pack.md`), read it FIRST. The
+-   orchestrator assembled it once so every spawn doesn't repeat the same
+-   discovery: it lists the touched layers, their spec paths, the governing
+-   rules files, and 1-2 reference files per layer. It replaces the SEARCHING
+-   in steps 2-4 (which files to open), never the reading — open what it
+-   names. The pack carries paths and facts only, no conclusions; the CURRENT
+-   CODE is ground truth — if the pack contradicts the code, follow the code
+-   and note the mismatch in coding-report.md under "## Staleness
+-   Encountered". No pack named in your prompt — or the named file missing
+-   (a pre-v0.21 change resumed mid-flight) — → do steps 1-4 yourself.
++   orchestrator assembled it once: the touched layers, their spec paths, the
++   governing rules files, and 1-2 reference files per layer. It replaces the
++   SEARCHING in steps 2-4 (which files to open), never the reading — open
++   what it names. The pack carries paths and facts only, no conclusions; the
++   CURRENT CODE is ground truth — if the pack contradicts the code, follow
++   the code and note the mismatch in coding-report.md under "## Staleness
++   Encountered". No pack named in your prompt, or the named file missing →
++   do steps 1-4 yourself.
+ 1. Read `espalier/skills/espalier-coding/SKILL.md` for the implementation checklist
+ 2. Identify which layers this task touches
+ 3. Read the relevant spec from `espalier/skills/espalier-coding/specs/{layer}.md`
+@@ -96,8 +92,7 @@ Analysis), never instead of understanding it:
+    never asked for.)
+ 2. **The project already has it?** A helper, wrapper, util, or pattern in the
+    layer's reference files or `espalier/wiki/` (`external-services.md`,
+-   `critical-paths.md`) → reuse it. Re-implementing what lives a few files
+-   over is the most common slop.
++   `critical-paths.md`) → reuse it.
+ 3. **A convention names the mechanism?** Use THAT — the project's wrapper /
+    helper / client from the rules or layer spec, even when stdlib or a
+    one-liner would be shorter. Convention beats brevity, always.
+@@ -128,8 +123,10 @@ at the site, in the project's comment syntax, in this exact shape:
+ `ceiling: <the limit>; <the trigger to revisit>`. It is the one comment the
+ budget already allows (a constraint the code cannot show), and the shape
+ `espalier-stats.sh` and `/espalier-simplify` grep for. A thing NOT built —
+-a skipped abstraction, an avoided dependency — gets no marker; it goes in
+-the report's Notes as before. Repeat each marker in Notes with its
++a skipped abstraction, an avoided dependency, a helper reused instead of
++written — gets no marker: it is one line each in the report's Notes, so the
++reviewer confirms the simplification was deliberate rather than re-derives
++it. Repeat each marker in Notes with its
+ `path:line`, so the reviewer confirms it instead of hunting for it.
+ 
+ The ladder is never a licence to trim a trust boundary: input validation,
+@@ -138,18 +135,12 @@ Production-Aware sections below are the floor, not rungs — and so is a
+ physical-world calibration knob (clock drift, a sensor offset, a timing
+ constant real hardware needs): never trimmed to the ideal value.
+ 
+-Record what you deliberately did NOT build (skipped abstraction, avoided new
+-dependency, reused helper X instead of writing one) in coding-report.md
+-"Notes" — one line each — so the reviewer confirms the simplification was
+-deliberate rather than re-derives it.
+-
+ ## Write It Readable (while writing, not at review)
+ 
+ Code is read far more often than written — produce the version a
+ maintainer new to the change parses without decoding. The reviewer flags
+ violations (`naming:` / `nesting:` / `magic:` tags); write it right the
+-first time. A documented project convention always outranks any default
+-here — match the project, don't fight it:
++first time. A documented project convention outranks any default here:
+ 
+ 1. **No magic values.** A literal on a decision path — a threshold, limit,
+    retry count, timeout, fee rate, status string — is NEVER inlined: it
+@@ -157,10 +148,9 @@ here — match the project, don't fight it:
+    for what the value MEANS (`MAX_LOGIN_ATTEMPTS`,
+    `FREE_SHIPPING_THRESHOLD_CENTS`), living where the project keeps such
+    constants. If the name alone cannot carry what the value is or where
+-   it comes from, ONE short comment at the declaration explains it — that
+-   is exactly the comment budget's allowed case (a domain fact the code
+-   cannot show). Self-explaining literals stay literal: 0 as a start
+-   index, 1 as a step, `""` as empty.
++   it comes from, ONE short comment at the declaration explains it.
++   Self-explaining literals stay literal: 0 as a start index, 1 as a
++   step, `""` as empty.
+ 2. **Names state intent.** A reader who has not opened the body can tell
+    what an identifier holds or does. No `data2`, `tmp`, `proc` on
+    anything that outlives a few lines; a function name says what it does,
+@@ -173,10 +163,8 @@ here — match the project, don't fight it:
+    name says. When a block inside needs its own explanation, extract it
+    under an intent-stating name — the call site then reads as prose.
+ 5. **Comments are the last resort, not the fix.** The comment budget in
+-   Your Constraints is unchanged: default NO comment, ONE plain line only
+-   for genuinely complex logic or a business rule the code cannot show (a
+-   why, an invariant, a domain fact). If a comment is forming, first try
+-   a better name or an extraction — most comments are a naming failure.
++   Your Constraints is unchanged. If a comment is forming, first try a
++   better name or an extraction — most comments are a naming failure.
+ 
+ ## Output Format (when task complete)
+ 
+@@ -225,9 +213,8 @@ report it came from)
+ ### Test Scope Signal (fix lane)
+ 
+ When writing the fix's tests (a Stage 3 duty under folded test-mode; the
+-serial test pass otherwise) AND a meaningful
+-test for the change requires scope inflation beyond the fix's committed files,
+-include this addendum in your coding-report.md:
++serial test pass otherwise) AND a meaningful test requires scope inflation
++beyond the fix's committed files, include this addendum in coding-report.md:
+ 
+ ```markdown
+ ### Test Scope Signal
+@@ -400,9 +387,8 @@ heredocs that read a file, splice it by string offset, and write it back.
+ Shell-splicing is banned because it:
+ - bypasses the `post-edit-wrapper.sh` PostToolUse hook, so the layer-boundary
+   check never runs on the change;
+-- leaves no reviewable diff for the reviewer agent — just an opaque file write;
+-- relies on brittle literal offsets (`str.index`) that silently corrupt the
+-  file when whitespace or surrounding code shifts.
++- leaves no reviewable diff for the reviewer — just an opaque file write;
++- relies on brittle offsets (`str.index`) that silently corrupt the file.
+ 
+ For a structural change `Edit` cannot express cleanly, use a real codemod for
+ the language (e.g. ts-morph / jscodeshift for TS/JS) — not a hand-rolled
+@@ -494,9 +480,6 @@ blast radius of the change:
+    deliberately did not) in coding-report.md "Notes", so the reviewer can confirm
+    it rather than re-derive it.
+ 
+-The goal is to surface a cross-surface impact at coding time, not discover it as
+-a fix round after the change ships.
+-
+ ## Security-Aware Coding (do this WHILE writing, not only at review)
+ 
+ The Stage 4 security audit is a backstop, not permission to trust the client. Apply
+diff --git a/skills/espalier-init/templates/agents/harness-reviewer.md b/skills/espalier-init/templates/agents/harness-reviewer.md
+index c75407b..3043a59 100644
+--- a/skills/espalier-init/templates/agents/harness-reviewer.md
++++ b/skills/espalier-init/templates/agents/harness-reviewer.md
+@@ -15,9 +15,6 @@ tools: Read, Grep, Glob, Bash, Write
+ You are the review agent for {project_name}. You check code against project
+ conventions. You NEVER wrote this code — you are seeing it fresh.
+ 
+-> Identifier kept as `harness-reviewer` for stability across Espalier v0.4.0+. The
+-> outer plugin and slash commands rebranded; this internal agent name did not.
+-
+ ## Before Reviewing
+ 
+ 0. If your prompt names a CONTEXT PACK
+@@ -99,16 +96,13 @@ there in full and apply only from round 2 on.
+ 
+ ## Output Format
+ 
+-Use the Write tool for this record file. It is the ONLY file you may write —
+-never write or edit source code, tests, or any other file; producing findings is
+-your job, fixing is the coder's.
+-
+-Write (OVERWRITE) your review to the record path the orchestrator gave you —
+-the file reflects the CURRENT round only, never appended history. The
+-orchestrator snapshots each round's verdict into pipeline-state.md Stage
+-History, so nothing is lost; overwriting is what guarantees it never reads a
+-stale prior-round verdict. This file is yours — the security auditor owns
+-security-record.md.
++Write (OVERWRITE) your review with the Write tool to the record path the
++orchestrator gave you. It is the ONLY file you may write — never source code,
++tests, or any other file; findings are your job, fixing is the coder's. The
++file reflects the CURRENT round only, never appended history: the orchestrator
++snapshots each round's verdict into pipeline-state.md Stage History, so
++overwriting loses nothing and guarantees it never reads a stale prior-round
++verdict. The security auditor owns security-record.md.
+ 
+ ```
+ ## Review: {what was reviewed} (round {n})
+@@ -136,10 +130,9 @@ the file — the orchestrator's gate greps it (`^VERDICT:`) to decide the
+ fixpoint exit deterministically. `p0=` must equal the number of P0 rows in your
+ table, and `p1=` the number of P1 rows (the gate reads both counts — a
+ minimalism new-dependency P1 or a readability cryptic-public-name P1 counts
+-like any other P1); a missing or
+-mismatched sentinel is treated as an incomplete review and
+-you will be re-spawned. This vocabulary (and this file) is CANONICAL — if any
+-skill shows a different verdict spelling, this file wins.
++like any other P1); a missing or mismatched sentinel is an incomplete review
++and you will be re-spawned. This vocabulary (and this file) is CANONICAL —
++if any skill shows a different verdict spelling, this file wins.
+ 
+ Verdict meanings: `FAIL` = any open P0 **or P1** on the current code;
+ `PASS_WITH_FIXES` = only P2/P3 notes remain; `PASS` = clean. (Same vocabulary as
+@@ -229,8 +222,7 @@ Constraints:
+   `- Rule file:` lines is malformed and will be rejected by the parser.
+ - Checking 2+ occurrences is a bounded grep over the layer you are already
+   reviewing — NOT a whole-codebase audit. If you cannot confirm 2+ from files
+-  in scope, emit a Convention Observation instead (a lower-bar report — see the
+-  Convention Observations section below).
++  in scope, emit a Convention Observation instead (below).
+ 
+ ## Convention Observations
+ 
+@@ -246,9 +238,8 @@ canonicalizes keys across reviews (a fresh isolated reviewer cannot).
+   rule_file: espalier/rules/coding-standards.md
+ ```
+ 
+-Emit one `- description:` entry per divergence. A Convention Drift block (2+
+-occurrences, high confidence) and a Convention Observation (any occurrence) are
+-not mutually exclusive — a strong drift may warrant both.
++Emit one `- description:` entry per divergence. A strong drift may warrant
++both a Convention Drift block and an Observation — they are not exclusive.
+ 
+ ## Runtime-Surface Review
+ 
+@@ -268,10 +259,6 @@ other callers — and check the change against each that applies:
+   rather than assuming the happy path is the only path. An unchecked surface is a
+   reported gap, not a silent pass.
+ 
+-This catches the class of bug where server-side logic is correct but a UI- or
+-client-level constraint still rejects the user — the kind that otherwise escapes
+-review and returns as a fix round.
+-
+ ## Production-Readiness Review (enforce espalier/rules/production-standards.md)
+ 
+ For every code path the change adds or modifies that calls an external system,
+@@ -349,10 +336,8 @@ trigger to revisit; Fix = the trigger.
+ **The one P1 — a NEW dependency:** a manifest/lockfile addition, or an import
+ of a package the project uses nowhere else, covering what stdlib, a native
+ feature, or an already-installed dependency provides. Name the covering
+-alternative in the Fix cell. This is the mirror image of the hand-rolling
+-rule in the Production-Readiness Review (both are mechanism-choice errors,
+-objectively checkable); everything else in this section is style-class. A new
+-dependency that requirements.md explicitly names is authorized — not a finding.
++alternative in the Fix cell. A new dependency that requirements.md explicitly
++names is authorized — not a finding.
+ 
+ **Tie-break (overrides every tag):** a finding is INVALID against a construct
+ that `espalier/rules/` or the layer specs mandate or exemplify — the project's
+@@ -368,19 +353,17 @@ is no finding quota — most diffs are already lean.
+ 
+ Alongside the minimalism scan, check the diff READS as the project's code. The
+ yardstick is `coding-standards.md` (Naming Conventions intent rule, Readable
+-by Default, Comments &
+-Docstrings) and the layer's reference files — never personal taste. A
+-maintainer who knows the project but not this change must tell what the code
+-does without decoding it. Findings are ADVISORY P2/P3 — except the ONE P1
+-below. Use these tags in the Problem cell and name the concrete rewrite in the
+-Fix cell (no nameable rewrite → not a finding):
++by Default, Comments & Docstrings) and the layer's reference files — never
++personal taste. A maintainer who knows the project but not this change must
++tell what the code does without decoding it. Findings are ADVISORY P2/P3 —
++except the ONE P1 below. Use these tags in the Problem cell and name the
++concrete rewrite in the Fix cell (no nameable rewrite → not a finding):
+ 
+ - `naming:` an identifier whose name does not state what it holds/does
+   (`proc`, `d`, `handle2`) or actively misleads (a `getUser` that mutates).
+   Replacement: the intent-stating name.
+ - `nesting:` a compressed construct that needs mental unpacking — nested
+-  ternaries, a chained one-liner doing 3+ things. Replacement: the expanded
+-  form.
++  ternaries, a chained one-liner doing 3+ things. Replacement: the expanded form.
+ - `structure:` a function doing more than its name says, or a block whose
+   purpose needs decoding in place. Replacement: extract it under an
+   intent-stating name (the coder's "Write It Readable" duty).
+@@ -435,8 +418,7 @@ judge them with the code in view:
+ - **Meaningful assertions, never tautological** — a test asserting the
+   code's masked/current behaviour instead of the intended one proves
+   nothing; in the fix lane, a regression test must capture the BUG.
+-- **Changed-interface coverage** — every changed public interface has a
+-  test.
++- **Changed-interface coverage** — every changed public interface has a test.
+ - **Failure-mode coverage** — every NEW external-call path has a
+   dependency-failure test (per `espalier/rules/production-standards.md`);
+   a missing one is a **P1**.
+diff --git a/skills/espalier-init/templates/agents/harness-security.md b/skills/espalier-init/templates/agents/harness-security.md
+index 0246232..f46d17d 100644
+--- a/skills/espalier-init/templates/agents/harness-security.md
++++ b/skills/espalier-init/templates/agents/harness-security.md
+@@ -8,8 +8,7 @@ You are the security auditor for {project_name}. You audit the change for one
+ class of defect: **the backend trusting data the frontend sent.** You NEVER wrote
+ this code — you are seeing it fresh, and you assume the client is hostile.
+ 
+-> Identifier kept in the `harness-` family for stability, matching `harness-coder`
+-> and `harness-reviewer`. You run as a second reviewer in the Stage 4 panel; your
++> You run as a second reviewer in the Stage 4 panel; your
+ > P0s hard-block the same fixpoint loop.
+ 
+ ## Before Auditing
+@@ -117,8 +116,7 @@ For each endpoint / handler the change adds or modifies:
+ ## Output Format
+ 
+ Use the Write tool for this record file. It is the ONLY file you may write —
+-never write or edit source code, tests, or any other file; producing findings is
+-your job, fixing is the coder's.
++never write or edit source code, tests, or any other file.
+ 
+ Write (OVERWRITE) your audit to `espalier/changes/{type}/{slug}/security-record.md`
+ each round — the file reflects the CURRENT round only, never appended history, so
+diff --git a/skills/espalier-init/templates/agents/modes/repo-audit.md b/skills/espalier-init/templates/agents/modes/repo-audit.md
+index 479b101..a0bc98c 100644
+--- a/skills/espalier-init/templates/agents/modes/repo-audit.md
++++ b/skills/espalier-init/templates/agents/modes/repo-audit.md
+@@ -1,8 +1,7 @@
+ # Mode: repo-audit
+ 
+ Read by `harness-security` when the spawning prompt says **REPO-AUDIT MODE** (`/espalier-audit`). Named on that prompt line by the orchestrator;
+-not loaded otherwise. Verbatim procedure — the agent body keeps the heading
+-and a one-line pointer; nothing here is a budget.
++not loaded otherwise.
+ 
+ ## Repo-Audit Mode (spawned by /espalier-audit)
+ 
+diff --git a/skills/espalier-init/templates/agents/modes/stage6-abuse-coverage.md b/skills/espalier-init/templates/agents/modes/stage6-abuse-coverage.md
+index 33f92e0..0b12ab6 100644
+--- a/skills/espalier-init/templates/agents/modes/stage6-abuse-coverage.md
++++ b/skills/espalier-init/templates/agents/modes/stage6-abuse-coverage.md
+@@ -1,8 +1,7 @@
+ # Mode: stage6-abuse-coverage
+ 
+ Read by `harness-reviewer` when it reviews the contract tests — the contract delta review (serial mode: Stage 6). Named on that prompt line by the orchestrator;
+-not loaded otherwise. Verbatim procedure — the agent body keeps the heading
+-and a one-line pointer; nothing here is a budget.
++not loaded otherwise.
+ 
+ ## Security Abuse-Test Coverage (contract delta review — serial: Stage 6)
+ 
+diff --git a/skills/espalier-init/templates/rules/coding-standards.md b/skills/espalier-init/templates/rules/coding-standards.md
+index a1b2f98..e1c65d8 100644
+--- a/skills/espalier-init/templates/rules/coding-standards.md
++++ b/skills/espalier-init/templates/rules/coding-standards.md
+@@ -53,9 +53,8 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
+   conditionals; no chained one-liner doing three things.
+ - Small, single-purpose functions: a block that needs its own explanation
+   is extracted under an intent-stating name.
+-- Comments are the last resort: structure the code so it explains itself;
+-  per the comment rules above, one plain line only for genuinely complex
+-  logic or a business rule the code cannot show.
++- Comments are the last resort: structure the code so it explains itself
++  (comment rules above).
+ - {observed exceptions — terse idioms this codebase itself uses consistently}
+ 
+ ## Required Patterns
+diff --git a/skills/espalier-init/templates/scout-prompts.md b/skills/espalier-init/templates/scout-prompts.md
+index ad9dea2..7295f21 100644
+--- a/skills/espalier-init/templates/scout-prompts.md
++++ b/skills/espalier-init/templates/scout-prompts.md
+@@ -3,8 +3,7 @@
+ Canonical, target-side copies of the Phase 1 discovery scouts. `/espalier-prune`
+ and `/espalier-doctor` both read THIS file (they ship into the target project and
+ cannot read the plugin's `references/discovery-checklist.md`) — the single source
+-of truth for re-scouting an artifact. Spawn the scout(s) mapped to the artifact
+-under refresh; run each as an Agent/Task scout against the current codebase.
++of truth for re-scouting an artifact.
+ 
+ > Sync note: this file mirrors the scout blocks in the plugin's
+ > `references/discovery-checklist.md`. When a scout's JSON shape changes, edit
+diff --git a/skills/espalier-init/templates/skills/espalier-ask.md b/skills/espalier-init/templates/skills/espalier-ask.md
+index 698c7dc..4b431e2 100644
+--- a/skills/espalier-init/templates/skills/espalier-ask.md
++++ b/skills/espalier-init/templates/skills/espalier-ask.md
+@@ -70,8 +70,7 @@ exist. Do NOT fail on its absence: fall back to
+ 
+ Docs are the map, code is the truth. Any behavior or location claim taken
+ from a doc MUST be confirmed by reading the cited file before it goes in the
+-answer. Never answer a behavior question from the wiki alone — the wiki can
+-be stale.
++answer — the wiki can be stale.
+ 
+ ### 4. Fall back to code
+ 
+diff --git a/skills/espalier-init/templates/skills/espalier-audit.md b/skills/espalier-init/templates/skills/espalier-audit.md
+index 2ce47e4..8463375 100644
+--- a/skills/espalier-init/templates/skills/espalier-audit.md
++++ b/skills/espalier-init/templates/skills/espalier-audit.md
+@@ -6,11 +6,10 @@ description: Repo-wide security audit — inventory every trust-boundary defect
+ # Espalier Audit
+ 
+ A standalone repo-wide security audit lane. The Stage 4 `harness-security` audit
+-is **change-scoped** — it sees only the diff a pipeline run produced, so a
+-trust-boundary hole that predates Espalier (or arrived outside the pipeline) is
+-never in its view. This lane closes that gap: it enumerates the project's whole
+-security surface, runs `harness-security` in **repo-audit mode** over it, and
+-writes a point-in-time findings inventory to `espalier/wiki/security-audit.md`.
++is **change-scoped**, so a trust-boundary hole that predates Espalier (or arrived
++outside the pipeline) is never in its view. This lane enumerates the project's
++whole security surface, runs `harness-security` in **repo-audit mode** over it,
++and writes a point-in-time findings inventory to `espalier/wiki/security-audit.md`.
+ 
+ It is NOT a pipeline. No stages, no gates, no `changes/` folder, no
+ `pipeline-state.md`, and **no hard-blocking** — findings are an inventory, not a
+@@ -216,8 +215,7 @@ codebase.
+ 
+ - Never edits source code, and never spawns `harness-coder` — every fix goes
+   through `/espalier-fix` with its own approval gate and review panel.
+-- Never blocks anything. No gate reads this page; it is an inventory. (The
+-  Stage 4 panel remains the enforcement point for changes.)
++- Never blocks anything. No gate reads this page; it is an inventory.
+ - Never appends history — the page is OVERWRITTEN per run; git history holds
+   prior audits.
+ - Never edits `security-standards.md` or any rule/wiki/spec — staleness is
+diff --git a/skills/espalier-init/templates/skills/espalier-doctor.md b/skills/espalier-init/templates/skills/espalier-doctor.md
+index c9edc8d..4d93b61 100644
+--- a/skills/espalier-init/templates/skills/espalier-doctor.md
++++ b/skills/espalier-init/templates/skills/espalier-doctor.md
+@@ -84,8 +84,6 @@ semantics; the end-of-session restamp rule applies). Write a timestamped human
+ summary to the gitignored `espalier/.drift-report.md`: artifacts scanned,
+ flagged, confirmed-current.
+ 
+-The doctor never edits an artifact. To apply a refresh, run `/espalier-prune`.
+-
+ ## Cadence
+ 
+ The cadence is chosen at `/espalier-init` (Phase 0 Q3) and stored in the tracked
+@@ -113,9 +111,7 @@ the canonical branch (`canonical-branch` in `espalier/.espalier-config`),
+ via the temporary-worktree flow described in `/espalier-prune`'s
+ Multi-Developer Discipline section — one scan per interval, one maintenance
+ PR carrying the scan's prune refreshes. Prune and promotion have their own
+-lanes (see that section's per-mechanism table); the doctor's lane is the
+-weekly maintenance PR only — a scan result stranded on a feature branch
+-helps nobody until merge.
++lanes (see that section's per-mechanism table).
+ 
+ **The shared stamp (tracked `espalier/.doctor-stamp`).** The doctor is the
+ stamp's ONLY writer. At the END of the maintenance session, write it and
+@@ -168,9 +164,6 @@ mapped to each artifact in scope (Scout Mapping above); run each as an
+ Agent/Task scout against the current codebase. `/espalier-prune` reads the same
+ file, so the two can never drift apart.
+ 
+-For an artifact with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both
+-and merge before the two-way diff.
+-
+ ## Config Advisories (report-only)
+ 
+ While writing the report, check one shipped-but-unused opt-in and, when it
+diff --git a/skills/espalier-init/templates/skills/espalier-fix.md b/skills/espalier-init/templates/skills/espalier-fix.md
+index 53529fb..4215d2a 100644
+--- a/skills/espalier-init/templates/skills/espalier-fix.md
++++ b/skills/espalier-init/templates/skills/espalier-fix.md
+@@ -156,8 +156,6 @@ prefix with `fix-`
+ ### Step 10: Leading-hyphen guard
+ If starts with hyphen (post-sanitization edge case): prefix with `x-`
+ 
+-This completes `{kebab}` (the deterministic identity tail).
+-
+ ### Step 10.5: Date prefix
+ Prepend the UTC creation date so change folders sort chronologically:
+ 
+@@ -330,9 +328,8 @@ merge), and the same fetch race guard run before the prompt.
+ 
+ ## Stage 0: Auto-Link Discovery (NEW)
+ 
+-Self-contained below — this skill ships into the target project and cannot read
+-any external plan. Stage 0 turns the bug input into a set of blamed commit SHAs
+-(`SHAS` array), then resolves each to the change that introduced it.
++Stage 0 turns the bug input into a set of blamed commit SHAs (`SHAS` array),
++then resolves each to the change that introduced it.
+ 
+ ### 0.1 Parse user input for a bug anchor
+ 
+@@ -404,8 +401,7 @@ Per-SHA lookup runs through Layers 0-3. `espalier/.merge-hook-decision`
+ > `. espalier/hooks/lookup-helpers.sh`
+ 
+ Resolve `ask-later` UPFRONT so the inner loop never hits a prompt. The bash
+-below only DETECTS the decision (same pattern as the Stage 5/6 detectors —
+-bash detects, the orchestrator prompts). If it reads `ask-later` (or the file
++below only DETECTS the decision. If it reads `ask-later` (or the file
+ is absent) AND `interactivity_mode` (from `drift-helpers.sh`) is NOT
+ `unattended`, YOU (the orchestrator) ask via `AskUserQuestion` — the same
+ choices the init-time question offers (options: `installed` /
+@@ -611,9 +607,8 @@ and `## Reproduction` sections. Record its verdict (`GRILLED (light)` /
+ ## Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
+ 
+ MANDATORY. After Stage 1 writes `requirements.md` and the diagnosis grill
+-resolves the root cause, STOP. Do NOT chain straight into Stage 3 coding — that
+-is the bug this gate closes. No code has been written yet; get explicit user
+-sign-off first.
++resolves the root cause, STOP and get explicit user sign-off — never chain
++straight into Stage 3 coding.
+ 
+ **Order:** run the Stage 1 Escalation Gate FIRST (it may migrate the fix to the
+ feat lane). Only if the fix stays in-lane does this approval gate fire.
+@@ -813,9 +808,8 @@ to it:
+    re-appends its `- REGRESSION_VERIFIED:` line; readers take the LAST
+    line. The panel sees the result BEFORE round 1;
+ 4. **scope detectors:** the reactive escalation gate counts **non-test
+-   files only** toward its `>5 files / >2 layers` thresholds (the fold
+-   moved test files into this diff — counting them would trip the gate on
+-   former Stage-5 work), and
++   files only** toward its `>5 files / >2 layers` thresholds (see the
++   Stage 3 Gate table under Escalation Gates for why), and
+    `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/fix/{slug}/coding-report.md`
+    fires the late-escalation prompt (the signal kept its own detector; it
+    just moved here with the work).
+@@ -825,9 +819,8 @@ self-reported status is a claim, not the gate. A build/lint/test failure
+ returns to the coder without a panel round and without counting a P0 round.
+ `report_archive` runs before EVERY coder spawn after the first (labels:
+ `stage3`, `handoff-{n}`, `blocked-{n}`, `round{n}-fix`, `exit-gate-fix`,
+-`contract-phase`),
+-so `coding-report.md` is always the CURRENT spawn's report and the
+-`REGRESSION_VERIFIED` lines appended below land on it.
++`contract-phase`), so `coding-report.md` is always the CURRENT spawn's report
++and the `REGRESSION_VERIFIED` lines appended below land on it.
+ 
+ **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
+ 
+@@ -957,10 +950,9 @@ block marks its rule file stale and appends `convention_drift: {rule file}`
+ `convention_drift_malformed: {rule file} (reviewer bundled blocks — drift NOT
+ indexed)` instead. It prints the lines it appended.
+ 
+-A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
+-Stage 4 has already PASSED when this parse runs — record it in pipeline-state.md
+-and surface one line to the user; never write a fake P0 into review-record.md
+-(it would contaminate the Stage 6 gate read).
++On a `MALFORMED` line (Stage 4 has already PASSED when this parse runs) record
++it in pipeline-state.md and surface one line to the user; never write a fake P0
++into review-record.md (it would contaminate the Stage 6 gate read).
+ 
+ **Convention Observations → the convention index.** The reviewer also emits
+ lower-bar Convention Observations (see `harness-reviewer.md`) — one per
+@@ -1033,9 +1025,8 @@ racing a rewrite certifies the wrong tree). The panel therefore sees the
+ result BEFORE its first verdict.
+ **Skip condition:** each verified run also appends
+ `- REGRESSION_VERIFIED_SCOPE: {hash}` (the helper below); when the current
+-scope hash equals the last recorded one — `Base-Ref` never changes within a
+-change — the helper skips both runs and re-appends the previous result
+-marked `(cached)`.
++scope hash equals the last recorded one the helper skips both runs and
++re-appends the previous result marked `(cached)` — see **Cache** below.
+ (With `test-mode: serial`: run it once, after the last test-writing spawn,
+ before Stage 6 — as pre-v0.23.)
+ 
+@@ -1089,10 +1080,8 @@ round-1 panel:
+   report) it skips both runs and re-appends the previous result marked
+   `(cached)`.
+ - No `Base-Ref` → `skipped — no Base-Ref recorded`; no test file named →
+-  `skipped — no regression test file named`.
+-
+-It appends the `- REGRESSION_VERIFIED:` line and the scope line to
+-coding-report.md and prints the former.
++  `skipped — no regression test file named`. It appends the
++  `- REGRESSION_VERIFIED:` line and the scope line and prints the former.
+ 
+ A `REGRESSION_VERIFIED: false` is a P0 the round-1 panel reviewer must
+ catch (folded; the Stage 6 reviewer in serial mode) — the
+diff --git a/skills/espalier-init/templates/skills/espalier-grill.md b/skills/espalier-init/templates/skills/espalier-grill.md
+index b31b3b8..2735461 100644
+--- a/skills/espalier-init/templates/skills/espalier-grill.md
++++ b/skills/espalier-init/templates/skills/espalier-grill.md
+@@ -12,11 +12,10 @@ unconfirmed diagnosis that passes Stage 1 is trusted by every later stage — an
+ later gate audits it. Grill is that audit: it converts an under-specified input into
+ one a coding agent can execute without guessing.
+ 
+-Grill also closes the one blind spot a bare reading of the input cannot: a requirement
+-that will violate a convention the project already encoded in `espalier/rules/` or
+-re-implement something `espalier/wiki/` already documents. That collision is known to
+-the repo but unknown to the requester — Step 1.5 cross-references the input against the
+-project map and turns it into a question before any code is written.
++Grill also closes the one blind spot a bare reading cannot: a requirement that violates
++a convention in `espalier/rules/` or re-implements what `espalier/wiki/` documents —
++known to the repo, unknown to the requester. Step 1.5 cross-references the input against
++the project map and turns that collision into a question before any code is written.
+ 
+ Grill is invoked BY Stage 1 of `/espalier` and `/espalier-fix`, and by
+ `/espalier-map` when resolving a grilling ticket. It is not a slash command and
+@@ -61,14 +60,13 @@ ambiguity lives in the answer space. Everything below applies with these deltas:
+ 
+ ### Score-only mode (`mode=score`)
+ 
+-The map lane's CLEARED → FILED handoff calls this to score each drafted
+-slice requirement BEFORE filing it. Run Step 1's signal count against
+-`input_text` (the drafted slice requirement) — nothing else: no Step 1.5,
+-no questions, no file writes. Return ONE line to the caller:
+-`SCORE: {skip|light|full} (signals={N})`. The handoff files `skip`/`light`
+-slices and refuses would-be-`full` ones (the map is not actually clear
+-there). This mode records no verdict in pipeline-state.md — no change
+-exists yet.
++The map lane's CLEARED → FILED handoff calls this to score each drafted slice
++requirement BEFORE filing it. Run Step 1's signal count against `input_text`
++(the drafted slice requirement) — nothing else: no Step 1.5, no questions, no
++file writes. Return ONE line to the caller: `SCORE: {skip|light|full}
++(signals={N})`. The handoff files `skip`/`light` slices and refuses
++would-be-`full` ones (the map is not actually clear there). This mode records
++no verdict in pipeline-state.md — no change exists yet.
+ 
+ ## Process
+ 
+@@ -145,9 +143,7 @@ count. A `skip`→`light`/`full` bump runs Step 2; a bump down to `skip` returns
+ 
+ Runs in both modes, after Step 1, before Step 2. Its job is the collision the requester
+ could not have flagged — a rule they don't know exists, a capability the wiki already
+-documents. These are known to the repo but unknown to the requester, and no text-signal
+-count in Step 1 can catch them. This is the one class of unknown the project's own map
+-can surface and a bare reading of `input_text` cannot.
++documents — which no text-signal count in Step 1 can catch.
+ 
+ Read the project map — NOT source code:
+ - `espalier/rules/*.md` — the encoded conventions.
+@@ -155,8 +151,7 @@ Read the project map — NOT source code:
+ 
+ **If neither directory exists or both are empty, skip this step silently** — there is
+ nothing to cross-check (e.g. a repo not yet initialised by `/espalier-init`). No signal,
+-no tier change, no output. (This keeps grill's behaviour identical to before on any
+-input that has no map to collide with.)
++no tier change, no output.
+ 
+ Scan for three collision classes (the last three rows of Step 1's signal table):
+ 
+diff --git a/skills/espalier-init/templates/skills/espalier-map.md b/skills/espalier-init/templates/skills/espalier-map.md
+index 22e77ba..462eda1 100644
+--- a/skills/espalier-init/templates/skills/espalier-map.md
++++ b/skills/espalier-init/templates/skills/espalier-map.md
+@@ -190,9 +190,8 @@ printf 'map: %s\nsession_started: %s\n' "{slug}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)
+ ```
+ 
+ While the marker exists, the `map-guard.sh` PreToolUse hook **blocks every
+-Write/Edit outside `espalier/maps/`** (exit-2 contract). This is the
+-machine-enforced form of "plan, don't do" — the drift this lane's upstream
+-inspiration is best known for is structurally impossible here.
++Write/Edit outside `espalier/maps/`** (exit-2 contract) — the machine-enforced
++form of "plan, don't do".
+ 
+ - **Task-ticket write windows:** when a task ticket genuinely needs writes
+   outside the map (a scaffold CLI, a config file), ask the user first
+diff --git a/skills/espalier-init/templates/skills/espalier-maprun.md b/skills/espalier-init/templates/skills/espalier-maprun.md
+index 57b0e73..e124733 100644
+--- a/skills/espalier-init/templates/skills/espalier-maprun.md
++++ b/skills/espalier-init/templates/skills/espalier-maprun.md
+@@ -387,10 +387,9 @@ two legs without stage progress, and a leg that dies on a usage-limit
+ signature makes the wrapper exit sentinel-less so reap classifies the ticket
+ as resumable `QUOTA`, never an escalation. `inline` spawns no worker at all —
+ the master works the ticket itself per step 5-inline; the contract above
+-still binds it (stages 1–6 only, the change folder is the ticket, never push,
+-resume discipline), except the question rules: an inline master asks the
+-human directly instead of parking, and marks state directly instead of
+-writing sentinels.
++still binds it, except the question rules: an inline master asks the human
++directly instead of parking, and marks state directly instead of writing
++sentinels.
+ 
+ ## State Vocabulary
+ 
+@@ -514,7 +513,7 @@ These are structural, not advisory:
+ - **Your working checkout is never touched.** All merges and edits happen in
+   the integration worktree.
+ - **Without a `pr` config, nothing is ever pushed.** Getting work to the
+-  remote is a deliberate human act, after review — exactly v0.19 behavior.
++  remote is a deliberate human act, after review.
+ - **With a `pr` config** (an explicit plan-time human opt-in), the MASTER —
+   never a worker — pushes ticket branches and the integration branch and
+   opens slice PRs. Merging the final assembly PR into the base branch
+diff --git a/skills/espalier-init/templates/skills/espalier-prune.md b/skills/espalier-init/templates/skills/espalier-prune.md
+index 8cbbd24..6b94ce6 100644
+--- a/skills/espalier-init/templates/skills/espalier-prune.md
++++ b/skills/espalier-init/templates/skills/espalier-prune.md
+@@ -135,9 +135,6 @@ A skipped gardener week self-corrects: the shared stamp ages out,
+ `doctor_due()` starts nagging everyone again — the pre-rota behavior is the
+ fallback, not a new failure.
+ 
+-Payoff: most devs stop seeing maintenance pressure entirely; exactly one
+-scan and at most one prune sweep per interval.
+-
+ **Worktree flow — do the discipline FOR the user, not BY the user.** When a
+ maintenance-lane action should land on the canonical branch while the user
+ sits on a feature branch, offer: *"run this in a temporary worktree of the
+@@ -255,11 +252,6 @@ mapped to the artifact under refresh (Scout Mapping above); run each as an
+ Agent/Task scout against the current codebase. Keeping the prompts in a single
+ shipped file means `/espalier-prune` and `/espalier-doctor` can never drift apart.
+ 
+-For a file with two scouts (`coding-standards.md` ← 1.3 + 1.6), spawn both and
+-merge their outputs into ONE proposed file before diffing. For a hook, regenerate
+-the scripted block from the scout's structured output (see Scout Mapping notes),
+-never prose.
+-
+ ## What This Skill Does NOT Do
+ 
+ - Does not re-run a full `/espalier-init`. It refreshes only flagged files.
+diff --git a/skills/espalier-init/templates/skills/espalier-review.md b/skills/espalier-init/templates/skills/espalier-review.md
+index e2ed1e4..78219b5 100644
+--- a/skills/espalier-init/templates/skills/espalier-review.md
++++ b/skills/espalier-init/templates/skills/espalier-review.md
+@@ -77,9 +77,6 @@ that applies to the change:
+ - [ ] Migrations follow expand → migrate → contract; destructive steps requirement-authorized
+ - [ ] Mutating consumers/webhooks are idempotent under redelivery
+ 
+-Severity tier for any gap: read it from the rule, not this list. The code-review
+-loop delegates enforcement to `harness-reviewer` (Production-Readiness Review).
+-
+ ## Output Template
+ 
+ The CANONICAL output format (columns, verdict vocabulary, sentinel line) is
+diff --git a/skills/espalier-init/templates/skills/espalier-simplify.md b/skills/espalier-init/templates/skills/espalier-simplify.md
+index 46a0931..f038dcd 100644
+--- a/skills/espalier-init/templates/skills/espalier-simplify.md
++++ b/skills/espalier-init/templates/skills/espalier-simplify.md
+@@ -6,16 +6,14 @@ description: Evidence-first simplification survey of the EXISTING code — hunt
+ # Espalier Simplify
+ 
+ A standalone lane that reduces what the codebase must keep coherent: the
+-number of facts, states, contracts, checks, and concepts a maintainer has to
+-hold in their head. Fewer lines are evidence, never the objective — a run may
+-conclude that the inspected surface is already justified, and that is a valid
+-result.
++facts, states, contracts, checks, and concepts a maintainer has to hold in
++their head. Fewer lines are evidence, never the objective — a run may
++conclude the inspected surface is already justified; that is a valid result.
+ 
+ Method adapted from `tt-a1i/simplify-codebase` (MIT) — prove first, then
+-delete. The enforcement is Espalier's: the survey is read-only, every cut runs
+-as a normal `refactor` change through `/espalier` (approval gate, coder,
+-two-agent panel, exit gates, push gate), and the docs that described the
+-retired surface are flagged into the drift sidecar for `/espalier-prune`.
++delete. The enforcement is Espalier's: the survey is read-only and every cut
++runs as a normal `refactor` change through `/espalier` (approval gate, coder,
++two-agent panel, exit gates, push gate; see What This Skill Does NOT Do).
+ 
+ It is NOT a pipeline. No stages, no gates, no round counters. It writes ONE
+ wiki page, files change skeletons on request, and flags docs. It never edits
+@@ -63,8 +61,7 @@ the discovered contract cannot tell a dead export from a plugin hook.
+ 
+ ### 1. Establish the contract (docs first, code second)
+ 
+-Espalier already wrote the decision records a simplification must respect.
+-Read, in this order, and keep notes — this is the map every scout gets:
++Read in this order and keep notes — this is the CONTRACT MAP every scout gets:
+ 
+ 1. `espalier/rules/engineering-structure.md` + `espalier/wiki/architecture.md`
+    — the layer / module map (the Broad partition list) and dependency
+@@ -151,8 +148,7 @@ Agent tool (read-only — Read, Grep, Glob, Bash for searches only):
+ ### 3. Consolidate and rank
+ 
+ Merge the batches. Two records with the same cut boundary are one candidate
+-(keep the stronger evidence). Then classify EVERY record — nothing is left
+-unclassified:
++(keep the stronger evidence). Classify EVERY record — none left unclassified:
+ 
+ | Class | Bar |
+ |-------|-----|
+diff --git a/skills/espalier-init/templates/skills/espalier-stages/1-2-requirements.md b/skills/espalier-init/templates/skills/espalier-stages/1-2-requirements.md
+index 7151cc8..9fb7dee 100644
+--- a/skills/espalier-init/templates/skills/espalier-stages/1-2-requirements.md
++++ b/skills/espalier-init/templates/skills/espalier-stages/1-2-requirements.md
+@@ -102,10 +102,9 @@ sign-off on `requirements.md` before Stage 3.
+ 
+    Record `- Deploy-Target: {target | ASK}` in pipeline-state.md. Stage 9
+    honors it (see pipeline.md Stage 9): a pre-authorized target deploys and
+-   health-checks without re-prompting; `ASK`/missing prompts at Stage 9 as
+-   today. The health-check gate, its rollback path, and the Stage 10 human
+-   acceptance are untouched — like the push pre-auth, this removes only the
+-   redundant wait, and it NEVER extends to Stage 10.
++   health-checks without re-prompting; `ASK`/missing prompts at Stage 9. The
++   health-check gate, its rollback path, and the Stage 10 human acceptance
++   are untouched; it NEVER extends to Stage 10.
+ 
+ 3d. In the SAME `AskUserQuestion` call — when it still has a slot (the
+    tool takes four questions; with 3b AND 3c both present, ask this one
+diff --git a/skills/espalier-init/templates/skills/espalier-stages/3-coding.md b/skills/espalier-init/templates/skills/espalier-stages/3-coding.md
+index f2e66eb..92374e6 100644
+--- a/skills/espalier-init/templates/skills/espalier-stages/3-coding.md
++++ b/skills/espalier-init/templates/skills/espalier-stages/3-coding.md
+@@ -8,13 +8,11 @@
+ ### Stage 3 Entry: Context Pack (assemble once — every spawn reuses it)
+ 
+ In the SAME orchestrator turn that presents the Requirements Approval Gate
+-prompt — the pack is paths/facts only and approval-independent, so
+-assembling it while the human reads the gate saves one turn — write
++prompt — the pack is paths/facts only and approval-independent — write
+ `espalier/changes/{type}/{slug}/context-pack.md` (overwrite if resuming a
+ pre-Stage-3 crash; never rewrite it mid-loop — re-spawn rounds reuse it).
+ On **Edit** that changes the layer set, re-derive the pack before
+-re-asking; on **Abort** the pack is dead weight in the aborted change dir —
+-harmless:
++re-asking; on **Abort** it is harmless dead weight:
+ 
+ ```markdown
+ # Context Pack: {slug}
+@@ -47,11 +45,10 @@ refusal: the human approved this text at the gate; the line is for the next
+ Stage 2, not this Stage 3.
+ 
+ Derive the layer list and reference files ONCE (from the requirement +
+-`engineering-structure.md` + a quick glob of the touched layers) — this is
+-exactly the discovery the coder, both panel agents, and the test spawns
+-would otherwise EACH repeat from scratch. The pack lists PATHS AND FACTS
+-only — never conclusions, never verdicts, never "this part is fine": every
+-agent still reads the named files itself and trusts the current code over
++`engineering-structure.md` + a quick glob of the touched layers). The
++pack lists PATHS AND FACTS only — never conclusions, never verdicts,
++never "this part is fine": every agent still reads the named files
++itself and trusts the current code over
+ the pack. Add the `CONTEXT PACK:` line to EVERY Stage 3-6 spawn prompt (the
+ prompt templates below carry it). A spawn that finds no pack (resumed old
+ change, fix lane before its pack step) falls back to its own discovery —
+@@ -108,14 +105,11 @@ re-spawns may run the build themselves again). Only after the exit gate
+ passes: commit each part's files as ONE commit with the part's `- Commit:`
+ message, in sub-task order (`git add {the part's Files created / modified /
+ Test files}` — never `-A`, never `espalier/`), record the SHAs under the
+-combined report's `- Commits:`, then delete the part files. Any overlap or uncertainty → serial dispatch,
+-exactly as before. Parallelism changes DISPATCH only — the Stage 4 panel
+-always reviews the COMBINED diff, and the review/gate contract is untouched.
++combined report's `- Commits:`, then delete the part files. Any overlap or
++uncertainty → serial dispatch.
+ 
+ ### Sub-Agent Delegation
+ 
+-Stages 3-6 use sub-agents for separation of concerns:
+-
+ **Stage 3 (Coding):**
+ ```
+ Agent tool:
+@@ -206,12 +200,11 @@ report is archived before anything overwrites or appends to it:
+    runs the discovered build and lint as two concurrent jobs, then — folded
+    mode — the discovered test command scoped to the coding report's listed
+    test files where the runner supports path filtering (full suite where it
+-   does not; the old Stage 5 "tests pass" gate, moved earlier — the panel
+-   must never review tests nobody has executed), and prints one line per
+-   job plus the log path of any failure. The commands have one source: the
+-   `run_build` / `run_lint` / `run_tests` bodies init substituted into
+-   `espalier/hooks/pre-push-gate.sh`. Exit codes: `0` green; `1` a job
+-   failed — red; `2` a `run_*` function is missing or unparseable in a
++   does not), and prints one line per job plus the log path of any failure.
++   The commands have one source: the `run_build` / `run_lint` / `run_tests`
++   bodies init substituted into `espalier/hooks/pre-push-gate.sh`. Exit
++   codes: `0` green; `1` a job failed — red; `2` a `run_*` function is
++   missing or unparseable in a
+    customised gate; `3` the greenfield placeholder gate. Only `1` is red.
+    On `2` or `3` run the gate by hand exactly as before: build + lint as
+    two concurrent background jobs in ONE bash call (`$BUILD & $LINT &`,
+@@ -238,8 +231,7 @@ spawn's report is one file in `coding-log/` (read only when named). Labels
+ name the spawn that wrote the archived report: `stage3` (`stage3-part{k}`
+ for a wave's parts), `handoff-{n}` (`handoff-{n}-part{k}`), `blocked-{n}`,
+ `round{n}-fix` (the FIX ROUND {n} report), `exit-gate-fix`,
+-`contract-phase`. A no-op when
+-no report exists.
++`contract-phase`. A no-op when no report exists.
+ 
+ **`test-mode` (read once at Stage 3 entry — word-key pattern, NOT the round
+ caps' integer grep):**
+diff --git a/skills/espalier-init/templates/skills/espalier-stages/4-panel.md b/skills/espalier-init/templates/skills/espalier-stages/4-panel.md
+index 5aff3f9..dff2d8a 100644
+--- a/skills/espalier-init/templates/skills/espalier-stages/4-panel.md
++++ b/skills/espalier-init/templates/skills/espalier-stages/4-panel.md
+@@ -7,9 +7,6 @@
+ 
+ ### Stage 4: The Review Panel
+ 
+-Stages 3-6 use sub-agents for separation of concerns; the panel prompts and
+-the round procedure are below.
+-
+ **Stage 4 (Review):**
+ ```
+ Agent tool:
+@@ -178,12 +175,10 @@ Stage 5 by any other path:
+    "espalier/changes/{type}/{slug}"` prints the coding report's
+    `### Deviations` entries (nothing when there are none): print them under
+    the PASS line, verbatim, and append `deviations: {n}` to the PASSED
+-   row's notes — this is where the human sees every departure from the
+-   approved contract, panel-verified, before anything is pushed (an
+-   unattended run has the row; the delivery brief carries them too) —
+-   THEN run the "Stage 4 Post-Review" drift processing below — it must finish BEFORE any contract
+-   delta-review spawn (that spawn overwrites the review-record.md the parse
+-   reads) — then the **stage boundary**: with the PASSED row, the
++   row's notes (the delivery brief carries them too) — THEN run the "Stage
++   4 Post-Review" drift processing below — it must finish BEFORE any
++   contract delta-review spawn (that spawn overwrites the review-record.md
++   the parse reads) — then the **stage boundary**: with the PASSED row, the
+    certificate, and the drift rows on disk, read `- Session-Boundary:` from
+    pipeline-state.md (collected at the Requirements Approval Gate; no
+    question here). `after-4` or `both` → write `- Current Stage: 5`, print
+diff --git a/skills/espalier-init/templates/skills/espalier-stages/5-6-contract.md b/skills/espalier-init/templates/skills/espalier-stages/5-6-contract.md
+index 84be5ab..ead8236 100644
+--- a/skills/espalier-init/templates/skills/espalier-stages/5-6-contract.md
++++ b/skills/espalier-init/templates/skills/espalier-stages/5-6-contract.md
+@@ -107,7 +107,7 @@ interface tests, failure-mode tests, AND the contracted abuse tests
+ report fresh to coding-report.md (the orchestrator archives the Stage 3
+ report first — `report_archive … "stage3"` / `"round{n}-fix"`); then
+ Stage 6 below reviews them as its own fixpoint loop. Stage 5/6 rows record
+-normally — no SKIPPED rows in serial mode. This is the pre-v0.22 flow.
++normally — no SKIPPED rows in serial mode.
+ 
+ **Stage 6 (serial mode only — Test Review):**
+ ```
+diff --git a/skills/espalier-init/templates/skills/espalier-stages/7-10-delivery.md b/skills/espalier-init/templates/skills/espalier-stages/7-10-delivery.md
+index 0164237..d454ba2 100644
+--- a/skills/espalier-init/templates/skills/espalier-stages/7-10-delivery.md
++++ b/skills/espalier-init/templates/skills/espalier-stages/7-10-delivery.md
+@@ -125,10 +125,8 @@ and prints `Stage 8.5: {N} stale doc(s) — run /espalier-prune to refresh.
+ (Not blocking; pipeline continues.)`.
+ 
+ `doc-patches.md` is a per-change artifact created on demand under
+-`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Stage 8.5 touches no
+-rule/wiki/spec file, so it cannot dirty a project-level doc. Advance to Stage 9
+-regardless of the result. In-pipeline auto-apply is a v2 item — refresh stays a
+-deliberate `/espalier-prune`.
++`espalier/changes/{type}/{slug}/` — like `ci-result.md`. Advance to Stage 9
++regardless of the result; refresh stays a deliberate `/espalier-prune`.
+ 
+ ### Stage 10: Delivery Brief (assembled, never authored)
+ 
+diff --git a/skills/espalier-init/templates/skills/espalier.md b/skills/espalier-init/templates/skills/espalier.md
+index 9160a9c..1724856 100644
+--- a/skills/espalier-init/templates/skills/espalier.md
++++ b/skills/espalier-init/templates/skills/espalier.md
+@@ -18,11 +18,9 @@ all 10 stages defined in `espalier/pipeline.md`.
+ ### Before Starting
+ 
+ 1. Read `espalier/pipeline.md` for stage definitions
+-2. Check for existing state: look in `espalier/changes/` for a matching
+-   requirement (matching = the kebab-tail rule in Session Resumption below)
+-   - If found, read `pipeline-state.md` and RESUME from the current stage
+-   - If not found, create a new directory and start from Stage 1 — an
+-     unrelated in-flight change is surfaced, never silently resumed
++2. Check for existing state per Session Resumption (below): a tail-matching
++   `IN_PROGRESS` change is resumed; otherwise start from Stage 1 — an
++   unrelated in-flight change is surfaced, never silently resumed
+ 
+ ### Flag Parsing
+ 
+@@ -37,8 +35,7 @@ requirement itself is never mistaken for a flag).
+ | `--resume` | Recognized no-op. Resumption is already automatic (see Session Resumption); accept and drop the token. |
+ 
+ An unrecognized leading `--token` is NOT absorbed into the requirement — warn the
+-user (`unrecognized flag: --token; ignoring`) and drop it. Only the flags above are
+-recognized.
++user (`unrecognized flag: --token; ignoring`) and drop it.
+ 
+ ### Stage 0 Pre-Flight (drift + conventions + doctor)
+ 
+@@ -88,11 +85,10 @@ Options:
+ print ONE line (`pre-flight: {N} stale, {M} promotion candidate(s), doctor
+ {due|not due} — deferred to the approval gate`), append the same summary to
+ `espalier/.drift-report.md` with a `deferred-to-approval-gate ({ts})` marker
+-line (an interrupted run leaves an inspectable trace, and the signals
+-re-surface at the next invocation's pre-flight anyway — the sidecar is never
+-cleared by deferral), and continue to Stage 1. The Requirements Approval
+-Gate carries the maintenance question (its step 3b) — still BEFORE Stage 3,
+-so a promotion decided there governs this run's coder. The weekly
++line (the sidecar is never cleared by deferral — the signals re-surface at
++the next pre-flight anyway), and continue to Stage 1. The Requirements
++Approval Gate carries the maintenance question (its step 3b) — still BEFORE
++Stage 3, so a promotion decided there governs this run's coder. The weekly
+ gardener rota (see /espalier-prune's Multi-Developer Discipline) remains
+ the default owner of non-critical maintenance either way.
+ 
+@@ -107,10 +103,9 @@ Stage 1. Never prune, never promote, never run a doctor scan unattended.
+ 
+ When the Stage 0 pre-flight reports a `pattern_key` with >= 3 deduped
+ `diverges` observations (from `conv_fold`) and the user picks "Handle now",
+-fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (rows, not
+-counts — it folds the legacy file and the per-key files and dedupes across
+-both), run the race guard below, and surface the candidate with
+-`AskUserQuestion`:
++fetch the evidence rows with `conv_observations "$PATTERN_KEY"` (folds the
++legacy and per-key files, deduped), run the race guard below, and surface
++the candidate with `AskUserQuestion`:
+ 
+ ```
+ Convention "{pattern_key}" has diverged in {N} changes:
+@@ -183,9 +178,8 @@ fi
+ (FETCH_HEAD, not `$R/$B` — a source-only fetch doesn't update the tracking
+ ref, and a fetch failure must SKIP the check rather than consult stale state.
+ The width guard keeps a malformed row from vacuously satisfying
+-`$5!="diverges"`.) The guard is a courtesy, not the race defense — two
+-same-key decisions on different branches surface as an ordinary git conflict
+-at merge, which is the structural detection.
++`$5!="diverges"`.) The guard is a courtesy — the git conflict described
++above remains the structural race detection.
+ 
+ ### Session Resumption
+ 
+@@ -215,9 +209,7 @@ unrelated in-flight change into the new request:
+    from 1).
+ 3. Non-matching in-flight state files do NOT block a new requirement. Start
+    the new change normally and surface ONE line: "Note: {N} other in-flight
+-   change(s): {slugs} — resume each with /espalier <its requirement>." (The
+-   push gate independently warns when several changes are in flight;
+-   finishing one before starting the next is the safe default.)
++   change(s): {slugs} — resume each with /espalier <its requirement>."
+ 4. Invoked with no requirement text at all (bare `/espalier`, or `--resume`
+    alone) → resume the single in-flight change; if several are in flight,
+    list them and ask which one via `AskUserQuestion`.
+@@ -292,12 +284,9 @@ flight; every spawn above is alone in its message.
+ 
+ ### State File Format
+ 
+-Parse `{type}` from the requirement prefix:
+-- `feat: <text>` → type = `feat`
+-- `fix: <text>` → type = `fix`
+-- `refactor: <text>` → type = `refactor`
+-- `docs: <text>` → type = `docs`
+-- Anything else → type = `feat` (default)
++Parse `{type}` from the requirement prefix: `feat:` → `feat`, `fix:` →
++`fix`, `refactor:` → `refactor`, `docs:` → `docs`; anything else → `feat`
++(default).
+ 
+ `fix:` on the FULL pipeline is for large fixes — >5 files, multiple layers, or
+ schema changes (the espalier-fix skill's own "Do NOT use for" list routes those
+@@ -383,10 +372,9 @@ Stage boundaries — after Stage 2 approval and after the Stage 4 PASS
+ Requirements Approval Gate (`stages/1-2-requirements.md` step 3d): one
+ question, first option default, recorded as `- Session-Boundary: none |
+ after-2 | after-4 | both`, never asked on an unattended run. Each boundary
+-then READS the line instead of asking (the v0.25 `Continue in a fresh
+-session` offer, chosen up front). Nothing depends on the answer: the state
+-is already on disk and Session Resumption is unchanged; a fresh session
+-runs the remaining stages with the change's state and the stage's
++then READS the line instead of asking. Nothing depends on the answer: the
++state is already on disk and Session Resumption is unchanged; a fresh
++session runs the remaining stages with the change's state and the stage's
+ procedure at the top of its context.
+ 
+ ### Completion

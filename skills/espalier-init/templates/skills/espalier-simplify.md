@@ -6,16 +6,14 @@ description: Evidence-first simplification survey of the EXISTING code — hunt 
 # Espalier Simplify
 
 A standalone lane that reduces what the codebase must keep coherent: the
-number of facts, states, contracts, checks, and concepts a maintainer has to
-hold in their head. Fewer lines are evidence, never the objective — a run may
-conclude that the inspected surface is already justified, and that is a valid
-result.
+facts, states, contracts, checks, and concepts a maintainer has to hold in
+their head. Fewer lines are evidence, never the objective — a run may
+conclude the inspected surface is already justified; that is a valid result.
 
 Method adapted from `tt-a1i/simplify-codebase` (MIT) — prove first, then
-delete. The enforcement is Espalier's: the survey is read-only, every cut runs
-as a normal `refactor` change through `/espalier` (approval gate, coder,
-two-agent panel, exit gates, push gate), and the docs that described the
-retired surface are flagged into the drift sidecar for `/espalier-prune`.
+delete. The enforcement is Espalier's: the survey is read-only and every cut
+runs as a normal `refactor` change through `/espalier` (approval gate, coder,
+two-agent panel, exit gates, push gate; see What This Skill Does NOT Do).
 
 It is NOT a pipeline. No stages, no gates, no round counters. It writes ONE
 wiki page, files change skeletons on request, and flags docs. It never edits
@@ -63,8 +61,7 @@ the discovered contract cannot tell a dead export from a plugin hook.
 
 ### 1. Establish the contract (docs first, code second)
 
-Espalier already wrote the decision records a simplification must respect.
-Read, in this order, and keep notes — this is the map every scout gets:
+Read in this order and keep notes — this is the CONTRACT MAP every scout gets:
 
 1. `espalier/rules/engineering-structure.md` + `espalier/wiki/architecture.md`
    — the layer / module map (the Broad partition list) and dependency
@@ -151,8 +148,7 @@ Agent tool (read-only — Read, Grep, Glob, Bash for searches only):
 ### 3. Consolidate and rank
 
 Merge the batches. Two records with the same cut boundary are one candidate
-(keep the stronger evidence). Then classify EVERY record — nothing is left
-unclassified:
+(keep the stronger evidence). Classify EVERY record — none left unclassified:
 
 | Class | Bar |
 |-------|-----|

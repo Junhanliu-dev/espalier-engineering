@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.28.1 — 2026-09-15
+
+Patch: **the trim.** Every shipped agent, skill, rule, and stage template
+says the same rules in fewer lines — 8,723 → 8,611 template lines (−112,
+1.3%) across 23 files — with **every rule, gate, rubric, verdict sentinel,
+tag, cap, path, heading, frontmatter, and code fence byte-identical.** What
+went: restated rationale ("this catches the class of bug where…"), history
+notes ("relocated, not altered", "the pre-v0.22 flow", "since v0.4.0+"),
+sentences doubled inside one section, section announcers ("Stages 3-6 use
+sub-agents…"), and broken wraps. What stayed, on purpose: every point-of-use
+repeat (a rule restated where an agent acts on it), every exception and
+condition, every worked example that is the only one of its format, and
+every line a migration, validation check, eval, or hook greps for (1,092
+anchor lines were frozen before editing; a verifier confirmed all of them,
+every heading, every fence, and every placeholder survived). The yield is
+small because the templates were already dense: 31% of lines are anchors
+or formats, and the owner rule keeps repeats that make an agent act.
+Per-file: harness-coder 603→586, harness-reviewer 475→457, espalier SKILL
+441→429, espalier-fix 1411→1400, 3-coding 260→252, prune 271→263, doctor
+194→187, grill 361→356, 4-panel 255→250, simplify 481→477; 12 more files
+lost 1–3 lines each (5-6-contract changed wording at equal length); 14
+files (pipeline.md, agent.md, four rules, espalier-coding / -security /
+-testing / -requirements, fix-round, re-review, simplification,
+platform-native.md) are unchanged.
+
+- **Migration #39 — a new, reusable mechanism for text-only refreshes.**
+  Anchored edits cannot express a 24-file trim, and a pure-copy refresh
+  would clobber customised agent files. The release ships its exact
+  template diff (`scripts/patches/v0.28.0-to-v0.28.1.patch`, generated
+  from the plugin's own history) and `migrate-v0.28.0-to-v0.28.1.sh`
+  applies it per file with `git apply`, ALL-OR-NOTHING per file: a file
+  still at the v0.28.0 shape (with its init-time `{project_name}`
+  substitution, read back from the file itself) takes the trim
+  byte-for-byte (backup `.pre-v0.28.1.bak`, gitignored); a file already at
+  the v0.28.1 shape is a no-op (the reverse patch applies); a customised
+  file — any hunk fails — is left UNTOUCHED and recorded in
+  `espalier/.migrations-skipped` as `v0.28.1-trim-<path>`. The trim is
+  text-only, so a skipped file loses nothing and needs no manual port.
+  `--dry-run` prints the per-file plan. No validation check (nothing new
+  to validate; totals stay 60 / 65 / 70), no config key, no hook.
+- **`/espalier-migrate`.** Step 39; `NEEDS_V0281_PATCH` probes one
+  reworded v0.28.1 line per trimmed surface (router SKILL, fix SKILL,
+  coder, reviewer — a skip record counts as handled); the supersession
+  floor recognises v0.28.1; the plugin probe is the new script.
+- **Suites.** bootstrap 395/395 (Test 39: the shipped patch must
+  reverse-apply onto the current templates — a freshness guard that fails
+  the moment a template is edited without regenerating the patch; fresh
+  install; a real v0.28.0 install migrated to byte-identity with backups;
+  re-run no-op; a customised reviewer left byte-untouched and recorded
+  while its siblings trim; Tests 35–38 now chain #39 before their
+  byte-identity asserts), hooks 211/211. Evals (opus pinned) re-run on
+  the trimmed templates: `coder-10-ceiling-marker` PASS, `review/rule-shrink-
+  ceiling-11` 2/2 caught + `clean-03-readable-over-shrink` 0 false
+  positives, `grill/overspec-01-settings-cache` catch-rate 1.00.
+- **Deferred** (`docs/deferred-items.md`): cross-file folding of shared
+  prose (would change when an agent receives an input — the owner's
+  context rule), the plugin-level `espalier-migrate` / `espalier-init`
+  SKILLs (not installed; the migrate skill's per-version chain paragraph
+  is combinatorial), and the deliberate point-of-use repeats.
+
 ## 0.28.0 — 2026-09-15
 
 Minor: **the ceiling ledger** — a second idea-level transplant from

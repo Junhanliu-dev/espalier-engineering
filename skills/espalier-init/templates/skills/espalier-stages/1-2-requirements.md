@@ -102,10 +102,9 @@ sign-off on `requirements.md` before Stage 3.
 
    Record `- Deploy-Target: {target | ASK}` in pipeline-state.md. Stage 9
    honors it (see pipeline.md Stage 9): a pre-authorized target deploys and
-   health-checks without re-prompting; `ASK`/missing prompts at Stage 9 as
-   today. The health-check gate, its rollback path, and the Stage 10 human
-   acceptance are untouched — like the push pre-auth, this removes only the
-   redundant wait, and it NEVER extends to Stage 10.
+   health-checks without re-prompting; `ASK`/missing prompts at Stage 9. The
+   health-check gate, its rollback path, and the Stage 10 human acceptance
+   are untouched; it NEVER extends to Stage 10.
 
 3d. In the SAME `AskUserQuestion` call — when it still has a slot (the
    tool takes four questions; with 3b AND 3c both present, ask this one
