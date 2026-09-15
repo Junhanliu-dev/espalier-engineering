@@ -1,8 +1,7 @@
 # Mode: repo-audit
 
 Read by `harness-security` when the spawning prompt says **REPO-AUDIT MODE** (`/espalier-audit`). Named on that prompt line by the orchestrator;
-not loaded otherwise. Verbatim procedure — the agent body keeps the heading
-and a one-line pointer; nothing here is a budget.
+not loaded otherwise.
 
 ## Repo-Audit Mode (spawned by /espalier-audit)
 

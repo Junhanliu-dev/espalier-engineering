@@ -156,8 +156,6 @@ prefix with `fix-`
 ### Step 10: Leading-hyphen guard
 If starts with hyphen (post-sanitization edge case): prefix with `x-`
 
-This completes `{kebab}` (the deterministic identity tail).
-
 ### Step 10.5: Date prefix
 Prepend the UTC creation date so change folders sort chronologically:
 
@@ -330,9 +328,8 @@ merge), and the same fetch race guard run before the prompt.
 
 ## Stage 0: Auto-Link Discovery (NEW)
 
-Self-contained below — this skill ships into the target project and cannot read
-any external plan. Stage 0 turns the bug input into a set of blamed commit SHAs
-(`SHAS` array), then resolves each to the change that introduced it.
+Stage 0 turns the bug input into a set of blamed commit SHAs (`SHAS` array),
+then resolves each to the change that introduced it.
 
 ### 0.1 Parse user input for a bug anchor
 
@@ -404,8 +401,7 @@ Per-SHA lookup runs through Layers 0-3. `espalier/.merge-hook-decision`
 > `. espalier/hooks/lookup-helpers.sh`
 
 Resolve `ask-later` UPFRONT so the inner loop never hits a prompt. The bash
-below only DETECTS the decision (same pattern as the Stage 5/6 detectors —
-bash detects, the orchestrator prompts). If it reads `ask-later` (or the file
+below only DETECTS the decision. If it reads `ask-later` (or the file
 is absent) AND `interactivity_mode` (from `drift-helpers.sh`) is NOT
 `unattended`, YOU (the orchestrator) ask via `AskUserQuestion` — the same
 choices the init-time question offers (options: `installed` /
@@ -611,9 +607,8 @@ and `## Reproduction` sections. Record its verdict (`GRILLED (light)` /
 ## Requirements Approval Gate (BLOCKING — before Stage 3 Coding)
 
 MANDATORY. After Stage 1 writes `requirements.md` and the diagnosis grill
-resolves the root cause, STOP. Do NOT chain straight into Stage 3 coding — that
-is the bug this gate closes. No code has been written yet; get explicit user
-sign-off first.
+resolves the root cause, STOP and get explicit user sign-off — never chain
+straight into Stage 3 coding.
 
 **Order:** run the Stage 1 Escalation Gate FIRST (it may migrate the fix to the
 feat lane). Only if the fix stays in-lane does this approval gate fire.
@@ -813,9 +808,8 @@ to it:
    re-appends its `- REGRESSION_VERIFIED:` line; readers take the LAST
    line. The panel sees the result BEFORE round 1;
 4. **scope detectors:** the reactive escalation gate counts **non-test
-   files only** toward its `>5 files / >2 layers` thresholds (the fold
-   moved test files into this diff — counting them would trip the gate on
-   former Stage-5 work), and
+   files only** toward its `>5 files / >2 layers` thresholds (see the
+   Stage 3 Gate table under Escalation Gates for why), and
    `grep -q '^- TEST_SCOPE_INFLATION: true' espalier/changes/fix/{slug}/coding-report.md`
    fires the late-escalation prompt (the signal kept its own detector; it
    just moved here with the work).
@@ -825,9 +819,8 @@ self-reported status is a claim, not the gate. A build/lint/test failure
 returns to the coder without a panel round and without counting a P0 round.
 `report_archive` runs before EVERY coder spawn after the first (labels:
 `stage3`, `handoff-{n}`, `blocked-{n}`, `round{n}-fix`, `exit-gate-fix`,
-`contract-phase`),
-so `coding-report.md` is always the CURRENT spawn's report and the
-`REGRESSION_VERIFIED` lines appended below land on it.
+`contract-phase`), so `coding-report.md` is always the CURRENT spawn's report
+and the `REGRESSION_VERIFIED` lines appended below land on it.
 
 **Escalation Gate (Stage 3):** see "Escalation Gates" section below.
 
@@ -957,10 +950,9 @@ block marks its rule file stale and appends `convention_drift: {rule file}`
 `convention_drift_malformed: {rule file} (reviewer bundled blocks — drift NOT
 indexed)` instead. It prints the lines it appended.
 
-A `MALFORMED` line means the reviewer bundled unrelated drifts into one block.
-Stage 4 has already PASSED when this parse runs — record it in pipeline-state.md
-and surface one line to the user; never write a fake P0 into review-record.md
-(it would contaminate the Stage 6 gate read).
+On a `MALFORMED` line (Stage 4 has already PASSED when this parse runs) record
+it in pipeline-state.md and surface one line to the user; never write a fake P0
+into review-record.md (it would contaminate the Stage 6 gate read).
 
 **Convention Observations → the convention index.** The reviewer also emits
 lower-bar Convention Observations (see `harness-reviewer.md`) — one per
@@ -1033,9 +1025,8 @@ racing a rewrite certifies the wrong tree). The panel therefore sees the
 result BEFORE its first verdict.
 **Skip condition:** each verified run also appends
 `- REGRESSION_VERIFIED_SCOPE: {hash}` (the helper below); when the current
-scope hash equals the last recorded one — `Base-Ref` never changes within a
-change — the helper skips both runs and re-appends the previous result
-marked `(cached)`.
+scope hash equals the last recorded one the helper skips both runs and
+re-appends the previous result marked `(cached)` — see **Cache** below.
 (With `test-mode: serial`: run it once, after the last test-writing spawn,
 before Stage 6 — as pre-v0.23.)
 
@@ -1089,10 +1080,8 @@ round-1 panel:
   report) it skips both runs and re-appends the previous result marked
   `(cached)`.
 - No `Base-Ref` → `skipped — no Base-Ref recorded`; no test file named →
-  `skipped — no regression test file named`.
-
-It appends the `- REGRESSION_VERIFIED:` line and the scope line to
-coding-report.md and prints the former.
+  `skipped — no regression test file named`. It appends the
+  `- REGRESSION_VERIFIED:` line and the scope line and prints the former.
 
 A `REGRESSION_VERIFIED: false` is a P0 the round-1 panel reviewer must
 catch (folded; the Stage 6 reviewer in serial mode) — the

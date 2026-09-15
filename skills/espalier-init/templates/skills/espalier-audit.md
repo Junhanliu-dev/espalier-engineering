@@ -6,11 +6,10 @@ description: Repo-wide security audit — inventory every trust-boundary defect 
 # Espalier Audit
 
 A standalone repo-wide security audit lane. The Stage 4 `harness-security` audit
-is **change-scoped** — it sees only the diff a pipeline run produced, so a
-trust-boundary hole that predates Espalier (or arrived outside the pipeline) is
-never in its view. This lane closes that gap: it enumerates the project's whole
-security surface, runs `harness-security` in **repo-audit mode** over it, and
-writes a point-in-time findings inventory to `espalier/wiki/security-audit.md`.
+is **change-scoped**, so a trust-boundary hole that predates Espalier (or arrived
+outside the pipeline) is never in its view. This lane enumerates the project's
+whole security surface, runs `harness-security` in **repo-audit mode** over it,
+and writes a point-in-time findings inventory to `espalier/wiki/security-audit.md`.
 
 It is NOT a pipeline. No stages, no gates, no `changes/` folder, no
 `pipeline-state.md`, and **no hard-blocking** — findings are an inventory, not a
@@ -216,8 +215,7 @@ codebase.
 
 - Never edits source code, and never spawns `harness-coder` — every fix goes
   through `/espalier-fix` with its own approval gate and review panel.
-- Never blocks anything. No gate reads this page; it is an inventory. (The
-  Stage 4 panel remains the enforcement point for changes.)
+- Never blocks anything. No gate reads this page; it is an inventory.
 - Never appends history — the page is OVERWRITTEN per run; git history holds
   prior audits.
 - Never edits `security-standards.md` or any rule/wiki/spec — staleness is

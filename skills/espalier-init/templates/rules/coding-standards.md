@@ -53,9 +53,8 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
   conditionals; no chained one-liner doing three things.
 - Small, single-purpose functions: a block that needs its own explanation
   is extracted under an intent-stating name.
-- Comments are the last resort: structure the code so it explains itself;
-  per the comment rules above, one plain line only for genuinely complex
-  logic or a business rule the code cannot show.
+- Comments are the last resort: structure the code so it explains itself
+  (comment rules above).
 - {observed exceptions — terse idioms this codebase itself uses consistently}
 
 ## Required Patterns

@@ -1,5 +1,36 @@
 # Deferred Items
 
+## Items deferred from v0.28.1
+
+- **Cross-file folding of shared prose.** The fix SKILL restates parts of
+  the stage files, the mode files restate their agent's section header,
+  and the coder/reviewer restate rules from `coding-standards.md`. Folding
+  them would cut lines but change WHEN an agent receives an input (a
+  pointer instead of the text) — the owner's context rule keeps inputs
+  arriving as they do today.
+  - **Trigger to revisit**: an owner decision to change the read graph
+    (which file each agent loads, and when), taken as its own release.
+- **Point-of-use repeats.** A rule restated where an agent acts on it
+  (the reviewer's "never assume the fix is correct" once per agent section,
+  the grill's "every decision lands as a verifiable line" in Step 3 and in
+  Anti-Patterns) was kept on purpose; ~40 such repeats remain.
+  - **Trigger to revisit**: an eval showing a repeat is not load-bearing
+    (the agent behaves identically with the second copy removed).
+- **Plugin-level skills.** `skills/espalier-migrate/SKILL.md` (1.9k lines)
+  and `skills/espalier-init/SKILL.md` (620) are not installed into
+  projects and were not trimmed; the migrate skill's per-version chain
+  paragraph ("a v0.X install needs …") is combinatorial and could become
+  one rule sentence.
+  - **Trigger to revisit**: the next change to the migration runner's
+    Step 1 detection block (Tests 35–39 extract and run it as-is).
+- **Anchor-pinned files.** `espalier-coding.md`, `espalier-security.md`,
+  `espalier-requirements.md`, `development-process.md`, `pipeline.md`,
+  `agent.md`, and the mode files lost nothing: every editable line sits
+  next to a migration or check anchor, so a rewrite gains no line without
+  moving an anchor.
+  - **Trigger to revisit**: a release that retires those anchors (each
+    migration script's probes are the ledger).
+
 ## Items deferred from v0.28.0
 
 - **Line metrics (ponytail Track F).** No per-change source-line count in

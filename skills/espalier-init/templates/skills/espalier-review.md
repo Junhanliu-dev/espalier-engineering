@@ -77,9 +77,6 @@ that applies to the change:
 - [ ] Migrations follow expand → migrate → contract; destructive steps requirement-authorized
 - [ ] Mutating consumers/webhooks are idempotent under redelivery
 
-Severity tier for any gap: read it from the rule, not this list. The code-review
-loop delegates enforcement to `harness-reviewer` (Production-Readiness Review).
-
 ## Output Template
 
 The CANONICAL output format (columns, verdict vocabulary, sentinel line) is

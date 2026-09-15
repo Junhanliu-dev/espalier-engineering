@@ -107,7 +107,7 @@ interface tests, failure-mode tests, AND the contracted abuse tests
 report fresh to coding-report.md (the orchestrator archives the Stage 3
 report first — `report_archive … "stage3"` / `"round{n}-fix"`); then
 Stage 6 below reviews them as its own fixpoint loop. Stage 5/6 rows record
-normally — no SKIPPED rows in serial mode. This is the pre-v0.22 flow.
+normally — no SKIPPED rows in serial mode.
 
 **Stage 6 (serial mode only — Test Review):**
 ```

@@ -1,8 +1,7 @@
 # Mode: stage6-abuse-coverage
 
 Read by `harness-reviewer` when it reviews the contract tests — the contract delta review (serial mode: Stage 6). Named on that prompt line by the orchestrator;
-not loaded otherwise. Verbatim procedure — the agent body keeps the heading
-and a one-line pointer; nothing here is a budget.
+not loaded otherwise.
 
 ## Security Abuse-Test Coverage (contract delta review — serial: Stage 6)
 

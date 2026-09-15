@@ -70,8 +70,7 @@ exist. Do NOT fail on its absence: fall back to
 
 Docs are the map, code is the truth. Any behavior or location claim taken
 from a doc MUST be confirmed by reading the cited file before it goes in the
-answer. Never answer a behavior question from the wiki alone — the wiki can
-be stale.
+answer — the wiki can be stale.
 
 ### 4. Fall back to code
 

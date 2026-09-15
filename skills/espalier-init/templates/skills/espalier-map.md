@@ -190,9 +190,8 @@ printf 'map: %s\nsession_started: %s\n' "{slug}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)
 ```
 
 While the marker exists, the `map-guard.sh` PreToolUse hook **blocks every
-Write/Edit outside `espalier/maps/`** (exit-2 contract). This is the
-machine-enforced form of "plan, don't do" — the drift this lane's upstream
-inspiration is best known for is structurally impossible here.
+Write/Edit outside `espalier/maps/`** (exit-2 contract) — the machine-enforced
+form of "plan, don't do".
 
 - **Task-ticket write windows:** when a task ticket genuinely needs writes
   outside the map (a scaffold CLI, a config file), ask the user first

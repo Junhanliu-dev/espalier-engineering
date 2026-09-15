@@ -3,8 +3,7 @@
 Canonical, target-side copies of the Phase 1 discovery scouts. `/espalier-prune`
 and `/espalier-doctor` both read THIS file (they ship into the target project and
 cannot read the plugin's `references/discovery-checklist.md`) — the single source
-of truth for re-scouting an artifact. Spawn the scout(s) mapped to the artifact
-under refresh; run each as an Agent/Task scout against the current codebase.
+of truth for re-scouting an artifact.
 
 > Sync note: this file mirrors the scout blocks in the plugin's
 > `references/discovery-checklist.md`. When a scout's JSON shape changes, edit
