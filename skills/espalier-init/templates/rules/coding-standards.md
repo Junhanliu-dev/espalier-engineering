@@ -38,6 +38,9 @@ itself uses consistently ({observed idioms, e.g. `i`, `ctx`}) is fine.
   show. No section banners, no doc-blocks restating a signature, no
   narration, no restating the code in prose — delete any comment that
   merely repeats what the line already says.
+- A deliberate shortcut with a known ceiling carries the one allowed line,
+  in this project's comment syntax: `ceiling: <limit>; <trigger>` — one
+  per shortcut, greppable (`harness-coder.md` → Solution Selection Ladder).
 
 ## Readable by Default
 - No magic values: a literal on a decision path (threshold, limit, retry

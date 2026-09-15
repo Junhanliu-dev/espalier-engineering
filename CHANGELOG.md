@@ -1,5 +1,119 @@
 # Changelog
 
+## 0.28.0 — 2026-09-15
+
+Minor: **the ceiling ledger** — a second idea-level transplant from
+[DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) (MIT,
+v4.10.0), inside the rule the first one set in v0.13.0: **conventions
+first, correctness within them, clarity then brevity break ties.** Gap
+analysis and the rejected pieces in `docs/ponytail-v4-transplant-plan.md`.
+**Every gate, rubric, verdict sentinel, round cap, and escalation path is
+contract-equal to v0.27.0; every new finding is advisory P3; no new lane,
+skill, or command; nothing sets a budget.** MINOR because the generated
+`harness-coder`, `harness-reviewer` and `coding-standards.md` files change
+shape and a new file lands under `espalier/skills/espalier-coding/`.
+Suites: bootstrap 380/380 (Test 38; Tests 34–37 now carry / chain #38),
+hooks 211/211 (T25); validation 60 / 65 / 70 by platform set (new check 70);
+evals (opus pinned): `coder-10-ceiling-marker` PASS (the coder wrote
+`// ceiling: per-process Map, entries never evicted; shared store with TTL
+when …` unprompted and repeated it in Notes), `review/rule-shrink-ceiling-11`
+2/2 caught at P3 with 0 false positives, `review/clean-03-readable-over-shrink`
+0 false positives, `grill/overspec-01-settings-cache` coverage 1.00 at tier
+`light`.
+
+- **Ceiling markers (the gap ponytail's `ponytail:` comment +
+  `/ponytail-debt` exposed).** Until now a deliberate shortcut lived only
+  in the change's coding-report Notes — read once by that round's
+  reviewer, never by the next coder or any survey. `harness-coder.md` →
+  Solution Selection Ladder gains "Mark a real corner": when the leanest
+  compliant shape cuts a corner with a KNOWN ceiling (a global lock, an
+  O(n²) scan over a list that grows, a naive heuristic, an in-memory
+  cache with no eviction), leave ONE plain line at the site in the
+  project's comment syntax — `ceiling: <the limit>; <the trigger to
+  revisit>`. It is the one comment the v0.21.1 budget already allows (a
+  constraint the code cannot show); a thing NOT built (a skipped
+  abstraction, an avoided dependency) gets no marker and stays in Notes;
+  each marker is repeated in Notes with its `path:line`.
+  `coding-standards.md` → Comments & Docstrings names the marker as the
+  allowed case. `harness-reviewer.md` → Minimalism Review files two P3
+  rows, never counted: `[ceiling]` (a Notes-listed shortcut with a real
+  ceiling and no marker at the site — Fix = the line) and `[no-trigger]`
+  (a marker naming a limit but no trigger — Fix = the trigger).
+- **The ledger — no new skill.** `espalier-stats.sh` gains "Ceiling
+  markers": `git grep` over tracked source (espalier/ and the
+  `grep-only-paths:` excluded) for a comment-led `ceiling:`, prints
+  `ceilings: markers=N no-trigger=M` and one row per marker with its
+  blame date (`- path:line (since YYYY-MM-DD) — limit; trigger`,
+  `[no-trigger]` where the `;` clause is missing). `/espalier-simplify`
+  step 2 lists the markers before spawning, hands each scout the ones in
+  its partition under `CEILING MARKERS:`, and the scout prompt gains the
+  "Fired ceiling" lens — a marker whose trigger has fired is a cut when
+  the code behind it is dead, otherwise `LEAD — upgrade: {trigger}` filed
+  as a normal change carrying the marker's own upgrade path.
+- **Rung 4 lookup.** New pure copy
+  `espalier/skills/espalier-coding/references/platform-native.md` —
+  ponytail's "you think you need X / the platform has Y" table (HTML,
+  CSS, browser APIs, Swift, Node, Python, SQL; MIT, attributed). The
+  ladder's rung 4 names it and says when to open it: only when the
+  conventions are silent on the mechanism, never as general reading; a
+  convention-named mechanism (rung 3) still beats every row.
+- **Two clauses in the coder.** The ladder floor keeps a physical-world
+  calibration knob (clock drift, a sensor offset, a timing constant real
+  hardware needs) — never trimmed to the ideal value. Change Impact
+  Analysis step 1 says where a fix lands: the shared function every
+  caller routes through — one guard there is the smaller diff AND the
+  whole fix; a guard on the reported path alone leaves each sibling
+  caller broken and returns as a fix round (the fix-round Class Sweep
+  keeps its wider duty from round 2 on).
+- **`shrink:` in the reviewer.** Same logic, fewer lines, the shorter
+  form shown in Fix — P3, and valid ONLY when the shorter form reads at
+  least as clearly: a `shrink:` whose replacement would draw a
+  Readability `nesting:` / `structure:` row is not a finding (clarity
+  beats brevity is the coder's own tie-break, so the two reviews cannot
+  ping-pong).
+- **Grill: over-specified mechanism.** Ponytail's rung 1 ("does this
+  need to exist?") is placed where Espalier decides WHAT: Step 1's
+  signal table gains "Over-specified mechanism" (the input names HOW
+  where the WHAT is met by a documented capability, stdlib / a native
+  feature, or nothing — "add a caching layer for X" when X is read once
+  per process); Step 2 asks ONE question offering the covering
+  alternative with its citation; the requester's choice stands — a
+  `## Scope Definition` out-line naming what covers it, or an Acceptance
+  Criteria line when the mechanism is kept, never re-argued downstream.
+- **Rejected, with the reason recorded** (plan §5): intensity modes and
+  session mode hooks (`ultra` re-litigates WHAT; state outside the audit
+  trail), "ship the lazy version and question it" (v0.27's Deviations
+  channel is the Espalier answer), a one-check test minimum (weaker than
+  the Stage 3 test duty), `net: -N lines` review scoring (a count is a
+  quota in disguise), `/ponytail-audit` as a skill (`/espalier-simplify`
+  is the stronger form — it now reads the markers), `/ponytail-gain`.
+  Track F (line metrics) deferred in `docs/deferred-items.md`.
+- **Evals.** Coder `coder-10-ceiling-marker` (a single-process in-memory
+  counter the task scopes as such — the leanest correct shape carries a
+  known ceiling; PASS = marker present, one line, with a trigger, no
+  dependency, no sweeper). Review `rule-shrink-ceiling-11` (a manual
+  parallel-array loop → one `Object.fromEntries` line, plus a
+  trigger-less marker — both must land at P3, a P0/P1 on either is
+  severity inflation) and `clean-03-readable-over-shrink` (guard clauses
+  a nested ternary could compress and a complete marker — zero `shrink:`
+  / `[ceiling]` rows; the FP guard). Grill `overspec-01-settings-cache`
+  (a TTL cache + invalidation endpoint named where the wiki says settings
+  never change at runtime — the covering alternative offered with its
+  citation, the answer landing as a Scope out-line).
+- **Migration.** `scripts/migrate-v0.27.0-to-v0.28.0.sh` — pure-copy
+  refresh of the grill / simplify SKILLs and `espalier-stats.sh` plus the
+  new lookup file (backups `.pre-v0.28.bak`); anchored edits EXTRACTED
+  from the templates at run time for `harness-coder.md` (rung-4 lookup
+  line, floor clause, "Mark a real corner" block, fix-placement clause),
+  `harness-reviewer.md` (`shrink:` tag, Ceiling-markers paragraph) and
+  `rules/coding-standards.md` (the comment case) — a customised file
+  missing its anchor is skipped with a record in
+  `espalier/.migrations-skipped`, never mangled. `/espalier-migrate`
+  chain step 38, detection probe + floor, plugin-location probe bumped;
+  the skill's description finally lists the v0.27 step too (it had
+  stopped at v0.26). Validation check 70 `ceiling-ledger`; totals 60 /
+  65 / 70. `docs/deferred-items.md` records what v0.28 chose not to do.
+
 ## 0.27.0 — 2026-09-14
 
 Minor: **finding the unknowns** — the map (requirements.md) is not the

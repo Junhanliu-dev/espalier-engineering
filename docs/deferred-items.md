@@ -1,5 +1,24 @@
 # Deferred Items
 
+## Items deferred from v0.28.0
+
+- **Line metrics (ponytail Track F).** No per-change source-line count in
+  `espalier-stats.sh` and no deterministic LOC column in the coder eval —
+  the stats hook stays line-count-free on purpose (a number in a report
+  becomes a target) and `overbuild` stays an LLM-judged 0/1.
+  - **Trigger to revisit**: a field report where the `overbuild` judge and
+    a reader disagree on a diff's size twice, or an owner request for a
+    trend line.
+- **`ponytail:` marker interop.** The marker word is `ceiling:`; a team
+  that also runs ponytail's `/ponytail-debt` gets two ledgers.
+  - **Trigger to revisit**: a request from a repo running both tools; the
+    change is one regex in `espalier-stats.sh` and the simplify grep.
+- **Doctor notify line for old markers.** `/espalier-doctor --full` does
+  not list `ceiling:` markers older than the cadence; the stats ledger
+  carries the blame date instead.
+  - **Trigger to revisit**: markers surviving two maintenance cycles with
+    a fired trigger nobody filed.
+
 ## Items deferred from v0.27.0
 
 - **Deviation classes as convention candidates.** v0.27 copies each change's
