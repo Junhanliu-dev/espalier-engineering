@@ -428,6 +428,49 @@ else
 fi
 echo
 
+# ── Ceiling markers ──────────────────────────────────────────────────────────
+# v0.28: deliberate shortcuts with a named limit — `ceiling: <limit>; <trigger>`
+# in a code comment (harness-coder.md → Solution Selection Ladder). Read-only
+# ledger over tracked source: count, the ones naming no trigger (no `;`), each
+# row with its blame date. espalier/ and the grep-only paths are never source.
+echo "## Ceiling markers (deliberate shortcuts with a named limit)"
+echo
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  _cl_excl="':(exclude)espalier/'"
+  for _p in $(grep -m1 '^grep-only-paths:' espalier/.espalier-config 2>/dev/null | cut -d: -f2-); do
+    case "$_p" in
+      */) _cl_excl="$_cl_excl ':(glob,exclude)${_p}**' ':(glob,exclude)**/${_p}**'" ;;
+      *)  _cl_excl="$_cl_excl ':(glob,exclude)$_p' ':(glob,exclude)**/$_p'" ;;
+    esac
+  done
+  _cl_rows=$(eval "git grep -nE '(#|//|--|/\\*|<!--) ?ceiling:' -- . $_cl_excl" 2>/dev/null)
+  if [ -n "$_cl_rows" ]; then
+    _cl_n=$(printf '%s\n' "$_cl_rows" | grep -c .)
+    _cl_nt=$(printf '%s\n' "$_cl_rows" | grep -vcE 'ceiling:[^;]*;' || true); _cl_nt=${_cl_nt:-0}
+    echo "ceilings: markers=$_cl_n no-trigger=$_cl_nt"
+    printf '%s\n' "$_cl_rows" | while IFS= read -r _r; do
+      _f=${_r%%:*}; _rest=${_r#*:}; _ln=${_rest%%:*}; _txt=${_rest#*:}
+      _txt=$(printf '%s' "$_txt" | sed -E 's/^.*ceiling:[[:space:]]*//; s/[[:space:]]*(\*\/|-->)[[:space:]]*$//')
+      _t=$(git blame -L"$_ln,$_ln" --porcelain -- "$_f" 2>/dev/null | awk '/^author-time /{print $2; exit}')
+      _d=""
+      if [ -n "$_t" ]; then _d=$(date -r "$_t" +%Y-%m-%d 2>/dev/null || date -d "@$_t" +%Y-%m-%d 2>/dev/null); fi
+      _tag=""; case "$_txt" in *\;*) ;; *) _tag=" [no-trigger]" ;; esac
+      echo "- $_f:$_ln${_d:+ (since $_d)} — $_txt$_tag"
+    done
+    echo
+    echo "(Quality reads: a marker is a shortcut the coder chose under the"
+    echo "ladder — the count is not a defect count; no-trigger rows are the ones"
+    echo "that rot, the reviewer files [no-trigger] when the line is next in a"
+    echo "diff; /espalier-simplify reads every marker as a lead and files a fired"
+    echo "trigger as a cut or an upgrade change.)"
+  else
+    echo "none — no ceiling: markers in tracked source"
+  fi
+else
+  echo "not a git work tree"
+fi
+echo
+
 # ── Workspace docs (report-only) ─────────────────────────────────────────────
 # Every CLAUDE.md / AGENTS.md in the repo with its size and last-change date.
 # Since Claude Code 2.1.259 a coder that Reads under a workspace gets that

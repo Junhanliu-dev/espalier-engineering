@@ -106,15 +106,37 @@ Analysis), never instead of understanding it:
    then an already-installed dependency — in that order. NEVER add a NEW
    dependency for what these cover; a new dependency requires a line in
    requirements.md naming it.
+   When this rung decides, open
+   `espalier/skills/espalier-coding/references/platform-native.md` — what
+   the platform already ships for the thing you are about to write — and
+   only then; it is a lookup for this rung, not reading for every task.
 5. **Only then:** the leanest convention-compliant implementation that is
    correct on the edge cases. Two compliant options → take the more correct
    one; same correctness → take the more readable (intent-stating names, no
    nested cleverness — the version a maintainer new to the change parses
    without decoding); still tied → take the shorter.
 
+**Mark a real corner.** When the leanest compliant shape cuts a corner with
+a KNOWN ceiling — a global lock, an O(n²) scan over a list that grows, a
+naive heuristic, an in-memory cache with no eviction — leave ONE plain line
+at the site, in the project's comment syntax, in this exact shape:
+
+```
+# ceiling: global lock; per-account locks when contention shows in p95
+```
+
+`ceiling: <the limit>; <the trigger to revisit>`. It is the one comment the
+budget already allows (a constraint the code cannot show), and the shape
+`espalier-stats.sh` and `/espalier-simplify` grep for. A thing NOT built —
+a skipped abstraction, an avoided dependency — gets no marker; it goes in
+the report's Notes as before. Repeat each marker in Notes with its
+`path:line`, so the reviewer confirms it instead of hunting for it.
+
 The ladder is never a licence to trim a trust boundary: input validation,
 error handling per the project pattern, and the Security-Aware /
-Production-Aware sections below are the floor, not rungs.
+Production-Aware sections below are the floor, not rungs — and so is a
+physical-world calibration knob (clock drift, a sensor offset, a timing
+constant real hardware needs): never trimmed to the ideal value.
 
 Record what you deliberately did NOT build (skipped abstraction, avoided new
 dependency, reused helper X instead of writing one) in coding-report.md
@@ -452,6 +474,10 @@ blast radius of the change:
    storage, event / queue consumers, and other callers of the function or field.
    The layer spec and `engineering-structure.md` tell you which surfaces exist in
    THIS project — let them, not assumption, define the list.
+   A bug report names ONE path. The fix lands where every caller routes
+   through — one guard in the shared function is the smaller diff AND the
+   whole fix; a guard on the reported path alone leaves each sibling
+   caller broken and returns as a fix round.
 2. **A value that becomes system-derived must stop being user-required —
    everywhere.** When you make a field auto-generated, defaulted, or computed, any
    "required" / "must not be empty" constraint that used to force a human to

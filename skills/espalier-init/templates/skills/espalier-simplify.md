@@ -118,6 +118,25 @@ that registers or dispatches it (a handler from its router, a plugin from its
 registry) — group by ownership, not alphabetically. **Focused:** one scout on
 the named boundary, one on everything that consumes it.
 
+**Ceiling markers are leads.** Before spawning, list the deliberate
+shortcuts coders left behind — one line per shortcut, `ceiling: <limit>;
+<trigger>` in a code comment (harness-coder.md → Solution Selection
+Ladder):
+
+```bash
+git grep -nE '(#|//|--|/\*|<!--) ?ceiling:' -- . ':(exclude)espalier/'
+```
+
+Hand each scout the markers inside its partition under `CEILING MARKERS:`
+(`path:line — <limit>; <trigger>`). A marker whose trigger has fired — the
+consumer it served is gone, or the limit it named is now measured — is a
+lead like any other: a cut when the code behind it is dead, otherwise an
+upgrade candidate the page records as `LEAD — upgrade: {trigger}` (filed as
+a normal change carrying the marker's own upgrade path, never a deletion).
+A marker naming no trigger is listed under Coverage as `no-trigger`
+(information only; the reviewer files `[no-trigger]` when the line is next
+in a diff).
+
 Scouts are read-only Agent-tool spawns using the Scout Prompt below. They
 return proof records as their final message; they write nothing. A scout that
 returns nothing usable is re-spawned once; a second failure is recorded in the
@@ -362,6 +381,9 @@ PRIOR DECISIONS (never re-propose; cite if relevant):
 
 PARTITION: {directories / responsibilities this scout owns}
 
+CEILING MARKERS (deliberate shortcuts in this partition — leads, not
+authority): {path:line — limit; trigger — or "none"}
+
 HUNT with these lenses — each is a burden the team must keep coherent:
 - Dormant contract: export, hook, event, option, route, command, package,
   protocol field with no current production consumer.
@@ -383,6 +405,9 @@ HUNT with these lenses — each is a burden the team must keep coherent:
   surface remains.
 - Feature fossil: the feature is gone; schema, config, tests, compat logic,
   or design records still carry its outline.
+- Fired ceiling: a `ceiling:` marker whose named trigger has fired — the
+  guarded case is measured, or its consumer is gone (a cut when the code
+  behind it is dead; otherwise an upgrade lead carrying the marker's path).
 - Implementation-shape guardrail: a test, source scan, snapshot, inventory,
   import ban, or build / CI check that enforces file layout, literal source
   text, private defaults, exact component counts, or a historical

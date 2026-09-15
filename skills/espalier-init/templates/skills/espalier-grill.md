@@ -104,6 +104,7 @@ Do not judge ambiguity by feel. Count concrete ambiguity **signals** in `input_t
 | Missing failure / error behaviour | nothing said about what happens when it fails |
 | Hidden quantifier | "fast", "some", "large", "soon" — unmeasured |
 | Unscoped edge case | the input describes only the happy path |
+| Over-specified mechanism | the input names HOW where the WHAT is met by a documented capability, stdlib / a native feature, or nothing at all — "add a caching layer for X" when X is read once per process |
 | (diagnosis) Unconfirmed cause | the cause is asserted, not evidenced |
 | (diagnosis) Weak reproduction | "sometimes fails" — no exact, repeatable steps |
 | Rule collision | the requirement's approach contradicts an `espalier/rules/` convention |
@@ -267,6 +268,12 @@ Rules for the loop:
   main session; the approval gate's fresh-session offer is what releases them.)
 - **Verify premises.** When the input assumes current behaviour ("extend the existing
   X", "the bug is in Y"), check the code and surface any contradiction immediately.
+- **Over-specified mechanism.** When the input names a mechanism (a cache class, a
+  new picker library, a config surface) and the map (Step 1.5), the layer specs, or
+  the platform meets the same outcome, ask ONE question that offers the covering
+  alternative with its citation. The requester's choice stands: a kept mechanism
+  is an Acceptance Criteria line, never re-argued downstream — the coder's ladder
+  trims only what the contract never asked for.
 - **By mode** — `spec`: probe scope (in / out), false premises, edge cases, vague
   terms. `diagnosis`: probe the root cause (symptom vs. cause?), the reproduction,
   and whether the stated "expected behaviour" is actually correct.
@@ -300,6 +307,7 @@ A **resolved collision** (Step 1.5) lands the same way, carrying its citation:
 |-----------------------|----------|
 | follow the convention | a `## Acceptance Criteria` line naming it ("errors returned as `Result<T>` per `rules/coding-standards.md`") |
 | reuse the existing capability | a `## Scope Definition` out-line ("reuse the documented `PaymentClient`; do not add a new HTTP client") |
+| over-specified mechanism resolved | a `## Scope Definition` out-line naming what covers it ("no cache class; memoize `loadSettings()` — revisit when settings change at runtime"), or an `## Acceptance Criteria` line when the requester keeps the mechanism |
 | intentional deviation | a `## Acceptance Criteria` line + one line of *why* the convention is overridden |
 | unresolved (non-answer / unattended) | an `## Open Questions` entry with the cited path + a conservative default |
 

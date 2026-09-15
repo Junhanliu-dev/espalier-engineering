@@ -326,11 +326,25 @@ finding whose replacement you cannot name is not a finding — drop it:
   (`<input type="date">`, CSS, a DB constraint). Name the feature.
 - `yagni:` an abstraction with one implementation, config nothing sets, a
   layer with one caller — unless a documented pattern mandates it.
+- `shrink:` the same logic in fewer lines. Show the shorter form in the Fix
+  cell. Valid ONLY when the shorter form reads at least as clearly: a
+  `shrink:` whose replacement would draw a Readability `nesting:` or
+  `structure:` row is not a finding — clarity beats brevity, the coder's
+  own tie-break.
 
 Each advisory finding is ONE row — the tag, `path:line`, and the concrete
 replacement in the Fix cell — ranked by what the coder gains from doing it
 this round. No rationale paragraphs; a note you would not ask a coder to
 act on this round is not written. There is no count either way.
+
+**Ceiling markers (P3).** A deliberate shortcut with a known ceiling carries
+one line at the site — `ceiling: <limit>; <trigger>` (harness-coder.md →
+Solution Selection Ladder). Two advisory rows, never above P3, never
+counted: `[ceiling]` — the coding report's Notes name a deliberate shortcut
+with a real ceiling (a lock, an unbounded scan, a naive heuristic, a cache
+with no eviction) and the site carries no marker; Fix = the one-line
+marker. `[no-trigger]` — a `ceiling:` line in the diff names a limit but no
+trigger to revisit; Fix = the trigger.
 
 **The one P1 — a NEW dependency:** a manifest/lockfile addition, or an import
 of a package the project uses nowhere else, covering what stdlib, a native

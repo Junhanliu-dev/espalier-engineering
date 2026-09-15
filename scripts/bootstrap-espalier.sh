@@ -16,7 +16,8 @@
 #   - Copies pure-copy templates (pipeline.md, espalier, espalier-fix,
 #     espalier-requirements, espalier-grill, espalier-prune, espalier-doctor,
 #     espalier-ask, espalier-audit, espalier-map, espalier-maprun,
-#     espalier-simplify SKILL.md + hooks).
+#     espalier-simplify SKILL.md + hooks; the espalier-coding
+#     references/platform-native.md lookup).
 #   - chmod +x every espalier/hooks/*.sh (catches LLM-written hooks too — R10).
 #   - Creates symlinks via portable abspath helper (R-extra).
 #   - Appends CLAUDE.md Espalier section (idempotent grep-guard).
@@ -337,6 +338,7 @@ stage_mkdirs() {
   log "Stage 2: mkdir -p (idempotent)"
   run "mkdir -p espalier/rules"
   run "mkdir -p espalier/skills/espalier-coding/specs"
+  run "mkdir -p espalier/skills/espalier-coding/references"
   run "mkdir -p espalier/skills/espalier-review"
   run "mkdir -p espalier/skills/espalier-security"
   run "mkdir -p espalier/skills/espalier-testing"
@@ -406,6 +408,9 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-map.md' espalier/skills/espalier-map/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-maprun.md' espalier/skills/espalier-maprun/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-simplify.md' espalier/skills/espalier-simplify/SKILL.md"
+  # v0.28: the ladder's rung-4 lookup (pure copy; the coding SKILL and its
+  # specs/ beside it stay LLM-written).
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-coding-references/platform-native.md' espalier/skills/espalier-coding/references/platform-native.md"
   # Shared shipped scout prompts — read by /espalier-prune AND /espalier-doctor
   # (single source of truth; a dotfile so it stays out of the way).
   run "cp '$PLUGIN_DIR/templates/scout-prompts.md' espalier/.scout-prompts.md"
@@ -1475,19 +1480,19 @@ stage_gitignore() {
 
 stage_validate() {
   # Check count is platform-dependent: 46 base (1-46) + 5 codex (47-51) +
-  # 5 copilot (52-56) + 12 unconditional base (57-68 — appended AFTER the
+  # 5 copilot (52-56) + 14 unconditional base (57-70 — appended AFTER the
   # platform blocks so shipped platform IDs stay stable; base numbering is
   # non-contiguous by design; 57-58 landed in v0.16, 59-60 in v0.18,
-  # 61-62 in v0.19, 63 in v0.24). Numbering is FIXED per platform; copilot without codex
+  # 61-62 in v0.19, 63 in v0.24, 70 in v0.28). Numbering is FIXED per platform; copilot without codex
   # still renders 47-51 as skip lines so the sequence stays contiguous. A
   # greenfield Pass 1 (espalier/.greenfield present) renders every
   # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
   # pending-skip — count and numbering unchanged.
-  local TOTAL_CHECKS=59
+  local TOTAL_CHECKS=60
   if want_copilot; then
-    TOTAL_CHECKS=69
+    TOTAL_CHECKS=70
   elif want_codex; then
-    TOTAL_CHECKS=64
+    TOTAL_CHECKS=65
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1712,7 +1717,7 @@ stage_validate() {
   # 57-65: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
   # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0,
   # 67-68 v0.26.0 turn economy
-  # 69 v0.27.0 unknowns channel
+  # 69 v0.27.0 unknowns channel, 70 v0.28.0 ceiling ledger
   # quality-first context) — run
   # UNCONDITIONALLY, regardless of --platforms; appended after
   # the platform blocks so the shipped IDs 47-56 stay stable.
@@ -1766,14 +1771,23 @@ stage_validate() {
   else
     run_check 69 "unknowns-channel" 'for fn in deviations_list open_question_append delivery_brief _md_section; do grep -q "^$fn()" espalier/hooks/drift-helpers.sh || exit 1; done; grep -qF "Step 1.6" espalier/skills/espalier-grill/SKILL.md && grep -qF "## References" espalier/skills/espalier-requirements/SKILL.md && grep -qF "### Deviations" espalier/agents/harness-coder.md && grep -qF -- "- BLOCKED-ON-REQUIREMENT:" espalier/agents/harness-coder.md && grep -qF "[deviation]" espalier/agents/harness-reviewer.md && grep -qF "### Deviations" espalier/agents/harness-security.md && cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md > "$tmpdir/69.cat" && grep -qF "BLOCKED-ON-REQUIREMENT" "$tmpdir/69.cat" && grep -qF "deviations_list" "$tmpdir/69.cat" && grep -qF "delivery_brief" "$tmpdir/69.cat" && grep -qF "delivery_brief" espalier/skills/espalier-fix/SKILL.md' &
   fi
+  # 70 (v0.28 ceiling ledger): the rung-4 lookup file, the stats ledger
+  # section, the simplify lead line and the grill signal (pure copies) plus
+  # the coder's marker rule and the reviewer's shrink: / [ceiling] rows
+  # (LLM-written at init — greenfield Pass 1 has no agent bodies yet).
+  if gf; then
+    skip_check 70 "ceiling-ledger" "pending greenfield Pass 2"
+  else
+    run_check 70 "ceiling-ledger" 'test -f espalier/skills/espalier-coding/references/platform-native.md && grep -qF "ceilings: markers=" espalier/hooks/espalier-stats.sh && grep -qF "CEILING MARKERS" espalier/skills/espalier-simplify/SKILL.md && grep -qF "Over-specified mechanism" espalier/skills/espalier-grill/SKILL.md && grep -qF "ceiling:" espalier/agents/harness-coder.md && grep -qF "platform-native.md" espalier/agents/harness-coder.md && grep -qF "[ceiling]" espalier/agents/harness-reviewer.md && grep -qF "shrink:" espalier/agents/harness-reviewer.md' &
+  fi
 
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-69.
+  # must reach stdout, which the run_check harness discards), then 26-70.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
-  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-9] 2>/dev/null
+  cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-9] "$tmpdir"/7[0-9] 2>/dev/null
 
   failed=$(ls "$tmpdir"/*.fail 2>/dev/null | wc -l | tr -d ' ')
   rm -rf "$tmpdir"

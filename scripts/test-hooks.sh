@@ -1635,6 +1635,38 @@ assert "24f espalier-stats: 'deviations: changes-with-logged-deviations=2 stage3
   "echo \"\$OUT\" | grep -qF 'deviations: changes-with-logged-deviations=2 stage3-blocked-rows=3'"
 [ "$KEEP" != "yes" ] && rm -rf "$TMP24"
 
+# ─── T25: v0.28 stats ceiling-marker ledger ─────────────────────────────────
+echo "T25: v0.28 stats ceiling-marker ledger"
+TMP25=$(mktemp -d -t hooks-t25.XXXX)
+make_repo "$TMP25"
+install_hooks "$TMP25"
+cp "$HOOKS_SRC/espalier-stats.sh" "$TMP25/espalier/hooks/" 2>/dev/null || true
+mkdir -p "$TMP25/src/lib" "$TMP25/src/__generated__" "$TMP25/espalier/agents"
+printf 'grep-only-paths: __generated__/ schema.graphql\n' > "$TMP25/espalier/.espalier-config"
+# one marker with a trigger, one without, one in a block comment; espalier/ and
+# a grep-only path carry markers that must NOT count; prose "ceiling:" with no
+# comment leader must not count either.
+printf 'const seen = new Map();\n// ceiling: single-process map, no eviction; a shared store when a second instance ships\nfunction f() {}\n' > "$TMP25/src/lib/a.js"
+printf 'lock = threading.Lock()\n# ceiling: global lock\ndef g(): pass\n' > "$TMP25/src/lib/b.py"
+printf '/* ceiling: O(n^2) scan; index the list past 10k rows */\nSELECT 1;\n' > "$TMP25/src/lib/c.sql"
+printf 'const s = "the ceiling: is prose";\n' > "$TMP25/src/lib/d.js"
+printf '// ceiling: generated; never\n' > "$TMP25/src/__generated__/x.js"
+printf '# ceiling: in espalier; never\n' > "$TMP25/espalier/agents/note.md"
+( cd "$TMP25" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm markers >/dev/null )
+OUT=$( cd "$TMP25" && bash espalier/hooks/espalier-stats.sh 2>/dev/null )
+assert "25a espalier-stats: 'ceilings: markers=3 no-trigger=1' — tracked source only (espalier/ and grep-only paths excluded, prose excluded); rows carry path:line, a blame date, the limit; trigger, and [no-trigger] where the ; is missing" \
+  "echo \"\$OUT\" | grep -qF 'ceilings: markers=3 no-trigger=1' \
+   && echo \"\$OUT\" | grep -qE '^- src/lib/a.js:2 \\(since [0-9]{4}-[0-9]{2}-[0-9]{2}\\) — single-process map, no eviction; a shared store when a second instance ships$' \
+   && echo \"\$OUT\" | grep -qE '^- src/lib/b.py:2 \\(since [0-9-]+\\) — global lock \\[no-trigger\\]$' \
+   && echo \"\$OUT\" | grep -qE '^- src/lib/c.sql:1 \\(since [0-9-]+\\) — O\\(n\\^2\\) scan; index the list past 10k rows$' \
+   && ! echo \"\$OUT\" | grep -qF '__generated__' && ! echo \"\$OUT\" | grep -qF 'espalier/agents/note.md' && ! echo \"\$OUT\" | grep -qF 'd.js'"
+( cd "$TMP25" && git rm -q src/lib/a.js src/lib/b.py src/lib/c.sql && git -c user.email=t@t -c user.name=t commit -qm rm >/dev/null )
+OUT=$( cd "$TMP25" && bash espalier/hooks/espalier-stats.sh 2>/dev/null )
+assert "25b espalier-stats: no markers → 'none — no ceiling: markers in tracked source'; read-only" \
+  "echo \"\$OUT\" | grep -qF 'none — no ceiling: markers in tracked source' \
+   && [ -z \"\$(cd \"$TMP25\" && git status --porcelain 2>/dev/null | grep -v '^??')\" ]"
+[ "$KEEP" != "yes" ] && rm -rf "$TMP25"
+
 # ─── Summary ──────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════"

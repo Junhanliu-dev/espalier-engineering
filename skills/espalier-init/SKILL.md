@@ -71,7 +71,8 @@ project-root/
 │   ├── skills/                     # folder name MUST equal SKILL.md `name:` frontmatter
 │   │   ├── espalier-coding/
 │   │   │   ├── SKILL.md
-│   │   │   └── specs/{layer}.md
+│   │   │   ├── specs/{layer}.md
+│   │   │   └── references/platform-native.md   # ladder rung-4 lookup (v0.28; pure copy)
 │   │   ├── espalier-review/SKILL.md
 │   │   ├── espalier-security/SKILL.md            # trust-boundary audit checklist (harness-security)
 │   │   ├── espalier-testing/SKILL.md
