@@ -338,10 +338,17 @@ espalier/rules/development-process.md"
     # Required checks, best effort: needs branch-protection read, which many
     # tokens lack and which 404s when protection is off. Absence is not proof
     # that nothing is required — the report says so rather than implying safety.
+    # `gh api` writes the error BODY to stdout on a 4xx (403 on a private repo
+    # without Pro, 404 when protection is off), so a bare `|| true` leaves JSON
+    # in REQUIRED and the report announces an error object as the required
+    # checks. Take the output only on success, and drop anything that still
+    # looks like JSON — a check context is a plain name.
     REQUIRED=""
     if command -v gh >/dev/null 2>&1 && gh auth token >/dev/null 2>&1; then
-      REQUIRED="$(gh api "repos/{owner}/{repo}/branches/$BASE_BRANCH/protection/required_status_checks" \
-                    --jq '.contexts[]?' 2>/dev/null || true)"
+      if _rq="$(gh api "repos/{owner}/{repo}/branches/$BASE_BRANCH/protection/required_status_checks" \
+                  --jq '.contexts[]?' 2>/dev/null)"; then
+        REQUIRED="$(printf '%s\n' "$_rq" | grep -v '[{}]' || true)"
+      fi
     fi
 
     WFDIR="$WFDIR" FILES="$FILES" REQUIRED="$REQUIRED" BASE_BRANCH="$BASE_BRANCH" python3 - << 'PYCI'

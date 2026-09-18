@@ -84,9 +84,15 @@ a rule you would have worded differently, a section you think is missing — all
 {one line per section the diff appears to retire — file, what, why — or `none`}
 ```
 
+Append BOTH blocks — `### Wiki Sweep` and `### Proposed Removals` — to the
+change's `espalier/changes/{type}/{slug}/doc-patches.md`, creating it if it is
+not there. That file is the sweep's record: `delivery_brief` reads the
+`### Wiki Sweep` block out of it for the brief's `## Doc Refresh` section, and
+a removal that exists only in your reply is a removal nobody will ever action.
+A sweep whose verdicts live only in the transcript leaves the human approving
+at Stage 10 with no idea a doc was touched.
+
 Then apply the patches you proposed — edit the files directly — and stop.
 Committing them is Stage 7's job, not yours: the orchestrator calls
 `espalier-pr.sh project` once for the wiki edits and once for the rule edits,
-so each class lands as its own revertable commit on the espalier PR. Write
-`### Proposed Removals` into the change's `doc-patches.md` before you stop; a
-removal that exists only in your report is a removal nobody will ever action.
+so each class lands as its own revertable commit on the espalier PR.

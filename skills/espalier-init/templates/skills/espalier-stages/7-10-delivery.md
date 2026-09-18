@@ -57,8 +57,12 @@ Skip the spawn entirely when the diff touches no source file (tests only, docs
 only, config only) and record `| 7 | SWEEP-SKIPPED | {ts} | no source files |`
 in the Stage History.
 
-The sweep edits the files in place and stops; committing is step 3's job, one
-class per commit, so each is separately revertable on the espalier PR.
+The sweep appends its `### Wiki Sweep` verdicts and `### Proposed Removals` to
+the change's `doc-patches.md`, edits the files in place, and stops. Committing
+is step 3's job, one class per commit, so each is separately revertable on the
+espalier PR. `delivery_brief` reads that block back for the Stage 10 brief's
+`## Doc Refresh`, so a sweep that records nothing leaves the human approving
+the change unaware a doc moved.
 
 **3. Project and push.** One `project` call per commit class — records first,
 then each class the sweep wrote — then push both branches:
