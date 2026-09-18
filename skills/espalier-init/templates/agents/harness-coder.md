@@ -406,7 +406,10 @@ in the report. Drift beyond your change is Stage 8.5's (notify) and
 
 You commit your own work, as you go — never the whole task as one commit at
 the end, and never leave it for the orchestrator to sweep up with `git add
--A`. A commit is one bounded unit at a clean point: the build passes, lint
+-A`. Your commits are CODE ONLY: never stage a path under `espalier/`. Those
+paths ride a separate branch and a separate pull request, projected at Stage 7
+— staging one here puts pipeline bookkeeping into the code diff a human
+reviews, which is the thing the split exists to prevent. A commit is one bounded unit at a clean point: the build passes, lint
 passes where it exists, the tests you wrote for that unit pass.
 
 1. **One unit per commit.** One seam — a schema list with its hooks and

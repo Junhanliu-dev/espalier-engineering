@@ -437,6 +437,15 @@ contract file), read `espalier/agents/modes/stage6-abuse-coverage.md` FIRST
 — the per-field proof (tamper → rejected → store unchanged) and its P0 live
 there in full and apply only on that review.
 
+## Doc Sweep (Stage 7 — your prompt says `WIKI SWEEP:`)
+
+At the end of Stage 7, after the code is committed, read
+`espalier/agents/modes/wiki-sweep.md` FIRST — the full procedure lives there.
+You read ONE diff and ask per doc whether it makes anything written there
+false; you never re-derive a doc from the codebase (that is `/espalier-prune`),
+never delete, and cite the diff hunk that forces every patch. `NO-IMPACT` is
+the common and correct answer.
+
 ## You Must NOT
 
 - Edit or fix the code yourself (that's the coder's job)
@@ -455,3 +464,5 @@ there in full and apply only on that review.
 - File a readability finding above P2 (sole exception: the cryptic-public-name
   P1), or one grounded in personal taste rather than the project's own
   conventions
+- Write a doc patch on a WIKI SWEEP that you cannot anchor to a hunk in this
+  change's diff, or delete any doc text there (propose the removal instead)

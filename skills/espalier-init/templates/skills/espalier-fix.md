@@ -1183,25 +1183,30 @@ tests; the push gate compares against this.
 
 ## Stage 7: Push (with back-link)
 
-### 7.0 Stage the convention index
+### 7.0 The split — code branch, espalier branch
 
-If this run appended an observation (Stage 4) or flipped a status, stage the
-per-key files BEFORE the push commit so the tracked state lands in this fix's
-commit and the Stage 7 clean-tree gate stays green:
+A fix ships as two pull requests exactly as a feat does; Stages 3–7 are shared.
+Do NOT stage `espalier/conventions/` or any other `espalier/` path into a code
+commit — the projection picks up everything under `espalier/`, and `git add`
+honours `.gitignore` so the per-clone sidecars stay out. (The legacy
+`espalier/.conventions.tsv` is read-only to this plugin version — never
+written, nothing to stage.)
+
+Commit code the coder left uncommitted under the message its report carries;
+the coder's commits are pushed as made, never squashed or rebased. Then run the
+doc sweep and the projection — the full procedure, including the two invariants
+that keep the checkout on the code branch and push both refs safely past the
+gate, is the espalier skill's `stages/7-10-delivery.md` → "Stage 7: The Split":
 
 ```bash
-[ -d espalier/conventions ] && git add espalier/conventions/
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"
+# plus one project call per class the WIKI SWEEP patched (espalier/agents/modes/wiki-sweep.md)
+espalier/hooks/espalier-pr.sh fix "$SLUG" push
+espalier/hooks/espalier-pr.sh fix "$SLUG" open
 ```
 
-(The legacy `espalier/.conventions.tsv` is read-only to this plugin version —
-never written, nothing to stage.)
-
-What is still uncommitted is handled by path — code the coder left
-uncommitted under the message its report carries, then the change's
-records as one `chore(espalier): {slug} — pipeline records` commit (the
-espalier skill's `stages/7-10-delivery.md` → "Stage 7: What Is Still
-Uncommitted"); the coder's commits are pushed as made, never squashed or
-rebased. Standard push. Then:
+The sweep matters more here than anywhere: the fix lane stops at Stage 7, so
+this is the ONLY point at which a fix can refresh a doc it invalidated. Then:
 
 > Variable in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
 > `fix/` prefix). Run 7.0 + 7.1 + 7.2 as ONE bash invocation — the whole

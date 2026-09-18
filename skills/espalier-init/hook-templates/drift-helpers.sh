@@ -1038,7 +1038,7 @@ open_question_append() {
 # source is one `none` line. Prints the path and one count line. Exit 1
 # without a requirements.md.
 delivery_brief() {
-  local type="$1" slug="$2" dir out req cod state rev sec n_dev n_round n_commit body
+  local type="$1" slug="$2" dir out req cod state rev sec n_dev n_round n_commit n_pr body
   dir="$_DS_ROOT/espalier/changes/$type/$slug"
   req="$dir/requirements.md"; cod="$dir/coding-report.md"; state="$dir/pipeline-state.md"
   rev="$dir/review-record.md"; sec="$dir/security-record.md"; out="$dir/delivery-brief.md"
@@ -1059,6 +1059,7 @@ delivery_brief() {
   n_dev=$(deviations_list "$dir" | grep -c .)
   n_round=$(grep -cE '^\| 4 \| ROUND [0-9]+ FAIL ' "$state" 2>/dev/null); n_round=${n_round:-0}
   n_commit=$(grep -cE '^\| 7 \| [0-9a-f]+ \|' "$state" 2>/dev/null); n_commit=${n_commit:-0}
+  n_pr=$(grep -cE '^\| (code|espalier) \| ' "$state" 2>/dev/null); n_pr=${n_pr:-0}
   {
     echo "# Delivery Brief: $type/$slug"
     echo ""
@@ -1100,7 +1101,13 @@ delivery_brief() {
     echo "## CI and deploy"
     if [ -f "$dir/ci-result.md" ]; then echo "- ci-result.md: present"; else echo "- ci-result.md: none"; fi
     if [ -f "$dir/deploy-result.md" ]; then echo "- deploy-result.md: present"; else echo "- deploy-result.md: none"; fi
+    echo ""
+    echo "## Pull Requests"
+    body=$(grep -E '^\| (code|espalier) \| ' "$state" 2>/dev/null); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    echo "## Doc Refresh (Stage 7 sweep)"
+    body=$(_md_section "$dir/doc-patches.md" "### Wiki Sweep" | grep -v '^[[:space:]]*$'); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
   } > "$out"
   printf '%s\n' "$out"
-  echo "delivery brief: $n_dev deviations, $n_round rounds, $n_commit commits"
+  echo "delivery brief: $n_dev deviations, $n_round rounds, $n_commit commits, $n_pr PRs"
 }

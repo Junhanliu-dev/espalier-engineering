@@ -5,42 +5,99 @@
 > rollback, human checkpoints, and completion; `espalier/pipeline.md` is the
 > contract. Verbatim procedure — read once, at stage entry.
 
-### Stage 7: Stage the Convention Index
+### Stage 7: The Split — Code Branch, Espalier Branch
 
-If this run appended an observation (Stage 4) or flipped a status
-(Convention Promotion), stage the per-key files into the Stage 7 commit
-alongside `espalier/changes/{type}/{slug}/*`:
+Stage 7 ends in TWO pull requests: the code branch carries every path outside
+`espalier/`, a sibling branch carries all of `espalier/**`, and both are based
+on the canonical branch. Everything below runs through
+`espalier/hooks/espalier-pr.sh`, which holds the two invariants that make the
+split safe. Read them once — they are not style:
+
+- **The checkout never switches branches.** `espalier/` is live working state
+  through Stage 10 (ci-result, doc-patches, the delivery brief, the close
+  commit are all still to come). Checking out the espalier branch takes those
+  files out of the tree and the push gate then finds no in-flight change at
+  all. The espalier branch is a PROJECTION, built in a temporary worktree and
+  synced one-way. `espalier-pr.sh` refuses to run from it.
+- **Both branches are pushed by refspec, from the code branch.**
+  `pre-push-gate.sh` fingerprints the source diff against the CURRENT checkout;
+  on an espalier-only branch that diff is empty, so the fingerprint is the
+  empty-blob hash and can never match the certificate. `espalier-pr.sh push`
+  pushes `<branch>:<branch>` with HEAD still on the code branch, so the gate
+  checks what it was written to check. Never push the espalier branch by hand
+  from a worktree, and never edit the gate.
+
+> Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
+> the orchestrator at Stage Execution entry.
+
+**1. Commit what the coder left.** The coder committed its units as it went
+(harness-coder.md → Commit Discipline), so the only code that can still be
+uncommitted is what its report flags (`- Commits: none — {reason}`, or a
+parallel wave's parts). Commit it on the code branch, one commit per part /
+unit, with the message the report carries (`- Commit:` line, or the coder's
+subject) — the orchestrator names it from the report, it does not invent
+scope. Never `git add -A`, never one "everything" commit, and never squash or
+rebase the coder's commits (squash-merge is the pull request's policy and the
+post-merge hook maps it back).
+
+The coder's commits are code only; `espalier/` paths are never staged into
+one. Do not stage `espalier/conventions/` here either — the projection in
+step 3 picks up everything under `espalier/`, tracked or new, and `git add`
+honours `.gitignore` so the per-clone sidecars stay out.
+
+**2. The doc sweep.** Spawn `harness-reviewer` with `WIKI SWEEP:` on the prompt
+line; the procedure is `espalier/agents/modes/wiki-sweep.md`. It reads this
+change's diff (`Base-Ref..HEAD`, `espalier/` excluded) against
+`espalier/wiki/*.md` and `espalier/rules/*.md` and asks one question per doc:
+does this diff make anything written here false? It re-derives nothing — that
+is `/espalier-prune` — and it never deletes; a section the diff appears to
+retire goes to `doc-patches.md` under `### Proposed Removals`.
+
+Skip the spawn entirely when the diff touches no source file (tests only, docs
+only, config only) and record `| 7 | SWEEP-SKIPPED | {ts} | no source files |`
+in the Stage History.
+
+The sweep edits the files in place and stops; committing is step 3's job, one
+class per commit, so each is separately revertable on the espalier PR.
+
+**3. Project and push.** One `project` call per commit class — records first,
+then each class the sweep wrote — then push both branches:
 
 ```bash
-[ -d espalier/conventions ] && git add espalier/conventions/
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
+  "chore(espalier): $SLUG — pipeline records"
+# only when the sweep patched them:
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
+  "docs(espalier): wiki refresh for $SLUG"
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
+  "docs(espalier): rules refresh for $SLUG"
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" push
 ```
 
-The per-key files are tracked; staging them here keeps the working tree
-clean for the Stage 7 gate and never leaves an automation-written file
-uncommitted. (The legacy `espalier/.conventions.tsv` is read-only to this
-plugin version — it is never written, so there is nothing of it to stage.)
+`project` is a no-op when nothing changed, so an unpatched class costs a line
+of output and nothing else.
 
-### Stage 7: What Is Still Uncommitted
+**4. Open both PRs.**
 
-The coder committed its units as it went (harness-coder.md → Commit
-Discipline), so by Stage 7 the working tree holds at most two kinds of
-uncommitted paths. Handle each by path — never `git add -A`, never one
-"everything" commit, and never squash or rebase the coder's commits (the
-pipeline pushes them as made; squash-merge is the pull request's policy and
-the post-merge hook maps it back):
+```bash
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" open
+```
 
-1. Code the coder left uncommitted (its report says `- Commits: none —
-   {reason}`, or a parallel wave's parts were never committed): commit it
-   as one commit per part / unit with the message the report carries
-   (`- Commit:` line, or the coder's subject for the unit) — the
-   orchestrator names it from the report, it does not invent scope.
-2. The change's records (`espalier/changes/{type}/{slug}/`, plus
-   `espalier/conventions/` when this run wrote there — staged above):
-   one `chore(espalier): {slug} — pipeline records` commit. Completion adds
-   its own `chore(espalier): close {slug}` afterwards.
+Both target the canonical branch — they are SIBLINGS, not a stack. GitHub
+closes a child PR when its base branch is deleted rather than retargeting it,
+and that close cannot be undone (the base of a closed PR cannot be changed and
+it cannot be reopened without its base), so a stack would lose the espalier PR
+of every change in any repo with `deleteBranchOnMerge`. Ordering is advisory
+and lives in the espalier PR's body. `open` records both in the state file's
+`## Pull Requests` table and is idempotent — a re-run finds the existing PRs.
 
-Then push. The Stage 7 gate (clean tree, branch convention, pre-push hook,
-certificate) is unchanged.
+With no `gh`, or a `gh` with no usable account, `open` exits 5 with a warning
+and the run continues: the branches are pushed and a human opens the PRs. The
+pipeline NEVER blocks on the forge.
+
+The Stage 7 gate is otherwise unchanged (branch convention, pre-push hook,
+certificate) with one amendment: the working tree is clean OUTSIDE `espalier/`.
+`espalier/` is expected dirty here — that is the projection's source.
 
 ### Stage 7 Commit Recording
 
@@ -65,6 +122,15 @@ self-heals the reverse-lookup cache through `_cache_append` when
 
 This commit-record is read at fix-time by `/espalier-fix` Stage 0 reverse lookup,
 and used by the post-merge hook for squash-merge mapping.
+
+Under the split it records the CODE branch's commits only, and that is on
+purpose. The table's readers blame a source line to one commit, so code-only
+rows make the `post-merge-backlink.sh` file-overlap match sharper than it was
+when the records commit's `espalier/` paths sat in the same range. The espalier
+branch's own commits are deliberately NOT recorded here: its squash carries
+only `espalier/` paths, `_fuzzy_scan` finds no source-file overlap, and the
+hook exits without writing — no row, rather than a wrong one. The espalier PR
+is tracked by number in `## Pull Requests` instead.
 
 ### Stage 7 Reverse-link to PARTIAL_FIX (when applicable)
 

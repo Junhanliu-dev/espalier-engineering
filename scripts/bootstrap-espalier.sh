@@ -431,6 +431,8 @@ stage_hooks() {
   # Copilot camelCase→snake_case hook shim (pure copy; inert unless
   # .github/hooks/espalier-gates.json references it — Stage 8e, copilot only).
   run "cp '$PLUGIN_DIR/hook-templates/copilot-hook-adapter.sh' espalier/hooks/copilot-hook-adapter.sh"
+  # Stage 7 forge surface: the code PR and its espalier sibling.
+  run "cp '$PLUGIN_DIR/hook-templates/espalier-pr.sh' espalier/hooks/espalier-pr.sh"
   # /espalier-map plan-don't-do guard (inert unless espalier/maps/.active-session exists).
   run "cp '$PLUGIN_DIR/hook-templates/map-guard.sh' espalier/hooks/map-guard.sh"
   # Read-only lane-quality report (run manually: bash espalier/hooks/espalier-stats.sh).
@@ -1751,7 +1753,7 @@ stage_validate() {
   # 66: the router names every stage file, every stage + mode file is
   # present, and every mode file is named on a prompt line (pure copies —
   # present from greenfield Pass 1).
-  run_check 66 "stage-procedures"   'for f in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do [ -f "espalier/skills/espalier/stages/$f.md" ] && grep -qF "stages/$f.md" espalier/skills/espalier/SKILL.md || exit 1; done; for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do [ -f "espalier/agents/modes/$m.md" ] || exit 1; done; cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md espalier/skills/espalier-audit/SKILL.md > "$tmpdir/66.cat" && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage; do grep -qF "modes/$m.md" "$tmpdir/66.cat" || exit 1; done' &
+  run_check 66 "stage-procedures"   'for f in 1-2-requirements 3-coding 4-panel 5-6-contract 7-10-delivery; do [ -f "espalier/skills/espalier/stages/$f.md" ] && grep -qF "stages/$f.md" espalier/skills/espalier/SKILL.md || exit 1; done; for m in fix-round simplification re-review repo-audit stage6-abuse-coverage wiki-sweep; do [ -f "espalier/agents/modes/$m.md" ] || exit 1; done; cat espalier/skills/espalier/stages/*.md espalier/skills/espalier-fix/SKILL.md espalier/skills/espalier-audit/SKILL.md > "$tmpdir/66.cat" && for m in fix-round simplification re-review repo-audit stage6-abuse-coverage wiki-sweep; do grep -qF "modes/$m.md" "$tmpdir/66.cat" || exit 1; done' &
   # 67-68 (v0.26 turn economy): the helpers the stage files call by name
   # (pure copy — present from Pass 1), and the contract-coverage / session-
   # boundary / one-call-verify markers in the agent bodies and lane skills

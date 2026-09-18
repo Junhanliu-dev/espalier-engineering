@@ -19,14 +19,23 @@ pipeline Stage 9 runs/verifies. If DISCOVERY.deploy was null, write exactly:
 {what must pass before merge — derived from CI + project conventions}
 
 ## Maintenance Commits
-<!-- ESPALIER MAINTENANCE COMMITS v1 — managed anchor; fixed policy text (not scout-discovered), keep this comment -->
+<!-- ESPALIER MAINTENANCE COMMITS v2 — managed anchor; fixed policy text (not scout-discovered), keep this comment -->
 
-- Espalier maintenance is lane-based: doctor scans and routine prune refreshes
-  ride ONE weekly maintenance PR on the canonical branch (`canonical-branch`
-  in `espalier/.espalier-config`); a prune for your OWN critical/expired flag
-  may ride your feature branch as its own isolated `docs:` commit; convention
-  promotions may ride the deciding feature branch as their own isolated
-  commit. Maintenance commits are never folded into feature commits.
+- Every change ships as TWO pull requests: the code PR (every path outside
+  `espalier/`) and its espalier PR (all of `espalier/**` — records, convention
+  index, and any doc the Stage 7 sweep refreshed). They are siblings on the
+  canonical branch, not a stack; the espalier PR's body says which to merge
+  first. Nothing enforces the order.
+- Drift YOUR change caused rides YOUR espalier PR, as its own isolated
+  `docs(espalier):` commit — the Stage 7 sweep writes it, scoped to what this
+  change's diff falsified. Drift you did NOT cause stays on the weekly
+  gardener lane: doctor scans and routine prune refreshes ride ONE weekly
+  maintenance PR on the canonical branch (`canonical-branch` in
+  `espalier/.espalier-config`). A prune for your OWN critical/expired flag may
+  ride your espalier PR as its own isolated `docs:` commit; convention
+  promotions ride the deciding change's espalier PR. Maintenance commits are
+  never folded into feature commits — the espalier PR is a separate PR, so
+  that invariant is now structural rather than a matter of discipline.
 - The weekly gardener rota: one rotating dev per cadence interval runs the
   maintenance loop (worktree of the canonical branch → `/espalier-doctor` →
   `/espalier-prune` over flagged files → re-run the doctor if the prune
