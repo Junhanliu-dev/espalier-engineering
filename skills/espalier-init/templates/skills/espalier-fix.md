@@ -1193,24 +1193,36 @@ honours `.gitignore` so the per-clone sidecars stay out. (The legacy
 written, nothing to stage.)
 
 Commit code the coder left uncommitted under the message its report carries;
-the coder's commits are pushed as made, never squashed or rebased. Then run the
-doc sweep and the projection — the full procedure, including the two invariants
-that keep the checkout on the code branch and push both refs safely past the
-gate, is the espalier skill's `stages/7-10-delivery.md` → "Stage 7: The Split":
+the coder's commits are pushed as made, never squashed or rebased. The full
+procedure — including the two invariants that keep the checkout on the code
+branch and push both refs safely past the gate — is the espalier skill's
+`stages/7-10-delivery.md` → "Stage 7: The Split". Three steps, in this order:
+
+1. **Sweep.** Spawn `harness-reviewer` with `WIKI SWEEP:` on the prompt line
+   (`espalier/agents/modes/wiki-sweep.md`) over this fix's diff, `espalier/wiki/`
+   and `espalier/rules/`. It edits the files it patches and stops. Skip the
+   spawn when the diff touches no source file. This matters more in this lane
+   than anywhere: the fix lane stops at Stage 7, so it is the ONLY point at
+   which a fix can refresh a doc it invalidated.
+2. **Project**, once for the records and once per class the sweep patched, so
+   each lands as its own revertable commit.
+3. **Push and open.**
 
 ```bash
 espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"
-# plus one project call per class the WIKI SWEEP patched (espalier/agents/modes/wiki-sweep.md)
+# only when the sweep patched them:
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): wiki refresh for $SLUG"
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): rules refresh for $SLUG"
 espalier/hooks/espalier-pr.sh fix "$SLUG" push
 espalier/hooks/espalier-pr.sh fix "$SLUG" open
 ```
 
-The sweep matters more here than anywhere: the fix lane stops at Stage 7, so
-this is the ONLY point at which a fix can refresh a doc it invalidated. Then:
+Then:
 
 > Variable in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
-> `fix/` prefix). Run 7.0 + 7.1 + 7.2 as ONE bash invocation — the whole
-> Stage 7 bookkeeping costs one round-trip.
+> `fix/` prefix). Step 1 is an agent spawn and cannot share a bash call; the
+> bash of 7.0 above runs with 7.1 + 7.2 as ONE invocation, so Stage 7 costs one
+> spawn and one round-trip.
 
 ### 7.1 Record own commits
 
