@@ -159,8 +159,16 @@ case "$CMD" in
     trap cleanup EXIT
     git -C "$REPO" worktree add --quiet "$WT" "$ESP_BRANCH"
 
+    # ADD collects only the paths that actually exist, because `git add -- <path>`
+    # exits 128 on a pathspec that matches nothing and would abort the run under
+    # `set -e`. A path the caller named but that is not present is reported, not
+    # fatal: the sweep names espalier/wiki and espalier/rules unconditionally,
+    # and an install may legitimately have neither.
+    ADD=""
+    MISSING=""
     for rel in $PATHS; do
-      [ -e "$REPO/$rel" ] || continue
+      if [ ! -e "$REPO/$rel" ]; then MISSING="$MISSING $rel"; continue; fi
+      ADD="$ADD $rel"
       if [ -d "$REPO/$rel" ]; then
         mkdir -p "$WT/$rel"
         # --delete retires files removed from this checkout, scoped to this path.
@@ -177,7 +185,17 @@ case "$CMD" in
       fi
     done
 
-    git -C "$WT" add -A espalier/
+    [ -n "$MISSING" ] && echo "pr: not present, skipped —$MISSING"
+    if [ -z "$ADD" ]; then
+      echo "pr: nothing to project onto $ESP_BRANCH (no named path exists)"
+      exit 0
+    fi
+
+    # Scoped to the paths named above. `-A espalier/` would stage anything else
+    # that differs under espalier/, which is the whole-tree behaviour this
+    # subcommand exists to avoid — it is equivalent only while the worktree
+    # happens to be otherwise clean, and that is not a property to rely on.
+    git -C "$WT" add -A -- $ADD
     if git -C "$WT" diff --cached --quiet; then
       echo "pr: nothing to project onto $ESP_BRANCH"
     else
