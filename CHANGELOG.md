@@ -75,6 +75,19 @@ unchanged, and nothing here sets a budget.
   branch is never retro-split. Verified end to end: a v0.28.1 install migrates
   byte-identical to a fresh v0.29.0 one, a re-run is a no-op, and a mangled
   anchor skips rather than mangles.
+- **Two new validation checks — totals 60 / 65 / 70 → 62 / 67 / 72.** Both
+  exist because of a defect this release shipped and then caught by reading:
+  the fix lane's Stage 7.0 was rewritten correctly and left contradicting the
+  prose around it. Check 71 (`stage7-split-order`) asserts, in BOTH lanes, that
+  `WIKI SWEEP` precedes `project`, which precedes `push`, which precedes
+  `open` — Stage 7's steps are ordered by data dependency, so an edit that
+  reorders or drops one leaves the rest referring to output nothing produced,
+  which reads fine and cannot work. Check 72 (`retired-turn-economy`) fails if
+  `7.0 + 7.1 + 7.2 as ONE bash invocation` ever returns; it was true until 7.0
+  grew an agent spawn, and a retired instruction is worse than a missing one.
+  Verified by mutation, not by inspection: both go green on the shipped
+  templates and red on an out-of-order sweep, a dropped `open` call, and a
+  reintroduced batching claim.
 - **`/espalier-migrate`.** Step 40; the probe is the two shipped files plus
   `pipeline.md`'s `**Pull requests:**` line (a skip record counts as handled);
   the supersession floor gains `NEEDS_V0290_PATCH` as its newest rung.

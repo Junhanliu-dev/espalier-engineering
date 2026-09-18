@@ -1490,11 +1490,11 @@ stage_validate() {
   # greenfield Pass 1 (espalier/.greenfield present) renders every
   # Phase-2-artifact check (5, 9, 15-16, 30-32, 34-36, 38-45) as a
   # pending-skip — count and numbering unchanged.
-  local TOTAL_CHECKS=60
+  local TOTAL_CHECKS=62
   if want_copilot; then
-    TOTAL_CHECKS=70
+    TOTAL_CHECKS=72
   elif want_codex; then
-    TOTAL_CHECKS=65
+    TOTAL_CHECKS=67
   fi
   log "Stage 11: validation ($TOTAL_CHECKS checks — R6; platforms: $PLATFORMS)"
   if [ "$DRY_RUN" = "yes" ]; then
@@ -1783,10 +1783,24 @@ stage_validate() {
     run_check 70 "ceiling-ledger" 'test -f espalier/skills/espalier-coding/references/platform-native.md && grep -qF "ceilings: markers=" espalier/hooks/espalier-stats.sh && grep -qF "CEILING MARKERS" espalier/skills/espalier-simplify/SKILL.md && grep -qF "Over-specified mechanism" espalier/skills/espalier-grill/SKILL.md && grep -qF "ceiling:" espalier/agents/harness-coder.md && grep -qF "platform-native.md" espalier/agents/harness-coder.md && grep -qF "[ceiling]" espalier/agents/harness-reviewer.md && grep -qF "shrink:" espalier/agents/harness-reviewer.md' &
   fi
 
+  # Stage 7's steps are ordered by data dependency, not taste: the sweep edits
+  # the docs, `project` commits what it edited, `push` needs those commits, and
+  # `open` needs the pushed branches. A prose edit that reorders or drops a step
+  # leaves the remaining calls referring to output nothing produced — it reads
+  # fine and cannot work. Assert the order in BOTH lanes (the fix lane mirrors
+  # the full one, and its Stage 7 is the only doc sweep a fix ever gets).
+  run_check 71 "stage7-split-order" 'for f in espalier/skills/espalier/stages/7-10-delivery.md espalier/skills/espalier-fix/SKILL.md; do s=$(grep -n "WIKI SWEEP" "$f" | head -1 | cut -d: -f1); p=$(grep -nE "espalier-pr\.sh .* project" "$f" | head -1 | cut -d: -f1); u=$(grep -nE "espalier-pr\.sh .* push" "$f" | head -1 | cut -d: -f1); o=$(grep -nE "espalier-pr\.sh .* open" "$f" | head -1 | cut -d: -f1); [ -n "$s" ] && [ -n "$p" ] && [ -n "$u" ] && [ -n "$o" ] || exit 1; [ "$s" -lt "$p" ] && [ "$p" -lt "$u" ] && [ "$u" -lt "$o" ] || exit 1; done' &
+
+  # A retired claim is worse than a missing one: it reads as instruction. Stage
+  # 7.0 batched into one bash call until it grew an agent spawn, which no bash
+  # call can contain. Fail if that sentence ever comes back — by hand, or by a
+  # migration re-inserting text a later release retired.
+  run_check 72 "retired-turn-economy" '! grep -rF -- "7.0 + 7.1 + 7.2 as ONE bash invocation" espalier/ >/dev/null 2>&1' &
+
   wait
 
   # Emit deterministic order: 1-24 (sorted), then #25 (serial — its tier table
-  # must reach stdout, which the run_check harness discards), then 26-70.
+  # must reach stdout, which the run_check harness discards), then 26-72.
   cat "$tmpdir"/0? "$tmpdir"/1? "$tmpdir"/2[0-4] 2>/dev/null
   run_check_25 || echo "fail" > "$tmpdir/25.fail"
   cat "$tmpdir"/2[6-9] "$tmpdir"/3? "$tmpdir"/4[0-9] "$tmpdir"/5[0-9] "$tmpdir"/6[0-9] "$tmpdir"/7[0-9] 2>/dev/null
