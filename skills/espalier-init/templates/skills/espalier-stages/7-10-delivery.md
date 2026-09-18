@@ -192,6 +192,21 @@ EOF
 fi
 ```
 
+This writes into ANOTHER change's records, so — exactly as the fix lane's
+back-link — it must be projected or it reaches no pull request. This feat
+caused the row, so the row rides THIS change's espalier PR, and only when that
+file already exists on the espalier branch (a partial fix still in flight has
+never merged; projecting it here would add its whole state file and collide
+with its own PR):
+
+```bash
+if [ -n "$FILED_FROM" ] && git cat-file -e "${TYPE}/${SLUG}-espalier:espalier/changes/${FILED_FROM}/pipeline-state.md" 2>/dev/null; then
+  espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
+    "chore(espalier): close the root-cause chain for ${FILED_FROM}" \
+    "espalier/changes/${FILED_FROM}/pipeline-state.md"
+fi
+```
+
 ### Stage 8.5 — Doc Drift Check (notify-only)
 
 Runs as a sub-step between Stage 8 (CI verify) and Stage 9 (deploy). It edits no

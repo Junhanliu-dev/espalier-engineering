@@ -1256,7 +1256,37 @@ written twice — the same slug can legitimately appear as `primary` and
 ```
 
 `backlink_all` parses the frontmatter itself and calls `_backlink_one` per
-entry; it prints one line per row written.
+entry; it prints one line per row written (`fix/{slug} -> {causing} ({role})`).
+
+**Those rows land in ANOTHER change's records, so they need projecting too.**
+Under the PR split each change's `espalier/` paths ride its own branch, and
+this fix's projection is scoped to its own folder — a back-link written into
+`espalier/changes/{causing}/pipeline-state.md` would sit in the working tree
+and reach no pull request at all. It is the fix that caused the row, so the row
+rides the FIX's espalier PR:
+
+```bash
+. espalier/hooks/drift-helpers.sh
+ROWS=$(backlink_all "$SLUG")
+printf '%s\n' "$ROWS"
+for CAUSING in $(printf '%s\n' "$ROWS" | awk '{print $3}' | sort -u); do
+  P="espalier/changes/$CAUSING/pipeline-state.md"
+  # Only when that file already exists on the espalier branch. A causing change
+  # still in flight has never been merged, so projecting it here would add its
+  # ENTIRE state file to this PR as a new file and collide when its own PR
+  # lands. Its records ride its own espalier PR; re-run the back-link after it
+  # merges.
+  if git cat-file -e "$ESP_BRANCH:$P" 2>/dev/null; then
+    espalier/hooks/espalier-pr.sh fix "$SLUG" project \
+      "chore(espalier): back-link from $SLUG to $CAUSING" "$P"
+  else
+    echo "back-link to $CAUSING recorded locally only — that change is not yet"
+    echo "merged, so its records ride ITS espalier PR. Re-run after it lands."
+  fi
+done
+```
+
+> `ESP_BRANCH` is `fix/${SLUG}-espalier`.
 
 ## Escalation Gates
 
