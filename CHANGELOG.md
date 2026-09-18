@@ -1,5 +1,84 @@
 # Changelog
 
+## 0.29.0 — 2026-09-18
+
+Minor: **the PR split.** A pipeline run no longer ends in one branch carrying
+both the work and the bookkeeping. Stage 7 now produces two pull requests — a
+code PR with every path outside `espalier/`, and an espalier PR with all of
+`espalier/**` — so the diff a reviewer reads is the change itself, not the
+change plus its pipeline records. Between the two, a new doc sweep reads the
+change's own diff against `espalier/wiki/` and `espalier/rules/` and commits
+what that diff falsified onto the espalier PR. Contract-equal to 0.28.1
+elsewhere: every gate, rubric, sentinel, round cap and escalation path is
+unchanged, and nothing here sets a budget.
+
+- **Two PRs, siblings, never a stack.** The stacked design — espalier PR based
+  on the code branch — was built first and probed on a throwaway repo before
+  any template was written. It failed: GitHub fires `base_ref_deleted` →
+  `closed` on the child PR the instant the base branch is deleted, and the
+  close is irrecoverable (`gh pr edit --base` refuses on a closed PR, `gh pr
+  reopen` refuses without its base). Any repo with `deleteBranchOnMerge` would
+  have destroyed the espalier PR of every change, silently, after Stage 10 had
+  already marked the run COMPLETE. Both PRs therefore target the canonical
+  branch; ordering is advisory and lives in the espalier PR's body. This is
+  finding #1 of the run lane's own stacked-PR rejection
+  (`docs/maprun-stacked-pr-plan.md`), met a second time.
+- **`espalier/hooks/espalier-pr.sh`** — `project` / `push` / `open` / `status`.
+  The single-change lane has never opened a PR; only the run lane did. Two
+  invariants it exists to hold, both found by reading the code it touches:
+  the main checkout NEVER switches branches (`espalier/` is live working state
+  through Stage 10 — checking the espalier branch out takes the state file out
+  of the tree and the push gate then finds no in-flight change at all, so the
+  espalier branch is a one-way projection built in a temp worktree, and
+  `project` refuses to run from it); and both branches are pushed BY REFSPEC
+  from the code branch, because `pre-push-gate.sh` fingerprints the source
+  diff against the current checkout and on an espalier-only branch that diff
+  is empty — the empty-blob hash, which can never match the certificate.
+  `pre-push-gate.sh` is untouched and gains no bypass.
+- **The Stage 7 doc sweep** — `harness-reviewer` in `WIKI SWEEP:` mode
+  (`espalier/agents/modes/wiki-sweep.md`). It reads ONE diff and asks per doc
+  whether that diff made anything written there false. It re-derives nothing
+  (that is `/espalier-prune`, which re-scouts the whole codebase), never
+  deletes (a proposed removal goes to `doc-patches.md`, because a silently
+  dropped rule is unrecoverable and invisible), and cites the diff hunk behind
+  every patch — that citation is the only reason it may commit without a human
+  accept. `NO-IMPACT` is the expected answer; a sweep that finds something
+  every run is miscalibrated. Wiki and rule edits land as separate
+  `docs(espalier):` commits, each revertable on its own.
+- **Stage 7, not 8.5.** The sweep was designed for Stage 8.5 and moved: the fix
+  lane is 7 stages and skips 8, 9 and 10, so a sweep at 8.5 would have been
+  invisible to every bug fix — the case where a critical path most often goes
+  stale. Cost, accepted: it runs before CI, so a refresh can describe code that
+  then fails. Visible and cheap against a silent, permanent gap. Stage 8.5's
+  own `.drift-state.tsv` notify table is unchanged.
+- **`MAINTENANCE COMMITS` v1 → v2.** The rule said the opposite: routine prune
+  refreshes "ride ONE weekly maintenance PR". Now drift YOUR change caused
+  rides YOUR espalier PR; drift you did not cause stays on the weekly gardener
+  lane. "Maintenance commits are never folded into feature commits" survives
+  and is structural rather than a matter of discipline.
+- **The commit table still records the code branch only.** Its readers blame a
+  source line to one commit, so code-only rows make the
+  `post-merge-backlink.sh` overlap match sharper than when the records commit's
+  `espalier/` paths sat in the same range. The espalier branch's squash carries
+  no source path, finds no overlap, and writes no row — absence rather than a
+  wrong mapping. The espalier PR is tracked by number in the new
+  `## Pull Requests` table, which `delivery_brief` renders alongside the
+  sweep's verdicts.
+- **Migration #40 — `migrate-v0.28.1-to-v0.29.0.sh`.** Adds `espalier-pr.sh`
+  and `modes/wiki-sweep.md`; pure-copy refresh of `pipeline.md`,
+  `stages/7-10-delivery.md`, the espalier-fix SKILL and `drift-helpers.sh`
+  (backups `.pre-v0.29.bak`); anchored edits, extracted from the templates at
+  run time, to `harness-coder.md`, `harness-reviewer.md` and
+  `rules/development-process.md` — a customised file missing its anchor is left
+  UNTOUCHED with a record in `espalier/.migrations-skipped`. A change already
+  at Stage ≥ 7 is reported and finishes on the old single-branch path; a pushed
+  branch is never retro-split. Verified end to end: a v0.28.1 install migrates
+  byte-identical to a fresh v0.29.0 one, a re-run is a no-op, and a mangled
+  anchor skips rather than mangles.
+- **`/espalier-migrate`.** Step 40; the probe is the two shipped files plus
+  `pipeline.md`'s `**Pull requests:**` line (a skip record counts as handled);
+  the supersession floor gains `NEEDS_V0290_PATCH` as its newest rung.
+
 ## 0.28.1 — 2026-09-15
 
 Patch: **the trim.** Every shipped agent, skill, rule, and stage template
