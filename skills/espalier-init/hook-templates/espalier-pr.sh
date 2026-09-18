@@ -2,8 +2,9 @@
 # espalier-pr.sh — the pipeline's forge surface: the code PR and its espalier
 # sibling.
 #
-#   espalier-pr.sh <type> <slug> project [msg]  project espalier/ onto the espalier
-#                                               branch and commit it there
+#   espalier-pr.sh <type> <slug> project [msg] [path...]
+#                                               project the named espalier/ paths onto
+#                                               the espalier branch and commit them there
 #   espalier-pr.sh <type> <slug> push           push BOTH branches (by refspec)
 #   espalier-pr.sh <type> <slug> open           open/find both PRs, record them
 #   espalier-pr.sh <type> <slug> status         print the recorded PR table
@@ -42,6 +43,7 @@ TYPE="${1:?usage: espalier-pr.sh <type> <slug> project|push|open|status}"
 SLUG="${2:?slug required}"
 CMD="${3:?subcommand required: project|push|open|status}"
 MSG="${4:-}"
+shift 4 2>/dev/null || shift $#   # anything left is an explicit path list for `project`
 
 REPO="$(git rev-parse --show-toplevel)"
 STATE="$REPO/espalier/changes/$TYPE/$SLUG/pipeline-state.md"
@@ -58,6 +60,12 @@ if [ -z "$BASE_BRANCH" ]; then
 fi
 BASE_BRANCH="${BASE_BRANCH:-main}"
 
+if [ "$CODE_BRANCH" = "HEAD" ]; then
+  echo "pr: ERROR — detached HEAD. The split needs a named code branch to push"
+  echo "  and to open a PR from. Check out the change's branch and re-run."
+  exit 1
+fi
+
 # Guard invariant 1 at every entry point, not just where it would corrupt state.
 if [ "$CODE_BRANCH" = "$ESP_BRANCH" ]; then
   echo "pr: ERROR — the checkout is on $ESP_BRANCH."
@@ -71,7 +79,18 @@ base_ref() {  # the Stage 3 certificate anchor; merge-base is the legacy fallbac
   local r
   r="$(grep -E '^(- )?Base-Ref:' "$STATE" 2>/dev/null | tail -1 | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')"
   [ -n "$r" ] || r="$(git -C "$REPO" merge-base HEAD "$REMOTE/$BASE_BRANCH" 2>/dev/null || true)"
-  [ -n "$r" ] || r="$(git -C "$REPO" rev-parse HEAD)"
+  [ -n "$r" ] || r="$(git -C "$REPO" merge-base HEAD "$BASE_BRANCH" 2>/dev/null || true)"
+  # NEVER fall back to HEAD. The espalier branch is cut from this ref, so HEAD
+  # would put every code commit of the change on it — and the espalier PR would
+  # carry the code as well, silently defeating the split. Fail instead.
+  if [ -z "$r" ]; then
+    echo "pr: ERROR — cannot determine this change's base." >&2
+    echo "  No 'Base-Ref:' in $STATE, and no merge-base with $REMOTE/$BASE_BRANCH" >&2
+    echo "  or $BASE_BRANCH. Record Base-Ref (Stage 3 writes it) or fetch the" >&2
+    echo "  canonical branch, then re-run. Cutting the espalier branch from HEAD" >&2
+    echo "  would put this change's code on the espalier PR." >&2
+    exit 1
+  fi
   printf '%s' "$r"
 }
 
@@ -121,22 +140,41 @@ case "$CMD" in
       echo "pr: created $ESP_BRANCH at ${BR:0:8} (Base-Ref)"
     fi
 
+    # WHAT gets projected is explicit, never "whatever is dirty under espalier/".
+    # A whole-tree copy sweeps in other in-flight changes' records, migration
+    # .bak backups, and any unrelated local edit — all of which would land in
+    # THIS change's pull request. Default: this change's own records, plus the
+    # convention index when the run wrote there. The sweep passes its own paths.
+    if [ "$#" -gt 0 ]; then
+      PATHS="$*"
+    else
+      PATHS="espalier/changes/$TYPE/$SLUG"
+      [ -d "$REPO/espalier/conventions" ] && PATHS="$PATHS espalier/conventions"
+    fi
+
     WT="$(mktemp -d "${TMPDIR:-/tmp}/espalier-pr-XXXXXX")"
     cleanup() { git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1 || true; }
     trap cleanup EXIT
     git -C "$REPO" worktree add --quiet "$WT" "$ESP_BRANCH"
 
-    # Project. rsync --delete also retires files removed from this checkout;
-    # without rsync we copy over the top and say plainly what we cannot do.
-    if command -v rsync >/dev/null 2>&1; then
-      rsync -a --delete "$REPO/espalier/" "$WT/espalier/"
-    else
-      cp -R "$REPO/espalier/." "$WT/espalier/"
-      echo "  NOTE: rsync not found — copied without --delete, so a file removed"
-      echo "        from espalier/ in this checkout still exists on $ESP_BRANCH."
-    fi
+    for rel in $PATHS; do
+      [ -e "$REPO/$rel" ] || continue
+      if [ -d "$REPO/$rel" ]; then
+        mkdir -p "$WT/$rel"
+        # --delete retires files removed from this checkout, scoped to this path.
+        if command -v rsync >/dev/null 2>&1; then
+          rsync -a --delete "$REPO/$rel/" "$WT/$rel/"
+        else
+          cp -R "$REPO/$rel/." "$WT/$rel/"
+          echo "  NOTE: rsync not found — copied $rel without --delete, so a file"
+          echo "        removed from it still exists on $ESP_BRANCH."
+        fi
+      else
+        mkdir -p "$WT/$(dirname "$rel")"
+        cp "$REPO/$rel" "$WT/$rel"
+      fi
+    done
 
-    # `git add` honours .gitignore, so per-clone sidecars stay untracked.
     git -C "$WT" add -A espalier/
     if git -C "$WT" diff --cached --quiet; then
       echo "pr: nothing to project onto $ESP_BRANCH"

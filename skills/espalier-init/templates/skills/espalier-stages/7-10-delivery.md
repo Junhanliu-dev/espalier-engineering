@@ -66,16 +66,22 @@ then each class the sweep wrote — then push both branches:
 ```bash
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
   "chore(espalier): $SLUG — pipeline records"
-# only when the sweep patched them:
+# only when the sweep patched them — each names the paths it may commit:
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
-  "docs(espalier): wiki refresh for $SLUG"
+  "docs(espalier): wiki refresh for $SLUG" espalier/wiki
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
-  "docs(espalier): rules refresh for $SLUG"
+  "docs(espalier): rules refresh for $SLUG" espalier/rules
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" push
 ```
 
 `project` is a no-op when nothing changed, so an unpatched class costs a line
 of output and nothing else.
+
+Each call names WHAT it may commit and nothing else can enter — the default is
+this change's own records plus `espalier/conventions/`. That scoping is not
+tidiness: the working tree can also hold another in-flight change's records,
+migration `.bak` backups, and unrelated local edits under `espalier/`, and a
+whole-tree projection would put all of them in THIS change's pull request.
 
 **4. Open both PRs.**
 

@@ -1456,6 +1456,7 @@ stage_gitignore() {
     "espalier/.doctor-last-run" \
     "espalier/.drift-overrides.log" \
     "espalier/.dep-audit-cache" \
+    "*.pre-v0.*.bak" \
   | while IFS= read -r entry; do
       grep -qxF "$entry" .gitignore 2>/dev/null && continue
       if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then

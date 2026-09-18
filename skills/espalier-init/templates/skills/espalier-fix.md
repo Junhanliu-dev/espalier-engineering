@@ -1205,14 +1205,15 @@ branch and push both refs safely past the gate — is the espalier skill's
    than anywhere: the fix lane stops at Stage 7, so it is the ONLY point at
    which a fix can refresh a doc it invalidated.
 2. **Project**, once for the records and once per class the sweep patched, so
-   each lands as its own revertable commit.
+   each lands as its own revertable commit. Each call names the paths it may
+   commit; nothing else under `espalier/` can reach this fix's PR.
 3. **Push and open.**
 
 ```bash
 espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"
 # only when the sweep patched them:
-espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): wiki refresh for $SLUG"
-espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): rules refresh for $SLUG"
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): wiki refresh for $SLUG" espalier/wiki
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): rules refresh for $SLUG" espalier/rules
 espalier/hooks/espalier-pr.sh fix "$SLUG" push
 espalier/hooks/espalier-pr.sh fix "$SLUG" open
 ```

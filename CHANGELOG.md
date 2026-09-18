@@ -34,7 +34,15 @@ unchanged, and nothing here sets a budget.
   from the code branch, because `pre-push-gate.sh` fingerprints the source
   diff against the current checkout and on an espalier-only branch that diff
   is empty — the empty-blob hash, which can never match the certificate.
-  `pre-push-gate.sh` is untouched and gains no bypass.
+  `pre-push-gate.sh` is untouched and gains no bypass. And a third: `project`
+  commits ONLY the paths it is given — this change's records plus
+  `espalier/conventions/` by default, and the sweep names its own. A whole-tree
+  projection would sweep in another in-flight change's records, migration
+  `.bak` backups, and any unrelated local edit under `espalier/`, all landing
+  in THIS change's pull request. It also refuses to run from a detached HEAD,
+  and refuses to cut the espalier branch from HEAD when no base can be
+  determined — that fallback would put the change's code on the espalier PR and
+  silently defeat the split.
 - **The Stage 7 doc sweep** — `harness-reviewer` in `WIKI SWEEP:` mode
   (`espalier/agents/modes/wiki-sweep.md`). It reads ONE diff and asks per doc
   whether that diff made anything written there false. It re-derives nothing
