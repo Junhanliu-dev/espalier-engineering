@@ -101,6 +101,21 @@ With no `gh`, or a `gh` with no usable account, `open` exits 5 with a warning
 and the run continues: the branches are pushed and a human opens the PRs. The
 pipeline NEVER blocks on the forge.
 
+`open` finishes with a CI scan (`espalier-pr.sh {type} {slug} ci-scan`, also
+runnable on its own). The espalier PR's diff is `espalier/**` and nothing else,
+which breaks `pull_request` path filters in two opposite directions, so the
+scan reports rather than prescribes:
+
+- A workflow whose `paths:` excludes `espalier/` never runs on that PR. Fine on
+  its own — a **deadlock** if any of its checks are required by branch
+  protection, because a required check that never runs blocks the PR forever.
+- A workflow with no path filter runs the full suite against a diff with no
+  code in it. Mergeable, but it doubles CI per change.
+
+The fix for one is the cause of the other, so the scan names which workflows
+are in which bucket and the required checks it can read, and edits nothing.
+Never blocking: a scan failure is reported and the run continues.
+
 The Stage 7 gate is otherwise unchanged (branch convention, pre-push hook,
 certificate) with one amendment: the working tree is clean OUTSIDE `espalier/`.
 `espalier/` is expected dirty here — that is the projection's source.

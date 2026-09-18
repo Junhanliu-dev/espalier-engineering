@@ -43,6 +43,18 @@ unchanged, and nothing here sets a budget.
   and refuses to cut the espalier branch from HEAD when no base can be
   determined — that fallback would put the change's code on the espalier PR and
   silently defeat the split.
+- **`espalier-pr.sh ci-scan`, run at the end of `open`.** The espalier PR's diff
+  is `espalier/**` and nothing else, which breaks `pull_request` path filters in
+  two opposite directions: a workflow filtered to `src/**` never runs on it —
+  harmless alone, a deadlock if its checks are required, since a required check
+  that never runs blocks the PR forever — while an unfiltered workflow runs the
+  full suite against a diff with no code, doubling CI per change. The fix for
+  one causes the other, so the scan reports which workflows are in which bucket,
+  names the required checks when the token can read branch protection, says so
+  explicitly when it cannot, and edits no workflow. Path globs are matched the
+  way the forge matches them (`**` crosses `/`, `*` does not); `types: [closed]`
+  deploy triggers are excluded; a `!` negation is reported as unevaluated rather
+  than guessed at.
 - **The Stage 7 doc sweep** — `harness-reviewer` in `WIKI SWEEP:` mode
   (`espalier/agents/modes/wiki-sweep.md`). It reads ONE diff and asks per doc
   whether that diff made anything written there false. It re-derives nothing

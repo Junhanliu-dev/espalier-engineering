@@ -1207,7 +1207,10 @@ branch and push both refs safely past the gate — is the espalier skill's
 2. **Project**, once for the records and once per class the sweep patched, so
    each lands as its own revertable commit. Each call names the paths it may
    commit; nothing else under `espalier/` can reach this fix's PR.
-3. **Push and open.**
+3. **Push and open.** `open` ends with a CI scan of the espalier PR — its diff
+   is `espalier/**` only, which either misses path-filtered workflows (a
+   deadlock when their checks are required) or runs the full suite against a
+   diff with no code. It reports and never edits; see the full-lane procedure.
 
 ```bash
 espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"

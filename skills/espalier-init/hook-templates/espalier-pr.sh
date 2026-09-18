@@ -8,6 +8,8 @@
 #   espalier-pr.sh <type> <slug> push           push BOTH branches (by refspec)
 #   espalier-pr.sh <type> <slug> open           open/find both PRs, record them
 #   espalier-pr.sh <type> <slug> status         print the recorded PR table
+#   espalier-pr.sh <type> <slug> ci-scan        report which workflows will (not) run
+#                                               on the espalier PR
 #
 # Two invariants this script exists to protect:
 #
@@ -263,6 +265,8 @@ has not merged yet — \`/espalier-doctor\` flags the mismatch on its next scan.
     else
       echo "  NOTE: $ESP_BRANCH does not exist — no espalier PR opened"
     fi
+    echo "pr: CI scan for the espalier PR"
+    "$0" "$TYPE" "$SLUG" ci-scan || true
     ;;
 
   # ──────────────────────────────────────────────────────────────── status ──
@@ -274,6 +278,157 @@ has not merged yet — \`/espalier-doctor\` flags the mismatch on its next scan.
     fi
     ;;
 
+  # ─────────────────────────────────────────────────────────────── ci-scan ──
+  # The espalier PR's diff is `espalier/**` and nothing else, which interacts
+  # badly with `pull_request` path filters in two OPPOSITE ways — so this
+  # reports which workflows land in which bucket instead of giving one blanket
+  # instruction:
+  #
+  #   - A workflow whose `paths:` does not match `espalier/**` never runs on the
+  #     espalier PR. Harmless on its own; a DEADLOCK if any of its checks are
+  #     required by branch protection, because a required check that never runs
+  #     leaves the PR permanently un-mergeable.
+  #   - A workflow with no path filter runs the full suite against a diff with
+  #     no code in it. Mergeable, but it doubles CI for every change.
+  #
+  # Advice differs per bucket and the buckets contradict each other, so this
+  # never edits a workflow. It reports, and names the required checks when the
+  # token can read branch protection.
+  ci-scan)
+    WFDIR="$REPO/.github/workflows"
+    [ -d "$WFDIR" ] || { echo "pr: no .github/workflows — nothing to scan"; exit 0; }
+
+    # Three-dot against the canonical branch — the same diff the forge computes
+    # for the PR. A two-dot diff from Base-Ref answers a different question and
+    # would misreport the moment the branch is not where you assume.
+    FILES=""
+    if git -C "$REPO" show-ref --verify --quiet "refs/heads/$ESP_BRANCH"; then
+      for ref in "$BASE_BRANCH" "$REMOTE/$BASE_BRANCH"; do
+        if git -C "$REPO" rev-parse --verify --quiet "$ref" >/dev/null; then
+          FILES="$(git -C "$REPO" diff --name-only "$ref...$ESP_BRANCH" || true)"
+          break
+        fi
+      done
+    fi
+    # Before the first projection there is no branch to diff; scan against the
+    # paths the espalier PR is always made of, so the warning still arrives in
+    # time to be acted on.
+    [ -n "$FILES" ] || FILES="espalier/changes/$TYPE/$SLUG/pipeline-state.md
+espalier/wiki/architecture.md
+espalier/rules/development-process.md"
+
+    # Required checks, best effort: needs branch-protection read, which many
+    # tokens lack and which 404s when protection is off. Absence is not proof
+    # that nothing is required — the report says so rather than implying safety.
+    REQUIRED=""
+    if command -v gh >/dev/null 2>&1 && gh auth token >/dev/null 2>&1; then
+      REQUIRED="$(gh api "repos/{owner}/{repo}/branches/$BASE_BRANCH/protection/required_status_checks" \
+                    --jq '.contexts[]?' 2>/dev/null || true)"
+    fi
+
+    WFDIR="$WFDIR" FILES="$FILES" REQUIRED="$REQUIRED" BASE_BRANCH="$BASE_BRANCH" python3 - << 'PYCI'
+import os, re, sys
+
+wfdir = os.environ["WFDIR"]
+files = [f for f in os.environ["FILES"].split("\n") if f.strip()]
+required = [c for c in os.environ["REQUIRED"].split("\n") if c.strip()]
+base = os.environ["BASE_BRANCH"]
+
+def items(raw, bracketed):
+    out = []
+    for x in (raw.split(",") if bracketed else re.findall(r"-\s*(.+)", raw)):
+        x = x.split("#", 1)[0].strip().strip("'\"").strip()
+        if x:
+            out.append(x)
+    return out
+
+def to_re(pat):
+    # GitHub filter globs: ** crosses /, * and ? do not. Build the regex in one
+    # pass so a literal '*' after '**' is not re-expanded.
+    out, i = [], 0
+    while i < len(pat):
+        c = pat[i]
+        if c == "*":
+            if pat[i:i + 2] == "**":
+                out.append(".*"); i += 2; continue
+            out.append("[^/]*")
+        elif c == "?":
+            out.append("[^/]")
+        else:
+            out.append(re.escape(c))
+        i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+def find_block(text, key):
+    m = re.search(r"^\s*%s\s*:\s*\n((?:\s{2,}.*\n?)*)" % key, text, re.M)
+    return m.group(1) if m else None
+
+def filt(block, key):
+    b = re.search(r"%s\s*:\s*\[([^\]]*)\]" % key, block) \
+        or re.search(r"%s\s*:\s*\n((?:\s*-\s*.+\n?)+)" % key, block)
+    return items(b.group(1), "[" in b.group(0)) if b else None
+
+skipped, runs, negated = [], [], []
+for name in sorted(os.listdir(wfdir)):
+    if not name.endswith((".yml", ".yaml")):
+        continue
+    try:
+        text = open(os.path.join(wfdir, name), errors="replace").read()
+    except OSError:
+        continue
+    # `or` would be wrong here: a bare `pull_request:` with no sub-keys yields an
+    # EMPTY block, which is falsy but entirely valid — and it is the commonest
+    # shape there is. Test for None explicitly or those workflows vanish from
+    # the report, which are exactly the ones that do run on the espalier PR.
+    block = find_block(text, "pull_request")
+    if block is None:
+        block = find_block(text, "pull_request_target")
+    if block is None:
+        continue
+    types = filt(block, "types")
+    if types and set(types) <= {"closed"}:
+        continue   # deploy-on-merge trigger; PRs are not meant to fire it
+    br = filt(block, "branches")
+    if br and not any(to_re(p).match(base) for p in br):
+        continue   # does not run on either PR — pre-existing, not ours
+    paths, ignore = filt(block, "paths"), filt(block, "paths-ignore")
+    if any(p.startswith("!") for p in (paths or []) + (ignore or [])):
+        negated.append(name); continue
+    if paths is not None:
+        (runs if any(to_re(p).match(f) for p in paths for f in files) else skipped).append(name)
+    elif ignore is not None:
+        (skipped if all(any(to_re(p).match(f) for p in ignore) for f in files) else runs).append(name)
+    else:
+        runs.append(name)
+
+if skipped:
+    print("  %d workflow(s) will NOT run on the espalier PR (path filters exclude"
+          " espalier/): %s" % (len(skipped), ", ".join(skipped)))
+    if required:
+        print("  Branch protection on '%s' requires: %s" % (base, ", ".join(required)))
+        print("  If any of those checks come from the workflows above, the espalier PR")
+        print("  can never merge — a required check that never runs blocks it forever.")
+        print("  Add espalier/** to those filters, or drop those checks from the")
+        print("  required list.")
+    else:
+        print("  No required checks were readable for '%s' (protection off, or the"
+              " token cannot read it — absence is NOT proof none are required)." % base)
+        print("  If any are required, the espalier PR will never merge: add espalier/**")
+        print("  to those filters, or exclude those checks.")
+if runs:
+    print("  %d workflow(s) WILL run on the espalier PR: %s" % (len(runs), ", ".join(runs)))
+    print("  That PR's diff contains no code, so this is your full suite against an")
+    print("  unchanged tree — correct, but it doubles CI per change. Adding")
+    print("  paths-ignore: ['espalier/**'] cuts it, but ONLY if none of their checks")
+    print("  are required (see above).")
+if negated:
+    print("  %d workflow(s) use '!' negation in a path filter and were NOT evaluated:"
+          " %s — check them by hand." % (len(negated), ", ".join(negated)))
+if not (skipped or runs or negated):
+    print("  no pull_request workflow affects the espalier PR")
+PYCI
+    ;;
+
   *)
-    echo "pr: unknown subcommand '$CMD' (project|push|open|status)"; exit 1 ;;
+    echo "pr: unknown subcommand '$CMD' (project|push|open|status|ci-scan)"; exit 1 ;;
 esac
