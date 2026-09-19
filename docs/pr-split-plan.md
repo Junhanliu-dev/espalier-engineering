@@ -213,3 +213,7 @@ path — notice only, never retro-split a pushed branch. Idempotent.
 - If PR2 is closed and never merged, the wiki/rules half self-heals via
   doctor+prune, but the change records do **not** — they are not scout-derivable,
   and `/espalier-fix` Stage 0 reverse lookup depends on them.
+- A change ABORTED or ESCALATED after Stage 7 leaves both PRs open and nothing
+  closes them. Deliberate: the pipeline has never closed a PR, and a branch with
+  reviewed work on it is not something to discard automatically. The operator
+  closes them.

@@ -414,6 +414,15 @@ ride a separate branch and a separate pull request, projected at Stage 7 —
 staging one here puts pipeline bookkeeping into the code diff a human reviews,
 which is the thing the split exists to prevent.
 
+Not staging them is not enough, because you are not the only writer of the
+index: the review certificate runs `git add -A` before you are spawned, so
+`espalier/` is ALREADY staged when you arrive, and a bare `git commit` commits
+the whole index. **Always commit with an explicit pathspec** —
+`git commit -- src/foo.ts src/foo.test.ts` (or `git commit <paths>`) — so the
+commit contains what you name and nothing else. The push refuses a code branch
+carrying `espalier/` paths, so a bare commit here fails the stage later, far
+from the cause.
+
 1. **One unit per commit.** One seam — a schema list with its hooks and
    tests; one screen with its hook and its documents; one resolver with its
    tests. A refactor that prepares the change is its own commit BEFORE the

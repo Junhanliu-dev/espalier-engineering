@@ -208,6 +208,24 @@ case "$CMD" in
   # ────────────────────────────────────────────────────────────────── push ──
   push)
     echo "pr: push ($CODE_BRANCH + $ESP_BRANCH → $REMOTE)"
+    # The split is an invariant, so verify it instead of trusting it. It leaks
+    # through a path nobody intends: `certificate_write` runs `git add -A` (it
+    # must — an untracked new file would otherwise be invisible to the
+    # fingerprint), which leaves espalier/ STAGED on the code branch, and a
+    # later `git commit` commits the whole index. Any rollback that re-enters
+    # Stage 3 puts a coder commit after a certificate write, so the code PR
+    # silently acquires the pipeline's own records. Fail closed here rather than
+    # ship a code PR that is not code.
+    LEAKED="$(git -C "$REPO" diff --name-only "$(base_ref)..$CODE_BRANCH" -- espalier/ || true)"
+    if [ -n "$LEAKED" ]; then
+      echo "  ERROR: $CODE_BRANCH carries espalier/ paths — the split has leaked:"
+      printf '%s\n' "$LEAKED" | sed 's/^/    /' | head -10
+      echo "  A commit on the code branch absorbed paths left staged by"
+      echo "  certificate_write. Commit code with an explicit pathspec"
+      echo "  (git commit -- <paths>), move these onto the espalier branch, and"
+      echo "  re-run. Nothing was pushed."
+      exit 1
+    fi
     push_branch "$CODE_BRANCH"
     if git -C "$REPO" show-ref --verify --quiet "refs/heads/$ESP_BRANCH"; then
       push_branch "$ESP_BRANCH"

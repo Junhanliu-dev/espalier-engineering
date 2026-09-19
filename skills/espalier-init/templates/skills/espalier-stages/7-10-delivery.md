@@ -40,9 +40,15 @@ scope. Never `git add -A`, never one "everything" commit, and never squash or
 rebase the coder's commits (squash-merge is the pull request's policy and the
 post-merge hook maps it back).
 
-The coder's commits are code only; `espalier/` paths are never staged into
-one. Do not stage `espalier/conventions/` here either — the projection in
-step 3 picks up everything under `espalier/`, tracked or new, and `git add`
+Commit it with an explicit pathspec — `git commit -- {paths}` — never a bare
+`git commit`. `certificate_write` runs `git add -A`, so `espalier/` is already
+staged by the time you get here and a bare commit absorbs it; a rollback that
+re-enters Stage 3 puts a coder commit in exactly that position. `push` refuses
+a code branch carrying `espalier/` paths, so getting this wrong stops the stage
+instead of shipping a code PR full of pipeline records.
+
+Do not stage `espalier/conventions/` here either — the projection in step 3
+picks up what it is given under `espalier/`, tracked or new, and `git add`
 honours `.gitignore` so the per-clone sidecars stay out.
 
 **2. The doc sweep.** Spawn `harness-reviewer` with `WIKI SWEEP:` on the prompt
