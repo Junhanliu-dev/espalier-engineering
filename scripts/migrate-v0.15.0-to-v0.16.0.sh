@@ -72,7 +72,9 @@ TPL="$PLUGIN_DIR/skills/espalier-init"
 grep -qF 'conv_fold' "$TPL/hook-templates/drift-helpers.sh" 2>/dev/null \
   || die "plugin dir $PLUGIN_DIR is not v0.16.0 (drift-helpers template lacks conv_fold). Update the plugin first."
 DEVPROC_TPL="$TPL/templates/rules/development-process.md"
-grep -qF 'ESPALIER MAINTENANCE COMMITS v1' "$DEVPROC_TPL" 2>/dev/null \
+# Any version of the managed block counts: the template moves on (v0.29.0 is v2),
+# and this step only has to land the section — later chain steps upgrade it.
+grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' "$DEVPROC_TPL" 2>/dev/null \
   || die "plugin template missing the Maintenance Commits section — update the plugin."
 
 DEVPROC="espalier/rules/development-process.md"
@@ -96,7 +98,7 @@ grep -qE '^canonical-remote: .+' espalier/.espalier-config 2>/dev/null \
   || mark "canonical-remote key in espalier/.espalier-config"
 grep -qE '^canonical-branch: .+' espalier/.espalier-config 2>/dev/null \
   || mark "canonical-branch key in espalier/.espalier-config"
-grep -qF 'ESPALIER MAINTENANCE COMMITS v1' "$DEVPROC" 2>/dev/null \
+grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' "$DEVPROC" 2>/dev/null \
   || mark "## Maintenance Commits section in $DEVPROC"
 grep -qF 'Multi-Developer Maintenance' espalier/pipeline.md 2>/dev/null \
   || mark "pipeline.md multi-dev maintenance section"
@@ -129,7 +131,7 @@ if [ "$DRY_RUN" = yes ]; then
       log "  $dst already matches the template (no copy, no backup)"
     fi
   done
-  if ! grep -qF 'ESPALIER MAINTENANCE COMMITS v1' "$DEVPROC" 2>/dev/null; then
+  if ! grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' "$DEVPROC" 2>/dev/null; then
     log "  append '## Maintenance Commits' to $DEVPROC (backup → $DEVPROC.pre-v0.16.bak)"
   fi
   log "  re-wire: bootstrap --wire-only --merge-decision=$DECISION (appends the"
@@ -171,7 +173,7 @@ log "Step 2: Maintenance Commits section in $DEVPROC"
 if [ ! -f "$DEVPROC" ]; then
   die "$DEVPROC is missing — restore it (re-run espalier-init Phase 2) and re-run this migration."
 fi
-if grep -qF 'ESPALIER MAINTENANCE COMMITS v1' "$DEVPROC"; then
+if grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' "$DEVPROC"; then
   log "  marker already present — skipping the append"
 else
   cp "$DEVPROC" "$DEVPROC.pre-v0.16.bak"
@@ -181,7 +183,7 @@ else
   [ -n "$(tail -c1 "$DEVPROC")" ] && printf '\n' >> "$DEVPROC"
   printf '\n' >> "$DEVPROC"
   sed -n '/^## Maintenance Commits$/,$p' "$DEVPROC_TPL" >> "$DEVPROC"
-  log "  appended '## Maintenance Commits' (ESPALIER MAINTENANCE COMMITS v1)"
+  log "  appended '## Maintenance Commits' (the plugin template's managed block)"
 fi
 
 # --- Step 3: re-wire (gitattributes + config keys + CODEOWNERS + validation) --
@@ -208,7 +210,7 @@ log "verification"
 check "gitattributes union entry"         "grep -qxF 'espalier/.ask-gaps.tsv merge=union' .gitattributes"
 check "canonical-remote key"              "grep -qE '^canonical-remote: .+' espalier/.espalier-config"
 check "canonical-branch key"              "grep -qE '^canonical-branch: .+' espalier/.espalier-config"
-check "Maintenance Commits marker"        "grep -qF 'ESPALIER MAINTENANCE COMMITS v1' '$DEVPROC'"
+check "Maintenance Commits marker"        "grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' '$DEVPROC'"
 check "pipeline multi-dev section"        "grep -qF 'Multi-Developer Maintenance' espalier/pipeline.md"
 check "prune lane section"                "grep -qF 'Multi-Developer Discipline' espalier/skills/espalier-prune/SKILL.md"
 check "doctor lane section"               "grep -qF 'Multi-Developer Discipline' espalier/skills/espalier-doctor/SKILL.md"

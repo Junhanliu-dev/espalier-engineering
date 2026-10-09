@@ -158,6 +158,22 @@ unchanged, and nothing here sets a budget.
   handled); the supersession floor gains `NEEDS_V0290_PATCH` as its newest
   rung; the plugin-dir probe is bumped to the v0.29.0 script; the step count
   and the per-version chains run to v0.29.0.
+- **The migration chain survives the v2 maintenance block.**
+  `migrate-v0.15.0-to-v0.16.0.sh` refused to run unless the CURRENT plugin
+  template carried `ESPALIER MAINTENANCE COMMITS v1`, so once this release moved
+  the template to v2, no install older than v0.16.0 could migrate at all. It
+  (and `/espalier-migrate`'s v0.16 probe) now accepts the managed block at any
+  version — this step only has to land the section; #40 upgrades it.
+- **`scripts/test-bootstrap.sh` follows the release.** Totals 62 / 67 / 72;
+  the v0.25–v0.28.1 chains continue through #40 so their byte-identity checks
+  reach the current templates; test 39 checks the v0.28.1 step against the
+  v0.28.1 templates (its patch can only ever reverse-apply onto those); the
+  floor is v0.29.0. The v0.29.0 probe in `/espalier-migrate` reads only files
+  the plugin ships verbatim — agent bodies and rules are written at init. New
+  test 40: a fresh install, `espalier-pr.sh` against a real repo and a bare
+  remote (scoping, `project-sweep`, the additive-only refusal, the leak and
+  no-base refusals, `close` then `git pull` after both PRs merge), and the
+  migration on an install built from the v0.28.1 tag.
 - **Known limitations.**
   - A change ABORTED or ESCALATED after Stage 7 leaves both PRs open, and
     nothing closes them. The pipeline has never closed a PR, and a branch of

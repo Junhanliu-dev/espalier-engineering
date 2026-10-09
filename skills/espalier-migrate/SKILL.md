@@ -1026,7 +1026,7 @@ elif [ -d "espalier" ]; then
   if ! grep -qxF 'espalier/.ask-gaps.tsv merge=union' .gitattributes 2>/dev/null \
      || ! grep -qE '^canonical-remote: .+' espalier/.espalier-config 2>/dev/null \
      || ! grep -qE '^canonical-branch: .+' espalier/.espalier-config 2>/dev/null \
-     || ! grep -qF 'ESPALIER MAINTENANCE COMMITS v1' espalier/rules/development-process.md 2>/dev/null \
+     || ! grep -qE 'ESPALIER MAINTENANCE COMMITS v[0-9]+' espalier/rules/development-process.md 2>/dev/null \
      || ! grep -qF 'Multi-Developer Maintenance' espalier/pipeline.md 2>/dev/null \
      || ! grep -qF 'Multi-Developer Discipline' espalier/skills/espalier-prune/SKILL.md 2>/dev/null \
      || ! grep -qF 'Multi-Developer Discipline' espalier/skills/espalier-doctor/SKILL.md 2>/dev/null \
