@@ -53,8 +53,8 @@ section() {  # section <file> <heading> — body from `## <heading>` to the next
   ' "$1"
 }
 
-fm() {  # fm <file> <key> — a scalar from the frontmatter
-  awk -v k="$1" 'NR==1 && $0=="---"{on=1; next} on && $0=="---"{exit} on' "$2" \
+fm() {  # fm <key> <file> — a scalar from the frontmatter
+  awk 'NR==1 && $0=="---"{on=1; next} on && $0=="---"{exit} on' "$2" \
     | sed -n -E "s/^$1:[[:space:]]*//p" | head -1
 }
 
@@ -108,7 +108,9 @@ $(section "$fx" DOCS)"
   fixture_ok=yes
   while IFS="$(printf '\t')" read -r path want; do
     [ -n "$path" ] || continue
-    line="$(printf '%s\n' "$sweep" | grep -F "$path" | head -1)"
+    # `|| true`: under pipefail a grep that finds nothing would end the whole
+    # run here, silently — the MISS branch below exists for exactly that case.
+    line="$(printf '%s\n' "$sweep" | grep -F "$path" | head -1 || true)"
     if [ -z "$line" ]; then
       echo "  MISS  $path — no verdict line emitted"; fixture_ok=no; continue
     fi
@@ -138,14 +140,29 @@ $(section "$fx" DOCS)"
 $(expected_for "$fx")
 EOF_EXP
 
-  # SAFETY: no patched file may drop the forbidden term.
+  # SAFETY: no patched file may drop the forbidden term. Checked per file,
+  # against that file's own original — not by guessing which file the term
+  # lives in from the patched text, which a patch that dropped it would defeat.
   if [ -n "$forbidden" ]; then
-    patched="$(printf '%s' "$out" | awk '/^### PATCHED /{on=1} on')"
-    if [ -n "$patched" ] && printf '%s' "$patched" | grep -q "external-services" \
-       && ! printf '%s' "$patched" | grep -qF "$forbidden"; then
-      echo "  SAFETY  a patched doc dropped '$forbidden' — deletions are never applied"
-      fixture_ok=no; safety_violations=$((safety_violations + 1))
-    fi
+    printf '%s\n' "$out" | awk -v dir="$WORK/$id.patched" '
+      /^### PATCHED / { f = $3; sub(/^espalier\//, "", f); gsub(/[\/`]/, "_", f); next }
+      /^### /         { f = ""; next }
+      f               { print > (dir "." f) }
+    '
+    while IFS= read -r doc; do
+      [ -n "$doc" ] || continue
+      key="$(printf '%s' "$doc" | tr '/' '_')"
+      orig="$(printf '%s\n' "$(section "$fx" DOCS)" | awk -v h="### $doc" '
+        $0 == h {on=1; next} on && /^### /{exit} on {print}')"
+      pfile="$WORK/$id.patched.$key"
+      if printf '%s' "$orig" | grep -qF -- "$forbidden" && [ -f "$pfile" ] \
+         && ! grep -qF -- "$forbidden" "$pfile"; then
+        echo "  SAFETY  $doc: the patch dropped '$forbidden' — deletions are never applied"
+        fixture_ok=no; safety_violations=$((safety_violations + 1))
+      fi
+    done << EOF_DOCS
+$(section "$fx" DOCS | sed -n -E 's/^### (.+)$/\1/p')
+EOF_DOCS
   fi
 
   if [ "$fixture_ok" = yes ]; then
@@ -163,6 +180,12 @@ printf '%b' "$results"
 
 if [ "$scored" -eq 0 ]; then
   echo "no fixture executed — INFRA"; exit 3
+fi
+# A fixture lost to infra is not a pass. Scoring one fixture of four and
+# reporting GATE PASS would certify calibration nobody measured.
+if [ "$infra_count" -gt 0 ]; then
+  echo "GATE INCOMPLETE — $infra_count fixture(s) did not run; re-run before trusting the gate"
+  exit 3
 fi
 
 rate="$(awk "BEGIN{ printf \"%.2f\", $pass_count / $scored }")"

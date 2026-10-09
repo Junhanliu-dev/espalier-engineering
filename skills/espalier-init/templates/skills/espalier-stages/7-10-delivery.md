@@ -14,8 +14,8 @@ on the canonical branch. Everything below runs through
 split safe. Read them once — they are not style:
 
 - **The checkout never switches branches.** `espalier/` is live working state
-  through Stage 10 (ci-result, doc-patches, the delivery brief, the close
-  commit are all still to come). Checking out the espalier branch takes those
+  through Stage 10 (ci-result, doc-patches, the delivery brief and
+  Completion's close are all still to come). Checking out the espalier branch takes those
   files out of the tree and the push gate then finds no in-flight change at
   all. The espalier branch is a PROJECTION, built in a temporary worktree and
   synced one-way. `espalier-pr.sh` refuses to run from it.
@@ -47,7 +47,7 @@ re-enters Stage 3 puts a coder commit in exactly that position. `push` refuses
 a code branch carrying `espalier/` paths, so getting this wrong stops the stage
 instead of shipping a code PR full of pipeline records.
 
-Do not stage `espalier/conventions/` here either — the projection in step 3
+Do not stage `espalier/conventions/` here either — the projection in step 4
 picks up what it is given under `espalier/`, tracked or new, and `git add`
 honours `.gitignore` so the per-clone sidecars stay out.
 
@@ -65,35 +65,57 @@ in the Stage History.
 
 The sweep appends its `### Wiki Sweep` verdicts and `### Proposed Removals` to
 the change's `doc-patches.md`, edits the files in place, and stops. Committing
-is step 3's job, one class per commit, so each is separately revertable on the
+is step 4's job, one class per commit, so each is separately revertable on the
 espalier PR. `delivery_brief` reads that block back for the Stage 10 brief's
-`## Doc Refresh`, so a sweep that records nothing leaves the human approving
-the change unaware a doc moved.
+`## Doc Refresh` (and `### Proposed Removals` for `## Proposed Doc Removals`),
+so a sweep that records nothing leaves the human approving the change unaware
+a doc moved.
 
-**3. Project and push.** One `project` call per commit class — records first,
-then each class the sweep wrote — then push both branches:
+**3. Record.** Before anything is projected, write the records Stage 7 owes:
+the `## Commits` table (Stage 7 Commit Recording, below) and, when this feat
+was filed from a partial fix, the reverse-link into that fix's state file
+(Stage 7 Reverse-link, below). Order is the point: a record written after the
+projection sits in this checkout and reaches no pull request.
+
+```bash
+. espalier/hooks/drift-helpers.sh && record_commits "$TYPE" "$SLUG"
+# + the PARTIAL_FIX reverse-link write, when requirements.md carries
+#   filed_from_partial_fix: (the first block of Stage 7 Reverse-link, below)
+```
+
+**4. Project and push.** One `project` call per commit class — records first,
+then each class the sweep patched — then push both branches:
 
 ```bash
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
   "chore(espalier): $SLUG — pipeline records"
-# only when the sweep patched them — each names the paths it may commit:
-espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
-  "docs(espalier): wiki refresh for $SLUG" espalier/wiki
-espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
-  "docs(espalier): rules refresh for $SLUG" espalier/rules
+# the files the latest `### Wiki Sweep` block marked PATCH, one class per commit:
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project-sweep wiki
+espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project-sweep rules
+# when step 3 wrote a PARTIAL_FIX reverse-link (see that section for the guard):
+#   espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project "chore(espalier): close the root-cause chain for ${FILED_FROM}" \
+#     "espalier/changes/${FILED_FROM}/pipeline-state.md"
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" push
 ```
 
-`project` is a no-op when nothing changed, so an unpatched class costs a line
-of output and nothing else.
+`project` is a no-op when nothing changed, and `project-sweep` exits quietly
+when the sweep patched nothing in that class, so an unpatched class costs a
+line of output and nothing else.
 
 Each call names WHAT it may commit and nothing else can enter — the default is
-this change's own records plus `espalier/conventions/`. That scoping is not
-tidiness: the working tree can also hold another in-flight change's records,
-migration `.bak` backups, and unrelated local edits under `espalier/`, and a
-whole-tree projection would put all of them in THIS change's pull request.
+this change's own records plus `espalier/conventions/`, and `project-sweep`
+names exactly the files its block marked PATCH, never the whole directory.
+That scoping is not tidiness: the working tree can also hold another in-flight
+change's records, migration `.bak` backups, and unrelated local edits under
+`espalier/` — including in `wiki/` and `rules/` — and a whole-tree projection
+would put all of them in THIS change's pull request.
 
-**4. Open both PRs.**
+`project` refuses a wiki or rule file that was deleted or lost more lines than
+it gained — the sweep's never-delete rule, enforced rather than trusted. On
+that refusal, restore the text, record the removal under `### Proposed
+Removals`, and re-run the call.
+
+**5. Open both PRs.**
 
 ```bash
 espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" open
@@ -105,7 +127,15 @@ and that close cannot be undone (the base of a closed PR cannot be changed and
 it cannot be reopened without its base), so a stack would lose the espalier PR
 of every change in any repo with `deleteBranchOnMerge`. Ordering is advisory
 and lives in the espalier PR's body. `open` records both in the state file's
-`## Pull Requests` table and is idempotent — a re-run finds the existing PRs.
+`## Pull Requests` table, then projects and pushes that table itself (`sync`)
+so it reaches the espalier PR. It is idempotent — a re-run finds the open PRs
+(or a merged one still at this branch's tip) instead of opening new ones.
+
+**Re-entering Stage 7** (a Stage 8 rollback through Stage 3): run the same
+steps again. The sweep appends a fresh `### Wiki Sweep` block and
+`project-sweep` reads only the latest one; `record_commits` appends only the
+new commits; `project`, `push` and `open` are idempotent. New commits go onto
+the open PRs — never force-push, never open a second pair.
 
 With no `gh`, or a `gh` with no usable account, `open` exits 5 with a warning
 and the run continues: the branches are pushed and a human opens the PRs. The
@@ -132,10 +162,12 @@ certificate) with one amendment: the working tree is clean OUTSIDE `espalier/`.
 
 ### Stage 7 Commit Recording
 
-After `git push` at Stage 7 succeeds, record EVERY commit of the change —
-`Base-Ref..HEAD`, oldest first, one row each — in the state file's Commits
-table (the fix lane's reverse lookup blames a line to ONE commit, so every
-commit must resolve to this change).
+Runs at step 3 — after step 1 has committed every code unit, so
+`Base-Ref..HEAD` is final, and BEFORE the projection, so the table rides the
+espalier PR. Record EVERY commit of the change — `Base-Ref..HEAD`, oldest
+first, one row each — in the state file's Commits table (the fix lane's reverse
+lookup blames a line to ONE commit, so every commit must resolve to this
+change). A table written after the projection would merge without it.
 
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
 > the orchestrator at Stage Execution entry.
@@ -198,15 +230,20 @@ EOF
 fi
 ```
 
-This writes into ANOTHER change's records, so — exactly as the fix lane's
-back-link — it must be projected or it reaches no pull request. This feat
-caused the row, so the row rides THIS change's espalier PR, and only when that
-file already exists on the espalier branch (a partial fix still in flight has
-never merged; projecting it here would add its whole state file and collide
-with its own PR):
+Runs at step 3, before the projection. This writes into ANOTHER change's
+records, so — exactly as the fix lane's back-link — it must be projected or it
+reaches no pull request. This feat caused the row, so the row rides THIS
+change's espalier PR, and only when that file already exists on the espalier
+branch (a partial fix still in flight has never merged; projecting it here
+would add its whole state file and collide with its own PR). Run this at step
+4, between the sweep projections and `push`:
 
 ```bash
-if [ -n "$FILED_FROM" ] && git cat-file -e "${TYPE}/${SLUG}-espalier:espalier/changes/${FILED_FROM}/pipeline-state.md" 2>/dev/null; then
+ESP_BRANCH="${TYPE}/${SLUG}-espalier"
+# `project` creates the branch on first use, so after the records projection it
+# exists; testing an unset ref would read `:path` — the INDEX, where
+# certificate_write's `git add -A` has staged everything — and always pass.
+if [ -n "$FILED_FROM" ] && git cat-file -e "${ESP_BRANCH}:espalier/changes/${FILED_FROM}/pipeline-state.md" 2>/dev/null; then
   espalier/hooks/espalier-pr.sh "$TYPE" "$SLUG" project \
     "chore(espalier): close the root-cause chain for ${FILED_FROM}" \
     "espalier/changes/${FILED_FROM}/pipeline-state.md"

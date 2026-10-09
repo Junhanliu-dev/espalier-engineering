@@ -3,31 +3,38 @@
 #
 # v0.29.0 is the PR split. A pipeline run no longer ends in one branch: the
 # code branch carries every path outside espalier/, a sibling branch carries
-# all of espalier/**, and Stage 7 opens both pull requests. Between the two, a
-# new doc sweep reads the change's own diff against espalier/wiki/ and
-# espalier/rules/ and commits what the diff falsified onto the espalier PR.
+# this change's espalier/ paths, and Stage 7 opens both pull requests. Between
+# the two, a new doc sweep reads the change's own diff against espalier/wiki/
+# and espalier/rules/ and commits what the diff falsified onto the espalier PR.
+# Completion projects and pushes the bookkeeping instead of committing it on
+# the code branch.
 #
 # Contract-equal to v0.28.1 everywhere else: every gate, rubric, sentinel,
 # round cap and escalation path is unchanged. NOTHING here sets a budget.
 #
-#   - New files (pure copy):
-#       espalier/hooks/espalier-pr.sh        the forge surface (project/push/open/status)
-#       espalier/agents/modes/wiki-sweep.md  the sweep procedure
 #   - Pure-copy refresh (backup-on-diff → <file>.pre-v0.29.bak) — these ship
 #     verbatim, so a migrated install ends byte-identical to a fresh one:
+#       espalier/hooks/espalier-pr.sh        the forge surface (new; executable)
+#       espalier/agents/modes/wiki-sweep.md  the sweep procedure (new)
 #       espalier/pipeline.md
+#       espalier/skills/espalier/SKILL.md    Completion: `close`, not a code-branch commit
 #       espalier/skills/espalier/stages/7-10-delivery.md
 #       espalier/skills/espalier-fix/SKILL.md
+#       espalier/skills/espalier-prune/SKILL.md  (names the v2 maintenance marker)
 #       espalier/hooks/drift-helpers.sh      (delivery_brief gains the PR + sweep sections)
 #   - Anchored edits, text EXTRACTED from the plugin templates at run time
-#     (these files carry init-time project substitutions and are never copied):
+#     (these files carry init-time project substitutions and are never copied;
+#     backup-on-change → <file>.pre-v0.29.bak):
 #       espalier/agents/harness-coder.md     Commit Discipline — commits are code only
 #       espalier/agents/harness-reviewer.md  the Doc Sweep pointer + its You-Must-NOT bullet
 #       espalier/rules/development-process.md  MAINTENANCE COMMITS v1 → v2
 #     A customised file missing its anchor is SKIPPED with a record in
 #     espalier/.migrations-skipped, never mangled.
-#   - In-flight changes are never retro-split: a change already at Stage >= 7
-#     finishes on the old single-branch path and is reported, not touched.
+#   - In-flight changes are not touched. The refreshed stage files carry ONLY
+#     the split procedure, so a change resumed at Stage >= 7 runs it; if its
+#     code branch already carries espalier/ commits, `espalier-pr.sh push`
+#     refuses and names them. /espalier-migrate refuses to run with a change in
+#     flight at all (Step 0); this script reports them when run directly.
 #   No config key, no new instruction-file line, no hooks, no symlinks.
 #
 # Usage:
@@ -44,7 +51,7 @@ for arg in "$@"; do
     --dry-run)       DRY_RUN=yes ;;
     --yes)           SKIP_PROMPT=yes ;;
     --plugin-dir=*)  PLUGIN_DIR="${arg#--plugin-dir=}" ;;
-    -h|--help)       sed -n '2,34p' "$0"; exit 0 ;;
+    -h|--help)       sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "ERROR: unknown flag: $arg (use --help)" >&2; exit 2 ;;
   esac
 done
@@ -65,22 +72,28 @@ HTPL="$PLUGIN_DIR/skills/espalier-init/hook-templates"
 SKIPFILE="espalier/.migrations-skipped"
 
 # --- v0.29.0 markers (also the idempotency check) ---------------------------
-PR_MARK='espalier-pr.sh — the code PR and its espalier sibling'
-SWEEP_MARK='# Mode: wiki-sweep'
+# Each names text only the FINAL v0.29.0 shape of its file carries, so an
+# install that took an earlier cut of this release is refreshed, not skipped.
+PR_MARK='project-sweep)'
+SWEEP_MARK='espalier-pr.sh project-sweep'
 PIPE_MARK='**Pull requests:**'
-STAGE_MARK='### Stage 7: The Split — Code Branch, Espalier Branch'
-FIX_MARK='### 7.0 The split — code branch, espalier branch'
-HELP_MARK='## Doc Refresh (Stage 7 sweep)'
-CODER_MARK='Your commits are CODE ONLY: never stage a path under'
+ROUTER_MARK="close 'chore(espalier): close {slug}'"
+STAGE_MARK='**Re-entering Stage 7**'
+FIX_MARK='### 7.3 Project, push, open'
+HELP_MARK='## Proposed Doc Removals'
+PRUNE_MARK='ESPALIER MAINTENANCE COMMITS v2'
+CODER_MARK='Always commit with an explicit pathspec'
 REV_MARK='## Doc Sweep (Stage 7 — your prompt says'
 RULE_MARK='<!-- ESPALIER MAINTENANCE COMMITS v2'
 
-[ -f "$HTPL/espalier-pr.sh" ] \
+grep -qF -- "$PR_MARK"     "$HTPL/espalier-pr.sh" 2>/dev/null \
   && grep -qF -- "$SWEEP_MARK"  "$TPL/agents/modes/wiki-sweep.md" 2>/dev/null \
   && grep -qF -- "$PIPE_MARK"   "$TPL/pipeline.md" 2>/dev/null \
+  && grep -qF -- "$ROUTER_MARK" "$TPL/skills/espalier.md" 2>/dev/null \
   && grep -qF -- "$STAGE_MARK"  "$TPL/skills/espalier-stages/7-10-delivery.md" 2>/dev/null \
   && grep -qF -- "$FIX_MARK"    "$TPL/skills/espalier-fix.md" 2>/dev/null \
   && grep -qF -- "$HELP_MARK"   "$HTPL/drift-helpers.sh" 2>/dev/null \
+  && grep -qF -- "$PRUNE_MARK"  "$TPL/skills/espalier-prune.md" 2>/dev/null \
   && grep -qF -- "$CODER_MARK"  "$TPL/agents/harness-coder.md" 2>/dev/null \
   && grep -qF -- "$REV_MARK"    "$TPL/agents/harness-reviewer.md" 2>/dev/null \
   && grep -qF -- "$RULE_MARK"   "$TPL/rules/development-process.md" 2>/dev/null \
@@ -97,12 +110,14 @@ DEV=espalier/rules/development-process.md
 missing=""
 mark() { missing="$missing
   - $1"; }
-[ -f espalier/hooks/espalier-pr.sh ]                                   || mark "espalier/hooks/espalier-pr.sh (the forge surface)"
-[ -f espalier/agents/modes/wiki-sweep.md ]                             || mark "espalier/agents/modes/wiki-sweep.md (the sweep procedure)"
-grep -qF -- "$PIPE_MARK"  espalier/pipeline.md 2>/dev/null              || mark "pipeline.md Stage 7 (split + sweep + pull requests)"
-grep -qF -- "$STAGE_MARK" espalier/skills/espalier/stages/7-10-delivery.md 2>/dev/null || mark "stages/7-10-delivery.md (Stage 7 procedure)"
-grep -qF -- "$FIX_MARK"   espalier/skills/espalier-fix/SKILL.md 2>/dev/null || mark "espalier-fix SKILL Stage 7.0 (the split)"
-grep -qF -- "$HELP_MARK"  espalier/hooks/drift-helpers.sh 2>/dev/null  || mark "drift-helpers.sh delivery_brief (PR + doc-refresh sections)"
+grep -qF -- "$PR_MARK"     espalier/hooks/espalier-pr.sh 2>/dev/null        || mark "espalier/hooks/espalier-pr.sh (the forge surface)"
+grep -qF -- "$SWEEP_MARK"  espalier/agents/modes/wiki-sweep.md 2>/dev/null  || mark "espalier/agents/modes/wiki-sweep.md (the sweep procedure)"
+grep -qF -- "$PIPE_MARK"   espalier/pipeline.md 2>/dev/null                 || mark "pipeline.md Stage 7 (split + sweep + pull requests)"
+grep -qF -- "$ROUTER_MARK" espalier/skills/espalier/SKILL.md 2>/dev/null    || mark "espalier SKILL Completion (close onto the espalier PR)"
+grep -qF -- "$STAGE_MARK"  espalier/skills/espalier/stages/7-10-delivery.md 2>/dev/null || mark "stages/7-10-delivery.md (Stage 7 procedure)"
+grep -qF -- "$FIX_MARK"    espalier/skills/espalier-fix/SKILL.md 2>/dev/null || mark "espalier-fix SKILL Stage 7 (the split)"
+grep -qF -- "$HELP_MARK"   espalier/hooks/drift-helpers.sh 2>/dev/null      || mark "drift-helpers.sh delivery_brief (PR + doc-refresh sections)"
+grep -qF -- "$PRUNE_MARK"  espalier/skills/espalier-prune/SKILL.md 2>/dev/null || mark "espalier-prune SKILL (the v2 maintenance marker)"
 handled "$CODER_MARK" "$CODER" coder-code-only     || mark "harness-coder Commit Discipline — commits are code only"
 handled "$REV_MARK"   "$REV"   reviewer-doc-sweep  || mark "harness-reviewer — the Doc Sweep pointer"
 handled "$RULE_MARK"  "$DEV"   rules-maintenance-v2 || mark "development-process MAINTENANCE COMMITS v1 → v2"
@@ -113,30 +128,33 @@ if [ -z "$missing" ]; then
 fi
 
 # --- In-flight changes: reported, never retro-split --------------------------
+# Terminal statuses as the migrate skill's Step 0 barrier reads them, plus
+# PARTIAL_FIX — a partial fix has shipped and waits on its root-cause feat.
 inflight=""
 while IFS= read -r st; do
   [ -f "$st" ] || continue
-  grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE|FILED)\b' "$st" && continue
+  grep -qE '^- Status:[[:space:]]*(COMPLETE|ABORTED|ABORTED_LATE|ESCALATED|ESCALATED_LATE|FILED|PARTIAL_FIX)\b' "$st" && continue
   stage=$(grep -E '^(- )?Current Stage:' "$st" 2>/dev/null | head -1 | grep -oE '[0-9]+' | head -1)
   [ -n "$stage" ] && [ "$stage" -ge 7 ] 2>/dev/null && inflight="$inflight
   - ${st#espalier/changes/} (Stage $stage)"
 done << EOF_ST
 $(find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md -not -path "*/_template/*" 2>/dev/null)
 EOF_ST
+INFLIGHT_NOTE="will run the v0.29 split when resumed — if a code branch already carries espalier/ commits, \`espalier-pr.sh push\` refuses and names them:"
 
 if [ "$DRY_RUN" = yes ]; then
   log "DRY RUN — missing:$missing"
-  log "DRY RUN — would add espalier-pr.sh + modes/wiki-sweep.md, refresh 4 pure-copy files (backups: .pre-v0.29.bak), and anchored-edit harness-coder.md / harness-reviewer.md / rules/development-process.md"
-  [ -n "$inflight" ] && log "DRY RUN — in-flight past Stage 7, would be left on the old single-branch path:$inflight"
+  log "DRY RUN — would refresh 8 pure-copy files (espalier-pr.sh and modes/wiki-sweep.md among them; backups: .pre-v0.29.bak), and anchored-edit harness-coder.md / harness-reviewer.md / rules/development-process.md (backups: .pre-v0.29.bak)"
+  [ -n "$inflight" ] && log "DRY RUN — in flight at Stage >= 7, $INFLIGHT_NOTE$inflight"
   exit 0
 fi
 
 if [ "$SKIP_PROMPT" != yes ]; then
   echo "This migration will:"
-  echo "  - add espalier/hooks/espalier-pr.sh and espalier/agents/modes/wiki-sweep.md"
-  echo "  - refresh pipeline.md, stages/7-10-delivery.md, espalier-fix SKILL and drift-helpers.sh (backups: <file>.pre-v0.29.bak)"
-  echo "  - insert the v0.29 text into harness-coder.md, harness-reviewer.md and rules/development-process.md (customised files skipped, never mangled)"
-  [ -n "$inflight" ] && echo "  - leave these in-flight changes on the old single-branch path:$inflight"
+  echo "  - add or refresh espalier/hooks/espalier-pr.sh and espalier/agents/modes/wiki-sweep.md"
+  echo "  - refresh pipeline.md, the espalier SKILL, stages/7-10-delivery.md, the espalier-fix and espalier-prune SKILLs and drift-helpers.sh (backups: <file>.pre-v0.29.bak)"
+  echo "  - insert the v0.29 text into harness-coder.md, harness-reviewer.md and rules/development-process.md (customised files skipped, never mangled; backups: <file>.pre-v0.29.bak)"
+  [ -n "$inflight" ] && echo "  - NOTE: these in-flight changes $INFLIGHT_NOTE$inflight"
   printf "Proceed? [y/N] "
   read -r ans
   case "$ans" in y|Y|yes|YES) ;; *) log "aborted."; exit 0 ;; esac
@@ -147,32 +165,28 @@ skip() {  # skip <label> <reason>
   log "SKIPPED $1 — $2 (recorded in $SKIPFILE)"
 }
 
+BACKUPS=""
 refresh() {  # refresh <template> <installed>
   [ -f "$1" ] || die "template missing: $1"
-  if [ -f "$2" ] && ! cmp -s "$1" "$2"; then cp "$2" "$2.pre-v0.29.bak"; fi
-  cp "$1" "$2"
+  if [ -f "$2" ] && cmp -s "$1" "$2"; then
+    log "$2 already current"; return 0
+  fi
+  if [ -f "$2" ]; then
+    cp "$2" "$2.pre-v0.29.bak" || die "could not back up $2"
+    BACKUPS="$BACKUPS
+  - $2.pre-v0.29.bak"
+  fi
+  mkdir -p "$(dirname "$2")" || die "could not create $(dirname "$2")"
+  cp "$1" "$2" || die "could not write $2"
   log "refreshed $2"
 }
 
-# --- 1. New files ------------------------------------------------------------
-mkdir -p espalier/agents/modes
-if [ ! -f espalier/hooks/espalier-pr.sh ]; then
-  cp "$HTPL/espalier-pr.sh" espalier/hooks/espalier-pr.sh
-  chmod +x espalier/hooks/espalier-pr.sh
-  log "added espalier/hooks/espalier-pr.sh"
-fi
-[ -f espalier/agents/modes/wiki-sweep.md ] \
-  || { cp "$TPL/agents/modes/wiki-sweep.md" espalier/agents/modes/wiki-sweep.md; log "added espalier/agents/modes/wiki-sweep.md"; }
-
-# --- 2. Pure-copy refresh ----------------------------------------------------
-refresh "$TPL/pipeline.md"                              espalier/pipeline.md
-refresh "$TPL/skills/espalier-stages/7-10-delivery.md"  espalier/skills/espalier/stages/7-10-delivery.md
-refresh "$TPL/skills/espalier-fix.md"                   espalier/skills/espalier-fix/SKILL.md
-refresh "$HTPL/drift-helpers.sh"                        espalier/hooks/drift-helpers.sh
-
-# --- 3. Anchored edits (text extracted from the templates at run time) -------
+# --- 1. Anchored edits FIRST (text extracted from the templates at run time) -
+# Every template extraction happens before any file is written, so a plugin
+# whose templates lack an anchor dies here with the install untouched — not
+# halfway through, after the pure-copy refreshes already landed.
 EDIT_RESULTS=$(TPL="$TPL" CODER="$CODER" REV="$REV" DEV="$DEV" python3 - << 'PYEDIT'
-import os, pathlib, re, sys
+import os, pathlib, re, shutil, sys
 
 TPL = pathlib.Path(os.environ["TPL"])
 results = []
@@ -183,6 +197,28 @@ def block(path, start, end, inclusive_end=True):
     i = text.index(start)
     j = text.index(end, i)
     return text[i:j + (len(end) if inclusive_end else 0)]
+
+try:
+    # harness-coder: the code-only paragraphs (the rule, then the explicit-
+    # pathspec commit it needs), inserted after the Commit Discipline opener
+    CODER_PARA = block(TPL / "agents/harness-coder.md",
+                       "Your commits are CODE ONLY",
+                       "fails the stage later, far\nfrom the cause.")
+    CODER_P1_END = "which is the thing the split exists to prevent."
+    # harness-reviewer: the Doc Sweep section (before You Must NOT) + its bullet
+    REV_SECTION = block(TPL / "agents/harness-reviewer.md",
+                        "## Doc Sweep (Stage 7 — your prompt says",
+                        "## You Must NOT", inclusive_end=False)
+    REV_BULLET = block(TPL / "agents/harness-reviewer.md",
+                       "- Write a doc patch on a WIKI SWEEP",
+                       "change's diff, or delete any doc text there (propose the removal instead)")
+    # development-process: the managed maintenance block, v1 -> v2
+    DEV_V2 = block(TPL / "rules/development-process.md",
+                   "<!-- ESPALIER MAINTENANCE COMMITS v2",
+                   "that invariant is now structural rather than a matter of discipline.")
+except (OSError, ValueError) as e:
+    print(f"TEMPLATE\t{e}")
+    sys.exit(3)
 
 def edit(installed, label, fn):
     p = pathlib.Path(installed)
@@ -195,40 +231,39 @@ def edit(installed, label, fn):
         results.append((label, "skip", f"anchor not found ({e})")); return
     if out is None:
         results.append((label, "noop", "already present")); return
+    shutil.copyfile(p, str(p) + ".pre-v0.29.bak")
     p.write_text(out)
-    results.append((label, "done", ""))
+    results.append((label, "done", str(p) + ".pre-v0.29.bak"))
 
-# harness-coder: the code-only paragraph, inserted after the Commit Discipline opener
-CODER_PARA = block(TPL / "agents/harness-coder.md",
-                   "Your commits are CODE ONLY",
-                   "which is the thing the split exists to prevent.")
 def coder(s):
-    if "Your commits are CODE ONLY" in s:
+    if "Always commit with an explicit pathspec" in s:
         return None
+    if "Your commits are CODE ONLY" in s:
+        # An earlier cut of this release inserted the first paragraph only;
+        # the pathspec paragraph is the one that actually stops the leak.
+        i = s.index("Your commits are CODE ONLY")
+        j = s.index(CODER_P1_END, i) + len(CODER_P1_END)
+        return s[:i] + CODER_PARA + s[j:]
     anchor = "passes where it exists, the tests you wrote for that unit pass."
     if anchor not in s:
         raise ValueError("Commit Discipline opener")
     return s.replace(anchor, anchor + "\n\n" + CODER_PARA, 1)
 
-# harness-reviewer: the Doc Sweep section (before You Must NOT) + its bullet
-REV_SECTION = block(TPL / "agents/harness-reviewer.md",
-                    "## Doc Sweep (Stage 7 — your prompt says",
-                    "## You Must NOT", inclusive_end=False)
-REV_BULLET = block(TPL / "agents/harness-reviewer.md",
-                   "- Write a doc patch on a WIKI SWEEP",
-                   "change's diff, or delete any doc text there (propose the removal instead)")
 def reviewer(s):
     if "## Doc Sweep (Stage 7" in s:
         return None
     if "## You Must NOT" not in s:
         raise ValueError("You Must NOT heading")
     s = s.replace("## You Must NOT", REV_SECTION + "## You Must NOT", 1)
-    return s.rstrip("\n") + "\n" + REV_BULLET + "\n"
+    # The bullet belongs at the END of the You Must NOT section, which is not
+    # the end of the file when a project added a section after it.
+    i = s.index("## You Must NOT")
+    m = re.search(r"\n## ", s[i + 1:])
+    if m is None:
+        return s.rstrip("\n") + "\n" + REV_BULLET + "\n"
+    j = i + 1 + m.start()
+    return s[:j].rstrip("\n") + "\n" + REV_BULLET + "\n\n" + s[j + 1:]
 
-# development-process: the managed maintenance block, v1 -> v2
-DEV_V2 = block(TPL / "rules/development-process.md",
-               "<!-- ESPALIER MAINTENANCE COMMITS v2",
-               "that invariant is now structural rather than a matter of discipline.")
 def dev(s):
     if "ESPALIER MAINTENANCE COMMITS v2" in s:
         return None
@@ -245,12 +280,19 @@ edit(os.environ["DEV"],   "rules-maintenance-v2", dev)
 for label, status, why in results:
     print(f"{label}\t{status}\t{why}")
 PYEDIT
-) || die "anchored-edit pass failed"
+)
+rc=$?
+case "$rc" in
+  0) ;;
+  3) die "plugin templates lack an anchor this migration extracts (${EDIT_RESULTS#*	}) — nothing was changed. Update the plugin." ;;
+  *) die "anchored-edit pass failed (python3 exit $rc) — check that python3 is installed" ;;
+esac
 
 while IFS=$'\t' read -r label status why; do
   [ -n "$label" ] || continue
   case "$status" in
-    done) log "edited $label" ;;
+    done) log "edited $label"; BACKUPS="$BACKUPS
+  - $why" ;;
     noop) log "$label already present — left alone" ;;
     skip) skip "$label" "$why" ;;
   esac
@@ -258,7 +300,19 @@ done << EOF_ED
 $EDIT_RESULTS
 EOF_ED
 
+# --- 2. Pure-copy refresh ----------------------------------------------------
+refresh "$HTPL/espalier-pr.sh"                          espalier/hooks/espalier-pr.sh
+chmod +x espalier/hooks/espalier-pr.sh || die "could not chmod espalier/hooks/espalier-pr.sh"
+refresh "$TPL/agents/modes/wiki-sweep.md"               espalier/agents/modes/wiki-sweep.md
+refresh "$TPL/pipeline.md"                              espalier/pipeline.md
+refresh "$TPL/skills/espalier.md"                       espalier/skills/espalier/SKILL.md
+refresh "$TPL/skills/espalier-stages/7-10-delivery.md"  espalier/skills/espalier/stages/7-10-delivery.md
+refresh "$TPL/skills/espalier-fix.md"                   espalier/skills/espalier-fix/SKILL.md
+refresh "$TPL/skills/espalier-prune.md"                 espalier/skills/espalier-prune/SKILL.md
+refresh "$HTPL/drift-helpers.sh"                        espalier/hooks/drift-helpers.sh
+
 log "done. v0.29.0: Stage 7 splits the change into a code PR and an espalier PR,"
 log "and sweeps espalier/wiki + espalier/rules against the change's own diff."
-[ -n "$inflight" ] && log "in-flight past Stage 7, finishing on the old single-branch path:$inflight"
+[ -n "$BACKUPS" ] && log "backups of every file this run replaced or edited (customisations to port by hand live here):$BACKUPS"
+[ -n "$inflight" ] && log "in flight at Stage >= 7 — these $INFLIGHT_NOTE$inflight"
 exit 0

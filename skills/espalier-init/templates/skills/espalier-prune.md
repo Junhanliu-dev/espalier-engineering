@@ -216,7 +216,7 @@ the same day; the merge shows add/add conflicts inside it. All in ONE commit:
 | `hooks/pre-push-gate.sh` | 1.5 → re-substitute build/lint/test commands |
 
 `development-process.md` is a mixed file too: its `## Maintenance Commits`
-section (the `ESPALIER MAINTENANCE COMMITS v1` marker) is fixed policy text —
+section (the `ESPALIER MAINTENANCE COMMITS v2` marker) is fixed policy text —
 scout 1.5 regenerates the discovered sections ONLY, and the two-way diff must
 show the marker section unchanged.
 

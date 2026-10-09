@@ -92,7 +92,18 @@ a removal that exists only in your reply is a removal nobody will ever action.
 A sweep whose verdicts live only in the transcript leaves the human approving
 at Stage 10 with no idea a doc was touched.
 
+Keep each verdict line exactly in that shape — `- wiki/<file>.md: PATCH — …`
+or `- rules/<file>.md: PATCH — …`, path first, the word `PATCH` right after
+the colon. It is not only for the human: `espalier-pr.sh project-sweep` reads
+the LATEST `### Wiki Sweep` block and commits exactly the files marked
+`PATCH` there, nothing else. A file you edit without a `PATCH` line is never
+committed; a `PATCH` line for a file you did not edit commits nothing. On a
+re-run (a rollback back through Stage 7), append a fresh block — never edit
+the earlier one.
+
 Then apply the patches you proposed — edit the files directly — and stop.
 Committing them is Stage 7's job, not yours: the orchestrator calls
-`espalier-pr.sh project` once for the wiki edits and once for the rule edits,
-so each class lands as its own revertable commit on the espalier PR.
+`espalier-pr.sh project-sweep wiki` and `project-sweep rules`, so each class
+lands as its own revertable commit on the espalier PR. That call refuses a doc
+that was deleted or lost more lines than it gained, so a removal applied here
+stops Stage 7 instead of shipping.

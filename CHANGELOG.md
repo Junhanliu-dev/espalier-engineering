@@ -23,7 +23,8 @@ unchanged, and nothing here sets a budget.
   branch; ordering is advisory and lives in the espalier PR's body. This is
   finding #1 of the run lane's own stacked-PR rejection
   (`docs/maprun-stacked-pr-plan.md`), met a second time.
-- **`espalier/hooks/espalier-pr.sh`** — `project` / `push` / `open` / `status`.
+- **`espalier/hooks/espalier-pr.sh`** — `project` / `project-sweep` / `sync` /
+  `close` / `push` / `open` / `status` / `ci-scan`.
   The single-change lane has never opened a PR; only the run lane did. Two
   invariants it exists to hold, both found by reading the code it touches:
   the main checkout NEVER switches branches (`espalier/` is live working state
@@ -39,10 +40,14 @@ unchanged, and nothing here sets a budget.
   `espalier/conventions/` by default, and the sweep names its own. A whole-tree
   projection would sweep in another in-flight change's records, migration
   `.bak` backups, and any unrelated local edit under `espalier/`, all landing
-  in THIS change's pull request. It also refuses to run from a detached HEAD,
-  and refuses to cut the espalier branch from HEAD when no base can be
-  determined — that fallback would put the change's code on the espalier PR and
-  silently defeat the split.
+  in THIS change's pull request; a path outside `espalier/` is refused. It also
+  refuses to run from a detached HEAD or from the canonical branch, and refuses
+  to cut the espalier branch from HEAD when no base can be determined — that
+  fallback would put the change's code on the espalier PR and silently defeat
+  the split. Every push of the code branch (`push`, `open`, `sync`) first
+  verifies the split: a commit only the code branch has that touches
+  `espalier/` refuses the push and names the files — and a base that cannot be
+  resolved fails the check rather than passing it.
 - **`espalier-pr.sh ci-scan`, run at the end of `open`.** The espalier PR's diff
   is `espalier/**` and nothing else, which breaks `pull_request` path filters in
   two opposite directions: a workflow filtered to `src/**` never runs on it —
@@ -50,11 +55,15 @@ unchanged, and nothing here sets a budget.
   that never runs blocks the PR forever — while an unfiltered workflow runs the
   full suite against a diff with no code, doubling CI per change. The fix for
   one causes the other, so the scan reports which workflows are in which bucket,
-  names the required checks when the token can read branch protection, says so
-  explicitly when it cannot, and edits no workflow. Path globs are matched the
-  way the forge matches them (`**` crosses `/`, `*` does not); `types: [closed]`
-  deploy triggers are excluded; a `!` negation is reported as unevaluated rather
-  than guessed at.
+  names the required checks when the token can read branch protection (both
+  the `contexts` and the newer `checks` form), says so explicitly when it
+  cannot, and edits no workflow. Workflows are read by indentation, so a
+  sibling `push:` block is never mistaken for the pull_request filters, and
+  the inline triggers (`on: pull_request`, `on: [push, pull_request]`, flow
+  mappings) are recognised. Path globs are matched the way the forge matches
+  them (`**` crosses `/`, `**/` also matches zero directories, `*` does not);
+  `types: [closed]` deploy triggers and `branches-ignore` exclusions are
+  honoured; a `!` negation is reported as unevaluated rather than guessed at.
 - **The Stage 7 doc sweep** — `harness-reviewer` in `WIKI SWEEP:` mode
   (`espalier/agents/modes/wiki-sweep.md`). It reads ONE diff and asks per doc
   whether that diff made anything written there false. It re-derives nothing
@@ -64,7 +73,23 @@ unchanged, and nothing here sets a budget.
   every patch — that citation is the only reason it may commit without a human
   accept. `NO-IMPACT` is the expected answer; a sweep that finds something
   every run is miscalibrated. Wiki and rule edits land as separate
-  `docs(espalier):` commits, each revertable on its own.
+  `docs(espalier):` commits, each revertable on its own, through
+  `project-sweep`, which commits exactly the files the LATEST `### Wiki Sweep`
+  block marks `PATCH` — never the whole directory, which would carry any
+  unrelated local edit in `wiki/` or `rules/` along as a "refresh". Never
+  deleting is enforced, not only instructed: `project` refuses a wiki or rule
+  file that was deleted or lost more lines than it gained. Proposed removals
+  reach the Stage 10 brief as `## Proposed Doc Removals`.
+- **Every record rides the espalier PR.** Stage 7 writes the `## Commits`
+  table and the cross-change back-links BEFORE projecting, `open` projects and
+  pushes the `## Pull Requests` table it records, and Completion runs
+  `espalier-pr.sh close` instead of a `chore(espalier): close` commit on the
+  code branch: it projects and pushes what Stages 8–10 wrote, then retires
+  this checkout's copies the pushed branch holds byte-for-byte. They cannot
+  stay — once the espalier PR merges, `git pull` refuses to write over an
+  untracked file even when it is identical. A rollback back through Stage 7
+  re-runs the same calls; each is idempotent and new commits go onto the open
+  PRs.
 - **Stage 7, not 8.5.** The sweep was designed for Stage 8.5 and moved: the fix
   lane is 7 stages and skips 8, 9 and 10, so a sweep at 8.5 would have been
   invisible to every bug fix — the case where a critical path most often goes
@@ -84,17 +109,29 @@ unchanged, and nothing here sets a budget.
   wrong mapping. The espalier PR is tracked by number in the new
   `## Pull Requests` table, which `delivery_brief` renders alongside the
   sweep's verdicts.
-- **Migration #40 — `migrate-v0.28.1-to-v0.29.0.sh`.** Adds `espalier-pr.sh`
-  and `modes/wiki-sweep.md`; pure-copy refresh of `pipeline.md`,
-  `stages/7-10-delivery.md`, the espalier-fix SKILL and `drift-helpers.sh`
-  (backups `.pre-v0.29.bak`); anchored edits, extracted from the templates at
-  run time, to `harness-coder.md`, `harness-reviewer.md` and
-  `rules/development-process.md` — a customised file missing its anchor is left
-  UNTOUCHED with a record in `espalier/.migrations-skipped`. A change already
-  at Stage ≥ 7 is reported and finishes on the old single-branch path; a pushed
-  branch is never retro-split. Verified end to end: a v0.28.1 install migrates
-  byte-identical to a fresh v0.29.0 one, a re-run is a no-op, and a mangled
-  anchor skips rather than mangles.
+- **Migration #40 — `migrate-v0.28.1-to-v0.29.0.sh`.** Pure-copy refresh,
+  backup-on-diff (`.pre-v0.29.bak`), of `espalier-pr.sh` and
+  `modes/wiki-sweep.md` (new), `pipeline.md`, the espalier SKILL,
+  `stages/7-10-delivery.md`, the espalier-fix and espalier-prune SKILLs and
+  `drift-helpers.sh`;
+  anchored edits, extracted from the templates at run time, to
+  `harness-coder.md` (the code-only rule AND the explicit-pathspec commit it
+  needs), `harness-reviewer.md` (the bullet lands at the end of `You Must
+  NOT`, not the end of the file) and `rules/development-process.md`, each
+  backed up before it is written — a customised file missing its anchor is
+  left UNTOUCHED with a record in `espalier/.migrations-skipped`. Every
+  template extraction runs before any file is written, so a plugin missing
+  an anchor dies with the install untouched. The run ends by listing every
+  backup it made. In-flight changes are not touched and are reported: the
+  refreshed stage files carry only the split, so a change resumed at Stage
+  ≥ 7 runs it, and `push` refuses (naming the files) if its code branch
+  already carries `espalier/` commits. `/espalier-migrate` refuses to run
+  with a change in flight at all. Verified end to end against an install
+  bootstrapped from the v0.28.1 tag: every touched file byte-identical to a
+  fresh v0.29.0 install, validation 62/62, a re-run a no-op, a reviewer with
+  a project section after `You Must NOT` edited in the right place, an
+  install that took an earlier cut of the coder text upgraded, and a plugin
+  with a broken template anchor leaving the install byte-for-byte unchanged.
 - **Two new validation checks — totals 60 / 65 / 70 → 62 / 67 / 72.** Both
   exist because of a defect this release shipped and then caught by reading:
   the fix lane's Stage 7.0 was rewritten correctly and left contradicting the
@@ -102,15 +139,41 @@ unchanged, and nothing here sets a budget.
   `WIKI SWEEP` precedes `project`, which precedes `push`, which precedes
   `open` — Stage 7's steps are ordered by data dependency, so an edit that
   reorders or drops one leaves the rest referring to output nothing produced,
-  which reads fine and cannot work. Check 72 (`retired-turn-economy`) fails if
-  `7.0 + 7.1 + 7.2 as ONE bash invocation` ever returns; it was true until 7.0
-  grew an agent spawn, and a retired instruction is worse than a missing one.
-  Verified by mutation, not by inspection: both go green on the shipped
-  templates and red on an out-of-order sweep, a dropped `open` call, and a
-  reintroduced batching claim.
-- **`/espalier-migrate`.** Step 40; the probe is the two shipped files plus
-  `pipeline.md`'s `**Pull requests:**` line (a skip record counts as handled);
-  the supersession floor gains `NEEDS_V0290_PATCH` as its newest rung.
+  which reads fine and cannot work. It also asserts `record_commits` precedes
+  the first `push` (a record written after the projection reaches no PR), and
+  that both Completions `close` onto the espalier PR with no
+  `chore(espalier): close` commit left on the code branch. Check 72
+  (`retired-turn-economy`) fails if `7.0 + 7.1 + 7.2 as ONE bash invocation`,
+  or its `with 7.1 + 7.2 as ONE invocation` variant, ever returns; it was true
+  until 7.0 grew an agent spawn, and a retired instruction is worse than a
+  missing one. Migration backups (`*.bak`) are excluded — every migrated
+  install keeps one holding the retired text. Verified by mutation, not by
+  inspection: both go green on the shipped templates and red on an
+  out-of-order sweep, a dropped `open` call, a record written after the push,
+  a close commit restored on the code branch, and a reintroduced batching
+  claim.
+- **`/espalier-migrate`.** Step 40; the probe is the two shipped files,
+  `pipeline.md`'s `**Pull requests:**` line, `espalier-pr.sh`'s
+  `project-sweep` and the espalier SKILL's `close` (a skip record counts as
+  handled); the supersession floor gains `NEEDS_V0290_PATCH` as its newest
+  rung; the plugin-dir probe is bumped to the v0.29.0 script; the step count
+  and the per-version chains run to v0.29.0.
+- **Known limitations.**
+  - A change ABORTED or ESCALATED after Stage 7 leaves both PRs open, and
+    nothing closes them. The pipeline has never closed a PR, and a branch of
+    reviewed work is not something to discard automatically — the operator
+    closes them.
+  - Merge order is advisory. Landing the espalier PR first leaves `main`'s
+    wiki describing code that has not merged, until the code PR lands;
+    `/espalier-doctor` flags it on its next scan.
+  - If the espalier PR is closed unmerged, the wiki/rules half self-heals
+    through doctor + prune, but the change records do not — and
+    `/espalier-fix`'s reverse lookup reads them.
+  - Every change gets an espalier PR, including records-only ones: twice the
+    forge noise, deliberately, over two code paths.
+  - A repo whose required checks come from path-filtered workflows will
+    deadlock the espalier PR until those filters or that list change;
+    `ci-scan` names them and edits nothing.
 
 ## 0.28.1 — 2026-09-15
 

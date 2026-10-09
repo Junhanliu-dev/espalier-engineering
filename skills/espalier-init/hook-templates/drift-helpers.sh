@@ -974,6 +974,23 @@ regression_verify() {
 # heading of the same or a higher level, a `- HANDOFF:` / `- BLOCKED-ON-…`
 # sentinel, or EOF. Fenced blocks inside the section are printed as-is.
 # Prints nothing (exit 0) when the file or the heading is absent.
+_md_last_section() {  # FILE HEADING — like _md_section, but the LAST block under that heading
+  # A rollback that re-runs a stage appends a fresh block under the same
+  # heading; the earlier one describes work that no longer exists.
+  local f="$1" h="$2"
+  [ -f "$f" ] || return 0
+  awk -v want="$h" '
+    /^```/ { fence = !fence; if (insp) buf = buf $0 "\n"; next }
+    fence  { if (insp) buf = buf $0 "\n"; next }
+    /^#+ / {
+      if ($0 == want) { insp = 1; buf = ""; depth = 0; while (substr($0, depth + 1, 1) == "#") depth++; next }
+      if (insp) { d = 0; while (substr($0, d + 1, 1) == "#") d++; if (d <= depth) insp = 0 }
+    }
+    insp { buf = buf $0 "\n" }
+    END { printf "%s", buf }
+  ' "$f"
+}
+
 _md_section() {
   local f="$1" h="$2"
   [ -f "$f" ] || return 0
@@ -1106,7 +1123,12 @@ delivery_brief() {
     body=$(grep -E '^\| (code|espalier) \| ' "$state" 2>/dev/null); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
     echo ""
     echo "## Doc Refresh (Stage 7 sweep)"
-    body=$(_md_section "$dir/doc-patches.md" "### Wiki Sweep" | grep -v '^[[:space:]]*$'); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    body=$(_md_last_section "$dir/doc-patches.md" "### Wiki Sweep" | grep -v '^[[:space:]]*$'); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
+    echo ""
+    # The sweep never applies a removal — it proposes one. A proposal that only
+    # sits in doc-patches.md is one nobody is told to read, so it is copied here.
+    echo "## Proposed Doc Removals (not applied — /espalier-prune decides)"
+    body=$(_md_last_section "$dir/doc-patches.md" "### Proposed Removals" | grep -v '^[[:space:]]*$' | grep -vix 'none'); [ -n "$body" ] && printf '%s\n' "$body" || echo "none"
   } > "$out"
   printf '%s\n' "$out"
   echo "delivery brief: $n_dev deviations, $n_round rounds, $n_commit commits, $n_pr PRs"

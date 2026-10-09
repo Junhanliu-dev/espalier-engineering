@@ -91,7 +91,7 @@ project-root/
 │   ├── agents/                     # harness-coder.md, harness-reviewer.md, harness-security.md (agent names kept for stability)
 │   │   └── modes/                  # fix-round, simplification, re-review, repo-audit, stage6-abuse-coverage, wiki-sweep — mode text read when a prompt names it (v0.25; pure copies)
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
-│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh, maprun.py + maprun-*.sh (run-lane engine)
+│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh, espalier-pr.sh (Stage 7 code PR / espalier PR), maprun.py + maprun-*.sh (run-lane engine)
 │   ├── pipeline.md
 │   ├── maps/                       # decision maps ({slug}/map.md + tickets/ + assets/) — /espalier-map
 │   └── changes/                    # typed: feat/, fix/, refactor/, …

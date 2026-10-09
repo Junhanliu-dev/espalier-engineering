@@ -1196,37 +1196,34 @@ Commit code the coder left uncommitted under the message its report carries;
 the coder's commits are pushed as made, never squashed or rebased. The full
 procedure — including the two invariants that keep the checkout on the code
 branch and push both refs safely past the gate — is the espalier skill's
-`stages/7-10-delivery.md` → "Stage 7: The Split". Three steps, in this order:
+`stages/7-10-delivery.md` → "Stage 7: The Split". Four steps, in this order —
+each one's output is the next one's input:
 
 1. **Sweep.** Spawn `harness-reviewer` with `WIKI SWEEP:` on the prompt line
    (`espalier/agents/modes/wiki-sweep.md`) over this fix's diff, `espalier/wiki/`
-   and `espalier/rules/`. It edits the files it patches and stops. Skip the
-   spawn when the diff touches no source file. This matters more in this lane
-   than anywhere: the fix lane stops at Stage 7, so it is the ONLY point at
-   which a fix can refresh a doc it invalidated.
-2. **Project**, once for the records and once per class the sweep patched, so
-   each lands as its own revertable commit. Each call names the paths it may
-   commit; nothing else under `espalier/` can reach this fix's PR.
-3. **Push and open.** `open` ends with a CI scan of the espalier PR — its diff
-   is `espalier/**` only, which either misses path-filtered workflows (a
-   deadlock when their checks are required) or runs the full suite against a
-   diff with no code. It reports and never edits; see the full-lane procedure.
+   and `espalier/rules/`. It edits the files it patches, records its verdicts
+   in `doc-patches.md`, and stops. Skip the spawn when the diff touches no
+   source file. This matters more in this lane than anywhere: the fix lane
+   stops at Stage 7, so it is the ONLY point at which a fix can refresh a doc
+   it invalidated.
+2. **Record** — 7.1 (own commits) and 7.2 (back-links), BEFORE anything is
+   projected. A record written after the projection sits in this checkout and
+   reaches no pull request — and this lane has no later stage to carry it.
+3. **Project** — 7.2's back-link projections, then 7.3: once for the records
+   and once per class the sweep patched, so each lands as its own revertable
+   commit. Each call names the paths it may commit; nothing else under
+   `espalier/` can reach this fix's PR.
+4. **Push and open** — 7.3. `open` records the PR table and projects it too,
+   then ends with a CI scan of the espalier PR — its diff is `espalier/**`
+   only, which either misses path-filtered workflows (a deadlock when their
+   checks are required) or runs the full suite against a diff with no code. It
+   reports and never edits; see the full-lane procedure.
 
-```bash
-espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"
-# only when the sweep patched them:
-espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): wiki refresh for $SLUG" espalier/wiki
-espalier/hooks/espalier-pr.sh fix "$SLUG" project "docs(espalier): rules refresh for $SLUG" espalier/rules
-espalier/hooks/espalier-pr.sh fix "$SLUG" push
-espalier/hooks/espalier-pr.sh fix "$SLUG" open
-```
-
-Then:
-
-> Variable in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
-> `fix/` prefix). Step 1 is an agent spawn and cannot share a bash call; the
-> bash of 7.0 above runs with 7.1 + 7.2 as ONE invocation, so Stage 7 costs one
-> spawn and one round-trip.
+> Variables in scope for all Stage 7 snippets: `SLUG` (this fix's slug, no
+> `fix/` prefix) and `ESP_BRANCH="fix/${SLUG}-espalier"` — set it before 7.1.
+> Step 1 is an agent spawn and cannot share a bash call; 7.1, 7.2 and 7.3 can
+> share one invocation after it returns, so Stage 7 costs one spawn plus one
+> round-trip.
 
 ### 7.1 Record own commits
 
@@ -1267,6 +1264,13 @@ rides the FIX's espalier PR:
 
 ```bash
 . espalier/hooks/drift-helpers.sh
+ESP_BRANCH="fix/${SLUG}-espalier"
+# What the espalier branch holds. Before its first projection (7.3) it does not
+# exist yet, and it will be cut from Base-Ref — so Base-Ref is what it holds.
+REF="$ESP_BRANCH"
+git rev-parse --verify --quiet "refs/heads/$REF" >/dev/null \
+  || REF=$(grep -E '^(- )?Base-Ref:' "espalier/changes/fix/$SLUG/pipeline-state.md" | tail -1 \
+           | sed 's/.*Base-Ref:[[:space:]]*//' | tr -d '[:space:]')
 ROWS=$(backlink_all "$SLUG")
 printf '%s\n' "$ROWS"
 for CAUSING in $(printf '%s\n' "$ROWS" | awk '{print $3}' | sort -u); do
@@ -1275,8 +1279,10 @@ for CAUSING in $(printf '%s\n' "$ROWS" | awk '{print $3}' | sort -u); do
   # still in flight has never been merged, so projecting it here would add its
   # ENTIRE state file to this PR as a new file and collide when its own PR
   # lands. Its records ride its own espalier PR; re-run the back-link after it
-  # merges.
-  if git cat-file -e "$ESP_BRANCH:$P" 2>/dev/null; then
+  # merges. The ref MUST be non-empty: with an empty one the test reads `:$P`,
+  # which is the INDEX — certificate_write's `git add -A` has staged everything
+  # there, so the guard would always pass.
+  if [ -n "$REF" ] && git cat-file -e "$REF:$P" 2>/dev/null; then
     espalier/hooks/espalier-pr.sh fix "$SLUG" project \
       "chore(espalier): back-link from $SLUG to $CAUSING" "$P"
   else
@@ -1286,7 +1292,29 @@ for CAUSING in $(printf '%s\n' "$ROWS" | awk '{print $3}' | sort -u); do
 done
 ```
 
-> `ESP_BRANCH` is `fix/${SLUG}-espalier`.
+A causing change merged before this fix's Base-Ref is on that ref; one still
+in flight is not — which is exactly the line between "ride this PR" and "ride
+its own".
+
+### 7.3 Project, push, open
+
+After 7.1 and 7.2 have written everything Stage 7 records:
+
+```bash
+espalier/hooks/espalier-pr.sh fix "$SLUG" project "chore(espalier): $SLUG — pipeline records"
+# the files the latest `### Wiki Sweep` block marked PATCH, one class per commit:
+espalier/hooks/espalier-pr.sh fix "$SLUG" project-sweep wiki
+espalier/hooks/espalier-pr.sh fix "$SLUG" project-sweep rules
+espalier/hooks/espalier-pr.sh fix "$SLUG" push
+espalier/hooks/espalier-pr.sh fix "$SLUG" open
+```
+
+`project-sweep` commits exactly the files the sweep marked PATCH, never the
+whole directory, and `project` refuses a wiki or rule file that was deleted or
+lost more lines than it gained — restore it, record the removal under
+`### Proposed Removals`, and re-run. A Stage 6 → Stage 3 rollback that comes
+back through here re-runs all four steps; every call is idempotent and new
+commits go onto the open PRs.
 
 ## Escalation Gates
 
@@ -1433,19 +1461,29 @@ When Stage 7 passes:
   full lane): if Stage History recorded `ROUND {n} FAIL` rows, write their
   bracketed finding lines to
   `espalier/maps/{map-slug}/findings/{YYYY-MM-DD}-fix-{kebab}.md` (skip if
-  it exists), update the map's Spawned Changes row, and stage the map dir
-  in the bookkeeping commit below.
+  it exists), update the map's Spawned Changes row, and name the map dir
+  in the bookkeeping projection below.
 - **Delivery brief + territory notes** — `. espalier/hooks/drift-helpers.sh
   && delivery_brief fix "{slug}"` assembles `delivery-brief.md` from the
   records (requirement, ratified decisions, deviations, verdicts, rounds,
   commits — copied, never authored); when the coding report carries
   `### Deviations` or the Stage History a `BLOCKED` row, append the entries
   to `requirements-notes.md` under `## Settled for next time` (one line
-  each, verbatim). Both ride the bookkeeping commit below.
-- Commit the espalier bookkeeping (`git add espalier/changes/fix/{slug}`
-  + `git add espalier/maps/{map-slug}` when charted
-  `&& git commit -m 'chore(espalier): close {slug}'`) so the next change starts
-  from a clean tree.
+  each, verbatim). Both ride the bookkeeping projection below.
+- Project the espalier bookkeeping onto the espalier PR — never commit it on
+  the code branch, whose PR is code only (`push` refuses a code branch
+  carrying `espalier/` paths):
+  `espalier/hooks/espalier-pr.sh fix {slug} close 'chore(espalier): close {slug}'`
+  (+ ` espalier/changes/fix/{slug} espalier/conventions espalier/maps/{map-slug}`
+  when charted). `close` projects and pushes — the brief and `COMPLETE` reach
+  the espalier PR here and nowhere else — then retires this checkout's copies
+  that the pushed branch holds byte-for-byte, so the next `git pull` after the
+  espalier PR merges is not blocked by identical untracked files. A file it
+  keeps is named; resolve it before the next pull.
 - Summarize from `delivery-brief.md`: original cause, fix files, regression
   tests added, deviations ratified.
 - Report total rounds and any escalation gates tripped (even if user chose to override).
+- Present both PR links (`espalier-pr.sh fix {slug} status`) and say both are
+  left OPEN: merging is a human act — the code PR first, then the espalier PR.
+  The pipeline never merges or closes a PR, including on an abort or
+  escalation after Stage 7; closing those is the operator's call.

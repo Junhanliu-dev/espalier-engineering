@@ -1,6 +1,8 @@
 # v0.29.0 — the PR split: code PR / espalier PR + in-pipeline doc sweep
 
-Status: **plan, not implemented.**
+Status: **implemented in v0.29.0.** This is the plan as written before the
+build; where the build departed from it, an *As built* note says how and why.
+`CHANGELOG.md` 0.29.0 is the authoritative description of what shipped.
 
 **Not a new lane.** No new command, no new state machine. This changes shared
 stages inside the existing pipeline:
@@ -100,7 +102,7 @@ already moved.
 
 ## Two blockers found in the existing code
 
-**B1 — the push gate blocks branch B.** `pre-push-gate.sh:126` fingerprints
+**B1 — the push gate blocks branch B.** `pre-push-gate.sh:125` fingerprints
 `git diff $BASE_REF -- . ':(exclude)espalier/'` against the current checkout and
 exits 2 on mismatch. On B that diff is empty, so it can never match. The gate
 finds its state file by mtime, not branch name — no escape hatch.
@@ -137,13 +139,23 @@ check.
 records commit routes through `espalier-pr.sh project`, the checkout never
 switches branches. `record_commits` now records code commits only, which makes
 the `post-merge-backlink.sh` file-overlap match (`:31-37`) *cleaner* than today;
-add a branch column so B's squash can be backlinked too. Stage 10: brief gains
+add a branch column so B's squash can be backlinked too. *As built: no branch
+column.* B's squash carries only `espalier/` paths, so the backlink's
+source-file overlap finds nothing and writes no row — absence, not a wrong
+mapping; B is tracked by number in `## Pull Requests` instead (CHANGELOG,
+"The commit table still records the code branch only"). Stage 10: brief gains
 `## Pull Requests` and `## Doc Refresh`, presents both PR links, and marks
 COMPLETE with both PRs open — merging stays entirely a human act.
 
 **Stage 7 — the sweep.** Runs after the code commits and **before** the
 espalier projection, so its edits ride the same PR2. Order within Stage 7:
-code commits → sweep → `espalier-pr.sh project` → `push` → `open`.
+code commits → sweep → `espalier-pr.sh project` → `push` → `open`. *As built:*
+code commits → sweep → `record_commits` + back-links → `project` (records,
+then `project-sweep wiki` / `rules`) → `push` → `open`, which projects and
+pushes the PR table it records. A record written after the projection reaches
+no pull request, which the first cut got wrong. Completion runs `close`
+(project, push, then retire the local copies the pushed branch holds) rather
+than a close commit on the code branch.
 
 It is a new, diff-driven pass, unrelated to `stage85_drift`
 (`drift-helpers.sh:796`), which reads the `.drift-state.tsv` staleness sidecar
@@ -186,6 +198,15 @@ the hook and the mode, patch the maintenance anchor v1→v2, patch pipeline.md b
 heading anchor. A change already at Stage ≥ 7 finishes on the old single-branch
 path — notice only, never retro-split a pushed branch. Idempotent.
 
+*As built:* no `docs/migrating-*` page — that series stopped at v0.18→v0.19 and
+the CHANGELOG entry plus the script's own `--help` carry it. `pipeline.md` is a
+pure copy, not a heading patch. And there is no old single-branch path left to
+finish on: the refreshed stage files carry only the split, so an in-flight
+change resumed at Stage ≥ 7 runs it, and `push` refuses (naming the files) if
+its code branch already carries `espalier/` commits. `/espalier-migrate`
+refuses to run with any change in flight, so this only matters when the
+script is run by hand.
+
 ## Verification
 
 1. **Live forge probe — DONE** (2026-09-18, `Junhanliu-dev/espalier-prstack-probe`).
@@ -209,7 +230,10 @@ path — notice only, never retro-split a pushed branch. Idempotent.
   code paths and two fixture sets instead of one.
 - Rule sweep can stall PR2 behind a rule owner (accepted).
 - A permanently-dirty `espalier/` surprises anyone running `git status` mid-run
-  — mitigate with a Stage 7 message naming what is dirty and why.
+  — mitigate with a Stage 7 message naming what is dirty and why. *As built:*
+  `push` prints how many paths stay dirty and why; Completion's `close`
+  retires the copies the pushed branch holds, because identical untracked
+  files would otherwise block the `git pull` after the espalier PR merges.
 - If PR2 is closed and never merged, the wiki/rules half self-heals via
   doctor+prune, but the change records do **not** — they are not scout-derivable,
   and `/espalier-fix` Stage 0 reverse lookup depends on them.

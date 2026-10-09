@@ -1790,13 +1790,19 @@ stage_validate() {
   # leaves the remaining calls referring to output nothing produced — it reads
   # fine and cannot work. Assert the order in BOTH lanes (the fix lane mirrors
   # the full one, and its Stage 7 is the only doc sweep a fix ever gets).
-  run_check 71 "stage7-split-order" 'for f in espalier/skills/espalier/stages/7-10-delivery.md espalier/skills/espalier-fix/SKILL.md; do s=$(grep -n "WIKI SWEEP" "$f" | head -1 | cut -d: -f1); p=$(grep -nE "espalier-pr\.sh .* project" "$f" | head -1 | cut -d: -f1); u=$(grep -nE "espalier-pr\.sh .* push" "$f" | head -1 | cut -d: -f1); o=$(grep -nE "espalier-pr\.sh .* open" "$f" | head -1 | cut -d: -f1); [ -n "$s" ] && [ -n "$p" ] && [ -n "$u" ] && [ -n "$o" ] || exit 1; [ "$s" -lt "$p" ] && [ "$p" -lt "$u" ] && [ "$u" -lt "$o" ] || exit 1; done' &
+  # `record_commits` must precede the first push: a record written after the
+  # projection reaches no pull request. And Completion must `close` (sync) the
+  # bookkeeping onto the espalier PR — a close commit on the code branch puts
+  # espalier/ on the code PR, and everything Stages 8–10 wrote never ships.
+  run_check 71 "stage7-split-order" 'for f in espalier/skills/espalier/stages/7-10-delivery.md espalier/skills/espalier-fix/SKILL.md; do s=$(grep -n "WIKI SWEEP" "$f" | head -1 | cut -d: -f1); r=$(grep -nE "record_commits (\"\\\$TYPE\"|fix) " "$f" | head -1 | cut -d: -f1); p=$(grep -nE "espalier-pr\.sh .* project" "$f" | head -1 | cut -d: -f1); u=$(grep -nE "espalier-pr\.sh .* push" "$f" | head -1 | cut -d: -f1); o=$(grep -nE "espalier-pr\.sh .* open" "$f" | head -1 | cut -d: -f1); [ -n "$s" ] && [ -n "$r" ] && [ -n "$p" ] && [ -n "$u" ] && [ -n "$o" ] || exit 1; [ "$s" -lt "$p" ] && [ "$r" -lt "$u" ] && [ "$p" -lt "$u" ] && [ "$u" -lt "$o" ] || exit 1; done; for f in espalier/skills/espalier/SKILL.md espalier/skills/espalier-fix/SKILL.md; do grep -qE "espalier-pr\.sh .* close .chore\(espalier\): close" "$f" && ! grep -qF "git commit -m '"'"'chore(espalier): close" "$f" || exit 1; done' &
 
   # A retired claim is worse than a missing one: it reads as instruction. Stage
   # 7.0 batched into one bash call until it grew an agent spawn, which no bash
   # call can contain. Fail if that sentence ever comes back — by hand, or by a
-  # migration re-inserting text a later release retired.
-  run_check 72 "retired-turn-economy" '! grep -rF -- "7.0 + 7.1 + 7.2 as ONE bash invocation" espalier/ >/dev/null 2>&1' &
+  # migration re-inserting text a later release retired. Migration backups
+  # (*.bak) are excluded: they hold the retired text on purpose, and every
+  # migrated install keeps one of the pre-v0.29 fix SKILL.
+  run_check 72 "retired-turn-economy" '! grep -rE --exclude="*.bak" -- "7\.0 \+ 7\.1 \+ 7\.2 as ONE bash invocation|with 7\.1 \+ 7\.2 as ONE invocation" espalier/ >/dev/null 2>&1' &
 
   wait
 

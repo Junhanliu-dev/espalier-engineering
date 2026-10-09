@@ -98,7 +98,7 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Commits:** the coder's commits are pushed as made — the pipeline never squashes or rebases them (squash-merge is the pull request's policy; the post-merge hook maps it back); code left uncommitted is committed by path under the report's message. The change's `espalier/` paths do NOT ride the code branch: they are projected onto a sibling branch (`{type}/{slug}-espalier`) by `espalier/hooks/espalier-pr.sh project`
 - **Doc sweep:** `harness-reviewer` in `WIKI SWEEP:` mode (`espalier/agents/modes/wiki-sweep.md`) reads this change's diff against `espalier/wiki/` + `espalier/rules/` and patches what the diff falsified — additive only, every patch citing a hunk, deletions proposed in `doc-patches.md` and never applied; skipped when the diff touches no source file
 - **Pull requests:** `espalier-pr.sh open` opens BOTH against the canonical branch — siblings, never a stack (GitHub closes a child PR when its base branch is deleted, irrecoverably). Recorded in `## Pull Requests`. No `gh` → exit 5, warn, continue: the pipeline never blocks on the forge
-- **Output:** `## Commits` rows — one per commit in `Base-Ref..HEAD` (Stage 7, SHA, files) in pipeline-state.md (`record_commits`) — read by `/espalier-fix` reverse lookup; the convention index staged; the PARTIAL_FIX reverse-link when applicable
+- **Output:** `## Commits` rows — one per commit in `Base-Ref..HEAD` (Stage 7, SHA, files) in pipeline-state.md (`record_commits`) — read by `/espalier-fix` reverse lookup, written BEFORE the projection so they ride the espalier PR; the convention index projected with the records; the PARTIAL_FIX reverse-link when applicable
 - **Procedure:** espalier skill → stages/7-10-delivery.md
 
 ### 8. CI Verification
@@ -128,7 +128,7 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 ### 10. User Confirmation
 - **Human checkpoint:** final delivery acceptance — present `delivery-brief.md` (`delivery_brief`: requirement, ratified decisions, deviations, verdicts, rounds, commits, CI / deploy — assembled from the records, never authored) and offer the quiz (interactive only, default no); Approve / Request Changes via `AskUserQuestion`. Push and deploy pre-authorization NEVER extend here
 - **Non-interactive exception:** unattended → record `delivery auto-accepted (non-interactive)` and mark COMPLETE — do not hang
-- **Output:** espalier/changes/{type}/{slug}/delivery-brief.md (carrying `## Pull Requests` and, when the sweep wrote anything, `## Doc Refresh`); pipeline-state.md `- Status: COMPLETE`; both PRs left OPEN — merging is a human act the pipeline never performs; deviations copied to requirements-notes.md `## Settled for next time`; the bookkeeping commit (`chore(espalier): close {slug}`)
+- **Output:** espalier/changes/{type}/{slug}/delivery-brief.md (carrying `## Pull Requests` and, when the sweep wrote anything, `## Doc Refresh`); pipeline-state.md `- Status: COMPLETE`; both PRs left OPEN — merging is a human act the pipeline never performs; deviations copied to requirements-notes.md `## Settled for next time`; the bookkeeping projected and pushed onto the espalier PR (`espalier-pr.sh {type} {slug} close 'chore(espalier): close {slug}'` — never a commit on the code branch; the local copies the pushed branch holds are then retired); both PR links presented
 - **Procedure:** espalier skill → Completion
 
 ## Rollback Rules
