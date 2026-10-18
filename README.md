@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.28.1-2ea44f" alt="version v0.28.1"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.29.0-2ea44f" alt="version v0.29.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>
@@ -150,6 +150,8 @@ Init is a one-time ~$2–5 on a medium repo (Opus main + Sonnet scouts + cache).
 5. **Every rule has a reason** — an observed pattern, or a known failure mode it prevents.
 
 ## Latest release
+
+**v0.29.0 — the PR split.** A pipeline run now ends in two sibling pull requests instead of one branch carrying both the work and its bookkeeping: a code PR with every path outside `espalier/`, and an espalier PR with all of `espalier/**`, so the diff a reviewer reads is the change itself. Both target the canonical branch — a stacked design was probed first and rejected, because GitHub closes a child PR irrecoverably when its base branch is deleted. The new `espalier/hooks/espalier-pr.sh` projects the records in a temp worktree (the main checkout never switches branches), pushes by refspec so `pre-push-gate.sh` stays untouched, refuses a code branch that leaked `espalier/` commits, and its `ci-scan` reports how the espalier PR lands against `pull_request` path filters and required checks. Between the two PRs, a Stage 7 doc sweep (`harness-reviewer` in `WIKI SWEEP:` mode) reads the change's own diff against `espalier/wiki/` and `espalier/rules/`, cites the hunk behind every patch, never deletes, and commits what that diff falsified onto the espalier PR. `MAINTENANCE COMMITS` v1 → v2: drift your change caused rides your espalier PR. Every gate, rubric, sentinel, round cap and escalation path is contract-equal to v0.28.1. Migration #40, validation checks 71–72 (62 / 67 / 72 by platform set).
 
 **v0.28.1 — the trim.** Every shipped agent, skill, rule, and stage template says the same rules in fewer lines (8,723 → 8,611 template lines, −1.3%, across 23 files) with every rule, gate, rubric, sentinel, tag, cap, path, heading, and code fence byte-identical — only restated rationale, history notes, doubled sentences, and section announcers went; point-of-use repeats, exceptions, and the one worked example per format stayed on purpose. Migration #39 introduces a reusable mechanism for text-only refreshes: the release ships its exact template diff and applies it per file with `git apply`, all-or-nothing per file — a pristine file trims byte-for-byte, a customised file is left untouched and recorded (nothing to port). No new check, key, or hook.
 

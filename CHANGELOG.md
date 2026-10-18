@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.29.0 — 2026-09-18
+## 0.29.0 — 2026-10-18
 
 Minor: **the PR split.** A pipeline run no longer ends in one branch carrying
 both the work and the bookkeeping. Stage 7 now produces two pull requests — a
