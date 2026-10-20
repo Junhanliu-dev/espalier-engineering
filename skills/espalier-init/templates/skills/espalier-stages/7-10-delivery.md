@@ -27,6 +27,18 @@ split safe. Read them once — they are not style:
   checks what it was written to check. Never push the espalier branch by hand
   from a worktree, and never edit the gate.
 
+**Outside mode (v0.30 — `outside-root:` in `espalier/.espalier-config`).** The
+procedure below is run UNCHANGED; `espalier-pr.sh` reads the key and changes
+what the calls do: `project` / `project-sweep` / `sync` / `close` commit the
+named paths into the outside root's local git repo (via
+`espalier/hooks/espalier-outside.sh commit`) instead of projecting an espalier
+branch; `push` pushes the code branch only; `open` opens the code PR only and
+records the espalier side in `## Pull Requests` as
+`| espalier | local | — | local: <root> @ <sha> |`; `ci-scan` prints `n/a`.
+There is no espalier PR to merge and nothing to retire at Completion — the
+project tree never held the records. Say so in the Stage 10 summary: ONE PR
+link, and the outside root path with its commit.
+
 > Variables in scope: `TYPE` and `SLUG` are the active change's type/slug, set by
 > the orchestrator at Stage Execution entry.
 

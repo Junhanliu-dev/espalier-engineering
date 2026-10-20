@@ -33,6 +33,7 @@ following the Espalier structure below.
 | Simplify | espalier/skills/espalier-simplify/ | Evidence-first simplification survey → wiki/simplify-survey.md; proven cuts filed as refactor skeletons for /espalier | Via /espalier-simplify |
 | Doctor   | espalier/skills/espalier-doctor/ | Periodic drift scan of espalier/ artifacts vs the code | Via /espalier-doctor |
 | Prune    | espalier/skills/espalier-prune/ | Refresh stale rules/wiki/hooks flagged by drift detection | Via /espalier-prune |
+| Repot    | espalier/skills/espalier-repot/ | Move the install inside <-> outside the repo (espalier-main/<name>/, local git; nothing tracked by the project) | Via /espalier-repot |
 
 ## Core Responsibilities
 1. Understand the requirement fully before acting

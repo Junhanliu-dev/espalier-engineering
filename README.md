@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.29.0-2ea44f" alt="version v0.29.0"></a>
+  <a href="./CHANGELOG.md"><img src="https://img.shields.io/badge/version-v0.30.0-2ea44f" alt="version v0.30.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Copilot-8a63d2" alt="works with Claude Code, Codex, and GitHub Copilot">
 </p>
@@ -54,9 +54,9 @@ espalier/
 
 | Command | What it does |
 |---|---|
-| `/espalier-init` | One-time setup: discover conventions, generate + wire the guardrails |
-| `/espalier <feature>` | Full 10-stage pipeline: grilled requirements → your approval → code → independent review → tests → gated push |
-| `/espalier-fix <bug>` | Slimmer bug-fix lane that auto-links each fix to the change that caused it |
+| `/espalier-init [--outside]` | One-time setup: discover conventions, generate + wire the guardrails. `--outside` keeps every espalier file out of the project repo, in a sibling `espalier-main/<project>/` with its own local git |
+| `/espalier [--simple] <feature>` | Full 10-stage pipeline: grilled requirements → your approval → code → independent review → tests → gated push. `--simple`: grill → spec → your approval → code → review → tests, then stop with everything uncommitted for your own review — no records kept, no PR |
+| `/espalier-fix [--simple] <bug>` | Slimmer bug-fix lane that auto-links each fix to the change that caused it; `--simple` as above |
 | `/espalier-ask <question>` | Read-only Q&A — answers from your docs, verified against the code, every claim sourced |
 | `/espalier-audit` | Repo-wide security audit of *existing* code; findings hand off into fix runs |
 | `/espalier-simplify [scope]` | Evidence-first simplification survey of *existing* code — proven cuts file as refactor changes the pipeline runs; the docs that described them get flagged for prune |
@@ -64,6 +64,7 @@ espalier/
 | `/espalier-maprun` | Execute a cleared map: headless workers in isolated worktrees, reviewable slice PRs |
 | `/espalier-doctor` / `/espalier-prune` | Detect doc drift / refresh a stale doc (gated) |
 | `/espalier-migrate` | Upgrade an existing install to the current version |
+| `/espalier-repot` | Move an existing install outside the project repo (`espalier-main/<project>/`, local git, nothing tracked) — or back in |
 
 Highlights along the way:
 
@@ -150,6 +151,8 @@ Init is a one-time ~$2–5 on a medium repo (Opus main + Sonnet scouts + cache).
 5. **Every rule has a reason** — an observed pattern, or a known failure mode it prevents.
 
 ## Latest release
+
+**v0.30.0 — the human-review lane and the outside install.** Two independent additions, both opt-in, both contract-equal elsewhere. `--simple` on `/espalier` and `/espalier-fix` runs the grill, the spec, your approval, the coder, a reviewer-only review panel and the exit gate exactly as today — then stops. The coder never runs git, nothing is committed, no PR is opened, no record is kept: the working files live in a gitignored `espalier/.simple/<slug>/` that is deleted when you approve the result, and the tree you are left with is exactly the agents' uncommitted work, for you to read and commit by hand (a dirty tree at start is refused, so the diff is never mixed with yours). `--outside` on `/espalier-init` puts the whole `espalier/` tree one level up, in `espalier-main/<project>/` with its own remote-less local git repo, reached through a locally excluded symlink; the `.claude/` wiring goes to `settings.local.json` and `CLAUDE.local.md`, so the project repo never tracks one espalier byte and the espalier PR becomes a local commit in that folder. `/espalier-repot` moves an existing install out or back in, staging the git changes and leaving the commit to you. Migration #41; validation totals unchanged.
 
 **v0.29.0 — the PR split.** A pipeline run now ends in two sibling pull requests instead of one branch carrying both the work and its bookkeeping: a code PR with every path outside `espalier/`, and an espalier PR with all of `espalier/**`, so the diff a reviewer reads is the change itself. Both target the canonical branch — a stacked design was probed first and rejected, because GitHub closes a child PR irrecoverably when its base branch is deleted. The new `espalier/hooks/espalier-pr.sh` projects the records in a temp worktree (the main checkout never switches branches), pushes by refspec so `pre-push-gate.sh` stays untouched, refuses a code branch that leaked `espalier/` commits, and its `ci-scan` reports how the espalier PR lands against `pull_request` path filters and required checks. Between the two PRs, a Stage 7 doc sweep (`harness-reviewer` in `WIKI SWEEP:` mode) reads the change's own diff against `espalier/wiki/` and `espalier/rules/`, cites the hunk behind every patch, never deletes, and commits what that diff falsified onto the espalier PR. `MAINTENANCE COMMITS` v1 → v2: drift your change caused rides your espalier PR. Every gate, rubric, sentinel, round cap and escalation path is contract-equal to v0.28.1. Migration #40, validation checks 71–72 (62 / 67 / 72 by platform set).
 

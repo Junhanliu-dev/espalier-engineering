@@ -14,6 +14,33 @@ Discover the actual patterns, conventions, and architecture of an existing codeb
 - "Make AI code production-ready for this repo"
 - "Build agent constraints for this project"
 - "/espalier-init"
+- "/espalier-init --outside" — install with the `espalier/` tree OUTSIDE the repo (nothing espalier-related committed)
+
+## Flags
+
+| Flag | Effect |
+|------|--------|
+| `--outside[=<dir>]` | **Outside mode (v0.30).** The `espalier/` tree lives at `<dir>/<name>/espalier/` — default `<dir>` is the project's PARENT directory + `/espalier-main`, created if missing — with its own local git repo (no remote). The project root gets a RELATIVE symlink `espalier -> ../espalier-main/<name>/espalier`, excluded via `.git/info/exclude`. Hooks go to `.claude/settings.local.json`, the instruction section to `CLAUDE.local.md`, every wiring path to the exclude file: the project repo never tracks anything espalier-related, and Stage 7 commits records into the outside repo instead of opening an espalier PR. Fresh installs only — an existing inside install moves with `/espalier-repot`. |
+| `--outside-name=<n>` | Outside mode: the folder name under `<dir>` (default: the project's basename). Pass it when two projects share a basename — init refuses to adopt a root whose `.espalier-origin` names another project. |
+
+**Outside mode has ONE extra step, and it comes FIRST.** Phase 2 writes
+`espalier/rules/…`, `espalier/agents/…` and the rest by path, so the symlink
+must exist before any of those writes — otherwise they create a real
+directory inside the repo. Immediately after Phase 0's questions, before
+Phase 1:
+
+```bash
+# ${CLAUDE_SKILL_DIR} = this skill's directory. Append --main=<dir> when
+# --outside=<dir> was given, --name=<n> when --outside-name=<n> was given.
+bash "${CLAUDE_SKILL_DIR}/hook-templates/espalier-outside.sh" prepare .
+```
+
+It prints the outside root. Exit 3 means the default root already belongs to
+another project or holds foreign content: surface the message and ask the
+user for `--outside-name=<other>`; do not proceed. Pass the same flags to
+bootstrap in Phase 3 (`--outside[=<dir>]`, `--outside-name=<n>`) — bootstrap
+re-runs `prepare` (idempotent) and writes every wiring file in its
+outside-mode form. Re-runs auto-detect the mode from the symlink.
 
 ## Philosophy
 
@@ -87,11 +114,12 @@ project-root/
 │   │   ├── espalier-audit/SKILL.md             # repo-wide security audit (slash: /espalier-audit)
 │   │   ├── espalier-map/SKILL.md               # multi-session planning lane (slash: /espalier-map)
 │   │   ├── espalier-maprun/SKILL.md               # map batch executor (slash: /espalier-maprun)
-│   │   └── espalier-simplify/SKILL.md             # simplification survey lane (slash: /espalier-simplify)
+│   │   ├── espalier-simplify/SKILL.md             # simplification survey lane (slash: /espalier-simplify)
+│   │   └── espalier-repot/SKILL.md                # move the install inside <-> outside the repo (slash: /espalier-repot; v0.30)
 │   ├── agents/                     # harness-coder.md, harness-reviewer.md, harness-security.md (agent names kept for stability)
 │   │   └── modes/                  # fix-round, simplification, re-review, repo-audit, stage6-abuse-coverage, wiki-sweep — mode text read when a prompt names it (v0.25; pure copies)
 │   ├── wiki/                       # architecture, data-models, critical-paths, external-services
-│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh, espalier-pr.sh (Stage 7 code PR / espalier PR), maprun.py + maprun-*.sh (run-lane engine)
+│   ├── hooks/                      # check-layer-boundaries.sh, pre-push-gate.sh, map-guard.sh, espalier-stats.sh, espalier-pr.sh (Stage 7 code PR / espalier PR), espalier-outside.sh (outside mode: prepare/discover/commit/repot), maprun.py + maprun-*.sh (run-lane engine)
 │   ├── pipeline.md
 │   ├── maps/                       # decision maps ({slug}/map.md + tickets/ + assets/) — /espalier-map
 │   └── changes/                    # typed: feat/, fix/, refactor/, …
@@ -101,6 +129,15 @@ project-root/
 │       └── refactor/{slug}/        # refactor outputs (simplify-filed cuts carry simplify_from frontmatter)
 └── src/  (existing code)
 ```
+
+**Outside mode (`--outside`)** changes WHERE, not WHAT: `project-root/espalier`
+is a relative symlink to `<parent>/espalier-main/<project-basename>/espalier/`
+(that root also holds `.espalier-origin` — the project's absolute path — and a
+`.git/` of its own, no remote). The `.claude/` wiring is identical but excluded
+via `.git/info/exclude`; `CLAUDE.md` → `CLAUDE.local.md`;
+`.claude/settings.json` → `.claude/settings.local.json`; no `.gitignore`,
+`.gitattributes` or CODEOWNERS edits. `espalier/.espalier-config` carries
+`outside-root: <abs path>`.
 
 ---
 
@@ -126,7 +163,7 @@ When you generate a skill:
 2. Use the SAME string as the folder name.
 3. Symlinks in `.claude/skills/<name>` then resolve to a same-named source folder — no mismatch possible.
 
-This applies to **all** skill folders generated by this skill: espalier-coding, espalier-review, espalier-security, espalier-testing, espalier-requirements, espalier-grill, espalier (main), espalier-fix, espalier-prune, espalier-doctor, espalier-ask, espalier-audit, espalier-map, espalier-maprun, espalier-simplify, and any additional ones added later.
+This applies to **all** skill folders generated by this skill: espalier-coding, espalier-review, espalier-security, espalier-testing, espalier-requirements, espalier-grill, espalier (main), espalier-fix, espalier-prune, espalier-doctor, espalier-ask, espalier-audit, espalier-map, espalier-maprun, espalier-simplify, espalier-repot, and any additional ones added later.
 
 ---
 
@@ -456,6 +493,9 @@ bash "${CLAUDE_SKILL_DIR}/../../scripts/bootstrap-espalier.sh" \
 # Greenfield Pass 1 ONLY (see Greenfield Path above): also append --greenfield
 # Append ONLY when Q5 collected handles (omit the flags entirely when skipped):
 #   --codeowners-rules=<Q5 rules handle> --codeowners-wiki=<Q5 wiki handle>
+# Outside mode ONLY (the invocation carried --outside; see Flags): also append
+#   --outside            (or --outside=<dir> exactly as given)
+#   --outside-name=<n>   (only when given)
 ```
 
 Shell variables do NOT persist between Bash calls — substitute literal values
@@ -473,14 +513,14 @@ so `../../scripts/` lands in the clone:
 Bootstrap runs all 11 internal stages in one shell process:
 
 - **Stages 1-2:** preflight + `mkdir -p` (idempotent — Phase 2 Writes already created some dirs).
-- **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements,espalier-grill,espalier-prune,espalier-doctor,espalier-ask,espalier-audit,espalier-map,espalier-maprun,espalier-simplify}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
+- **Stage 3:** `cp` pure-copy templates → `espalier/pipeline.md`, `espalier/skills/{espalier,espalier-fix,espalier-requirements,espalier-grill,espalier-prune,espalier-doctor,espalier-ask,espalier-audit,espalier-map,espalier-maprun,espalier-simplify,espalier-repot}/SKILL.md`. (No conflict with Phase 2 outputs — different files.)
 - **Stage 4:** `cp` non-substitution hooks (post-edit-wrapper, pre-push-gate-wrapper, post-merge-backlink, lookup-helpers, rebuild-commit-index, drift-detect, drift-helpers, parse-drift-blocks.py, plus the run-lane engine maprun.py + maprun-{dispatch,merge,integration,verify}.sh — engine files are write-if-absent so a locally-adapted engine survives) + `chmod +x espalier/hooks/*.sh` (also chmods Phase 2's pre-push-gate.sh + check-layer-boundaries.sh).
 - **Stage 5:** safe symlinks `.claude/{rules,skills,agents}/*` → `espalier/...` (refuses if target is regular file; uses portable `abspath`).
 - **Stage 6:** heredoc `espalier/changes/_template/pipeline-state.md`.
-- **Stage 7:** append `## Espalier` to `CLAUDE.md` (grep-guarded).
-- **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup).
+- **Stage 7:** append `## Espalier` to `CLAUDE.md` (grep-guarded). Outside mode: to `CLAUDE.local.md`.
+- **Stage 8:** merge `.claude/settings.json` hooks (additive by `(matcher, command)` tuple — never clobbers user hooks; atomic temp-file write + backup). Outside mode: `.claude/settings.local.json`.
 - **Stage 9:** persist the merge decision (the literal Q1 answer passed via `--merge-decision`) to `espalier/.merge-hook-decision` and the Phase 0 Q3 cadence to `espalier/.doctor-cadence` (written once, never auto-rewritten). Install the post-merge dispatcher (`.husky/post-merge` or `.git/hooks/post-merge`) unconditionally — it runs `drift-detect.sh` on every merge and `post-merge-backlink.sh` only when the decision is `installed`.
-- **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) to `.gitignore`; append `espalier/.ask-gaps.tsv merge=union` to `.gitattributes` (the one union attribute); write the CODEOWNERS marker block when Q5 supplied handles (GitHub search order; replace-within-markers on re-run). All newline-guarded.
+- **Stage 10:** append `espalier/.commit-index.tsv` + the drift sidecars (`.drift-state.tsv*`, `.drift.log`, `.drift-report.md`, `.doctor-last-run`, `.drift-overrides.log`) + `espalier/.simple/` (the `--simple` lane's scratch dir) to `.gitignore`; append `espalier/.ask-gaps.tsv merge=union` to `.gitattributes` (the one union attribute); write the CODEOWNERS marker block when Q5 supplied handles (GitHub search order; replace-within-markers on re-run). All newline-guarded. Outside mode: every wiring path goes to `.git/info/exclude` instead; `.gitattributes` and CODEOWNERS are skipped (the tree is not in this repo).
 - **Stage 11:** run the validation checks — 53 when only claude is targeted, 58 with codex, 63 with copilot (all but #25 in parallel, #25 serial for its tier table; a greenfield Pass 1 renders the Phase-2-artifact checks as pending-skips); print sorted output; non-zero exit if any failed.
 
 **Re-run safety:** if `espalier/.merge-hook-decision` exists, bootstrap auto-runs Stage 11 only (idempotent re-run = health check). `--force` overrides.
@@ -520,6 +560,15 @@ Codex wiring is in place. Three one-time steps inside Codex:
 Then invoke the pipeline with $espalier <requirement> ($espalier-fix, $espalier-ask, $espalier-audit, $espalier-simplify likewise).
 ```
 
+**If outside mode was used** (`--outside`), also insert, with the root bootstrap printed:
+
+```
+Outside mode: the espalier/ tree lives at <outside root> (its own local git, no
+remote — back it up yourself). This repo tracks nothing espalier-related; the
+pipelines reach it through the gitignored `espalier` symlink. Move it back
+with /espalier-repot --in.
+```
+
 **If the copilot platform was wired** (copilot in Q4), also insert:
 
 ```
@@ -552,6 +601,14 @@ mechanics:
 Phase 2's Write batch and Phase 3's bootstrap are already platform-neutral
 (plain file writes + one bash script). Include the platform you are running
 on in the Q4 answer — you are the proof the user uses it.
+
+**Outside mode on Codex / Copilot** is partial by the platforms' design: they
+have no local-only instruction file. Bootstrap writes `AGENTS.md`,
+`.github/copilot-instructions.md`, `.codex/config.toml` and the hook JSON
+only when they are UNTRACKED (then excludes them locally); a tracked one is
+left alone and the section / hook block is printed for a user-level file,
+with the path recorded in `espalier/.outside-skipped` so validation accepts
+it. Say so in the completion message when it happened.
 
 ---
 

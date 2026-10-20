@@ -47,6 +47,14 @@
 # Degradation, as everywhere else in this plugin: gh missing or unauthenticated
 # is exit 5 and a warning; the pipeline continues. Nothing here ever force-pushes.
 #
+# OUTSIDE MODE (v0.30, `outside-root:` in espalier/.espalier-config): espalier/
+# is a gitignored symlink into <espalier-main>/<name>/espalier, which has its
+# own local git repo and no remote. There is no espalier branch and no espalier
+# PR — `project` / `project-sweep` / `sync` / `close` commit the named paths
+# into that repo (espalier-outside.sh commit), `push` pushes the code branch
+# only, `open` opens the code PR only and records the espalier side as
+# `local: <root> @ <sha>`, and `ci-scan` has nothing to scan.
+#
 # Exit codes:  0 done   5 forge unavailable   1 error
 set -euo pipefail
 
@@ -73,6 +81,28 @@ if [ -z "$BASE_BRANCH" ]; then
   BASE_BRANCH="$(git -C "$REPO" symbolic-ref --quiet --short "refs/remotes/$REMOTE/HEAD" 2>/dev/null | sed "s|^$REMOTE/||" || true)"
 fi
 BASE_BRANCH="${BASE_BRANCH:-main}"
+
+# Outside mode: the symlink is the fact (it is RELATIVE, so it survives the
+# project moving together with its sibling); the config key is the fallback,
+# and a key naming a directory that no longer exists is ignored.
+OUTSIDE_ROOT=""
+if [ -L "$REPO/espalier" ]; then
+  _lt="$(readlink "$REPO/espalier")"; case "$_lt" in /*) ;; *) _lt="$REPO/$_lt" ;; esac
+  [ -f "$(dirname "$_lt")/.espalier-origin" ] && OUTSIDE_ROOT="$(cd "$(dirname "$_lt")" && pwd -P)"
+fi
+if [ -z "$OUTSIDE_ROOT" ]; then
+  OUTSIDE_ROOT="$(grep -m1 '^outside-root:' "$REPO/espalier/.espalier-config" 2>/dev/null | awk '{print $2}' || true)"
+  [ -n "$OUTSIDE_ROOT" ] && [ ! -d "$OUTSIDE_ROOT" ] && OUTSIDE_ROOT=""
+fi
+OUTSIDE_SH="$REPO/espalier/hooks/espalier-outside.sh"
+outside() { [ -n "$OUTSIDE_ROOT" ]; }
+outside_commit() {  # outside_commit <msg> [paths...] → prints the short SHA or "nothing to commit"
+  [ -x "$OUTSIDE_SH" ] || { echo "pr: ERROR — $OUTSIDE_SH missing; outside mode needs it (re-run /espalier-migrate)"; exit 1; }
+  local out
+  out="$(bash "$OUTSIDE_SH" commit "$REPO" "$@")" || { echo "pr: ERROR — commit into $OUTSIDE_ROOT failed:"; printf '%s\n' "$out" | sed 's/^/    /'; exit 1; }
+  printf '%s\n' "$out" | tail -1
+}
+outside_sha() { git -C "$OUTSIDE_ROOT" rev-parse --short HEAD 2>/dev/null || echo none; }
 
 # The checkout guards apply to the subcommands that build or push branches.
 # `status` and `ci-scan` only read, so they run from anywhere.
@@ -210,6 +240,23 @@ case "$CMD" in
   # sweep patched), by `open` (the PR table it records), and at Completion via
   # `close` (brief + close).
   project)
+    if outside; then
+      if [ "$#" -eq 0 ]; then
+        set -- "espalier/changes/$TYPE/$SLUG"
+        [ -d "$REPO/espalier/conventions" ] && set -- "$@" espalier/conventions
+      fi
+      for rel in "$@"; do
+        case "$rel" in espalier/*) ;; *) echo "pr: ERROR — '$rel' is outside espalier/; the outside repo carries espalier/** only."; exit 1 ;; esac
+      done
+      R="$(outside_commit "${MSG:-chore(espalier): $SLUG — pipeline records}" "$@")"
+      if [ "$R" = "nothing to commit" ]; then
+        echo "pr: nothing to record in $OUTSIDE_ROOT"
+      else
+        echo "pr: recorded in $OUTSIDE_ROOT @ $R — $(git -C "$OUTSIDE_ROOT" log -1 --pretty=%s)"
+        git -C "$OUTSIDE_ROOT" diff-tree --no-commit-id --name-only -r HEAD | sed 's/^/    /'
+      fi
+      exit 0
+    fi
     BR="$(base_ref)" || exit 1
     if ! git -C "$REPO" show-ref --verify --quiet "refs/heads/$ESP_BRANCH"; then
       git -C "$REPO" branch "$ESP_BRANCH" "$BR"
@@ -368,6 +415,13 @@ case "$CMD" in
   # Anything else — a file written after the sync, another change's records —
   # is left in place and named.
   close)
+    if outside; then
+      # No pushed branch to compare against and nothing to retire: the records
+      # live in the outside repo, and the project tree never held them.
+      ESPALIER_PR_CLOSING=1 "$0" "$TYPE" "$SLUG" sync "${MSG:-chore(espalier): close $SLUG}" "$@"
+      echo "pr: closed — records are in $OUTSIDE_ROOT @ $(outside_sha) (local git, no remote)"
+      exit 0
+    fi
     ESPALIER_PR_CLOSING=1 "$0" "$TYPE" "$SLUG" sync "${MSG:-chore(espalier): close $SLUG}" "$@"
     if [ "$#" -eq 0 ]; then
       set -- "espalier/changes/$TYPE/$SLUG"
@@ -407,6 +461,12 @@ EOF_RET
 
   # ────────────────────────────────────────────────────────────────── push ──
   push)
+    if outside; then
+      echo "pr: push ($CODE_BRANCH → $REMOTE; outside mode — the espalier side is a local commit in $OUTSIDE_ROOT @ $(outside_sha))"
+      assert_no_leak
+      push_branch "$CODE_BRANCH"
+      exit 0
+    fi
     echo "pr: push ($CODE_BRANCH + $ESP_BRANCH → $REMOTE)"
     assert_no_leak
     push_branch "$CODE_BRANCH"
@@ -427,6 +487,43 @@ EOF_RET
   # ────────────────────────────────────────────────────────────────── open ──
   open)
     require_gh
+    if outside; then
+      echo "pr: open ($CODE_BRANCH → $BASE_BRANCH; outside mode — code PR only)"
+      assert_no_leak
+      push_branch "$CODE_BRANCH"
+      TITLE="$(grep -m1 '^# ' "$REPO/espalier/changes/$TYPE/$SLUG/requirements.md" 2>/dev/null | sed 's/^# //' || true)"
+      [ -n "$TITLE" ] || TITLE="$TYPE: $SLUG"
+      EX="$(find_pr "$CODE_BRANCH" "$BASE_BRANCH")"
+      if [ -n "$EX" ]; then
+        CODE_NUM="${EX%%$'\t'*}"; CODE_URL="${EX#*$'\t'}"
+        echo "  code PR already exists: #$CODE_NUM"
+      else
+        BODY="Espalier change \`$TYPE/$SLUG\` — code only. This project runs Espalier in
+outside mode: the pipeline's records (requirements, review verdicts, deviations,
+commits) are kept in a local repository beside the project, not in this one."
+        OUT="$(gh pr create --head "$CODE_BRANCH" --base "$BASE_BRANCH" \
+                      --title "$TITLE" --body "$BODY" 2>&1)" \
+          || { echo "  ERROR: gh pr create failed:"; printf '%s\n' "$OUT" | sed 's/^/    /' | head -6; exit 5; }
+        CODE_URL="$(pr_url "$OUT")"
+        [ -n "$CODE_URL" ] || { echo "  ERROR: gh pr create printed no PR URL:"; printf '%s\n' "$OUT" | sed 's/^/    /' | head -6; exit 5; }
+        CODE_NUM="${CODE_URL##*/}"
+        echo "  opened code PR #$CODE_NUM"
+      fi
+      record_pr code "$CODE_BRANCH" "$CODE_NUM" "$CODE_URL"
+      # The espalier side: a local commit, recorded in the same table so the
+      # delivery brief and `status` have a row to show.
+      if [ -f "$STATE" ]; then
+        grep -q '^## Pull Requests' "$STATE" \
+          || printf '\n## Pull Requests\n| Role | Branch | PR | URL |\n|------|--------|----|----|\n' >> "$STATE"
+        grep -qE '^\| espalier \| local \|' "$STATE" \
+          || printf '| espalier | local | — | local: %s @ %s |\n' "$OUTSIDE_ROOT" "$(outside_sha)" >> "$STATE"
+      fi
+      "$0" "$TYPE" "$SLUG" sync "chore(espalier): $SLUG — pull request links" \
+        || { echo "  ERROR: the PR table was recorded locally but not committed — re-run:"
+             echo "    espalier/hooks/espalier-pr.sh $TYPE $SLUG sync"; exit 1; }
+      echo "pr: ci-scan: n/a in outside mode (no espalier PR)"
+      exit 0
+    fi
     echo "pr: open ($CODE_BRANCH, $ESP_BRANCH → $BASE_BRANCH)"
     assert_no_leak
     push_branch "$CODE_BRANCH"
@@ -542,6 +639,7 @@ has not merged yet — \`/espalier-doctor\` flags the mismatch on its next scan.
   # never edits a workflow. It reports, and names the required checks when the
   # token can read branch protection.
   ci-scan)
+    if outside; then echo "ci-scan: n/a in outside mode (no espalier PR)"; exit 0; fi
     WFDIR="$REPO/.github/workflows"
     [ -d "$WFDIR" ] || { echo "pr: no .github/workflows — nothing to scan"; exit 0; }
     command -v python3 >/dev/null 2>&1 \

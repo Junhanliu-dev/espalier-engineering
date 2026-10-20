@@ -1,5 +1,189 @@
 # Changelog
 
+## 0.30.0 — 2026-10-20
+
+Minor: **the human-review lane and the outside install.** Two independent,
+opt-in additions. Neither changes a gate, rubric, sentinel, round cap or
+escalation path of a run that does not ask for it; nothing here sets a budget.
+
+- **`--simple` on `/espalier` and `/espalier-fix`.** The pipeline grills,
+  writes the spec, asks ONE approval question, codes, reviews, runs the exit
+  gate — and then stops, with the change UNCOMMITTED in the working tree for
+  a human to read and commit by hand. Grilled from the request down to its
+  edge cases before a line was written; every decision below is the
+  requester's:
+  - The coder never runs git (`SIMPLE MODE:` prompt line; harness-coder.md
+    `## Simple Mode: Never Run Git`), and writes one `- Commit:` suggested
+    subject per unit instead — the human's commit messages, ready to use.
+    Under parallel dispatch the orchestrator commits nothing after the wave.
+  - A dirty tree outside `espalier/` at start is REFUSED (the reviewer judges
+    `git diff <Base-Ref>`, so a human's own edits would be reviewed as the
+    coder's and the result would be a mix); dirt under `espalier/` only warns.
+    Unattended mode is refused: nobody is there to give the approval that
+    ends the run.
+  - The run's records live in `espalier/.simple/{slug}/` — gitignored (init
+    writes the entry; the migration adds it), created from the same template,
+    carrying `- Mode: simple` and `- Base-Ref:` from the first line. ONE path
+    rule rewrites every `espalier/changes/{type}/{slug}` the stage files name;
+    the DIR-taking helpers are called with it, the TYPE/SLUG-taking ones
+    belong to steps the mode removes. Resumption finds simple runs by the same
+    tail match; a simple run and a normal change never adopt each other.
+  - Stage 1 and 2 as today. The approval gate asks Approve / Edit / Abort and
+    nothing else — no push, deploy, session-boundary or maintenance question,
+    because none of those stages run. Stage 3 as today, exit gate included.
+    Stage 4 is the reviewer ALONE: single-record gate read, the fixpoint loop,
+    `FIX ROUND {n}` re-spawn, `max-code-rounds` cap and ROUND FAIL snapshots
+    unchanged. Stages 5/6 are SKIPPED rows so the stage integer stays
+    monotonic. The fix lane's Stage 0 auto-link runs READ-ONLY (blame, lookup,
+    the causing change's records read for the diagnosis; no index write, no
+    back-link), and its regression gate (fails before / passes after) stays.
+  - NOT run, ever: the Stage 0 pre-flight and convention promotion, the
+    security auditor and the contract phase, `certificate_write`, the Stage 4
+    post-review drift index and convention rows, the wiki sweep,
+    `record_commits`, every `espalier-pr.sh` subcommand, CI, the 8.5 drift
+    check, deploy, `delivery_brief`, the Completion projection and the
+    map / simplify / PARTIAL_FIX bookkeeping. Nothing under `espalier/`
+    changes except the scratch folder.
+  - **The Final Gate** replaces Stages 7–10 in both lanes: a whole-tree
+    `exit_gate`, then the new `simple_brief` (drift-helpers.sh) assembles
+    `simple-brief.md` from `git status` (the change itself — Base-Ref never
+    moved), the coding report's file and `- Commit:` lines, the deviations,
+    the reviewer's last verdict, the regression line and the ROUND / HANDOFF /
+    BLOCKED rows. Approve deletes the folder and prints the files and the
+    suggested subjects (the brief goes with the folder, so they are printed
+    first). Request Changes sends the note to a fresh coder as a fix round,
+    re-reviews, re-presents. Abort — or an escalation at the cap — leaves the
+    code AND the folder in place and says where it is; the pipeline never
+    reverts code and never deletes on a non-Approve exit.
+  - Accepted losses, stated to the requester and accepted: no audit trail,
+    no `espalier-stats.sh` row, no convention observations, no causal link
+    for a later fix to find.
+  Procedure: the new `stages/simple.md`, read at Stage 1 entry (fix lane:
+  before Stage 0) and kept resident; `pipeline.md` names the mode beside the
+  lanes; the eleven stage headings are byte-identical.
+- **`--outside` on `/espalier-init`, and `/espalier-repot`.** For a project
+  whose git history must never carry an espalier byte. The whole `espalier/`
+  tree lives one level up, in `<parent>/espalier-main/<project>/` (override
+  the dir with `--outside=<dir>`, the name with `--outside-name=<n>`), beside a
+  `.espalier-origin` file naming the project's absolute path and inside that
+  folder's own remote-less local git repo — history without a push target;
+  `git remote add` later is the user's call. The project root gets a RELATIVE
+  symlink `espalier -> ../espalier-main/<project>/espalier`, so every one of
+  the hundreds of `espalier/...` paths in skills, hooks and settings keeps
+  working unchanged — the symlink is the mechanism, not a path rewrite.
+  - The wiring that cannot leave the project (Claude Code loads only
+    `<project>/.claude/` and CLAUDE.md) is written but kept out of git
+    locally: hooks go to `.claude/settings.local.json`, the espalier section to
+    `CLAUDE.local.md`, and the symlink, those two files, the `.claude/`
+    rule/skill/agent links, the post-merge dispatcher (`.git/hooks`, never
+    `.husky`) and what `.gitignore` / `.gitattributes` would have carried are
+    listed in `.git/info/exclude` under an `# espalier (outside mode)` block.
+    CODEOWNERS is skipped with a note. Codex and Copilot wiring is written and
+    excluded when its instruction/config files are untracked; a TRACKED
+    AGENTS.md, copilot-instructions.md or config is left alone and the section
+    printed for a user-level file. `git status --porcelain` on a fresh outside
+    install is EMPTY.
+  - `espalier/hooks/espalier-outside.sh` — `prepare` (create or ADOPT: an
+    existing `espalier-main/<name>/` whose origin names this project is
+    re-linked; one naming another path is refused), `discover` (inside /
+    outside / `relinked` — a missing symlink whose outside root still matches
+    is recreated — / exit 4 "run /espalier-init first"), `status`, `commit`
+    (the outside repo's add + commit, used by `espalier-pr.sh` and by
+    `/espalier-migrate`), `repot-out` and `repot-in`.
+  - **Install discovery** opens both pipelines: `espalier/` present → run; not
+    present but `../espalier-main/<project>/.espalier-origin` matches →
+    relink and run; otherwise stop with "run /espalier-init first". A fresh
+    clone on the same machine has no `.claude/` wiring either, so the real
+    recovery path is `/espalier-init`, which finds and adopts the outside
+    root instead of rediscovering the codebase.
+  - **The espalier PR becomes a local commit.** `espalier-pr.sh` finds its
+    files with `git ls-files`, and an excluded symlink is invisible to it, so
+    in outside mode (`outside-root:` in `.espalier-config`) `project`,
+    `project-sweep`, `sync` and `close` commit into the outside repo, `push`
+    pushes the code branch only, `open` opens the code PR only and records the
+    espalier side as `local: <root> @ <sha>`, and `ci-scan` has nothing to
+    scan. The code PR is the only PR. The pre-push gate is untouched.
+  - `/espalier-repot` moves an EXISTING install out (`--out`, the default when
+    inside) or back in (`--in`): refuses while any change is IN_PROGRESS or an
+    espalier PR is unmerged; out = move the tree, prepare the outside root
+    with a baseline commit, `git rm -r --cached` the tracked espalier paths,
+    move hooks to `settings.local.json` and the CLAUDE.md section to
+    `CLAUDE.local.md`, drop the `.gitignore` / `.gitattributes` lines, write
+    the exclude block, then `bootstrap --wire-only --outside`; in = the
+    inverse. Both leave the git changes STAGED with a suggested commit message
+    and never commit — committing is the human's act.
+  - **The symlink is authoritative.** It is RELATIVE, so a project moved
+    together with its sibling keeps working. The absolute `outside-root:` key
+    and `.espalier-origin` would go stale; `espalier-pr.sh` derives the root
+    from the symlink and ignores a key naming a directory that no longer
+    exists, `discover` rewrites both when the symlink still proves the link,
+    `status` flags a stale key, and every bootstrap run on an outside
+    install (validate-only included) runs `discover` first, so the repair is
+    automatic. Verified by moving a fixture install and validating 62/62.
+  - **Reviewed before shipping, twelve findings fixed.** An independent
+    review of the diff found, and reproduced live, that a flagless re-run on a
+    `--outside-name` install would have prepared a second empty root and
+    silently repointed the symlink onto it; a re-run now keeps the existing
+    link and refuses flags that name a different root. The project remembers
+    its root in its LOCAL git config (`espalier.outside-root`, never
+    committed), so a non-default root is found again after `git clean -fdx`.
+    `repot-out` refuses a foreign non-empty folder, untracks the Copilot gates
+    file, strips the CODEOWNERS block and the dispatcher from a tracked
+    `core.hooksPath` hook; `repot-in` copies before it replaces the link;
+    `prepare` checks for collisions before any side effect and bootstrap reads
+    its exit status; a tracked Codex config's blocks are printed on every exit
+    path; validation renders a tracked file left alone as a skip, never a
+    check that cannot fail; the exclude and sidecar lists have one definition
+    (the hook script's), which bootstrap reads.
+  - Accepted losses: no teammate sharing of rules, conventions or CODEOWNERS
+    routing (the install is per machine); backup of the outside history is
+    the user's.
+- **`/espalier-migrate`** gains step 41 (`NEEDS_V0300_PATCH`; probe = the
+  three shipped files — `stages/simple.md`, `espalier-outside.sh`, the
+  `espalier-repot` SKILL — plus `simple_brief()` and the two routers' flag
+  lines; the coder's section counts as handled through its skip record), the
+  floor's newest rung, the plugin-dir probe bumped to the v0.30.0 script, the
+  per-version chains run to v0.30.0, Step 0 treats `espalier/.simple/*` runs
+  as in flight, and on an OUTSIDE install the migration is committed into the
+  outside repo (`espalier-outside.sh commit`) — the project has nothing to
+  commit.
+- **Migration #41 — `migrate-v0.29.0-to-v0.30.0.sh`.** Pure-copy refresh,
+  backup-on-diff (`.pre-v0.30.bak`), of the two routers, `pipeline.md`,
+  `espalier-pr.sh`, `drift-helpers.sh`; new files `stages/simple.md`,
+  `espalier-outside.sh` (executable), the `espalier-repot` SKILL and its
+  `.claude/skills` symlink (Codex / Copilot skill links when those platforms
+  are wired); the `espalier/.simple/` ignore entry (to `.gitignore`, or to
+  `.git/info/exclude` on an outside install); one anchored edit extracted from
+  the template — the coder's `## Simple Mode: Never Run Git` before `## Fix
+  Rounds` (a customised body missing the anchor is skipped with a record).
+  In-flight changes are reported, never touched. Validation totals unchanged
+  (62 / 67 / 72): the outside-mode install swaps the COMMAND of the checks
+  that read `.gitignore`, `settings.json` and CLAUDE.md for their local-file
+  counterparts, so the same numbered checks pass on both layouts.
+- **The v0.28.1 trim step survives later template edits.**
+  `migrate-v0.28.0-to-v0.28.1.sh` classified a file by whether its hunks
+  reverse-applied, so once this release edited the routers near one of those
+  hunks, a CURRENT espalier / espalier-fix SKILL read as "customised" and was
+  recorded in `espalier/.migrations-skipped` on every fresh install. A file
+  byte-identical to the current plugin template is now "done" before any
+  hunk is checked — it is past the trim by construction. Same lesson as
+  v0.29's maintenance-block fix: older migrations must not depend on text a
+  later release is free to move.
+- **`scripts/test-bootstrap.sh` follows the release.** The v0.25–v0.29.0
+  chains continue through #41 so their byte-identity checks reach the current
+  templates; test 40's identity loop runs after #41 for the same reason; the
+  floor is v0.30.0. New test 41: a fresh `--outside` install (symlink,
+  origin, local repo with a baseline commit, `settings.local.json`,
+  `CLAUDE.local.md`, the exclude block, an EMPTY `git status`, validation
+  62/62 and 72/72 with every platform), `discover` relinking after the symlink
+  is removed, `repot-out` then `repot-in` on a normal install (only staged
+  changes, round trip restores the tree), `espalier-pr.sh` in outside mode
+  against a bare remote (records committed outside, code branch alone
+  pushed, `local:` recorded), `simple_brief` on a seeded scratch run, the
+  `.simple/` ignore entry, and the migration on an install built from the
+  v0.29.0 tag (byte-identity, backups, idempotent re-run, outside-install
+  variant committing into the outside repo).
+
 ## 0.29.0 — 2026-10-18
 
 Minor: **the PR split.** A pipeline run no longer ends in one branch carrying

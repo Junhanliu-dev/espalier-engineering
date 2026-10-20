@@ -15,12 +15,52 @@ description: Execute the Espalier development pipeline for a requirement
 You are the pipeline orchestrator. For the given requirement, drive it through
 all 10 stages defined in `espalier/pipeline.md`.
 
+### Install discovery (first step of every invocation)
+
+`espalier/` may be a real directory (inside mode) or a gitignored symlink into
+`<parent>/espalier-main/<basename>/espalier` (outside mode, v0.30 — nothing
+espalier-related is tracked by this repo; see `/espalier-init --outside` and
+`/espalier-repot`). Every `espalier/...` path below works in both modes. When
+the symlink is missing (a `git clean -fdx`, a fresh clone on the same machine),
+re-create it from the sibling root before anything else — or stop:
+
+```bash
+if [ ! -e espalier ]; then
+  R="$(git rev-parse --show-toplevel)"
+  # The local git config remembers a non-default root (--outside=<dir> /
+  # --outside-name); the default sibling is the fallback.
+  M="$(git config --local --get espalier.outside-root 2>/dev/null)"
+  [ -n "$M" ] && [ -f "$M/.espalier-origin" ] || M="$(dirname "$R")/espalier-main/$(basename "$R")"
+  if [ -f "$M/.espalier-origin" ] && [ "$(head -1 "$M/.espalier-origin")" = "$R" ] && [ -d "$M/espalier" ]; then
+    [ -L espalier ] && rm -f espalier                      # a dangling link
+    ln -s "$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$M/espalier" "$R")" espalier
+    bash espalier/hooks/espalier-outside.sh discover "$R"   # rewrites the .git/info/exclude block + the remembered root
+    echo "relinked the outside install at $M"
+  else
+    echo "no espalier install — run /espalier-init first"
+    # STOP HERE. Nothing below can run without the tree.
+  fi
+fi
+```
+
+A found install prints `inside <path>`, `outside <root>` or `relinked <root>`
+via `espalier/hooks/espalier-outside.sh discover`; `exit 4` is "no install".
+
 ### Before Starting
 
 1. Read `espalier/pipeline.md` for stage definitions
 2. Check for existing state per Session Resumption (below): a tail-matching
    `IN_PROGRESS` change is resumed; otherwise start from Stage 1 — an
    unrelated in-flight change is surfaced, never silently resumed
+3. **Simple mode** (`SIMPLE_MODE=yes`): read
+   `espalier/skills/espalier/stages/simple.md` NOW — before Stage 0 — run
+   its pre-checks (unattended → refuse; dirty tree outside `espalier/` →
+   refuse; dirty `espalier/` → one line), and keep it resident for the run:
+   it overrides the stage files where it says so (the folder is
+   `espalier/.simple/{slug}/`, Stage 0 pre-flight does not run, the gate
+   asks one question, the coder never runs git, Stage 4 is the reviewer
+   alone, Stages 7–10 are its Final Gate). Everything it does not mention
+   runs as written.
 
 ### Flag Parsing
 
@@ -33,6 +73,7 @@ requirement itself is never mistaken for a flag).
 |------|--------|
 | `--no-grill` | Set `GRILL_DISABLED=yes` — Stage 1 skips the requirement grill. |
 | `--resume` | Recognized no-op. Resumption is already automatic (see Session Resumption); accept and drop the token. |
+| `--simple` | Set `SIMPLE_MODE=yes` — the human-review lane: grill → spec → approval → code → review → tests, then STOP with the code uncommitted for a human to commit by hand. Records live in `espalier/.simple/{slug}/` (gitignored) and Approve deletes them; no pre-flight, no security auditor, no commit, no push, no PR, no write under `espalier/` beyond that folder. Composes with `--no-grill`. Procedure: `stages/simple.md`. |
 
 An unrecognized leading `--token` is NOT absorbed into the requirement — warn the
 user (`unrecognized flag: --token; ignoring`) and drop it.
@@ -186,7 +227,13 @@ above remains the structural race detection.
 On every invocation, check:
 ```
 find espalier/changes -mindepth 3 -maxdepth 3 -name pipeline-state.md
+find espalier/.simple  -mindepth 2 -maxdepth 2 -name pipeline-state.md 2>/dev/null
 ```
+
+(The second line finds simple-mode runs — `stages/simple.md`; their state
+files carry `- Mode: simple`. A simple run resumes only under `--simple`,
+and `--simple` resumes only simple runs: the two never adopt each other's
+folders.)
 
 Resumption is scoped to THIS invocation's requirement — never hijack an
 unrelated in-flight change into the new request:
@@ -261,6 +308,7 @@ For each stage:
    | 4 | `stages/4-panel.md` — the two-agent panel prompts and procedure (round ≥ 2 prompts carry `CHANGED SINCE LAST REVIEW:`; gate read: Advance ONLY when EVERY record's last sentinel is PASS/PASS_WITH_FIXES with p0=0 p1=0), the `FIX ROUND {n}:` re-spawn, the PASS write + certificate (`certificate_write`) + the deviations surfaced (`deviations_list`) + the boundary read, post-review drift (`drift_index`) and convention index |
    | 5–6 | `stages/5-6-contract.md` — Stage 5/6 (folded): contract coverage first (`contract_gaps` — a coder only for the gaps) and the delta review / test writing and test review (serial), the certificate, crash recovery |
    | 7–10 | `stages/7-10-delivery.md` — the code PR / espalier PR split (`espalier-pr.sh`), the doc sweep (`WIKI SWEEP:`), commit recording (`record_commits`), the PARTIAL_FIX reverse-link, the Stage 8.5 doc-drift check (`stage85_drift`), the Stage 10 delivery brief (`delivery_brief`) and quiz offer |
+   | `--simple` | `stages/simple.md` — read at Before Starting step 3 and kept resident; its path rule rewrites every `espalier/changes/{type}/{slug}` above to `espalier/.simple/{slug}`, and its Final Gate replaces 7–10 (no `7-10-delivery.md` read on a simple run) |
 
    This file ROUTES; the stage files carry the procedure verbatim and
    `espalier/pipeline.md` is the contract (trigger / load / gate / output /
@@ -379,6 +427,11 @@ procedure at the top of its context.
 
 ### Completion
 
+**Simple mode** (`- Mode: simple` in the state file): none of this section
+runs — the Final Gate of `stages/simple.md` is the completion (Approve
+deletes `espalier/.simple/{slug}/`; nothing is projected, pushed, or
+opened).
+
 When Stage 10 passes:
 - Update pipeline-state.md with final status: COMPLETE
 - **Map-charted changes** (requirements.md frontmatter has
@@ -431,6 +484,10 @@ When Stage 10 passes:
   espalier PR merges, `git pull` refuses to write over an untracked file even
   when it is identical. A file `close` keeps (it differs from the pushed
   branch) is named in its output; resolve it before the next pull.
+  **Outside mode:** the same `close` call commits the bookkeeping into the
+  outside root's local repo and prints `records are in <root> @ <sha>`; there
+  is no espalier PR and no local copies to retire. Present the code PR link
+  and that line instead of two PR links.
 - Summarize from `delivery-brief.md` (written before the Stage 10
   checkpoint — `stages/7-10-delivery.md`): files changed, tests added,
   review findings addressed, deviations ratified
@@ -439,3 +496,5 @@ When Stage 10 passes:
   are left OPEN: merging is a human act — the code PR first, then the
   espalier PR. The pipeline never merges or closes a PR, including on an
   abort or escalation after Stage 7; closing those is the operator's call.
+  In outside mode there is one PR; the espalier row reads
+  `local: <root> @ <sha>`.

@@ -65,6 +65,21 @@
 #   --codeowners-rules=<h>   GitHub handle/team owning espalier/rules/ (CODEOWNERS
 #                            block, R4). '@' prefixed if missing.
 #   --codeowners-wiki=<h>    Same for espalier/wiki/. Both empty → sub-step no-ops.
+#   --outside[=<dir>]        Outside mode (v0.30): the espalier/ tree lives in
+#                            <dir>/<name>/espalier (default <dir> = the project's
+#                            PARENT dir + /espalier-main, <name> = the project's
+#                            basename) with its own local git repo and NO remote;
+#                            the project holds a gitignored symlink `espalier`.
+#                            Nothing espalier-related is tracked by the project:
+#                            hooks go to .claude/settings.local.json, the
+#                            instruction section to CLAUDE.local.md, every wiring
+#                            path to .git/info/exclude. Auto-detected on re-runs
+#                            (symlink into an .espalier-origin root). Fresh
+#                            installs only — move an inside install with
+#                            /espalier-repot.
+#   --outside-name=<n>       Outside mode: the folder name under <dir> (default:
+#                            the project's basename — pass this when two projects
+#                            share a basename).
 #   --greenfield             Greenfield Pass 1 (near-empty repo): full wiring, but
 #                            writes a placeholder pre-push-gate.sh, records
 #                            espalier/.greenfield, and validation renders every
@@ -102,6 +117,10 @@ PLATFORMS_FLAG=""     # raw --platforms value (empty = not passed)
 CODEOWNERS_RULES=""   # optional @handle owning espalier/rules/ (A4)
 CODEOWNERS_WIKI=""    # optional @handle owning espalier/wiki/
 GREENFIELD=no         # greenfield Pass 1 (placeholder gate + .greenfield marker)
+OUTSIDE=no            # outside mode (v0.30): espalier/ is a symlink into espalier-main/<name>/
+OUTSIDE_MAIN=""       # --outside=<dir>: the espalier-main dir (default: <project parent>/espalier-main)
+OUTSIDE_NAME=""       # --outside-name=<n>: folder under it (default: project basename)
+OUTSIDE_ROOT=""       # resolved by prepare: <dir>/<name>
 MODE="full"  # full | copy-only | wire-only | validate-only
 
 for arg in "$@"; do
@@ -116,6 +135,9 @@ for arg in "$@"; do
     --codeowners-rules=*)   CODEOWNERS_RULES="${arg#--codeowners-rules=}" ;;
     --codeowners-wiki=*)    CODEOWNERS_WIKI="${arg#--codeowners-wiki=}" ;;
     --greenfield)           GREENFIELD=yes ;;
+    --outside)              OUTSIDE=yes ;;
+    --outside=*)            OUTSIDE=yes; OUTSIDE_MAIN="${arg#--outside=}" ;;
+    --outside-name=*)       OUTSIDE=yes; OUTSIDE_NAME="${arg#--outside-name=}" ;;
     --dry-run)              DRY_RUN=yes ;;
     --yes)                  SKIP_PROMPT=yes ;;
     --force)                FORCE=yes ;;
@@ -201,6 +223,84 @@ if [ -z "$PLUGIN_DIR" ] || [ ! -d "$PLUGIN_DIR/hook-templates" ]; then
   echo "ERROR: --plugin-dir not found. Set ESPALIER_PLUGIN_DIR or pass --plugin-dir=<path>" >&2
   echo "Expected: <path>/hook-templates/post-merge-backlink.sh" >&2
   exit 1
+fi
+
+# --- Outside mode (v0.30) ----------------------------------------------------
+# Auto-detect: `espalier` is a symlink whose target's parent carries
+# .espalier-origin → this is an outside install, whatever the flags said (so
+# --wire-only / --validate-only re-runs and the repot lane need no flag).
+OUTSIDE_SH="$PLUGIN_DIR/hook-templates/espalier-outside.sh"
+# Detection runs whether or not --outside was passed: an existing link is the
+# truth, and the flags are then only checked against it (below), never used
+# to prepare a second root.
+if [ -L espalier ]; then
+  _lt="$(readlink espalier)"; case "$_lt" in /*) ;; *) _lt="$PWD/$_lt" ;; esac
+  if [ -f "$(dirname "$_lt")/.espalier-origin" ]; then
+    OUTSIDE=yes
+    OUTSIDE_ROOT="$(cd "$(dirname "$_lt")" && pwd -P)"
+    log "Outside mode detected (espalier -> $(readlink espalier))"
+    # Self-heal after a move: `discover` rewrites a stale outside-root: key and
+    # .espalier-origin when the symlink still proves the link (metadata only).
+    [ "$DRY_RUN" = "yes" ] || [ ! -f "$OUTSIDE_SH" ] || bash "$OUTSIDE_SH" discover "$PWD" >/dev/null 2>&1 || true
+  fi
+fi
+tracked() { git ls-files --error-unmatch -- "$1" >/dev/null 2>&1; }
+outside_excl() {  # outside_excl ENTRY... — record local excludes (no-op outside outside mode / dry-run)
+  [ "$OUTSIDE" = "yes" ] || return 0
+  if [ "$DRY_RUN" = "yes" ]; then echo "[dry-run] .git/info/exclude += $*"; return 0; fi
+  bash "$OUTSIDE_SH" exclude-add "$PWD" "$@" >/dev/null
+}
+outside_skip() {  # outside_skip FILE — a tracked instruction/hook file left alone; recorded for validation
+  log "  OUTSIDE MODE: $1 is tracked by this repo — left untouched (nothing espalier-related is committed)."
+  log "  Place the block printed below in a user-level file by hand."
+  [ "$DRY_RUN" = "yes" ] || { mkdir -p espalier; grep -qxF -- "$1" espalier/.outside-skipped 2>/dev/null || echo "$1" >> espalier/.outside-skipped; }
+}
+# No symlink, but the project's local git config remembers an outside root
+# (set by prepare / repot-out / discover; survives `git clean -fdx`): relink
+# through `discover` rather than preparing a second, empty root.
+if [ "$OUTSIDE" != "yes" ] && [ ! -e espalier ] && [ -f "$OUTSIDE_SH" ] \
+   && [ -n "$(git config --local --get espalier.outside-root 2>/dev/null)" ] && [ "$DRY_RUN" != "yes" ]; then
+  if bash "$OUTSIDE_SH" discover "$PWD" >/dev/null 2>&1 && [ -L espalier ]; then
+    OUTSIDE=yes
+    OUTSIDE_ROOT="$(cd -P espalier && cd .. && pwd -P)"
+    log "Outside mode: relinked from the local git config (espalier -> $(readlink espalier))"
+  fi
+fi
+if [ "$OUTSIDE" = "yes" ] && [ "$MODE" != "validate-only" ]; then
+  [ -f "$OUTSIDE_SH" ] || { echo "ERROR: $OUTSIDE_SH missing — the plugin predates v0.30 outside mode" >&2; exit 1; }
+  if [ -n "$OUTSIDE_ROOT" ]; then
+    # Already linked (auto-detected or relinked). The link is the truth: a
+    # re-run never repoints it. Flags that name a DIFFERENT root are an error,
+    # not a second empty root with the symlink silently moved onto it.
+    _want=""
+    if [ -n "$OUTSIDE_MAIN$OUTSIDE_NAME" ]; then
+      _m="${OUTSIDE_MAIN:-$(dirname "$PWD")/espalier-main}"; case "$_m" in /*) ;; *) _m="$PWD/$_m" ;; esac
+      _want="${_m%/}/${OUTSIDE_NAME:-$(basename "$PWD")}"
+      _want="$(cd "$_want" 2>/dev/null && pwd -P || printf '%s' "$_want")"
+    fi
+    if [ -n "$_want" ] && [ "$_want" != "$OUTSIDE_ROOT" ]; then
+      echo "ERROR: this project is already linked to the outside root $OUTSIDE_ROOT," >&2
+      echo "  but --outside/--outside-name name $_want. A re-run never repoints the link;" >&2
+      echo "  move the install with /espalier-repot, or drop the flags." >&2
+      exit 1
+    fi
+    log "Outside mode: espalier/ -> $OUTSIDE_ROOT/espalier (existing link kept)"
+  elif [ "$DRY_RUN" = "yes" ]; then
+    echo "[dry-run] espalier-outside.sh prepare $PWD ${OUTSIDE_MAIN:+--main=$OUTSIDE_MAIN} ${OUTSIDE_NAME:+--name=$OUTSIDE_NAME}"
+  else
+    set -- "$PWD"
+    [ -n "$OUTSIDE_MAIN" ] && set -- "$@" "--main=$OUTSIDE_MAIN"
+    [ -n "$OUTSIDE_NAME" ] && set -- "$@" "--name=$OUTSIDE_NAME"
+    _prep_out="$(bash "$OUTSIDE_SH" prepare "$@" 2>&1)"; _prep_rc=$?
+    if [ "$_prep_rc" -ne 0 ]; then
+      printf '%s\n' "$_prep_out" >&2
+      echo "ERROR: outside-mode prepare failed (exit $_prep_rc). An existing inside espalier/ dir is moved with /espalier-repot, not --outside." >&2
+      exit 1
+    fi
+    OUTSIDE_ROOT="$(printf '%s\n' "$_prep_out" | tail -1)"
+    [ -d "$OUTSIDE_ROOT" ] || { echo "ERROR: outside root not created: $OUTSIDE_ROOT" >&2; exit 1; }
+    log "Outside mode: espalier/ -> $OUTSIDE_ROOT/espalier (local git, no remote)"
+  fi
 fi
 
 # Re-run detection (only blocks in full mode; debug modes bypass).
@@ -354,6 +454,7 @@ stage_mkdirs() {
   run "mkdir -p espalier/skills/espalier-map"
   run "mkdir -p espalier/skills/espalier-maprun"
   run "mkdir -p espalier/skills/espalier-simplify"
+  run "mkdir -p espalier/skills/espalier-repot"
   run "mkdir -p espalier/maps"
   run "mkdir -p espalier/agents"
   run "mkdir -p espalier/agents/modes"
@@ -408,6 +509,8 @@ stage_pure_copy() {
   run "cp '$PLUGIN_DIR/templates/skills/espalier-map.md' espalier/skills/espalier-map/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-maprun.md' espalier/skills/espalier-maprun/SKILL.md"
   run "cp '$PLUGIN_DIR/templates/skills/espalier-simplify.md' espalier/skills/espalier-simplify/SKILL.md"
+  # v0.30: the repot lane (inside <-> outside) — pure copy.
+  run "cp '$PLUGIN_DIR/templates/skills/espalier-repot.md' espalier/skills/espalier-repot/SKILL.md"
   # v0.28: the ladder's rung-4 lookup (pure copy; the coding SKILL and its
   # specs/ beside it stay LLM-written).
   run "cp '$PLUGIN_DIR/templates/skills/espalier-coding-references/platform-native.md' espalier/skills/espalier-coding/references/platform-native.md"
@@ -435,6 +538,8 @@ stage_hooks() {
   run "cp '$PLUGIN_DIR/hook-templates/espalier-pr.sh' espalier/hooks/espalier-pr.sh"
   # /espalier-map plan-don't-do guard (inert unless espalier/maps/.active-session exists).
   run "cp '$PLUGIN_DIR/hook-templates/map-guard.sh' espalier/hooks/map-guard.sh"
+  # v0.30 outside mode: prepare / discover / commit / repot-out / repot-in.
+  run "cp '$PLUGIN_DIR/hook-templates/espalier-outside.sh' espalier/hooks/espalier-outside.sh"
   # Read-only lane-quality report (run manually: bash espalier/hooks/espalier-stats.sh).
   run "cp '$PLUGIN_DIR/hook-templates/espalier-stats.sh' espalier/hooks/espalier-stats.sh"
   # /espalier-maprun engine (write-if-absent: a repo carrying a locally-adapted
@@ -483,7 +588,7 @@ stage_hooks() {
 
 # --- Stage 5: Symlinks ------------------------------------------------------
 
-ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit espalier-map espalier-maprun espalier-simplify"
+ESPALIER_SKILL_NAMES="espalier-coding espalier-review espalier-security espalier-testing espalier-requirements espalier-grill espalier espalier-fix espalier-prune espalier-doctor espalier-ask espalier-audit espalier-map espalier-maprun espalier-simplify espalier-repot"
 
 stage_symlinks() {
   log "Stage 5: platform wiring symlinks ($PLATFORMS)"
@@ -586,16 +691,21 @@ stage_claudemd() {
     log "Stage 7: CLAUDE.md append — skipped (claude not in --platforms)"
     return
   fi
-  log "Stage 7: CLAUDE.md append (idempotent grep-guard)"
-  if [ -f CLAUDE.md ] && grep -q "## Espalier" CLAUDE.md 2>/dev/null; then
-    log "  CLAUDE.md already has Espalier section — skipping"
+  # Outside mode: the section goes to CLAUDE.local.md — Claude Code loads it
+  # beside CLAUDE.md, and it is excluded locally, so the tracked CLAUDE.md is
+  # never touched.
+  local target=CLAUDE.md
+  [ "$OUTSIDE" = "yes" ] && target=CLAUDE.local.md
+  log "Stage 7: $target append (idempotent grep-guard)"
+  if [ -f "$target" ] && grep -q "## Espalier" "$target" 2>/dev/null; then
+    log "  $target already has Espalier section — skipping"
     return
   fi
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] append Espalier section to CLAUDE.md"
+    echo "[dry-run] append Espalier section to $target"
     return
   fi
-  cat >> CLAUDE.md << 'CLAUDETMPL'
+  cat >> "$target" << 'CLAUDETMPL'
 
 ## Espalier
 
@@ -631,26 +741,31 @@ stage_settings_json() {
     log "Stage 8: .claude/settings.json merge — skipped (claude not in --platforms)"
     return
   fi
-  log "Stage 8: .claude/settings.json merge"
+  # Outside mode: the hooks go to .claude/settings.local.json — Claude Code
+  # merges it over settings.json and it is excluded locally. The commands are
+  # unchanged ($CLAUDE_PROJECT_DIR/espalier/hooks/… resolves through the symlink).
+  local settings=.claude/settings.json
+  [ "$OUTSIDE" = "yes" ] && settings=.claude/settings.local.json
+  log "Stage 8: $settings merge"
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] merge .claude/settings.json (Appendix A algorithm)"
+    echo "[dry-run] merge $settings (Appendix A algorithm)"
     return
   fi
 
   # Backup existing
-  if [ -f .claude/settings.json ]; then
-    cp .claude/settings.json ".claude/settings.json.espalier-backup-$(date +%s)"
+  if [ -f "$settings" ]; then
+    cp "$settings" "$settings.espalier-backup-$(date +%s)"
     # Rotate — keep last 5
-    ls -t .claude/settings.json.espalier-backup-* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+    ls -t "$settings".espalier-backup-* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
   fi
 
-  python3 - << 'PYMERGE'
+  SETTINGS_PATH="$settings" python3 - << 'PYMERGE'
 import json
 import os
 import sys
 import tempfile
 
-SETTINGS = ".claude/settings.json"
+SETTINGS = os.environ.get("SETTINGS_PATH", ".claude/settings.json")
 
 ESPALIER_HOOKS = {
     "PostToolUse": [
@@ -702,7 +817,7 @@ else:
         with open(SETTINGS) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
-        print(f"ERROR: .claude/settings.json is invalid JSON: {e}", file=sys.stderr)
+        print(f"ERROR: {SETTINGS} is invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
     if "hooks" not in data or not isinstance(data["hooks"], dict):
@@ -729,10 +844,10 @@ try:
     with open(tmp) as f:
         json.load(f)
     os.replace(tmp, SETTINGS)
-    print(f"[bootstrap]   settings.json: {mode}")
+    print(f"[bootstrap]   {os.path.basename(SETTINGS)}: {mode}")
 except Exception as e:
     os.unlink(tmp)
-    print(f"ERROR: failed to write settings.json: {e}", file=sys.stderr)
+    print(f"ERROR: failed to write {SETTINGS}: {e}", file=sys.stderr)
     sys.exit(1)
 PYMERGE
 }
@@ -752,7 +867,13 @@ stage_agentsmd() {
     echo "[dry-run] append Espalier section to AGENTS.md"
     return
   fi
-  cat >> AGENTS.md << 'AGENTSTMPL'
+  # Outside mode: a tracked AGENTS.md is never edited — the section is printed
+  # for a user-level AGENTS.md instead; an untracked one is written and excluded.
+  local dest=AGENTS.md
+  if [ "$OUTSIDE" = "yes" ] && tracked AGENTS.md; then
+    outside_skip AGENTS.md; dest="$(mktemp)"
+  fi
+  cat >> "$dest" << 'AGENTSTMPL'
 
 ## Espalier
 
@@ -801,6 +922,7 @@ Espalier's skill files use Claude Code vocabulary in places; on Codex apply thes
   (run `/hooks` once in Codex to trust them; they are the quality gates).
 - `$CLAUDE_PROJECT_DIR` in docs → the repo root (`git rev-parse --show-toplevel`).
 AGENTSTMPL
+  if [ "$dest" != AGENTS.md ]; then cat "$dest"; rm -f "$dest"; else outside_excl /AGENTS.md; fi
 }
 
 # --- Stage 8b: .codex/config.toml hooks merge (codex) ------------------------
@@ -810,18 +932,38 @@ stage_codex_config() {
     return
   fi
   log "Stage 8b: .codex/config.toml hooks merge (marker-guarded)"
+  # Outside mode: a tracked config.toml is never edited — the blocks are
+  # printed for a user-level config instead (written to a temp copy so the
+  # marker guards below still read the real file's state).
+  local cfg=.codex/config.toml cfg_print=no
+  if [ "$OUTSIDE" = "yes" ] && [ "$DRY_RUN" != "yes" ] && tracked .codex/config.toml; then
+    outside_skip .codex/config.toml; cfg="$(mktemp)"; cfg_print=yes; cp .codex/config.toml "$cfg"
+  fi
+  # Every exit of this stage runs through here: a tracked file's blocks are
+  # printed (whatever subset was appended to the temp copy) and the copy removed.
+  _cfg_finish() {
+    if [ "$cfg_print" = yes ]; then
+      if ! cmp -s .codex/config.toml "$cfg"; then
+        echo "----- blocks for a user-level codex config.toml -----"
+        diff .codex/config.toml "$cfg" | sed -n 's/^> //p'
+      fi
+      rm -f "$cfg" "$cfg".espalier-backup-* 2>/dev/null
+    else
+      [ -f .codex/config.toml ] && outside_excl /.codex/config.toml
+    fi
+  }
   # The map-guard block has its OWN marker so a pre-v0.18 install (whose
   # ESPALIER HOOKS v1 block already exists) still receives it on re-run.
   _codex_map_guard_block() {
-    if grep -q "ESPALIER MAP GUARD" .codex/config.toml 2>/dev/null; then
+    if grep -q "ESPALIER MAP GUARD" "$cfg" 2>/dev/null; then
       return 0
     fi
     if [ "$DRY_RUN" = "yes" ]; then
-      echo "[dry-run] append Espalier map-guard block to .codex/config.toml"
+      echo "[dry-run] append Espalier map-guard block to $cfg"
       return 0
     fi
-    [ -s .codex/config.toml ] && printf '\n' >> .codex/config.toml
-    cat >> .codex/config.toml << 'CODEXMAPGUARD'
+    [ -s "$cfg" ] && printf '\n' >> "$cfg"
+    cat >> "$cfg" << 'CODEXMAPGUARD'
 # >>> ESPALIER MAP GUARD v1 >>> (managed by espalier bootstrap — do not edit between markers)
 # Blocks writes outside espalier/maps/ while a /espalier-map session marker is
 # active (plan, don't do). Inert otherwise. Exit 2 + stderr blocks.
@@ -835,26 +977,27 @@ statusMessage = "Espalier map-session write guard"
 timeout = 5
 # <<< ESPALIER MAP GUARD v1 <<<
 CODEXMAPGUARD
-    log "  .codex/config.toml: map-guard block appended"
+    log "  $cfg: map-guard block appended"
   }
-  if [ -f .codex/config.toml ] && grep -q "ESPALIER HOOKS" .codex/config.toml 2>/dev/null; then
-    log "  .codex/config.toml already has Espalier hook block — skipping"
+  if [ -f "$cfg" ] && grep -q "ESPALIER HOOKS" "$cfg" 2>/dev/null; then
+    log "  $cfg already has Espalier hook block — skipping"
     _codex_map_guard_block
+    _cfg_finish
     return
   fi
   if [ "$DRY_RUN" = "yes" ]; then
-    echo "[dry-run] append Espalier hook block to .codex/config.toml"
+    echo "[dry-run] append Espalier hook block to $cfg"
     _codex_map_guard_block
     return
   fi
   mkdir -p .codex
-  if [ -f .codex/config.toml ]; then
-    cp .codex/config.toml ".codex/config.toml.espalier-backup-$(date +%s)"
-    ls -t .codex/config.toml.espalier-backup-* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
+  if [ -f "$cfg" ]; then
+    cp "$cfg" "$cfg.espalier-backup-$(date +%s)"
+    ls -t "$cfg".espalier-backup-* 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null || true
     # Appending [[hooks.*]] tables at EOF is always valid top-level TOML.
-    printf '\n' >> .codex/config.toml
+    printf '\n' >> "$cfg"
   fi
-  cat >> .codex/config.toml << 'CODEXHOOKS'
+  cat >> "$cfg" << 'CODEXHOOKS'
 # >>> ESPALIER HOOKS v1 >>> (managed by espalier bootstrap — do not edit between markers)
 # Same exit-code contract as Claude Code hooks: exit 2 + stderr blocks/feeds back.
 # Codex loads this project layer only when the project is trusted; run /hooks
@@ -878,8 +1021,9 @@ statusMessage = "Espalier push gate"
 timeout = 30
 # <<< ESPALIER HOOKS v1 <<<
 CODEXHOOKS
-  log "  .codex/config.toml: Espalier hook block appended"
+  log "  $cfg: Espalier hook block appended"
   _codex_map_guard_block
+  _cfg_finish
 }
 
 # --- Stage 8c: .codex/agents/*.toml sub-agents (codex) ------------------------
@@ -969,7 +1113,11 @@ stage_copilot_instructions() {
     return
   fi
   mkdir -p .github
-  cat >> .github/copilot-instructions.md << 'COPILOTTMPL'
+  local dest=.github/copilot-instructions.md
+  if [ "$OUTSIDE" = "yes" ] && tracked .github/copilot-instructions.md; then
+    outside_skip .github/copilot-instructions.md; dest="$(mktemp)"
+  fi
+  cat >> "$dest" << 'COPILOTTMPL'
 
 ## Espalier
 
@@ -1023,6 +1171,7 @@ Espalier's skill files use Claude Code vocabulary in places; on Copilot apply th
   chat does not run hooks — the pipeline's in-skill gates still apply).
 - `$CLAUDE_PROJECT_DIR` in docs → the repo root (`git rev-parse --show-toplevel`).
 COPILOTTMPL
+  if [ "$dest" != .github/copilot-instructions.md ]; then cat "$dest"; rm -f "$dest"; else outside_excl /.github/copilot-instructions.md; fi
 }
 
 # --- Stage 8d: .github/agents/*.agent.md sub-agents (copilot) -----------------
@@ -1149,6 +1298,7 @@ stage_copilot_hooks() {
 }
 COPILOTHOOKS
   log "  wrote .github/hooks/espalier-gates.json"
+  outside_excl /.github/hooks/espalier-gates.json
 }
 
 # --- Stage 9: Squash-merge decision + post-merge dispatcher -----------------
@@ -1253,6 +1403,12 @@ ESPALIERCFG
     log "  wrote espalier/.espalier-config (review-round + rollback caps, default 3; canonical ref $CANON_REMOTE/$CANON_BRANCH; grep-only-paths default)"
   fi
 
+  # Outside mode (v0.30): record where the tree lives — the pipelines and
+  # espalier-pr.sh read this key to commit records into the outside repo.
+  if [ "$OUTSIDE" = "yes" ] && [ -n "$OUTSIDE_ROOT" ]; then
+    _append_config_key outside-root "$OUTSIDE_ROOT"
+  fi
+
   # Opt-in parallel push-gate sections (discovery proposed + human confirmed).
   # Append-if-missing only — a later hand-edit to the key survives re-bootstrap.
   if [ "$HOOK_PARALLEL_FLAG" = "yes" ]; then
@@ -1326,6 +1482,29 @@ ESPALIERCFG
   if [ -z "$HOOK_DST" ]; then
     return   # hooks dir unreachable — warning already emitted; check #20 will flag it
   fi
+
+  # Outside mode: a TRACKED hook file (a committed .husky/post-merge, a tracked
+  # core.hooksPath dir) is never edited — the dispatcher block is printed for the
+  # user to place; an untracked one is written and excluded locally.
+  if [ "$OUTSIDE" = "yes" ] && tracked "$HOOK_DST"; then
+    outside_skip "$HOOK_DST"
+    echo "----- post-merge dispatcher block -----"
+    cat << 'DISPATCHPRINT'
+# >>> ESPALIER_POSTMERGE_DISPATCH v1 >>>
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$ROOT" || exit 0
+[ -f espalier/hooks/drift-detect.sh ] && bash espalier/hooks/drift-detect.sh
+if [ "$(cat espalier/.merge-hook-decision 2>/dev/null)" = "installed" ]; then
+  [ -f espalier/hooks/post-merge-backlink.sh ] && bash espalier/hooks/post-merge-backlink.sh
+fi
+# <<< ESPALIER_POSTMERGE_DISPATCH v1 <<<
+DISPATCHPRINT
+    return
+  fi
+  case "$HOOK_DST" in
+    .git/*|*/.git/*) ;;                               # inside .git — never tracked
+    *) outside_excl "/${HOOK_DST#./}" ;;              # e.g. an untracked .husky/post-merge
+  esac
 
   HOOK_DST_PARENT=$(dirname "$HOOK_DST")
   if [ ! -d "$HOOK_DST_PARENT" ]; then
@@ -1438,6 +1617,22 @@ stage_codeowners() {
 }
 
 stage_gitignore() {
+  if [ "$OUTSIDE" = "yes" ]; then
+    # Outside mode: .gitignore, .gitattributes and CODEOWNERS are TRACKED files
+    # — editing them would commit espalier's presence. The ignore entries go to
+    # .git/info/exclude (the symlink is excluded whole, so the sidecars under it
+    # are covered; the *.bak pattern is the only one that lands elsewhere). The
+    # .ask-gaps.tsv union attribute is moot: that file sits in the outside repo,
+    # which this clone never merges. CODEOWNERS routing is a team mechanism and
+    # an outside install is per machine — skipped, with a line saying so.
+    log "Stage 10: outside mode — .git/info/exclude instead of .gitignore; .gitattributes + CODEOWNERS skipped"
+    # One definition: the hook script's base + platform lists (it reads
+    # espalier/.platforms, which Stage 9 has just written).
+    if [ "$DRY_RUN" = "yes" ]; then echo "[dry-run] .git/info/exclude += espalier-outside.sh exclude-defaults"
+    else bash "$OUTSIDE_SH" exclude-defaults "$PWD" >/dev/null; fi
+    [ -n "$CODEOWNERS_RULES$CODEOWNERS_WIKI" ] && log "  CODEOWNERS: skipped in outside mode (espalier/ is not in this repo)"
+    return
+  fi
   log "Stage 10: .gitignore/.gitattributes/CODEOWNERS append (idempotent + newline guard)"
   if [ "$DRY_RUN" = "yes" ]; then
     echo "[dry-run] append espalier cache + drift-sidecar entries to .gitignore"
@@ -1448,15 +1643,9 @@ stage_gitignore() {
   # commit-index cache + the five drift sidecars (.drift-state.tsv* glob also
   # covers mktemp temp files) + the dep-audit cache. Each entry appended once,
   # with a newline guard.
-  printf '%s\n' \
-    "espalier/.commit-index.tsv" \
-    "espalier/.drift-state.tsv*" \
-    "espalier/.drift.log" \
-    "espalier/.drift-report.md" \
-    "espalier/.doctor-last-run" \
-    "espalier/.drift-overrides.log" \
-    "espalier/.dep-audit-cache" \
-    "*.pre-v0.*.bak" \
+  # The sidecar list has ONE definition — espalier-outside.sh (the outside
+  # root's .gitignore and repot's add/remove read the same one).
+  bash "$OUTSIDE_SH" gitignore-entries "$PWD" \
   | while IFS= read -r entry; do
       grep -qxF "$entry" .gitignore 2>/dev/null && continue
       if [ -s .gitignore ] && [ -n "$(tail -c1 .gitignore)" ]; then
@@ -1581,9 +1770,13 @@ stage_validate() {
 
   if want_claude; then
     run_check  1 "rules-load"          'ls .claude/rules/espalier-*.md' &
-    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit .claude/skills/espalier-map .claude/skills/espalier-maprun .claude/skills/espalier-simplify' &
+    run_check  2 "skills-load"         'ls -d .claude/skills/espalier-coding .claude/skills/espalier-review .claude/skills/espalier-security .claude/skills/espalier-testing .claude/skills/espalier-requirements .claude/skills/espalier-grill .claude/skills/espalier .claude/skills/espalier-fix .claude/skills/espalier-prune .claude/skills/espalier-doctor .claude/skills/espalier-ask .claude/skills/espalier-audit .claude/skills/espalier-map .claude/skills/espalier-maprun .claude/skills/espalier-simplify .claude/skills/espalier-repot' &
     run_check  3 "agents-load"         'ls .claude/agents/harness-coder.md .claude/agents/harness-reviewer.md .claude/agents/harness-security.md' &
-    run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
+    if [ "$OUTSIDE" = "yes" ]; then
+      run_check  4 "hooks-configured (outside: settings.local.json)" 'grep -q "espalier/hooks" .claude/settings.local.json' &
+    else
+      run_check  4 "hooks-configured"    'grep -q "espalier/hooks" .claude/settings.json' &
+    fi
     if gf; then
       skip_check 5 "symlinks-valid" "pending greenfield Pass 2"
     else
@@ -1598,7 +1791,9 @@ stage_validate() {
   fi
   run_check  6 "hooks-executable"    'test -x espalier/hooks/post-edit-wrapper.sh && test -x espalier/hooks/pre-push-gate.sh && test -x espalier/hooks/pre-push-gate-wrapper.sh' &
   run_check  7 "state-template"      'test -f espalier/changes/_template/pipeline-state.md' &
-  if want_claude; then
+  if want_claude && [ "$OUTSIDE" = "yes" ]; then
+    run_check  8 "claudemd-updated (outside: CLAUDE.local.md)" 'grep -q "## Espalier" CLAUDE.local.md' &
+  elif want_claude; then
     run_check  8 "claudemd-updated"    'grep -q "## Espalier" CLAUDE.md' &
   else
     skip_check 8 "claudemd-updated" "claude not targeted"
@@ -1628,9 +1823,19 @@ stage_validate() {
   run_check 17 "merge-decision"      'grep -qE "^(not-needed|installed|fuzzy-allowed|skip-only|never-ask|ask-later)$" espalier/.merge-hook-decision' &
   run_check 18 "hook-template-copy"  'test -f espalier/hooks/post-merge-backlink.sh && test -x espalier/hooks/post-merge-backlink.sh' &
   run_check 19 "lookup-helpers"      'test -f espalier/hooks/lookup-helpers.sh' &
-  run_check 20 "post-merge-dispatcher" '_hd=$(git rev-parse --git-path hooks 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
+  if [ "$OUTSIDE" = "yes" ] && grep -q "post-merge" espalier/.outside-skipped 2>/dev/null; then
+    skip_check 20 "post-merge-dispatcher" "tracked hook file left alone (outside mode) — block printed at install"
+  else
+    run_check 20 "post-merge-dispatcher" '_hd=$(git rev-parse --git-path hooks 2>/dev/null); [ -n "$_hd" ] || _hd=.git/hooks; grep -qE "ESPALIER_POSTMERGE_DISPATCH" "$_hd/post-merge" 2>/dev/null || grep -qE "ESPALIER_POSTMERGE_DISPATCH" .husky/post-merge 2>/dev/null' &
+  fi
   run_check 21 "rebuild-script"      'test -x espalier/hooks/rebuild-commit-index.sh' &
-  run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
+  if [ "$OUTSIDE" = "yes" ]; then
+    # Outside mode: the whole symlink is excluded locally, and it must resolve
+    # into a root that names THIS project.
+    run_check 22 "gitignore-cache (outside: exclude + link)" '_ex=$(git rev-parse --git-path info/exclude); grep -qxF "/espalier" "$_ex" && [ -L espalier ] && _r=$(cd -P espalier && cd .. && pwd -P) && [ -f "$_r/.espalier-origin" ] && [ "$(head -1 "$_r/.espalier-origin")" = "$(pwd -P)" ]' &
+  else
+    run_check 22 "gitignore-cache"     'grep -qxF "espalier/.commit-index.tsv" .gitignore' &
+  fi
   run_check 23 "rebuild-runs"        'bash espalier/hooks/rebuild-commit-index.sh && test -f espalier/.commit-index.tsv' &
   run_check 24 "cache-tsv-format"    '[ ! -s espalier/.commit-index.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.commit-index.tsv' &
   run_check 26 "drift-state-format"  '[ ! -s espalier/.drift-state.tsv ] || awk -F"\t" "NF != 4 { exit 1 }" espalier/.drift-state.tsv' &
@@ -1697,11 +1902,19 @@ stage_validate() {
   run_check 46 "layer-boundaries-hook (fix: Phase 2 writes it; --lang=unsupported writes a no-op)" 'test -f espalier/hooks/check-layer-boundaries.sh && test -x espalier/hooks/check-layer-boundaries.sh' &
   # 47-51: codex wiring (skip-rendered when copilot alone keeps numbering contiguous).
   if want_codex; then
-    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit .agents/skills/espalier-map .agents/skills/espalier-maprun .agents/skills/espalier-simplify' &
+    run_check 47 "codex-skills-load"   'ls -d .agents/skills/espalier-coding .agents/skills/espalier-review .agents/skills/espalier-security .agents/skills/espalier-testing .agents/skills/espalier-requirements .agents/skills/espalier-grill .agents/skills/espalier .agents/skills/espalier-fix .agents/skills/espalier-prune .agents/skills/espalier-doctor .agents/skills/espalier-ask .agents/skills/espalier-audit .agents/skills/espalier-map .agents/skills/espalier-maprun .agents/skills/espalier-simplify .agents/skills/espalier-repot' &
     run_check 48 "codex-symlinks-valid" '[ -L .agents/skills/espalier ] && [ -e .agents/skills/espalier ]' &
     run_check 49 "codex-agents-toml"   'grep -q "^name = \"harness-coder\"" .codex/agents/harness-coder.toml && grep -q "^name = \"harness-reviewer\"" .codex/agents/harness-reviewer.toml && grep -q "^name = \"harness-security\"" .codex/agents/harness-security.toml' &
-    run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
-    run_check 51 "codex-agentsmd"      'grep -q "## Espalier" AGENTS.md' &
+    if [ "$OUTSIDE" = "yes" ] && grep -qxF ".codex/config.toml" espalier/.outside-skipped 2>/dev/null; then
+      skip_check 50 "codex-hooks-configured" "tracked file left alone (outside mode) — blocks printed at install"
+    else
+      run_check 50 "codex-hooks-configured" 'grep -q "espalier/hooks" .codex/config.toml' &
+    fi
+    if [ "$OUTSIDE" = "yes" ] && grep -qxF "AGENTS.md" espalier/.outside-skipped 2>/dev/null; then
+      skip_check 51 "codex-agentsmd" "tracked file left alone (outside mode) — section printed at install"
+    else
+      run_check 51 "codex-agentsmd"      'grep -q "## Espalier" AGENTS.md' &
+    fi
   elif want_copilot; then
     skip_check 47 "codex-skills-load"     "codex not targeted"
     skip_check 48 "codex-symlinks-valid"  "codex not targeted"
@@ -1711,11 +1924,15 @@ stage_validate() {
   fi
   # 52-56: copilot wiring (only when copilot is a target platform).
   if want_copilot; then
-    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit .github/skills/espalier-map .github/skills/espalier-maprun .github/skills/espalier-simplify' &
+    run_check 52 "copilot-skills-load"  'ls -d .github/skills/espalier-coding .github/skills/espalier-review .github/skills/espalier-security .github/skills/espalier-testing .github/skills/espalier-requirements .github/skills/espalier-grill .github/skills/espalier .github/skills/espalier-fix .github/skills/espalier-prune .github/skills/espalier-doctor .github/skills/espalier-ask .github/skills/espalier-audit .github/skills/espalier-map .github/skills/espalier-maprun .github/skills/espalier-simplify .github/skills/espalier-repot' &
     run_check 53 "copilot-symlinks-valid" '[ -L .github/skills/espalier ] && [ -e .github/skills/espalier ]' &
     run_check 54 "copilot-agents"       'grep -q "^name: harness-coder" .github/agents/harness-coder.agent.md && grep -q "^name: harness-reviewer" .github/agents/harness-reviewer.agent.md && grep -q "^name: harness-security" .github/agents/harness-security.agent.md' &
     run_check 55 "copilot-hooks-json"   'python3 -c "import json; json.load(open(\".github/hooks/espalier-gates.json\"))" && grep -q "copilot-hook-adapter" .github/hooks/espalier-gates.json && test -x espalier/hooks/copilot-hook-adapter.sh' &
-    run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
+    if [ "$OUTSIDE" = "yes" ] && grep -qxF ".github/copilot-instructions.md" espalier/.outside-skipped 2>/dev/null; then
+      skip_check 56 "copilot-instructions" "tracked file left alone (outside mode) — section printed at install"
+    else
+      run_check 56 "copilot-instructions" 'grep -q "## Espalier" .github/copilot-instructions.md' &
+    fi
   fi
   # 57-65: base checks (57-58 v0.16.0 multi-dev floor, 59-60 v0.18.0 map
   # lane, 61-62 v0.19.0 run lane, 63 v0.24.0 simplify lane, 64-66 v0.25.0,
@@ -1724,11 +1941,21 @@ stage_validate() {
   # quality-first context) — run
   # UNCONDITIONALLY, regardless of --platforms; appended after
   # the platform blocks so the shipped IDs 47-56 stay stable.
-  run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
+  if [ "$OUTSIDE" = "yes" ]; then
+    # Outside mode: no .gitattributes edit; the outside root must be a git repo
+    # with the config key naming it (the pipelines commit records there).
+    run_check 57 "gitattributes-union (outside: local repo + outside-root key)" '_r=$(cd -P espalier && cd .. && pwd -P); [ -d "$_r/.git" ] && [ -f "$_r/.espalier-origin" ] && grep -q "^outside-root: " espalier/.espalier-config' &
+  else
+    run_check 57 "gitattributes-union"  'grep -qxF "espalier/.ask-gaps.tsv merge=union" .gitattributes' &
+  fi
   run_check 58 "canonical-ref-keys"   'grep -qE "^canonical-remote: .+" espalier/.espalier-config && grep -qE "^canonical-branch: .+" espalier/.espalier-config' &
   if want_claude; then
     run_check 59 "map-skill"          'test -f .claude/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" .claude/skills/espalier-map/SKILL.md' &
-    run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh && grep -q "map-guard" .claude/settings.json' &
+    if [ "$OUTSIDE" = "yes" ]; then
+      run_check 60 "map-guard (outside: settings.local.json)" 'test -x espalier/hooks/map-guard.sh && grep -q "map-guard" .claude/settings.local.json' &
+    else
+      run_check 60 "map-guard"          'test -x espalier/hooks/map-guard.sh && grep -q "map-guard" .claude/settings.json' &
+    fi
     run_check 61 "maprun-skill"       'test -f .claude/skills/espalier-maprun/SKILL.md && grep -q "^name: espalier-maprun" .claude/skills/espalier-maprun/SKILL.md' &
   else
     run_check 59 "map-skill"          'test -f espalier/skills/espalier-map/SKILL.md && grep -q "^name: espalier-map" espalier/skills/espalier-map/SKILL.md' &
@@ -1823,6 +2050,18 @@ stage_validate() {
   return 0
 }
 
+# --- Outside mode: baseline commit --------------------------------------------
+# The outside root is its own repo; after the install (or a re-wire) its tree
+# is committed there so the history starts at the install, not at the first
+# pipeline run. Idempotent: nothing staged → nothing committed.
+stage_outside_commit() {
+  [ "$OUTSIDE" = "yes" ] || return 0
+  if [ "$DRY_RUN" = "yes" ]; then echo "[dry-run] espalier-outside.sh commit (baseline in the outside repo)"; return 0; fi
+  local r
+  r="$(bash "$OUTSIDE_SH" commit "$PWD" "chore(espalier): install $(basename "$PWD") (bootstrap)" 2>&1 | tail -1)" || true
+  log "Outside mode: outside repo — $r"
+}
+
 # --- Stage dispatcher --------------------------------------------------------
 
 case "$MODE" in
@@ -1842,6 +2081,7 @@ case "$MODE" in
     stage_copilot_hooks
     stage_merge_decision
     stage_gitignore
+    stage_outside_commit
     stage_validate
     ;;
   copy-only)
@@ -1864,6 +2104,7 @@ case "$MODE" in
     stage_copilot_hooks
     stage_merge_decision
     stage_gitignore
+    stage_outside_commit
     stage_validate
     ;;
   validate-only)
