@@ -43,6 +43,7 @@ Skipped from full pipeline:
 | `--rebuild-index` | Delete `espalier/.commit-index.tsv`, then run rebuild (forces fresh state). |
 | `--no-index` | Bypass reverse-lookup cache for this invocation only (debug). |
 | `--no-grill` | Skip the Stage 1 diagnosis grill for this invocation. |
+| `--simple` | The human-review lane: diagnose → spec → approval → fix → review → regression gate, then STOP with the fix uncommitted for a human to commit by hand. Records live in `espalier/.simple/{slug}/` (gitignored) and Approve deletes them; Stage 0 auto-link runs read-only (no index write, no back-link), no pre-flight, no security auditor, no commit, no push, no PR. Procedure: `espalier/skills/espalier/stages/simple.md` (shared with the full lane). |
 
 Env vars:
 - `ESPALIER_CACHE_THRESHOLD_MS=<ms>` — override the auto-build slow-scan threshold (default 1000ms; 0 = never warn). Legacy `HARNESS_CACHE_THRESHOLD_MS` also honored.
@@ -59,6 +60,7 @@ NO_INDEX="no"
 DO_BUILD_INDEX="no"
 DO_REBUILD_INDEX="no"
 GRILL_DISABLED="no"
+SIMPLE_MODE="no"
 
 # Walk tokens, extract flags
 # (Orchestrator parses argv; below is the variable contract — not literal bash)
@@ -67,6 +69,7 @@ case "$flag" in
   --caused-by)     CAUSED_BY_OVERRIDE="$next_arg" ;;
   --no-index)      NO_INDEX="yes" ;;
   --no-grill)      GRILL_DISABLED="yes" ;;
+  --simple)        SIMPLE_MODE="yes" ;;
   --build-index)   DO_BUILD_INDEX="yes" ;;
   --rebuild-index) DO_REBUILD_INDEX="yes" ;;
 esac
@@ -89,7 +92,7 @@ The remaining (flag-stripped) text becomes the bug description fed to Slug Deriv
 ## Slug & Path
 
 - Slug derivation: see Slug Derivation section below. Summary: sanitize bug input → kebab-case ASCII `{kebab}` (max 80 chars), then date-prefix → `{slug}` = `{YYYY-MM-DD}-{kebab}`; `--slug <name>` overrides literally; collision prompts user.
-- Path = `espalier/changes/fix/{slug}/` (e.g. `espalier/changes/fix/2026-06-02-npe-in-cart/`)
+- Path = `espalier/changes/fix/{slug}/` (e.g. `espalier/changes/fix/2026-06-02-npe-in-cart/`) — under `--simple`, `espalier/.simple/{slug}/` everywhere this file says `espalier/changes/fix/{slug}/` (the path rule of `stages/simple.md`).
 - All files inherit from `espalier/changes/_template/`.
 
 ## Slug Derivation
@@ -176,6 +179,9 @@ prior day. Glob existing dirs and compare the part after the `YYYY-MM-DD-`:
 ```bash
 shopt -s nullglob
 matches=(espalier/changes/fix/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-"${kebab}")
+# --simple: the simple folder instead — a simple run and a normal fix never
+# adopt each other (stages/simple.md); a FILED skeleton match is one line, not an adoption
+[ "$SIMPLE_MODE" = yes ] && matches=(espalier/.simple/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-"${kebab}")
 ```
 
 For each match read its `pipeline-state.md` Status (and tombstones at
@@ -224,10 +230,46 @@ rewrite that slug in every `## Follow-up Fixes` table — all in one commit).
 
 ## Before Starting
 
+### Install discovery (first step of every invocation)
+
+Same rule as `/espalier` (its "Install discovery" section): `espalier/` is a
+real directory or a gitignored symlink into
+`<parent>/espalier-main/<basename>/espalier` (outside mode, v0.30). When the
+symlink is missing, re-create it from the sibling root or stop:
+
+```bash
+if [ ! -e espalier ]; then
+  R="$(git rev-parse --show-toplevel)"
+  # The local git config remembers a non-default root (--outside=<dir> /
+  # --outside-name); the default sibling is the fallback.
+  M="$(git config --local --get espalier.outside-root 2>/dev/null)"
+  [ -n "$M" ] && [ -f "$M/.espalier-origin" ] || M="$(dirname "$R")/espalier-main/$(basename "$R")"
+  if [ -f "$M/.espalier-origin" ] && [ "$(head -1 "$M/.espalier-origin")" = "$R" ] && [ -d "$M/espalier" ]; then
+    [ -L espalier ] && rm -f espalier                      # a dangling link
+    ln -s "$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$M/espalier" "$R")" espalier
+    bash espalier/hooks/espalier-outside.sh discover "$R"   # rewrites the .git/info/exclude block + the remembered root
+    echo "relinked the outside install at $M"
+  else
+    echo "no espalier install — run /espalier-init first"
+    # STOP HERE. Nothing below can run without the tree.
+  fi
+fi
+```
+
+0. **Simple mode** (`SIMPLE_MODE=yes`): read
+   `espalier/skills/espalier/stages/simple.md` NOW, run its pre-checks
+   (unattended → refuse; dirty tree outside `espalier/` → refuse; dirty
+   `espalier/` → one line), and keep it resident for the run. It overrides
+   this file where it says so: the folder is `espalier/.simple/{slug}/`, the
+   Stage 0 pre-flight does not run, Stage 0 auto-link runs read-only, the
+   approval gate asks one question, the coder never runs git, Stage 4 is
+   the reviewer alone, and Stage 7 is its Final Gate (no split, no
+   back-link, no PR). Everything it does not mention runs as written below.
 1. Read `espalier/pipeline.md` for stage definitions (Stages 3-7 unchanged from /espalier).
 2. Check session resumption:
    ```bash
    find espalier/changes/fix -mindepth 2 -maxdepth 2 -name pipeline-state.md
+   # --simple: espalier/.simple/*/pipeline-state.md with `- Mode: simple` instead
    ```
    Resume is status-driven, not stage-driven: Resume any change whose
    `- Status:` is `IN_PROGRESS`, at whatever stage its `Current Stage:`
@@ -260,6 +302,9 @@ PARTIAL_FIX) is written at the end. Stage numbers in this lane: 0, 1, 3, 4, 5,
 6, 7 (2/8/9/10 are skipped — see the overview table; the gate only requires ≥ 7).
 
 ## Stage 0 Pre-Flight (drift + conventions + doctor)
+
+**Simple mode: this section does not run** — go straight to Stage 0
+Auto-Link Discovery (`stages/simple.md`). Otherwise:
 
 Run this BEFORE Stage 0 Auto-Link Discovery. Source the drift helpers:
 
@@ -330,6 +375,13 @@ merge), and the same fetch race guard run before the prompt.
 
 Stage 0 turns the bug input into a set of blamed commit SHAs (`SHAS` array),
 then resolves each to the change that introduced it.
+
+**Simple mode runs this stage READ-ONLY** (`stages/simple.md` → Fix lane
+Stage 0): blame, the lookup chain, and the linked-context read as written,
+`caused_by:` into the simple folder's `requirements.md` only — but no
+`_cache_append` (the `espalier/.commit-index.tsv` self-heal in Layers 1/2 is
+skipped; the cache is read, never written) and nothing written into the
+causing change's folder, here or at Stage 7.
 
 ### 0.1 Parse user input for a bug anchor
 
@@ -1183,9 +1235,27 @@ tests; the push gate compares against this.
 
 ## Stage 7: Push (with back-link)
 
+**Simple mode: Stage 7 is REPLACED by the Final Gate of
+`espalier/skills/espalier/stages/simple.md`** — a whole-tree `exit_gate`,
+`simple_brief`, one Approve / Request Changes / Abort question; nothing
+below (sweep, `record_commits`, `backlink_all`, `espalier-pr.sh`) runs, and
+a partial fix is stated in the brief rather than filed. Otherwise:
+
 ### 7.0 The split — code branch, espalier branch
 
 A fix ships as two pull requests exactly as a feat does; Stages 3–7 are shared.
+
+**Outside mode (v0.30 — `outside-root:` in `espalier/.espalier-config`).** The
+procedure below is run UNCHANGED; `espalier-pr.sh` reads the key and changes
+what the calls do: `project` / `project-sweep` / `sync` / `close` commit the
+named paths into the outside root's local git repo (via
+`espalier/hooks/espalier-outside.sh commit`) instead of projecting an espalier
+branch; `push` pushes the code branch only; `open` opens the code PR only and
+records the espalier side in `## Pull Requests` as
+`| espalier | local | — | local: <root> @ <sha> |`; `ci-scan` prints `n/a`.
+There is no espalier PR to merge and nothing to retire at Completion — the
+project tree never held the records. Say so in the fix summary: ONE PR
+link, and the outside root path with its commit.
 Do NOT stage `espalier/conventions/` or any other `espalier/` path into a code
 commit — the projection picks up everything under `espalier/`, and `git add`
 honours `.gitignore` so the per-clone sidecars stay out. (The legacy
@@ -1454,6 +1524,11 @@ Stage 7, it writes back to the partial fix's pipeline-state.md
 
 ## Completion
 
+**Simple mode** (`- Mode: simple` in the state file): none of this section
+runs — the Final Gate of `stages/simple.md` is the completion (Approve
+deletes `espalier/.simple/{slug}/`; nothing is projected, pushed, or
+opened).
+
 When Stage 7 passes:
 - Update own `pipeline-state.md` Status: COMPLETE (or PARTIAL_FIX if option 3).
 - **Map-charted fixes** (requirements.md frontmatter has
@@ -1480,6 +1555,10 @@ When Stage 7 passes:
   that the pushed branch holds byte-for-byte, so the next `git pull` after the
   espalier PR merges is not blocked by identical untracked files. A file it
   keeps is named; resolve it before the next pull.
+  **Outside mode:** the same `close` call commits the bookkeeping into the
+  outside root's local repo and prints `records are in <root> @ <sha>`; there
+  is no espalier PR and no local copies to retire. Present the code PR link
+  and that line instead of two PR links.
 - Summarize from `delivery-brief.md`: original cause, fix files, regression
   tests added, deviations ratified.
 - Report total rounds and any escalation gates tripped (even if user chose to override).

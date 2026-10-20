@@ -1133,3 +1133,71 @@ delivery_brief() {
   printf '%s\n' "$out"
   echo "delivery brief: $n_dev deviations, $n_round rounds, $n_commit commits, $n_pr PRs"
 }
+
+# simple_brief DIR — the `--simple` Final Gate's brief: write DIR/simple-brief.md
+# from the run's own records and the working tree (the change is uncommitted
+# in simple mode, so `git status` IS the change): requirement summary and
+# acceptance criteria, files changed (espalier/ excluded), the coding
+# report's file lines, every `- Commit:` suggested subject from the current
+# report and coding-log/, the Deviations block, the review record's last
+# VERDICT, the fix lane's last REGRESSION_VERIFIED line, and the ROUND /
+# HANDOFF / BLOCKED / ESCALATED / RESUMED rows. Copied, never authored; a
+# section with no source is one `none` line. Prints the path and one count
+# line. Exit 1 without a requirements.md.
+simple_brief() {
+  local dir="$1" out req cod state rev body files dev n_files n_dev n_round h_sum h_ac f
+  req="$dir/requirements.md"; cod="$dir/coding-report.md"; state="$dir/pipeline-state.md"
+  rev="$dir/review-record.md"; out="$dir/simple-brief.md"
+  [ -f "$req" ] || return 1
+  h_sum=$(grep -E '^##+ .*[Rr]equirement [Ss]ummary' "$req" 2>/dev/null | head -1)
+  [ -n "$h_sum" ] || h_sum=$(grep -E '^##+ .*(Goal|Symptom)' "$req" 2>/dev/null | head -1)
+  h_ac=$(grep -E '^##+ .*[Aa]cceptance [Cc]riteria' "$req" 2>/dev/null | head -1)
+  files=$(git -C "$_DS_ROOT" status --porcelain -- . ':(exclude)espalier/' 2>/dev/null)
+  dev=$(deviations_list "$dir")
+  n_files=$(printf '%s\n' "$files" | grep -c .)
+  n_dev=$(printf '%s\n' "$dev" | grep -c .)
+  n_round=$(grep -cE '^\| 4 \| ROUND [0-9]+ FAIL ' "$state" 2>/dev/null); n_round=${n_round:-0}
+  {
+    echo "# Simple Brief: $(basename "$dir")"
+    echo ""
+    echo "Assembled from the run's records and the working tree by \`simple_brief\` — copied, not authored. The change is UNCOMMITTED; nothing was pushed."
+    echo ""
+    echo "## What was asked"
+    body=""; [ -n "$h_sum" ] && body=$(_md_section "$req" "$h_sum" | grep -v '^[[:space:]]*$')
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Acceptance criteria"
+    body=""; [ -n "$h_ac" ] && body=$(_md_section "$req" "$h_ac" | grep -v '^[[:space:]]*$')
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Files changed (git status, espalier/ excluded — this is the change)"
+    if [ -n "$files" ]; then printf '%s\n' "$files"; else echo "none"; fi
+    echo ""
+    echo "## Files and tests (coding report)"
+    body=$(grep -E '^- (Files created|Files modified|Test files|Docs):' "$cod" 2>/dev/null)
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Suggested commit subjects (the coder's \`- Commit:\` lines — commit by hand)"
+    body=$( { grep -hE '^[[:space:]]*- Commit:' "$cod" 2>/dev/null
+              for f in "$dir"/coding-log/*.md; do [ -f "$f" ] && grep -hE '^[[:space:]]*- Commit:' "$f"; done
+            } | sed 's/^[[:space:]]*- Commit:[[:space:]]*//' | grep -v '^[[:space:]]*$' | awk '!seen[$0]++' | sed 's/^/- /')
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Deviations (the code vs the contract — reviewer-verified)"
+    if [ -n "$dev" ]; then printf '%s\n' "$dev"; else echo "none"; fi
+    echo ""
+    echo "## Verdict (last sentinel of the review record — the only gate in simple mode)"
+    body=$(grep '^VERDICT:' "$rev" 2>/dev/null | tail -1 | sed 's/^/- review: /')
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Regression verification (fix lane)"
+    body=$(grep '^- REGRESSION_VERIFIED:' "$cod" 2>/dev/null | tail -1)
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+    echo ""
+    echo "## Rounds, handoffs, blocks (Stage History)"
+    body=$(grep -E '^\| [0-9]+ \| (ROUND [0-9]+ FAIL|HANDOFF [0-9]+|BLOCKED [0-9]+|CHANGES REQUESTED|ESCALATED|RESUMED) ' "$state" 2>/dev/null)
+    if [ -n "$body" ]; then printf '%s\n' "$body"; else echo "none"; fi
+  } > "$out"
+  printf '%s\n' "$out"
+  echo "simple brief: $n_files files changed, $n_dev deviations, $n_round rounds"
+}

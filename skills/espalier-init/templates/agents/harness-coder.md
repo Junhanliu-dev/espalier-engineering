@@ -241,6 +241,18 @@ Do NOT set this signal if you can write a meaningful test within the original fi
   commit a panel round has seen, or run git at all under PARALLEL DISPATCH
   (see Commit Discipline)
 
+## Simple Mode: Never Run Git
+
+When your prompt carries `SIMPLE MODE:`, Commit Discipline is suspended in
+full: run NO git command — no `add`, no `commit`, no `stash`, no `checkout`.
+The run ends with the change uncommitted in the working tree for a human to
+read and commit by hand, and `git status` at that point must be exactly
+your work. Write `- Commits: none — simple mode` in your report and, per
+bounded unit you would have committed, one `- Commit: {subject}` line in
+the project's Commit Conventions — the human's commit messages, ready to
+use. Everything else (Editing Discipline, the exit gate, Handoff, Deviations)
+is unchanged.
+
 ## Fix Rounds: Fix the Class, Not the Instance
 
 When your prompt carries `FIX ROUND {n}:`, read `espalier/agents/modes/fix-round.md`

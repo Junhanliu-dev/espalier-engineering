@@ -83,6 +83,16 @@ After all generation and wiring is complete, validate end-to-end.
 | 69 | unknowns-channel | `drift-helpers.sh` defines `deviations_list`, `open_question_append`, `delivery_brief`, `_md_section`; the grill carries `Step 1.6`, espalier-requirements `## References`; the coder carries `### Deviations` + `- BLOCKED-ON-REQUIREMENT:`, the reviewer `[deviation]`, the auditor reads `### Deviations`; the stage files + fix SKILL carry `BLOCKED-ON-REQUIREMENT`, `deviations_list`, `delivery_brief` (greenfield Pass 1: pending) | Re-run bootstrap Stage 4 (hooks) + Stage 3 (pure copies); espalier-init Phase 2 for the agents — or migration #37 (a customised agent file missing its anchor is recorded in `espalier/.migrations-skipped`) |
 | 70 | ceiling-ledger | `espalier/skills/espalier-coding/references/platform-native.md` present (the ladder's rung-4 lookup); `espalier-stats.sh` carries the `ceilings: markers=` ledger; the simplify SKILL hands scouts `CEILING MARKERS`; the grill counts `Over-specified mechanism`; the coder carries the `ceiling:` marker rule and names `platform-native.md`; the reviewer carries `[ceiling]` and `shrink:` (greenfield Pass 1: pending) | Re-run bootstrap Stage 3 (pure copies) + Stage 4 (hooks); espalier-init Phase 2 for the agents — or migration #38 (a customised agent file missing its anchor is recorded in `espalier/.migrations-skipped`) |
 
+**Outside mode (v0.30, `--outside` / `/espalier-repot`)** keeps every check
+number and total; the checks that read a tracked file read its local-only
+counterpart instead: 4 and 60 read `.claude/settings.local.json`, 8 reads
+`CLAUDE.local.md`, 22 asserts `/espalier` in `.git/info/exclude` and a symlink
+resolving into a root whose `.espalier-origin` names this project, 57 asserts
+`outside-root:` names a directory with its own `.git` and `.espalier-origin`,
+and 20 / 50 / 51 / 56 also accept a path recorded in `espalier/.outside-skipped`
+(a tracked instruction or hook file bootstrap left alone). Checks 2 / 47 / 52
+include the `espalier-repot` skill link.
+
 When copilot is targeted WITHOUT codex, checks 47-51 print as `OK … (skipped — codex not targeted)` so numbering stays contiguous; totals: 60 (claude-only) / 65 (+codex) / 70 (+copilot); 57-70 run on every platform set.
 
 **Policy 3 — staleness tiers (check #25):** an artifact's age is measured from

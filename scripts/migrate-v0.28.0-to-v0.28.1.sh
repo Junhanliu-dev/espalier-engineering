@@ -58,6 +58,7 @@ if [ -z "$PLUGIN_DIR" ]; then
 fi
 [ -n "$PLUGIN_DIR" ] || die "cannot locate the plugin. Pass --plugin-dir=<espalier-engineering root>."
 PATCH="$PLUGIN_DIR/scripts/patches/v0.28.0-to-v0.28.1.patch"
+TPL_DIR="$PLUGIN_DIR/skills/espalier-init/templates"   # the CURRENT templates: a file identical to one is past this trim
 [ -f "$PATCH" ] || die "plugin dir '$PLUGIN_DIR' is not v0.28.1 (no scripts/patches/v0.28.0-to-v0.28.1.patch)."
 SKIPFILE="espalier/.migrations-skipped"
 
@@ -96,7 +97,7 @@ for piece in pieces:
     dst = installed(rel)
     n += 1
     if dst is None:
-        manifest.append((n, rel, "unmapped", 0)); continue
+        manifest.append((n, rel, "unmapped", 0, rel)); continue
     body = piece.split("\n", 1)[1]
     hdr = "diff --git a/%s b/%s\n" % (dst, dst)   # a/ b/ prefixes: git apply strips one component
     lines = body.split("\n")
@@ -136,9 +137,9 @@ for piece in pieces:
     if hunks and hunks[-1] and hunks[-1][-1] == "": hunks[-1].pop()
     for k, h in enumerate(hunks, 1):
         open(os.path.join(work, "%d.%d.patch" % (n, k)), "w", encoding="utf-8").write(hdr + "\n".join(pre) + "\n" + "\n".join(h) + "\n")
-    manifest.append((n, dst, status, len(hunks)))
+    manifest.append((n, dst, status, len(hunks), rel))
 with open(os.path.join(work, "manifest"), "w") as f:
-    for n, dst, st, hk in manifest: f.write("%d\t%s\t%s\t%d\n" % (n, dst, st, hk))
+    for n, dst, st, hk, rel in manifest: f.write("%d\t%s\t%s\t%d\t%s\n" % (n, dst, st, hk, rel))
 PYEND
 [ -s "$WORK/manifest" ] || die "the shipped patch names no template file — refusing to guess."
 
@@ -155,9 +156,13 @@ hunk_state() {
   elif git apply --check --whitespace=nowarn "$1" >/dev/null 2>&1; then echo apply
   else echo none; fi
 }
-classify() {  # $1 = file index, $2 = installed path, $3 = status from python, $4 = hunk count
+classify() {  # $1 = file index, $2 = installed path, $3 = status from python, $4 = hunk count, $5 = template-relative path
   [ -f "$2" ] || { echo absent; return; }
   if grep -qF "v0.28.1-trim-$2:" "$SKIPFILE" 2>/dev/null; then echo recorded; return; fi
+  # A file byte-identical to the CURRENT plugin template is past this trim
+  # by construction (a later release moved the template on, and a fresh init
+  # or the chain landed it) — "done", whatever the v0.28.1 hunks say.
+  if [ -f "$TPL_DIR/$5" ] && cmp -s "$TPL_DIR/$5" "$2"; then echo done; return; fi
   [ "$3" = ok ] || { echo skip; return; }
   local k st any_apply=no
   for k in $(seq 1 "$4"); do
@@ -167,9 +172,9 @@ classify() {  # $1 = file index, $2 = installed path, $3 = status from python, $
   [ "$any_apply" = yes ] && echo apply || echo done
 }
 PLAN=""; N_APPLY=0; N_SKIP=0
-while IFS=$'\t' read -r n dst st hk; do
+while IFS=$'\t' read -r n dst st hk rel; do
   [ "$st" = unmapped ] && continue
-  c=$(classify "$n" "$dst" "$st" "$hk")
+  c=$(classify "$n" "$dst" "$st" "$hk" "$rel")
   PLAN="$PLAN
 $n	$dst	$c	$hk"
   case "$c" in apply) N_APPLY=$((N_APPLY+1)) ;; skip) N_SKIP=$((N_SKIP+1)) ;; esac

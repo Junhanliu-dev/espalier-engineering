@@ -17,6 +17,15 @@ route into it rather than through it:
   integration branch, and relays worker questions to the human. Stages 7–10
   remain a deliberate human act on the assembled branch. See
   `espalier/skills/espalier-maprun/SKILL.md`.
+- `--simple` (a MODE of `/espalier` and `/espalier-fix`, not a lane) — the
+  human-review run: Stages 1–4 as below (the gate asks one question, Stage 4
+  is the reviewer alone), Stages 5/6 as SKIPPED rows, then a Final Gate in
+  place of 7–10: whole-tree exit gate, an assembled brief, Approve /
+  Request Changes / Abort. The code stays UNCOMMITTED for a human to commit
+  by hand; the records live in `espalier/.simple/{slug}/` (gitignored) and
+  Approve deletes them. No Stage 0 pre-flight, no certificate, no
+  convention or drift write, no sweep, no push, no PR. Procedure:
+  `espalier/skills/espalier/stages/simple.md`.
 - `/espalier-simplify` — the evidence-first simplification survey of the
   EXISTING code. Read-only: it ranks accidental complexity with a proof
   record per candidate into `espalier/wiki/simplify-survey.md` and files
@@ -25,6 +34,16 @@ route into it rather than through it:
   coder retires the whole boundary, the panel re-proves every retired name,
   and Completion flags the docs that described it for `/espalier-prune`. See
   `espalier/skills/espalier-simplify/SKILL.md`.
+- `/espalier-repot` — moves the install between **inside mode** (`espalier/`
+  a tracked directory; Stage 7 projects records onto an espalier PR) and
+  **outside mode** (v0.30: the tree lives at
+  `<parent>/espalier-main/<basename>/espalier/` in its own local git repo with
+  no remote; the project holds a gitignored symlink and tracks NOTHING
+  espalier-related). `/espalier-init --outside` installs outside from the
+  start. In outside mode `espalier-pr.sh` commits records into that local repo
+  instead of projecting an espalier branch — the code PR is the only PR, and
+  the espalier row of `## Pull Requests` reads `local: <root> @ <sha>`. See
+  `espalier/skills/espalier-repot/SKILL.md`.
 
 ## Stages
 
@@ -97,7 +116,7 @@ Protocol). The eleven headings below are frozen: `pre-push-gate.sh`,
 - **Human checkpoint:** confirm the push target — SKIPPED when `- Push-Target:` was pre-authorized at the approval gate (`ASK` or missing → prompt here)
 - **Commits:** the coder's commits are pushed as made — the pipeline never squashes or rebases them (squash-merge is the pull request's policy; the post-merge hook maps it back); code left uncommitted is committed by path under the report's message. The change's `espalier/` paths do NOT ride the code branch: they are projected onto a sibling branch (`{type}/{slug}-espalier`) by `espalier/hooks/espalier-pr.sh project`
 - **Doc sweep:** `harness-reviewer` in `WIKI SWEEP:` mode (`espalier/agents/modes/wiki-sweep.md`) reads this change's diff against `espalier/wiki/` + `espalier/rules/` and patches what the diff falsified — additive only, every patch citing a hunk, deletions proposed in `doc-patches.md` and never applied; skipped when the diff touches no source file
-- **Pull requests:** `espalier-pr.sh open` opens BOTH against the canonical branch — siblings, never a stack (GitHub closes a child PR when its base branch is deleted, irrecoverably). Recorded in `## Pull Requests`. No `gh` → exit 5, warn, continue: the pipeline never blocks on the forge
+- **Pull requests:** `espalier-pr.sh open` opens BOTH against the canonical branch — siblings, never a stack (GitHub closes a child PR when its base branch is deleted, irrecoverably). Recorded in `## Pull Requests`. No `gh` → exit 5, warn, continue: the pipeline never blocks on the forge. Outside mode (`outside-root:` in `.espalier-config`): the code PR only; the records are a commit in the outside repo (`espalier-pr.sh` handles both modes — the procedure is unchanged)
 - **Output:** `## Commits` rows — one per commit in `Base-Ref..HEAD` (Stage 7, SHA, files) in pipeline-state.md (`record_commits`) — read by `/espalier-fix` reverse lookup, written BEFORE the projection so they ride the espalier PR; the convention index projected with the records; the PARTIAL_FIX reverse-link when applicable
 - **Procedure:** espalier skill → stages/7-10-delivery.md
 
